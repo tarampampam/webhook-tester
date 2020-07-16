@@ -1,0 +1,76 @@
+# Documentation: <https://github.com/golangci/golangci-lint#config-file>
+
+run:
+  timeout: 2m
+  skip-dirs:
+    - .github
+    - .git
+
+linters-settings:
+  govet:
+    check-shadowing: false
+  golint:
+    min-confidence: 0.2
+  gocyclo:
+    min-complexity: 18
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+  misspell:
+    locale: US
+  lll:
+    line-length: 120
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose # Checks whether HTTP response body is closed successfully
+    - deadcode # Finds unused code
+    - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
+    - dupl # Tool for code clone detection
+    - errcheck # Errcheck is a program for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases
+    - funlen # Tool for detection of long functions
+    - gochecknoinits # Checks that no init functions are present in Go code
+    - goconst # Finds repeated strings that could be replaced by a constant
+    - gocritic # The most opinionated Go source code linter
+    - gocyclo # Computes and checks the cyclomatic complexity of functions
+    - gofmt # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
+    - goimports # Goimports does everything that gofmt does. Additionally it checks unused imports
+    - gomnd # An analyzer to detect magic numbers
+    - goprintffuncname # Checks that printf-like functions are named with `f` at the end
+    - gosec # Inspects source code for security problems
+    - gosimple # Linter for Go source code that specializes in simplifying a code
+    - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
+    - ineffassign # Detects when assignments to existing variables are not used
+    - interfacer # Linter that suggests narrower interface types
+    - lll # Reports long lines
+    - misspell # Finds commonly misspelled English words in comments
+    - nakedret # Finds naked returns in functions greater than a specified function length
+    - rowserrcheck # Checks whether Err of rows is checked successfully
+    - scopelint # Scopelint checks for unpinned variables in go programs
+    - staticcheck # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
+    - structcheck # Finds unused struct fields
+    - golint # Golint differs from gofmt. Gofmt reformats Go source code, whereas golint prints out style mistakes
+    - stylecheck # Stylecheck is a replacement for golint
+    - typecheck # Like the front-end of a Go compiler, parses and type-checks Go code
+    - unconvert # Remove unnecessary type conversions
+    - unparam # Reports unused function parameters
+    - unused # Checks Go code for unused constants, variables, functions and types
+    - varcheck # Finds unused global variables and constants
+    - whitespace # Tool for detection of leading and trailing whitespace
+    - godox # Tool for detection of FIXME, TODO and other comment keywords
+    - gochecknoglobals # Checks that no globals are present in Go code
+    - gocognit # Computes and checks the cognitive complexity of functions
+    - prealloc # Finds slice declarations that could potentially be preallocated
+    - wsl # Whitespace Linter - Forces you to use empty lines!
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
+        - funlen
+        - scopelint
+        - gocognit

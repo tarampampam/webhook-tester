@@ -1,0 +1,138 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - '**'
+  pull_request:
+
+jobs:
+  gofmt:
+    name: Run gofmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Run Gofmt
+        run: test -z "$(gofmt -l .)"
+
+  goimports:
+    name: Run goimports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install goimports
+        run: go get golang.org/x/tools/cmd/goimports
+
+      - name: Update PATH environment variable
+        run: echo "::set-env name=PATH::$HOME/go/bin:$PATH"
+
+      - name: Run goimports
+        run: command -v goimports && test -z "$(goimports -d .)"
+
+      - name: Show diff
+        if: failure()
+        run: goimports -d .
+
+  lint:
+    name: Run linters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Run GolangCI-Lint # https://github.com/golangci/golangci-lint
+        run: docker run --rm -t -v $(pwd):/app -w /app golangci/golangci-lint:v1.24-alpine golangci-lint run -v
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Run Unit tests
+        run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
+
+      - name: Upload Coverage report to CodeCov
+        continue-on-error: true
+        uses: codecov/codecov-action@v1.0.10 # https://github.com/codecov/codecov-action
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: /tmp/coverage.txt
+          fail_ci_if_error: false
+
+  build:
+    name: Build for ${{ matrix.os }} and execute
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, windows, darwin]
+    needs: [gofmt, goimports, lint, test]
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Generate version value
+        run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
+
+      - name: Build application
+        env:
+          GOOS: ${{ matrix.os }}
+        run: go build -ldflags="-s -w -X webhook-tester/version.version=${APP_VERSION}" -o /tmp/webhook-tester .
+
+      - name: Try to execute
+        if: matrix.os == 'linux'
+        run: /tmp/webhook-tester serve --listen 0.0.0.0 --port 8080 --prefix "foobar" &
+
+      - name: Send request using application
+        if: matrix.os == 'linux'
+        run: curl -v --fail http://127.0.0.1:8080/foobar/https/httpbin.org/json
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: webhook-tester
+          path: /tmp/webhook-tester
+
+  image:
+    name: Build and use docker image
+    runs-on: ubuntu-latest
+    needs: [gofmt, goimports, lint, test]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Build image
+        run: docker build -t image:local --build-arg "APP_VERSION=${GITHUB_SHA}" -f ./Dockerfile .
+
+      - name: Run image
+        run: docker run --rm -d -p "8080:8080/tcp" image:local serve --listen 0.0.0.0 --port 8080 --prefix "foobar"
+
+      - name: Send request using application in container
+        run: curl -v --fail http://127.0.0.1:8080/foobar/https/httpbin.org/json

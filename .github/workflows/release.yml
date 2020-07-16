@@ -1,0 +1,81 @@
+name: release
+
+on:
+  release: # Docs: <https://help.github.com/en/articles/events-that-trigger-workflows#release-event-release>
+    types: [published]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, windows, darwin]
+        arch: [amd64, 386]
+        include:
+          - os: windows
+            ext: '.exe'
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Install dependencies
+        run: sudo apt-get install -y upx
+
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Generate version value
+        run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
+
+      - name: Generate target file name
+        run: echo "::set-env name=TARGET_FILE::webhook-tester-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+
+      - name: Build application
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: go build -ldflags="-s -w -X webhook-tester/version.version=${APP_VERSION}" -o "/tmp/${TARGET_FILE}" .
+
+      - name: Pack binary file
+        run: upx -7 "/tmp/${TARGET_FILE}"
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /tmp/${{ env.TARGET_FILE }}
+          asset_name: ${{ env.TARGET_FILE }}
+          tag: ${{ github.ref }}
+
+  docker-image:
+    name: Build docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Generate version value
+        run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
+
+      - name: Generate image tag value
+        run: echo "::set-env name=IMAGE_TAG::${GITHUB_REF##*/[vV]}" # `/refs/tags/v1.2.3` -> `1.2.3`
+
+      - name: Make docker login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_LOGIN }}" --password-stdin &> /dev/null
+
+      - name: Build image
+        run: docker build --build-arg "APP_VERSION=${APP_VERSION}" --tag "tarampampam/webhook-tester:${IMAGE_TAG}" --tag "tarampampam/webhook-tester:latest" -f ./Dockerfile .
+
+      - name: Push version image
+        run: docker push "tarampampam/webhook-tester:${IMAGE_TAG}"
+
+      - name: Push latest image
+        run: docker push "tarampampam/webhook-tester:latest"
