@@ -112,6 +112,7 @@ jobs:
         run: /tmp/webhook-tester version
 
       - uses: actions/upload-artifact@v2
+        if: matrix.os == 'linux'
         with:
           name: webhook-tester
           path: /tmp/webhook-tester
