@@ -13,10 +13,11 @@ import (
 
 type (
 	ServerSettings struct {
-		Address          string // TCP address to listen on
-		WriteTimeout     time.Duration
-		ReadTimeout      time.Duration
-		KeepAliveEnabled bool
+		Address                   string // TCP address to listen on
+		WriteTimeout              time.Duration
+		ReadTimeout               time.Duration
+		PublicAssetsDirectoryPath string
+		KeepAliveEnabled          bool
 	}
 
 	Server struct {
