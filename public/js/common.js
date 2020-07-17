@@ -12,11 +12,14 @@ requirejs.config({
         // Plugin for runtime loading VueJs components
         // Docs: <https://github.com/FranckFreiburger/http-vue-loader>
         httpVueLoader: 'https://cdn.jsdelivr.net/gh/FranckFreiburger/http-vue-loader@1.4.2/src/httpVueLoader.min',
+        // Parse, validate, manipulate, and display dates in javascript
+        // Docs: <http://momentjs.com/>
+        moment: 'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/moment.min',
     },
     shim: {
         Vue: {
             exports: 'Vue'
-        }
+        },
     },
 });
 

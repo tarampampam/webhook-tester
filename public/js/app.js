@@ -3,7 +3,7 @@
 /** @typedef {Vue} Vue */
 /** @typedef {Object} httpVueLoader */
 
-define(['Vue', 'httpVueLoader'], (Vue) => {
+define(['Vue', 'moment', 'axios', 'vue-loader'], (Vue, moment, axios) => {
     let isProduction = true;
 
     if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
@@ -13,6 +13,10 @@ define(['Vue', 'httpVueLoader'], (Vue) => {
     }
 
     Vue.prototype.$isProduction = Vue.$isProduction = isProduction;
+
+    // Extending Vue with additional tools/libs
+    Vue.prototype.$moment = Vue.$moment = moment;
+    Vue.prototype.$axios = Vue.$axios = axios;
 
     new Vue({
         el: '#app',
