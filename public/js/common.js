@@ -15,6 +15,9 @@ requirejs.config({
         // Parse, validate, manipulate, and display dates in javascript
         // Docs: <http://momentjs.com/>
         moment: 'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/moment.min',
+        // Modern copy to clipboard. No Flash. Just 2kb
+        // Docs: <https://clipboardjs.com>
+        clipboard: 'https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min',
     },
     shim: {
         Vue: {

@@ -3,7 +3,7 @@
 /** @typedef {Vue} Vue */
 /** @typedef {Object} httpVueLoader */
 
-define(['Vue', 'moment', 'axios', 'vue-loader'], (Vue, moment, axios) => {
+define(['Vue', 'moment', 'axios', 'clipboard', 'vue-loader'], (Vue, moment, axios, clipboard) => {
     let isProduction = true;
 
     if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
@@ -15,6 +15,7 @@ define(['Vue', 'moment', 'axios', 'vue-loader'], (Vue, moment, axios) => {
     Vue.prototype.$isProduction = Vue.$isProduction = isProduction;
 
     // Extending Vue with additional tools/libs
+    Vue.prototype.$clipboard = Vue.$clipboard = new clipboard('.btn');
     Vue.prototype.$moment = Vue.$moment = moment;
     Vue.prototype.$axios = Vue.$axios = axios;
 

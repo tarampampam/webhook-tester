@@ -1,5 +1,5 @@
 <template>
-    <div class="request-plate list-group-item list-group-item-action flex-column">
+    <div class="list-group-item list-group-item-action flex-column">
         <div class="d-flex w-100 justify-content-between">
             <h5 class="mb-1 text-nowrap">{{ ip }}<span
                 class="badge text-uppercase ml-2 http-method"
@@ -48,7 +48,7 @@
         mounted: function () {
             this.updateFormattedWhen();
 
-            this.intervalId = setInterval(() => this.updateFormattedWhen(), 500);
+            this.intervalId = setInterval(() => this.updateFormattedWhen(), 1000);
         },
 
         beforeDestroy: function () {
@@ -77,8 +77,7 @@
                 // <https://michaelnthiessen.com/pass-function-as-prop/>
                 this.$emit('on-delete', this.uuid);
 
-                //this.$destroy();
-                //this.$el.parentNode.removeChild(this.$el);
+                this.updateFormattedWhen();
             },
 
             updateFormattedWhen() {
@@ -91,10 +90,6 @@
 </script>
 
 <style scoped>
-    .request-plate {
-        cursor: pointer;
-    }
-
     .http-method {
         position: relative;
         top: -.15em;
