@@ -1,7 +1,8 @@
 <template>
     <div>
         <main-header
-            :current-web-hook-url="getCurrentWebHookURL()"
+            :current-web-hook-url="sessionRequestURI"
+            @on-new-url="newUrlHandler"
         ></main-header>
 
         <div class="container-fluid">
@@ -37,7 +38,7 @@
                 </div>
 
                 <main class="col-sm-7 col-md-8 col-xl-9 py-3 pl-md-4" role="main">
-                    <div v-if="false">
+                    <div v-if="getRequestsCount()">
                         <div class="row pt-2">
                             <requests-navigation class="col-6"></requests-navigation>
                             <settings class="col-6 text-right"></settings>
@@ -48,7 +49,7 @@
                     </div>
                     <div v-else>
                         <h4 class="mt-2">
-                            WebHook Tester allows you to easily test webhooks and other types of HTTP requests.
+                            WebHook Tester allows you to easily test webhooks and other types of HTTP requests
                         </h4>
                         <p class="text-muted">
                             Any requests sent to that URL are logged here instantly — you don't even have to refresh!
@@ -56,24 +57,24 @@
                         <hr/>
                         <p>Here's your unique URL that was created just now:</p>
                         <p>
-                            <code id="current-webhook-url-text">{{ getCurrentWebHookURL() }}</code>
+                            <code id="current-webhook-url-text">{{ sessionRequestURI }}</code>
                             <button class="btn btn-primary btn-sm ml-2"
                                     data-clipboard-target="#current-webhook-url-text">
                                 <i class="fas fa-copy mr-1"></i> Copy
                             </button>
                             <a target="_blank"
                                class="btn btn-primary btn-sm"
-                               :href="getCurrentWebHookURL()">
+                               :href="sessionRequestURI">
                                 <i class="fas fa-external-link-alt pr-1"></i> Open in a new tab
                             </a>
                         </p>
                         <p>
                             Send simple POST request (execute next command in your terminal without leaving this page):
                         <p>
-                            <code id="current-webhook-curl-text">
-                                $ curl -v -X POST -d "foo=bar" {{ getCurrentWebHookURL() }}
+                            <code>
+                                $ <span id="current-webhook-curl-text">curl -v -X POST -d "foo=bar" {{ sessionRequestURI }}</span>
                             </code>
-                            <button class="btn btn-primary btn-sm"
+                            <button class="btn btn-primary btn-sm ml-2"
                                     data-clipboard-target="#current-webhook-curl-text">
                                 <i class="fas fa-copy mr-1"></i> Copy
                             </button>
@@ -99,7 +100,17 @@
 
     'use strict';
 
+    const storageSessionUuidKey = 'session_uuid';
+
     module.exports = {
+        /**
+         * Force the Vue instance to re-render. Note it does not affect all child components, only the instance
+         * itself and child components with inserted slot content.
+         *
+         * @method
+         * @name $forceUpdate
+         */
+
         components: {
             'main-header': 'url:/vue/components/main-header.vue',
             'request-plate': 'url:/vue/components/request-plate.vue',
@@ -115,53 +126,162 @@
 
             return {
                 requests: {
-                    'cd5e695f-1784-4dcf-9b3f-ef66c9a0aaaa': {
-                        ip: '1.1.1.1',
-                        method: 'post',
-                        when: pastDate,
-                    },
-                    '69b9131e-1594-4836-af86-f2529fb7bbbb': {
-                        ip: '2.2.2.2',
-                        method: 'get',
-                        when: new Date,
-                    },
+                    // 'cd5e695f-1784-4dcf-9b3f-ef66c9a0aaaa': {
+                    //     ip: '1.1.1.1',
+                    //     method: 'post',
+                    //     when: pastDate,
+                    //     content: 'foo bar',
+                    //     url: 'https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar',
+                    //     hostname: 'some_host',
+                    //     headers: {
+                    //         "host": "foo.example.com",
+                    //         "user-agent": "curl\/7.58.0",
+                    //         "accept": "text\/html,application\/xhtml+xml",
+                    //    },
+                    // },
                 },
-                baseURL: '',
-                currentWebHookUuid: '',
+
+                session: {
+                    UUID: null,
+                },
             }
         },
 
         mounted() {
             document.getElementById('main-loader').remove();
-            this.baseURL = window.location.origin;
-            this.currentWebHookUuid = 'foobar';
+
+            this.initSession();
+        },
+
+        computed: {
+            /**
+             * @returns {String}
+             */
+            sessionRequestURI: function () {
+                let uuid = this.session.UUID === null
+                    ? '________-____-____-____-____________'
+                    : this.session.UUID;
+
+                return `${window.location.origin}/${uuid}`;
+            }
         },
 
         methods: {
+            initSession() {
+                const localSessionUUID = this.$session.getLocalSessionUUID();
+
+                /**
+                 * @param {Object.<string, recordedRequest>} requests
+                 */
+                const initSessionRequests = (requests) => {
+                    for (let uuid in requests) {
+                        if (requests.hasOwnProperty(uuid)) {
+                            let request = requests[uuid];
+
+                            this.requests[uuid] = {
+                                ip: request.ip,
+                                method: request.method.toLowerCase(),
+                                when: new Date(request.created_at_unix * 1000),
+                                content: request.content,
+                                url: request.url,
+                                hostname: request.hostname,
+                                headers: request.headers,
+                            };
+                        }
+                    }
+                };
+
+                const startNewSession = () => {
+                    this.$api.startNewSession()
+                        .then((newSessionData) => {
+                            this.session.UUID = newSessionData.uuid;
+                            this.$session.setLocalSessionUUID(newSessionData.uuid);
+
+                            this.$api.getAllSessionRequests(newSessionData.uuid)
+                                .then((requests) => {
+                                    initSessionRequests(requests);
+                                    this.$forceUpdate();
+                                })
+                                .catch((err) => this.$izitoast.error({title: `Cannot retrieve requests: ${err.message}`}))
+                        })
+                        .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
+                };
+
+                if (localSessionUUID !== null) {
+                    this.session.UUID = localSessionUUID;
+
+                    this.$api.getAllSessionRequests(localSessionUUID)
+                        .then((requests) => {
+                            initSessionRequests(requests);
+                            this.$forceUpdate();
+                        })
+                        .catch(() => startNewSession())
+                } else {
+                    startNewSession()
+                }
+            },
+
+            /**
+             * @returns {Number}
+             */
             getRequestsCount() {
                 return Object.keys(this.requests).length;
             },
 
-            getCurrentWebHookURL() {
-                return this.baseURL + '/' + this.currentWebHookUuid;
-            },
-
-            deleteAllRequests() {
+            clearRequests() {
                 for (let uuid in this.requests) {
                     if (this.requests.hasOwnProperty(uuid)) {
-                        this.deleteRequestHandler(uuid);
+                        delete this.requests[uuid];
                     }
                 }
             },
 
+            deleteAllRequests() {
+                this.$api.deleteAllSessionRequests(this.session.UUID)
+                    .then((status) => {
+                        if (status.success === true) {
+                            this.$izitoast.success({title: 'All requests successfully removed!'});
+                        } else {
+                            throw new Error(`I've got unsuccessful status`);
+                        }
+                    })
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove all requests: ${err.message}`}))
+
+                this.clearRequests();
+                this.$forceUpdate();
+            },
+
+            /**
+             * @param {String} uuid
+             */
             deleteRequestHandler(uuid) {
-                console.warn(`Removing request with UUID ${uuid}`);
+                this.$api.deleteSessionRequest(this.session.UUID, uuid)
+                    .then((status) => {
+                        if (status.success === true) {
+                            this.$izitoast.success({title: 'Request successfully removed!'});
+                        } else {
+                            throw new Error(`I've got unsuccessful status`);
+                        }
+                    })
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
 
                 delete this.requests[uuid];
-                // @TODO: Send request to the API for request deletion
 
                 this.$forceUpdate();
-            }
+            },
+
+            newUrlHandler() {
+                this.$api.startNewSession()
+                    .then((newSessionData) => {
+                        this.session.UUID = newSessionData.uuid;
+                        this.$session.setLocalSessionUUID(newSessionData.uuid);
+
+                        this.clearRequests();
+                        this.$forceUpdate();
+                        this.$izitoast.success({title: 'New session started!'});
+                    })
+                    .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
+            },
         }
     }
 </script>

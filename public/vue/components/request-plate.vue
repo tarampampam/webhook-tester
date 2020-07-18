@@ -22,7 +22,7 @@
         props: {
             uuid: {
                 type: String,
-                default: undefined,
+                default: null,
             },
             ip: {
                 type: String,
@@ -48,7 +48,7 @@
         mounted: function () {
             this.updateFormattedWhen();
 
-            this.intervalId = setInterval(() => this.updateFormattedWhen(), 1000);
+            this.intervalId = setInterval(() => this.updateFormattedWhen(), 150);
         },
 
         beforeDestroy: function () {
@@ -72,6 +72,7 @@
                 return 'badge-light';
             }
         },
+
         methods: {
             remove() {
                 // <https://michaelnthiessen.com/pass-function-as-prop/>

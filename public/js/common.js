@@ -18,10 +18,23 @@ requirejs.config({
         // Modern copy to clipboard. No Flash. Just 2kb
         // Docs: <https://clipboardjs.com>
         clipboard: 'https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min',
+        // Elegant, responsive, flexible and lightweight notification plugin with no dependencies
+        // Docs: <http://izitoast.marcelodolza.com/>
+        izitoast: 'https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min',
+    },
+    map: {
+        '*': {
+            // Allow the direct "css!" usage: 'css!/path/to/style'(.css)
+            // Docs: <https://github.com/guybedford/require-css>
+            css: 'https://cdnjs.cloudflare.com/ajax/libs/require-css/0.1.10/css.min.js'
+        }
     },
     shim: {
         Vue: {
             exports: 'Vue'
+        },
+        izitoast: {
+            deps: ['css!https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css']
         },
     },
 });

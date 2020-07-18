@@ -16,7 +16,7 @@
             <button class="btn btn-success my-2 my-sm-0 border-0" v-bind:data-clipboard-text="currentWebHookUrl">
                 <i class="fas fa-copy mr-1"></i> Copy URL
             </button>
-            <button class="btn btn-info my-2 ml-2 my-sm-0 border-0">
+            <button class="btn btn-info my-2 ml-2 my-sm-0 border-0" @click="newURL">
                 <i class="fas fa-plus mr-1"></i> New URL
             </button>
         </div>
@@ -35,6 +35,13 @@
                 default: 'URL was not defined',
             },
         },
+
+        methods: {
+            newURL() {
+                // <https://michaelnthiessen.com/pass-function-as-prop/>
+                this.$emit('on-new-url');
+            },
+        }
     }
 </script>
 

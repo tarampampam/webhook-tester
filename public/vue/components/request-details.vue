@@ -14,7 +14,7 @@
                     <tbody>
                     <tr>
                         <td>URL</td>
-                        <td><code><a href="#">http://web.hook.sh/d0ec4f7d-6b34-4ea9-b68b-81adc6c24671</a></code>
+                        <td><code><a href="#">https://foo.example.com/d0ec4f7d-6b34-4ea9-b68b-81adc6c24671</a></code>
                         </td>
                     </tr>
                     <tr>
