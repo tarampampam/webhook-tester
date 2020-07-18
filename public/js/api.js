@@ -1,10 +1,6 @@
 'use strict';
 
-/**
- * @typedef {{ip: String, hostname: String, method: String, content: String, headers:Object.<string, string>, url: String, created_at_unix: Number}} recordedRequest
- */
-
-define(['axios', 'session'], (axios, session) => {
+define(['axios'], (axios) => {
     /**
      * @returns {String}
      */
@@ -20,7 +16,7 @@ define(['axios', 'session'], (axios, session) => {
     };
 
     /**
-     * @returns {Promise<{version: String, limits: {max_requests: Number}}>}
+     * @returns {Promise<APISettings>}
      */
     const getAppSettings = () => {
         return new Promise((resolve, reject) => {
@@ -32,7 +28,7 @@ define(['axios', 'session'], (axios, session) => {
     };
 
     /**
-     * @returns {Promise<{uuid: String, response: {content: String, code: Number, content_type: String, delay_sec: Number, created_at_unix: Number}}>}
+     * @returns {Promise<APINewSession>}
      */
     const startNewSession = () => {
         return new Promise((resolve, reject) => {
@@ -46,7 +42,7 @@ define(['axios', 'session'], (axios, session) => {
     /**
      * @param {String} uuid
      *
-     * @returns {Promise<{success: Boolean}>}
+     * @returns {Promise<APIDeleteSession>}
      */
     const deleteSession = (uuid) => {
         return new Promise((resolve, reject) => {
@@ -60,7 +56,7 @@ define(['axios', 'session'], (axios, session) => {
     /**
      * @param {String} uuid
      *
-     * @returns {Promise<Object.<string, recordedRequest>>}
+     * @returns {Promise<Object.<string, APIRecordedRequest>>}
      */
     const getAllSessionRequests = (uuid) => {
         return new Promise((resolve, reject) => {
@@ -75,7 +71,7 @@ define(['axios', 'session'], (axios, session) => {
      * @param {String} sessionUUID
      * @param {String} requestUUID
      *
-     * @returns {Promise<recordedRequest>}
+     * @returns {Promise<APIRecordedRequest>}
      */
     const getSessionRequest = (sessionUUID, requestUUID) => {
         return new Promise((resolve, reject) => {
@@ -90,7 +86,7 @@ define(['axios', 'session'], (axios, session) => {
      * @param {String} sessionUUID
      * @param {String} requestUUID
      *
-     * @returns {Promise<{success: Boolean}>}
+     * @returns {Promise<APIDeleteSessionRequest>}
      */
     const deleteSessionRequest = (sessionUUID, requestUUID) => {
         return new Promise((resolve, reject) => {
@@ -104,7 +100,7 @@ define(['axios', 'session'], (axios, session) => {
     /**
      * @param {String} uuid
      *
-     * @returns {Promise<{success: Boolean}>}
+     * @returns {Promise<APIDeleteAllSessionRequests>}
      */
     const deleteAllSessionRequests = (uuid) => {
         return new Promise((resolve, reject) => {

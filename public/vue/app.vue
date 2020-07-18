@@ -100,8 +100,6 @@
 
     'use strict';
 
-    const storageSessionUuidKey = 'session_uuid';
-
     module.exports = {
         /**
          * Force the Vue instance to re-render. Note it does not affect all child components, only the instance
@@ -171,7 +169,7 @@
                 const localSessionUUID = this.$session.getLocalSessionUUID();
 
                 /**
-                 * @param {Object.<string, recordedRequest>} requests
+                 * @param {Object.<string, APIRecordedRequest>} requests
                  */
                 const initSessionRequests = (requests) => {
                     for (let uuid in requests) {
@@ -273,6 +271,7 @@
             newUrlHandler() {
                 this.$api.startNewSession()
                     .then((newSessionData) => {
+                        newSessionData.uuid
                         this.session.UUID = newSessionData.uuid;
                         this.$session.setLocalSessionUUID(newSessionData.uuid);
 
