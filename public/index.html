@@ -36,6 +36,75 @@
             background: rgba(255, 255, 250, .25);
             border-radius: 3px;
         }
+
+        .ml {
+            position: absolute;
+            top: calc(50% - 32px);
+            left: calc(50% - 32px);
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            perspective: 800px;
+        }
+
+        .ml .i1, .ml .i2, .ml .i3 {
+            position: absolute;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border-color: #efeffa;
+            border-style: solid;
+            border-width: 0;
+        }
+
+        .ml .i1 {
+            left: 0;
+            top: 0;
+            animation: rotate-one 1s linear infinite;
+            border-bottom-width: 3px;
+        }
+
+        .ml .i2 {
+            right: 0;
+            top: 0;
+            animation: rotate-two 1s linear infinite;
+            border-right-width: 3px;
+        }
+
+        .ml .i3 {
+            right: 0;
+            bottom: 0;
+            animation: rotate-three 1s linear infinite;
+            border-top-width: 3px;
+        }
+
+        @keyframes rotate-one {
+            0% {
+                transform: rotateX(35deg) rotateY(-45deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(35deg) rotateY(-45deg) rotateZ(360deg);
+            }
+        }
+
+        @keyframes rotate-two {
+            0% {
+                transform: rotateX(50deg) rotateY(10deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(50deg) rotateY(10deg) rotateZ(360deg);
+            }
+        }
+
+        @keyframes rotate-three {
+            0% {
+                transform: rotateX(35deg) rotateY(55deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(35deg) rotateY(55deg) rotateZ(360deg);
+            }
+        }
     </style>
 
     <!-- Preview: <https://bootswatch.com/darkly/> -->
@@ -60,8 +129,12 @@
     </div>
 </noscript>
 
-<div class="w-100 text-center mt-5" id="main-loader">
-    <span class="spinner-border spinner-border-sm mr-1"></span> Loading assets
+<div class="vh-100 d-flex justify-content-center align-items-center" id="main-loader">
+    <div class="ml">
+        <div class="i1"></div>
+        <div class="i2"></div>
+        <div class="i3"></div>
+    </div>
 </div>
 
 <div id="app"></div>

@@ -146,7 +146,7 @@
         },
 
         mounted() {
-            document.getElementById('main-loader').remove();
+            window.setTimeout(() => document.getElementById('main-loader').remove(), 150);
 
             this.initSession();
         },
@@ -165,29 +165,54 @@
         },
 
         methods: {
+            /**
+             * @returns {Promise<undefined>}
+             */
+            reloadRequests() {
+                return new Promise((resolve, reject) => {
+                    this.$api.getAllSessionRequests(this.session.UUID)
+                        .then((requests) => {
+                            for (let uuid in requests) {
+                                if (requests.hasOwnProperty(uuid)) {
+                                    let request = requests[uuid];
+
+                                    this.requests[uuid] = {
+                                        ip: request.ip,
+                                        method: request.method.toLowerCase(),
+                                        when: new Date(request.created_at_unix * 1000),
+                                        content: request.content,
+                                        url: request.url,
+                                        hostname: request.hostname,
+                                        headers: request.headers,
+                                        __updated: true,
+                                    };
+                                }
+                            }
+
+                            // remove non-updated objects and (or) special `__updated` property
+                            for (let uuid in this.requests) {
+                                if (this.requests.hasOwnProperty(uuid)) {
+                                    let request = this.requests[uuid];
+
+                                    if (request.hasOwnProperty('__updated') && request.__updated === true) {
+                                        delete request['__updated'];
+                                    } else {
+                                        delete this.requests[uuid];
+                                    }
+                                }
+                            }
+
+                            this.$forceUpdate();
+
+                            resolve();
+                        })
+                        .catch((err) => reject(err))
+                });
+
+            },
+
             initSession() {
                 const localSessionUUID = this.$session.getLocalSessionUUID();
-
-                /**
-                 * @param {Object.<string, APIRecordedRequest>} requests
-                 */
-                const initSessionRequests = (requests) => {
-                    for (let uuid in requests) {
-                        if (requests.hasOwnProperty(uuid)) {
-                            let request = requests[uuid];
-
-                            this.requests[uuid] = {
-                                ip: request.ip,
-                                method: request.method.toLowerCase(),
-                                when: new Date(request.created_at_unix * 1000),
-                                content: request.content,
-                                url: request.url,
-                                hostname: request.hostname,
-                                headers: request.headers,
-                            };
-                        }
-                    }
-                };
 
                 const startNewSession = () => {
                     this.$api.startNewSession()
@@ -195,11 +220,7 @@
                             this.session.UUID = newSessionData.uuid;
                             this.$session.setLocalSessionUUID(newSessionData.uuid);
 
-                            this.$api.getAllSessionRequests(newSessionData.uuid)
-                                .then((requests) => {
-                                    initSessionRequests(requests);
-                                    this.$forceUpdate();
-                                })
+                            this.reloadRequests()
                                 .catch((err) => this.$izitoast.error({title: `Cannot retrieve requests: ${err.message}`}))
                         })
                         .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
@@ -208,11 +229,7 @@
                 if (localSessionUUID !== null) {
                     this.session.UUID = localSessionUUID;
 
-                    this.$api.getAllSessionRequests(localSessionUUID)
-                        .then((requests) => {
-                            initSessionRequests(requests);
-                            this.$forceUpdate();
-                        })
+                    this.reloadRequests()
                         .catch(() => startNewSession())
                 } else {
                     startNewSession()
