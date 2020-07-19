@@ -4,10 +4,11 @@
 /** @typedef {Object} httpVueLoader */
 
 define(
-    ['Vue', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'vue-loader'],
-    (Vue, moment, axios, clipboard, izitoast, api, session) => {
-        let isProduction = true,
-            clip = new clipboard('.btn');
+    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'vue-loader'],
+    (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session) => {
+        let isProduction = true;
+
+        const clip = new clipboard('.btn');
 
         // <https://clipboardjs.com/#events>
         clip.on('error', function (e) {
@@ -23,6 +24,13 @@ define(
             isProduction = false;
         }
 
+        const router = new VueRouter({
+            mode: 'hash',
+            routes: [{path: `/`, name: 'index'}, {path: `/:sessionUUID?/:requestUUID?`, name: 'request', props: true}],
+        });
+
+        Vue.use(VueRouter);
+
         Vue.prototype.$isProduction = Vue.$isProduction = isProduction;
 
         // Extending Vue with additional tools/libs
@@ -33,7 +41,8 @@ define(
         Vue.prototype.$axios = Vue.$axios = axios;
         Vue.prototype.$api = Vue.$api = api;
 
-        new Vue({
+        return new Vue({
+            router,
             el: '#app',
             template: `<app></app>`,
             components: {

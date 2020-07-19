@@ -48,7 +48,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 	// create new session
 	apiRouter.
 		Handle("/session", stub.Handler(`{
-			"uuid": "aaaaaaaa-bbbb-cccc-dddd-000000000000",
+			"uuid": "%RAND_UUID%",
 			"response": {
 				"content": "\"foobar\"",
 				"code": 200,

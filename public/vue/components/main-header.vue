@@ -1,13 +1,13 @@
 <template>
     <header class="navbar navbar-expand flex-column flex-md-row flex-sm-row navbar-dark bg-primary">
-        <a href="#" class="navbar-brand mr-0 mr-md-2">
+        <span class="navbar-brand mr-0 mr-md-2">
             WebHook Tester
-        </a>
+        </span>
 
         <div class="mr-auto">
             <ul class="navbar-nav flex-row d-none d-sm-block">
                 <li class="nav-item">
-                    <a class="nav-link" href="#"><i class="fas fa-question mr-1"></i> Help</a>
+                    <span class="nav-link"><i class="fas fa-question mr-1"></i> Help</span>
                 </li>
             </ul>
         </div>
@@ -46,4 +46,7 @@
 </script>
 
 <style scoped>
+    .nav-link {
+        cursor: pointer;
+    }
 </style>

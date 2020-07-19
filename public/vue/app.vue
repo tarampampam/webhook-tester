@@ -29,6 +29,9 @@
                             :ip="request.ip"
                             :method="request.method"
                             :when="request.when"
+                            :key="uuid"
+                            :class="{ active: requestUUID === uuid }"
+                            @click.native="requestUUID = uuid"
                             @on-delete="deleteRequestHandler"
                         ></request-plate>
                     </div>
@@ -139,9 +142,8 @@
                     // },
                 },
 
-                session: {
-                    UUID: null,
-                },
+                sessionUUID: null,
+                requestUUID: null,
             }
         },
 
@@ -149,6 +151,7 @@
             window.setTimeout(() => document.getElementById('main-loader').remove(), 150);
 
             this.initSession();
+            this.initRequest();
         },
 
         computed: {
@@ -156,21 +159,51 @@
              * @returns {String}
              */
             sessionRequestURI: function () {
-                let uuid = this.session.UUID === null
+                let uuid = this.sessionUUID === null
                     ? '________-____-____-____-____________'
-                    : this.session.UUID;
+                    : this.sessionUUID;
 
                 return `${window.location.origin}/${uuid}`;
             }
         },
 
+        watch: {
+            sessionUUID: function () {
+                if (this.$route.params.sessionUUID !== this.sessionUUID) {
+                    this.$router.push({
+                        name: 'request', params: {
+                            sessionUUID: this.sessionUUID,
+                        }
+                    });
+                }
+            },
+            requestUUID: function () {
+                if (this.$route.params.requestUUID !== this.requestUUID) {
+                    this.$router.push({
+                        name: 'request', params: {
+                            sessionUUID: this.sessionUUID,
+                            requestUUID: this.requestUUID,
+                        }
+                    });
+                }
+            },
+        },
+
         methods: {
+            /**
+             * @param {String} uuid
+             * @returns {Boolean}
+             */
+            isValidUUID(uuid) {
+                return typeof uuid === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(uuid);
+            },
+
             /**
              * @returns {Promise<undefined>}
              */
             reloadRequests() {
                 return new Promise((resolve, reject) => {
-                    this.$api.getAllSessionRequests(this.session.UUID)
+                    this.$api.getAllSessionRequests(this.sessionUUID)
                         .then((requests) => {
                             for (let uuid in requests) {
                                 if (requests.hasOwnProperty(uuid)) {
@@ -202,22 +235,34 @@
                                 }
                             }
 
+                            if (! this.requests.hasOwnProperty(this.requestUUID)) {
+                                /** @var {String|undefined} uuidToSet */
+                                const uuidToSet = Object.keys(this.requests)[0];
+
+                                if (this.isValidUUID(uuidToSet)) {
+                                    this.requestUUID = uuidToSet;
+                                }
+                            }
+
                             this.$forceUpdate();
 
                             resolve();
                         })
                         .catch((err) => reject(err))
                 });
-
             },
 
             initSession() {
                 const localSessionUUID = this.$session.getLocalSessionUUID();
+                const routeSessionUUID = this.$route.params.sessionUUID;
+                const sessionUUID = this.isValidUUID(routeSessionUUID)
+                    ? routeSessionUUID
+                    : (this.isValidUUID(localSessionUUID) ? localSessionUUID : null);
 
                 const startNewSession = () => {
                     this.$api.startNewSession()
                         .then((newSessionData) => {
-                            this.session.UUID = newSessionData.uuid;
+                            this.sessionUUID = newSessionData.uuid;
                             this.$session.setLocalSessionUUID(newSessionData.uuid);
 
                             this.reloadRequests()
@@ -226,13 +271,21 @@
                         .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
                 };
 
-                if (localSessionUUID !== null) {
-                    this.session.UUID = localSessionUUID;
+                if (sessionUUID !== null) {
+                    this.sessionUUID = sessionUUID;
 
                     this.reloadRequests()
                         .catch(() => startNewSession())
                 } else {
                     startNewSession()
+                }
+            },
+
+            initRequest() {
+                const routeRequestUUID = this.$route.params.requestUUID;
+
+                if (this.isValidUUID(routeRequestUUID)) {
+                    this.requestUUID = routeRequestUUID;
                 }
             },
 
@@ -252,7 +305,7 @@
             },
 
             deleteAllRequests() {
-                this.$api.deleteAllSessionRequests(this.session.UUID)
+                this.$api.deleteAllSessionRequests(this.sessionUUID)
                     .then((status) => {
                         if (status.success === true) {
                             this.$izitoast.success({title: 'All requests successfully removed!'});
@@ -270,7 +323,7 @@
              * @param {String} uuid
              */
             deleteRequestHandler(uuid) {
-                this.$api.deleteSessionRequest(this.session.UUID, uuid)
+                this.$api.deleteSessionRequest(this.sessionUUID, uuid)
                     .then((status) => {
                         if (status.success === true) {
                             this.$izitoast.success({title: 'Request successfully removed!'});
@@ -289,7 +342,7 @@
                 this.$api.startNewSession()
                     .then((newSessionData) => {
                         newSessionData.uuid
-                        this.session.UUID = newSessionData.uuid;
+                        this.sessionUUID = newSessionData.uuid;
                         this.$session.setLocalSessionUUID(newSessionData.uuid);
 
                         this.clearRequests();
