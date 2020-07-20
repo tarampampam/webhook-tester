@@ -2,6 +2,7 @@
     <div>
         <main-header
             :current-web-hook-url="sessionRequestURI"
+            :requests-lifetime="settings.requestsLifetime"
             @on-new-url="newUrlHandler"
         ></main-header>
 
@@ -142,16 +143,22 @@
                     // },
                 },
 
+                settings: {
+                    requestsLifetime: 40, // @todo: load this value async from backend
+                },
+
                 sessionUUID: null,
                 requestUUID: null,
             }
         },
 
-        mounted() {
-            window.setTimeout(() => document.getElementById('main-loader').remove(), 150);
-
+        created() {
             this.initSession();
             this.initRequest();
+        },
+
+        mounted() {
+            window.setTimeout(() => document.getElementById('main-loader').remove(), 150);
         },
 
         computed: {
