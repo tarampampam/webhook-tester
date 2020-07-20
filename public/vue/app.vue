@@ -8,7 +8,7 @@
 
         <div class="container-fluid">
             <div class="row flex-xl-nowrap">
-                <div class="sidebar col-sm-5 col-md-4 col-xl-3 px-2 py-0">
+                <div class="sidebar col-sm-5 col-md-4 col-lg-3 col-xl-2 px-2 py-0">
                     <div class="pl-3 pt-4 pr-3 pb-3">
                         <div class="d-flex w-100 justify-content-between">
                             <h5 class="text-uppercase mb-0">Requests <span
@@ -41,59 +41,48 @@
                     </div>
                 </div>
 
-                <main class="col-sm-7 col-md-8 col-xl-9 py-3 pl-md-4" role="main">
-                    <div v-if="getRequestsCount()">
+                <div class="col-sm-7 col-md-8 col-lg-9 col-xl-10 py-3 pl-md-4" role="main">
+                    <div v-if="getRequestsCount() > 0">
                         <div class="row pt-2">
-                            <requests-navigation class="col-6"></requests-navigation>
-                            <settings class="col-6 text-right"></settings>
+                            <div class="col-6">
+                                <div class="btn-group pb-1" role="group">
+                                    <button type="button" class="btn btn-secondary btn-sm">First request</button>
+                                    <button type="button" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-arrow-left"></i> Previous
+                                    </button>
+                                </div>
+                                <div class="btn-group pb-1" role="group">
+                                    <button type="button" class="btn btn-secondary btn-sm">
+                                        Next <i class="fas fa-arrow-right"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm">Last request</button>
+                                </div>
+                            </div>
+                            <div class="col-6 pb-1 text-right">
+                                <div class="custom-control custom-checkbox d-inline mr-3">
+                                    <input type="checkbox" class="custom-control-input" id="hide-details">
+                                    <label class="custom-control-label" for="hide-details">Hide details</label>
+                                </div>
+                                <div class="custom-control custom-checkbox d-inline"
+                                     title="Automatically select and go to the latest incoming webhook request">
+                                    <input type="checkbox" class="custom-control-input" id="auto-navigate" checked>
+                                    <label class="custom-control-label" for="auto-navigate">Auto navigate</label>
+                                </div>
+                            </div>
                         </div>
 
-                        <request-details class="pt-3"></request-details>
+                        <request-details
+                            class="pt-3"
+                            :request="this.requests[this.requestUUID]"
+                            :uuid="this.requestUUID"
+                        ></request-details>
                         <request-body></request-body>
                     </div>
-                    <div v-else>
-                        <h4 class="mt-2">
-                            WebHook Tester allows you to easily test webhooks and other types of HTTP requests
-                        </h4>
-                        <p class="text-muted">
-                            Any requests sent to that URL are logged here instantly — you don't even have to refresh!
-                        </p>
-                        <hr/>
-                        <p>Here's your unique URL that was created just now:</p>
-                        <p>
-                            <code id="current-webhook-url-text">{{ sessionRequestURI }}</code>
-                            <button class="btn btn-primary btn-sm ml-2"
-                                    data-clipboard-target="#current-webhook-url-text">
-                                <i class="fas fa-copy mr-1"></i> Copy
-                            </button>
-                            <a target="_blank"
-                               class="btn btn-primary btn-sm"
-                               :href="sessionRequestURI">
-                                <i class="fas fa-external-link-alt pr-1"></i> Open in a new tab
-                            </a>
-                        </p>
-                        <p>
-                            Send simple POST request (execute next command in your terminal without leaving this page):
-                        <p>
-                            <code>
-                                $ <span id="current-webhook-curl-text">curl -v -X POST -d "foo=bar" {{ sessionRequestURI }}</span>
-                            </code>
-                            <button class="btn btn-primary btn-sm ml-2"
-                                    data-clipboard-target="#current-webhook-curl-text">
-                                <i class="fas fa-copy mr-1"></i> Copy
-                            </button>
-                        </p>
-                        <hr/>
-                        <p>
-                            Bookmark this page to go back to the requests at any time. For more info, click
-                            <strong>Help</strong>.
-                        </p>
-                        <p>
-                            Click <strong>New URL</strong> to create a new url with the ability to customize status
-                            code, response body, etc.
-                        </p>
-                    </div>
-                </main>
+                    <index-empty
+                        v-else
+                        :current-web-hook-url="sessionRequestURI"
+                    ></index-empty>
+                </div>
             </div>
         </div>
     </div>
@@ -116,10 +105,9 @@
         components: {
             'main-header': 'url:/vue/components/main-header.vue',
             'request-plate': 'url:/vue/components/request-plate.vue',
-            'requests-navigation': 'url:/vue/components/requests-navigation.vue',
             'request-details': 'url:/vue/components/request-details.vue',
             'request-body': 'url:/vue/components/request-body.vue',
-            'settings': 'url:/vue/components/settings.vue',
+            'index-empty': 'url:/vue/components/index-empty.vue',
         },
 
         data: function () {
@@ -242,7 +230,7 @@
                                 }
                             }
 
-                            if (! this.requests.hasOwnProperty(this.requestUUID)) {
+                            if (!this.requests.hasOwnProperty(this.requestUUID)) {
                                 /** @var {String|undefined} uuidToSet */
                                 const uuidToSet = Object.keys(this.requests)[0];
 
@@ -273,9 +261,15 @@
                             this.$session.setLocalSessionUUID(newSessionData.uuid);
 
                             this.reloadRequests()
-                                .catch((err) => this.$izitoast.error({title: `Cannot retrieve requests: ${err.message}`}))
+                                .catch((err) => this.$izitoast.error({
+                                    title: `Cannot retrieve requests: ${err.message}`,
+                                    zindex: 10
+                                }))
                         })
-                        .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
+                        .catch((err) => this.$izitoast.error({
+                            title: `Cannot create new session: ${err.message}`,
+                            zindex: 10
+                        }))
                 };
 
                 if (sessionUUID !== null) {
@@ -315,12 +309,15 @@
                 this.$api.deleteAllSessionRequests(this.sessionUUID)
                     .then((status) => {
                         if (status.success === true) {
-                            this.$izitoast.success({title: 'All requests successfully removed!'});
+                            this.$izitoast.success({title: 'All requests successfully removed!', zindex: 10});
                         } else {
                             throw new Error(`I've got unsuccessful status`);
                         }
                     })
-                    .catch((err) => this.$izitoast.error({title: `Cannot remove all requests: ${err.message}`}))
+                    .catch((err) => this.$izitoast.error({
+                        title: `Cannot remove all requests: ${err.message}`,
+                        zindex: 10
+                    }))
 
                 this.clearRequests();
                 this.$forceUpdate();
@@ -333,20 +330,29 @@
                 this.$api.deleteSessionRequest(this.sessionUUID, uuid)
                     .then((status) => {
                         if (status.success === true) {
-                            this.$izitoast.success({title: 'Request successfully removed!'});
+                            this.$izitoast.success({title: 'Request successfully removed!', zindex: 10});
                         } else {
                             throw new Error(`I've got unsuccessful status`);
                         }
                     })
-                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`, zindex: 10}))
 
                 delete this.requests[uuid];
 
                 this.$forceUpdate();
             },
 
-            newUrlHandler() {
-                this.$api.startNewSession()
+            /**
+             *
+             * @param {{statusCode: String|null, contentType: String|null, responseDelay: String|null, responseBody: String|null}} urlSettings
+             */
+            newUrlHandler(urlSettings) {
+                this.$api.startNewSession({
+                    content_type: urlSettings.contentType,
+                    status_code: urlSettings.statusCode,
+                    response_delay: urlSettings.responseDelay,
+                    response_body: urlSettings.responseBody,
+                })
                     .then((newSessionData) => {
                         newSessionData.uuid
                         this.sessionUUID = newSessionData.uuid;
@@ -354,9 +360,12 @@
 
                         this.clearRequests();
                         this.$forceUpdate();
-                        this.$izitoast.success({title: 'New session started!'});
+                        this.$izitoast.success({title: 'New session started!', zindex: 10});
                     })
-                    .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
+                    .catch((err) => this.$izitoast.error({
+                        title: `Cannot create new session: ${err.message}`,
+                        zindex: 10
+                    }))
             },
         }
     }
@@ -372,9 +381,9 @@
         cursor: pointer;
     }
 
-    @media (min-width: 992px) {
-        .sidebar {
+    /*@media (min-width: 992px) {
+        .sidebar > * {
             max-width: 315px;
         }
-    }
+    }*/
 </style>

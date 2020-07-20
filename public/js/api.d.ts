@@ -24,6 +24,13 @@ export interface APINewSession {
     }
 }
 
+export interface APINewSessionSettings {
+    status_code: string | null
+    content_type: string | null
+    response_delay: string | null
+    response_body: string | null
+}
+
 export interface APIRecordedRequest {
     ip: string
     hostname: string

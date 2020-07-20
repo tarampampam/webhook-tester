@@ -28,12 +28,13 @@ define(['axios'], (axios) => {
     };
 
     /**
+     * @param {APINewSessionSettings} settings
      * @returns {Promise<APINewSession>}
      */
-    const startNewSession = () => {
+    const startNewSession = (settings) => {
         return new Promise((resolve, reject) => {
             axios
-                .post(`${getApiUri()}/session`)
+                .post(`${getApiUri()}/session`, settings)
                 .then((response) => resolve(response.data))
                 .catch((err) => reject(err));
         });

@@ -12,9 +12,9 @@ define(
 
         // <https://clipboardjs.com/#events>
         clip.on('error', function (e) {
-            izitoast.error({title: 'Copying error!', icon: 'fas fa-times'});
+            izitoast.error({title: 'Copying error!', icon: 'fas fa-times', zindex: 10});
         }).on('success', function (e) {
-            izitoast.success({title: 'Copied!', message: e.text, icon: 'fas fa-copy', timeout: 3000});
+            izitoast.success({title: 'Copied!', message: e.text, icon: 'fas fa-copy', timeout: 4000, zindex: 10});
             e.clearSelection();
         });
 
