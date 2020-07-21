@@ -13,7 +13,7 @@ DC_RUN_ARGS = --rm --user "$(shell id -u):$(shell id -g)"
 APP_NAME = $(notdir $(CURDIR))
 
 .PHONY : help \
-         image build fmt lint gotest test cover \
+         image build serve fmt lint gotest test cover \
          clean
 .DEFAULT_GOAL : help
 .SILENT : lint gotest
@@ -29,6 +29,10 @@ image: ## Build docker image with app
 
 build: ## Build app binary file
 	$(DC_BIN) run $(DC_RUN_ARGS) app go build -ldflags=$(LDFLAGS) .
+
+serve: ## Start static files serving
+	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now open in your favorite browser <http://127.0.0.1:8082> and press CTRL+C for stopping'
+	$(DC_BIN) run $(DC_RUN_ARGS) -p "8082:8080/tcp" app go run . serve --port 8080
 
 fmt: ## Run source code formatter tools
 	$(DC_BIN) run $(DC_RUN_ARGS) app sh -c 'GO111MODULE=off go get golang.org/x/tools/cmd/goimports && $$GOPATH/bin/goimports -d -w .'

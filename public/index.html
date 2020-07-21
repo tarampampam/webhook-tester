@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" href="favicon.ico" sizes="48x48"/>
+    <link rel="manifest" href="webmanifest.json">
+    <meta name="msapplication-TileColor" content="#222222">
+    <meta name="theme-color" content="#222222">
+
+    <style>
+        html, body {
+            background-color: #222;
+            font-family: sans-serif;
+            overflow-x: hidden;
+            height: 100%;
+        }
+
+        html, body, a {
+            color: #fff;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: 0 0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 250, .25);
+            border-radius: 3px;
+        }
+
+        .ml {
+            position: absolute;
+            top: calc(50% - 32px);
+            left: calc(50% - 32px);
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            perspective: 800px;
+        }
+
+        .ml .i1, .ml .i2, .ml .i3 {
+            position: absolute;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border-color: #efeffa;
+            border-style: solid;
+            border-width: 0;
+        }
+
+        .ml .i1 {
+            left: 0;
+            top: 0;
+            animation: rotate-one 1s linear infinite;
+            border-bottom-width: 3px;
+        }
+
+        .ml .i2 {
+            right: 0;
+            top: 0;
+            animation: rotate-two 1s linear infinite;
+            border-right-width: 3px;
+        }
+
+        .ml .i3 {
+            right: 0;
+            bottom: 0;
+            animation: rotate-three 1s linear infinite;
+            border-top-width: 3px;
+        }
+
+        @keyframes rotate-one {
+            0% {
+                transform: rotateX(35deg) rotateY(-45deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(35deg) rotateY(-45deg) rotateZ(360deg);
+            }
+        }
+
+        @keyframes rotate-two {
+            0% {
+                transform: rotateX(50deg) rotateY(10deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(50deg) rotateY(10deg) rotateZ(360deg);
+            }
+        }
+
+        @keyframes rotate-three {
+            0% {
+                transform: rotateX(35deg) rotateY(55deg) rotateZ(0deg);
+            }
+            100% {
+                transform: rotateX(35deg) rotateY(55deg) rotateZ(360deg);
+            }
+        }
+    </style>
+
+    <!-- Preview: <https://bootswatch.com/darkly/> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/thomaspark/bootswatch@4.5.0/dist/darkly/bootstrap.min.css"
+          integrity="sha384-Bo21yfmmZuXwcN/9vKrA5jPUMhr7znVBBeLxT9MA4r2BchhusfJ6+n8TLGUcRAtL"
+          crossorigin="anonymous"/>
+
+    <!-- Icons: <https://fontawesome.com/icons/> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css"
+          integrity="sha512-1PKOgIY59xJ8Co8+NE6FZ+LOAZKjy+KY8iq0G4B3CyeY6wYHN3yt9PW0XpSriVlkMXe40PTKnXrLnZ9+fkDaog=="
+          media="print" onload="this.media='all'"
+          crossorigin="anonymous"/>
+
+    <title>WebHook Tester</title>
+<body>
+
+<noscript>
+    <div class="text-center">
+        <div class="alert alert-danger mt-3 d-inline-block">
+            <strong>JavaScript</strong> is required on this page.
+        </div>
+    </div>
+</noscript>
+
+<div class="vh-100 d-flex justify-content-center align-items-center" id="main-loader">
+    <div class="ml">
+        <div class="i1"></div>
+        <div class="i2"></div>
+        <div class="i3"></div>
+    </div>
+</div>
+
+<div id="app"></div>
+
+<!-- Documentation: <https://api.jquery.com/> (required for Bootstrap) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"
+        integrity="sha512-/DXTXr6nQodMUiq+IUJYCt2PPOUjrHJ9wFrqpJ3XkgPNOZVfMok7cRw6CSxyCQxXn6ozlESsSh1/sMCTF1rL/g=="
+        crossorigin="anonymous"></script>
+
+<!-- Documentation: <https://popper.js.org/docs/v2/> (required for Bootstrap dropdown components) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.4.4/umd/popper.min.js"
+        integrity="sha512-eUQ9hGdLjBjY3F41CScH3UX+4JDSI9zXeroz7hJ+RteoCaY+GP/LDoM8AO+Pt+DRFw3nXqsjh9Zsts8hnYv8/A=="
+        crossorigin="anonymous"></script>
+
+<!-- Documentation: <https://getbootstrap.com/docs/4.5/> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.min.js"
+        integrity="sha512-I5TkutApDjnWuX+smLIPZNhw+LhTd8WrQhdCKsxCFRSvhFx2km8ZfEpNIhF9nq04msHhOkE8BMOBj5QE07yhMA=="
+        crossorigin="anonymous"></script>
+
+<!-- Documentation: <https://requirejs.org/docs/api.html> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+        data-main="js/common"
+        integrity="sha256-1fEPhSsRKlFKGfK3eO710tEweHh1fwokU5wFGDHO+vg="
+        crossorigin="anonymous"></script>
+</body>
+</html>

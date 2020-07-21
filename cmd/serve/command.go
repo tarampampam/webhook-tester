@@ -23,19 +23,22 @@ const (
 )
 
 type (
-	address string
-	port    uint16
+	address   string
+	port      uint16
+	publicDir string
 )
 
 // Command is a `serve` command.
 type Command struct {
-	Address address `required:"true" short:"l" long:"listen" env:"LISTEN_ADDR" default:"0.0.0.0" description:"IP address to listen on"` //nolint:lll
-	Port    port    `required:"true" short:"p" long:"port" env:"LISTEN_PORT" default:"8080" description:"TCP port number"`              //nolint:lll
+	Address   address   `required:"true" long:"listen" env:"LISTEN_ADDR" default:"0.0.0.0" description:"IP address to listen on"` //nolint:lll
+	Port      port      `required:"true" long:"port" env:"LISTEN_PORT" default:"8080" description:"TCP port number"`
+	PublicDir publicDir `required:"true" long:"public" default:"./public" description:"Directory with public assets"`
 }
 
 // Convert struct into string representation.
-func (a address) String() string { return string(a) }
-func (p port) String() string    { return strconv.FormatUint(uint64(p), 10) }
+func (a address) String() string   { return string(a) }
+func (p port) String() string      { return strconv.FormatUint(uint64(p), 10) }
+func (d publicDir) String() string { return string(d) }
 
 // Validate address for listening on.
 func (address) IsValidValue(ip string) error {
@@ -46,13 +49,23 @@ func (address) IsValidValue(ip string) error {
 	return nil
 }
 
+// Validate public directory path.
+func (publicDir) IsValidValue(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
 // Execute current command.
 func (cmd *Command) Execute(_ []string) error {
 	server := apphttp.NewServer(&apphttp.ServerSettings{
-		Address:          cmd.Address.String() + ":" + cmd.Port.String(),
-		WriteTimeout:     httpWriteTimeout,
-		ReadTimeout:      httpReadTimeout,
-		KeepAliveEnabled: false,
+		Address:                   cmd.Address.String() + ":" + cmd.Port.String(),
+		WriteTimeout:              httpWriteTimeout,
+		ReadTimeout:               httpReadTimeout,
+		PublicAssetsDirectoryPath: cmd.PublicDir.String(),
+		KeepAliveEnabled:          false,
 	})
 
 	server.RegisterHandlers()
