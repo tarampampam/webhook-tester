@@ -7,10 +7,11 @@
                 </div>
                 <div class="col-5 text-right">
                     <button class="btn btn-primary btn-sm"
-                       v-bind:data-clipboard-text="permalink"
-                       target="_blank"
-                       type="button"
-                    >Copy permalink</button>
+                            v-bind:data-clipboard-text="permalink"
+                            target="_blank"
+                            type="button"
+                    >Copy permalink
+                    </button>
                 </div>
             </div>
             <div class="row mx-0">
@@ -100,7 +101,7 @@
 
         methods: {
             updateFormattedWhen() {
-                this.formattedWhen = typeof this.request.when === 'object' && this.request.when != null
+                this.formattedWhen = this.request !== null && this.request.when != null
                     ? `${this.$moment(this.request.when).format('YYYY-MM-D h:mm:ss a')} (${this.$moment(this.request.when).fromNow()})`
                     : '';
             }

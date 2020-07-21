@@ -27,17 +27,39 @@
                             requests. Here's your unique URL:
                         <p>
                             <code>{{ currentWebHookUrl }}</code>
-                            <a :href="currentWebHookUrl" target="_blank">(try it!)</a>
+                            <button class="btn btn-outline-info btn-sm ml-2" v-bind:data-clipboard-text="currentWebHookUrl">
+                                <i class="fas fa-copy mr-1"></i> Copy
+                            </button>
+                            <a target="_blank"
+                               class="btn btn-outline-info btn-sm"
+                               :href="currentWebHookUrl">
+                                <i class="fas fa-external-link-alt pr-1"></i> Try it!
+                            </a>
                         </p>
                         <p>Any requests sent to that URL are instantly logged here - you don't even have to refresh.</p>
                         <hr/>
                         <p>Append a status code to the url, e.g.:</p>
-                        <p><code>{{ currentWebHookUrl }}/404</code></p>
+                        <p>
+                            <code>{{ currentWebHookUrl }}/404</code>
+                            <button class="btn btn-outline-info btn-sm ml-2"
+                                    v-bind:data-clipboard-text="currentWebHookUrl + '/404'">
+                                <i class="fas fa-copy mr-1"></i> Copy
+                            </button>
+                            <a target="_blank"
+                               class="btn btn-outline-info btn-sm"
+                               :href="currentWebHookUrl + '/404'">
+                                <i class="fas fa-external-link-alt pr-1"></i> Try it!
+                            </a>
+                        </p>
                         <p>So the URL will respond with a <code>404: Not Found</code>.</p>
                         <p>
                             You can bookmark this page to go back to the request contents at any time. Requests and the
-                            tokens for the URL expire <strong>after {{ requestsLifetime }}</strong> days of not being
+                            tokens for the URL expire <strong>after {{ sessionLifetimeDays }}</strong> days of not being
                             used.
+                        </p>
+                        <hr />
+                        <p class="small">
+                            Current application version: <strong> v{{ version }}</strong>
                         </p>
                     </div>
                 </div>
@@ -144,9 +166,13 @@
                 type: String,
                 default: 'URL was not defined',
             },
-            requestsLifetime: {
+            sessionLifetimeSec: {
                 type: Number,
-                default: NaN,
+                default: null,
+            },
+            version: {
+                type: String,
+                default: 'unknown',
             },
         },
 
@@ -159,6 +185,19 @@
                     responseBody: null,
                 },
             }
+        },
+
+        computed: {
+            /**
+             * @returns {Number}
+             */
+            sessionLifetimeDays: function () {
+                if (typeof this.sessionLifetimeSec === 'number') {
+                    return Number((this.sessionLifetimeSec / 24 / 60 / 60).toFixed(1));
+                }
+
+                return 0;
+            },
         },
 
         methods: {

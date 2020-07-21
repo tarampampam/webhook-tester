@@ -2,7 +2,8 @@
     <div>
         <main-header
             :current-web-hook-url="sessionRequestURI"
-            :requests-lifetime="settings.requestsLifetime"
+            :session-lifetime-sec="sessionLifetimeSec"
+            :version="appVersion"
             @on-new-url="newUrlHandler"
         ></main-header>
 
@@ -16,13 +17,13 @@
                             >{{ getRequestsCount() }}</span></h5>
                             <button type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    v-if="getRequestsCount()"
+                                    v-if="getRequestsCount() > 0"
                                     @click="deleteAllRequests()">Delete all
                             </button>
                         </div>
                     </div>
 
-                    <div class="list-group" v-if="getRequestsCount()">
+                    <div class="list-group" v-if="getRequestsCount() > 0">
                         <request-plate
                             v-for="(request, uuid) in this.requests"
                             class="request-plate"
@@ -46,37 +47,65 @@
                         <div class="row pt-2">
                             <div class="col-6">
                                 <div class="btn-group pb-1" role="group">
-                                    <button type="button" class="btn btn-secondary btn-sm">First request</button>
-                                    <button type="button" class="btn btn-secondary btn-sm">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                            @click.prevent="navigateFirstRequest"
+                                            :class="{disabled: getRequestsCount() <= 1}"
+                                    >
+                                        First request
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                            @click="navigatePreviousRequest"
+                                            :class="{disabled: getRequestsCount() <= 1}"
+                                    >
                                         <i class="fas fa-arrow-left"></i> Previous
                                     </button>
                                 </div>
                                 <div class="btn-group pb-1" role="group">
-                                    <button type="button" class="btn btn-secondary btn-sm">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                            @click="navigateNextRequest"
+                                            :class="{disabled: getRequestsCount() <= 1}"
+                                    >
                                         Next <i class="fas fa-arrow-right"></i>
                                     </button>
-                                    <button type="button" class="btn btn-secondary btn-sm">Last request</button>
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                            @click="navigateLastRequest"
+                                            :class="{disabled: getRequestsCount() <= 1}"
+                                    >
+                                        Last request
+                                    </button>
                                 </div>
                             </div>
                             <div class="col-6 pb-1 text-right">
-                                <div class="custom-control custom-checkbox d-inline mr-3">
-                                    <input type="checkbox" class="custom-control-input" id="hide-details">
-                                    <label class="custom-control-label" for="hide-details">Hide details</label>
+                                <div class="custom-control custom-checkbox d-inline-block">
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="show-details"
+                                           v-model="showRequestDetails">
+                                    <label class="custom-control-label" for="show-details">Show details</label>
                                 </div>
-                                <div class="custom-control custom-checkbox d-inline"
+                                <div class="custom-control custom-checkbox d-inline-block ml-3"
                                      title="Automatically select and go to the latest incoming webhook request">
-                                    <input type="checkbox" class="custom-control-input" id="auto-navigate" checked>
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="auto-navigate"
+                                           v-model="autoRequestNavigate">
                                     <label class="custom-control-label" for="auto-navigate">Auto navigate</label>
                                 </div>
                             </div>
                         </div>
 
                         <request-details
+                            v-if="showRequestDetails"
                             class="pt-3"
                             :request="this.requests[this.requestUUID]"
                             :uuid="this.requestUUID"
                         ></request-details>
-                        <request-body></request-body>
+
+                        <div class="pt-3">
+                            <h4>Body</h4>
+                            <pre v-if="requestsContent">{{ requestsContent | prettyContent }}</pre>
+                            <pre v-else class="text-muted">// empty request body</pre>
+                        </div>
                     </div>
                     <index-empty
                         v-else
@@ -106,7 +135,6 @@
             'main-header': 'url:/vue/components/main-header.vue',
             'request-plate': 'url:/vue/components/request-plate.vue',
             'request-details': 'url:/vue/components/request-details.vue',
-            'request-body': 'url:/vue/components/request-body.vue',
             'index-empty': 'url:/vue/components/index-empty.vue',
         },
 
@@ -131,9 +159,11 @@
                     // },
                 },
 
-                settings: {
-                    requestsLifetime: 40, // @todo: load this value async from backend
-                },
+                autoRequestNavigate: true,
+                showRequestDetails: true,
+
+                appVersion: null,
+                sessionLifetimeSec: null,
 
                 sessionUUID: null,
                 requestUUID: null,
@@ -141,6 +171,14 @@
         },
 
         created() {
+            this.$api.getAppSettings()
+                .then((settings) => {
+                    if (settings.hasOwnProperty('version')) {
+                        this.appVersion = settings.version;
+                    }
+                    this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
+                });
+
             this.initSession();
             this.initRequest();
         },
@@ -159,6 +197,32 @@
                     : this.sessionUUID;
 
                 return `${window.location.origin}/${uuid}`;
+            },
+
+            /**
+             * @returns {String|null}
+             */
+            requestsContent: function () {
+                const request = this.requests[this.requestUUID];
+
+                if (typeof request === 'object' && request.hasOwnProperty('content') && request.content !== '') {
+                    return request.content;
+                }
+
+                return null;
+            },
+        },
+
+        filters: {
+            prettyContent: function(value) {
+                // is json?
+                try {
+                    return JSON.stringify(JSON.parse(value), null, 2);
+                } catch (e) {
+                    //
+                }
+
+                return value; // as-is
             }
         },
 
@@ -255,7 +319,7 @@
                     : (this.isValidUUID(localSessionUUID) ? localSessionUUID : null);
 
                 const startNewSession = () => {
-                    this.$api.startNewSession()
+                    this.$api.startNewSession({})
                         .then((newSessionData) => {
                             this.sessionUUID = newSessionData.uuid;
                             this.$session.setLocalSessionUUID(newSessionData.uuid);
@@ -297,12 +361,43 @@
                 return Object.keys(this.requests).length;
             },
 
+            navigateFirstRequest() {
+                const firstUuid = Object.keys(this.requests)[0];
+                console.log(111);
+                if (firstUuid !== undefined && this.requestUUID !== firstUuid) {
+                    this.requestUUID = firstUuid;
+                }
+            },
+            navigatePreviousRequest() {
+                const keys = Object.keys(this.requests), prev = keys[keys.indexOf(this.requestUUID) - 1];
+
+                if (prev !== undefined && this.requestUUID !== prev) {
+                    this.requestUUID = prev;
+                }
+            },
+            navigateNextRequest() {
+                const keys = Object.keys(this.requests), next = keys[keys.indexOf(this.requestUUID) + 1];
+
+                if (next !== undefined && this.requestUUID !== next) {
+                    this.requestUUID = next;
+                }
+            },
+            navigateLastRequest() {
+                const keys = Object.keys(this.requests), lastUuid = keys[keys.length - 1];
+
+                if (lastUuid !== undefined && this.requestUUID !== lastUuid) {
+                    this.requestUUID = lastUuid;
+                }
+            },
+
             clearRequests() {
                 for (let uuid in this.requests) {
                     if (this.requests.hasOwnProperty(uuid)) {
                         delete this.requests[uuid];
                     }
                 }
+
+                this.requestUUID = null;
             },
 
             deleteAllRequests() {
@@ -330,12 +425,30 @@
                 this.$api.deleteSessionRequest(this.sessionUUID, uuid)
                     .then((status) => {
                         if (status.success === true) {
-                            this.$izitoast.success({title: 'Request successfully removed!', zindex: 10});
+                            this.$izitoast.success({
+                                title: `Request with UUID ${uuid} was successfully removed!`,
+                                zindex: 10
+                            });
                         } else {
                             throw new Error(`I've got unsuccessful status`);
                         }
                     })
                     .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`, zindex: 10}))
+
+                // find next request for selection
+                const UUIDs = Object.keys(this.requests);
+                const currentIndexNum = UUIDs.indexOf(uuid);
+                let newCurrentRequestUUID = this.requestUUID; // do not change
+
+                if (uuid !== this.requestUUID) {
+                    // do nothing
+                } else if (UUIDs[currentIndexNum + 1] !== undefined) {
+                    newCurrentRequestUUID = UUIDs[currentIndexNum + 1]; // select next
+                } else if (UUIDs[currentIndexNum - 1] !== undefined) {
+                    newCurrentRequestUUID = UUIDs[currentIndexNum - 1]; // select previous
+                }
+
+                this.requestUUID = newCurrentRequestUUID;
 
                 delete this.requests[uuid];
 
@@ -343,7 +456,6 @@
             },
 
             /**
-             *
              * @param {{statusCode: String|null, contentType: String|null, responseDelay: String|null, responseBody: String|null}} urlSettings
              */
             newUrlHandler(urlSettings) {
@@ -381,9 +493,7 @@
         cursor: pointer;
     }
 
-    /*@media (min-width: 992px) {
-        .sidebar > * {
-            max-width: 315px;
-        }
-    }*/
+    button .disabled {
+        pointer-events: none;
+    }
 </style>

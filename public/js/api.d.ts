@@ -5,6 +5,7 @@
 export interface APISettings {
     version: string
     limits: {
+        session_lifetime_sec: number
         max_requests: number
     }
 }

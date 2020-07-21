@@ -74,9 +74,12 @@
         },
 
         methods: {
-            remove() {
+            remove(e) {
                 // <https://michaelnthiessen.com/pass-function-as-prop/>
                 this.$emit('on-delete', this.uuid);
+
+                e.preventDefault();
+                e.stopPropagation();
 
                 this.updateFormattedWhen();
             },

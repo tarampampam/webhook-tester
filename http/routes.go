@@ -39,7 +39,8 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 		Handle("/settings", stub.Handler(`{
 			"version": "0.0.0",
 			"limits": {
-				"max_requests": 50
+				"max_requests": 50,
+				"session_lifetime_sec": 604800
 			}
 		}`)).
 		Methods(http.MethodGet).
@@ -87,14 +88,14 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
 					"dnt": "1"
 				},
-				"url": "https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar",
+				"url": "https://foo.example.com/%RAND_UUID%/foobar",
 				"created_at_unix": 1595017226
 			},
 			"22222222-0000-0000-0000-000000000000": {
 				"ip": "1.1.1.1",
 				"hostname": "some_host",
 				"method": "PUT",
-				"content": "fake content goes here too",
+				"content": "{\"foo\":1,\"bar\":\"baz\",\"a\":[1,2,3]}",
 				"headers": {
 					"host": "foo.example.com",
 					"user-agent": "curl\/7.58.0",
@@ -106,8 +107,27 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
 					"dnt": "1"
 				},
-				"url": "https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/barbaz",
+				"url": "https://foo.example.com/%RAND_UUID%/barbaz",
 				"created_at_unix": 1595017240
+			},
+			"33333333-0000-0000-0000-000000000000": {
+				"ip": "2.2.2.2",
+				"hostname": "another_host",
+				"method": "DELETE",
+				"content": "",
+				"headers": {
+					"host": "foo.example.boo",
+					"user-agent": "curl\/7.58.0",
+					"accept": "text\/html,application\/xhtml+xml",
+					"accept-encoding": "gzip",
+					"accept-language": "en,ru;q=0.9",
+					"cdn-loop": "cloudflare",
+					"cf-connecting-ip": "22.22.22.22",
+					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
+					"dnt": "0"
+				},
+				"url": "https://foo.example.com/%RAND_UUID%/blah",
+				"created_at_unix": 1595017340
 			}
 		}`)).
 		Methods(http.MethodGet).
