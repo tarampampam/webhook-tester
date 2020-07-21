@@ -45,6 +45,12 @@ requirejs.config({
             'https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min',
             'https://cdn.jsdelivr.net/npm/izitoast@1.4.0/dist/js/iziToast.min',
         ],
+        // Syntax highlighting with language autodetection
+        // Docs: <https://highlightjs.org/>
+        hljs: [
+            'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min',
+            'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@10.1.1/build/highlight.min'
+        ]
     },
     map: {
         '*': {
@@ -59,6 +65,9 @@ requirejs.config({
         },
         izitoast: {
             deps: ['css!https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css']
+        },
+        hljs: {
+            deps: ['css!https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/obsidian.min.css']
         },
     },
 });

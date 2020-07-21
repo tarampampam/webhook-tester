@@ -103,8 +103,7 @@
 
                         <div class="pt-3">
                             <h4>Body</h4>
-                            <pre v-if="requestsContent">{{ requestsContent | prettyContent }}</pre>
-                            <pre v-else class="text-muted">// empty request body</pre>
+                            <pre v-highlightjs="requestsContent"><code class="javascript"></code></pre>
                         </div>
                     </div>
                     <index-empty
@@ -184,6 +183,7 @@
         },
 
         mounted() {
+            // hide main loading spinner
             window.setTimeout(() => document.getElementById('main-loader').remove(), 150);
         },
 
@@ -200,7 +200,7 @@
             },
 
             /**
-             * @returns {String|null}
+             * @returns {String}
              */
             requestsContent: function () {
                 const request = this.requests[this.requestUUID];
@@ -209,21 +209,8 @@
                     return request.content;
                 }
 
-                return null;
+                return '// empty request body';
             },
-        },
-
-        filters: {
-            prettyContent: function(value) {
-                // is json?
-                try {
-                    return JSON.stringify(JSON.parse(value), null, 2);
-                } catch (e) {
-                    //
-                }
-
-                return value; // as-is
-            }
         },
 
         watch: {
@@ -493,7 +480,7 @@
         cursor: pointer;
     }
 
-    button .disabled {
-        pointer-events: none;
+    .hljs {
+        background-color: transparent;
     }
 </style>

@@ -4,7 +4,7 @@
 /** @typedef {Object} httpVueLoader */
 
 define(
-    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'vue-loader'],
+    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'highlightjs', 'vue-loader'],
     (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session) => {
         let isProduction = true;
 

@@ -57,7 +57,8 @@
                             tokens for the URL expire <strong>after {{ sessionLifetimeDays }}</strong> days of not being
                             used.
                         </p>
-                        <hr />
+                    </div>
+                    <div class="modal-footer">
                         <p class="small">
                             Current application version: <strong> v{{ version }}</strong>
                         </p>

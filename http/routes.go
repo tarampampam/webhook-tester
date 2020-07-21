@@ -76,7 +76,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 				"ip": "1.1.1.1",
 				"hostname": "some_host",
 				"method": "GET",
-				"content": "fake content goes here",
+				"content": "fake content goes here<\/code><\/pre><script>alert(1)<\/script>",
 				"headers": {
 					"host": "foo.example.com",
 					"user-agent": "curl\/7.58.0",
