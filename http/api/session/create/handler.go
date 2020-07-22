@@ -58,7 +58,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		DelaySec:    *request.ResponseDelaySec,
 	}
 
-	sessionData, sessionErr := h.storage.NewSession(webHookResp, h.appSettings.SessionTTL)
+	sessionData, sessionErr := h.storage.CreateSession(webHookResp, h.appSettings.SessionTTL)
 	if sessionErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, sessionErr.Error()).ToJSON())

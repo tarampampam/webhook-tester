@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	sessionCreate "webhook-tester/http/api/session/create"
+	sessionDelete "webhook-tester/http/api/session/delete"
 	settingsGet "webhook-tester/http/api/settings/get"
 	"webhook-tester/http/fileserver"
 	"webhook-tester/http/ping"
@@ -50,9 +51,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 
 	// delete session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(s.storage)).
 		Methods(http.MethodDelete).
 		Name("session_delete")
 
@@ -60,8 +59,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 	apiRouter.
 		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", stub.Handler(`{
 			"11111111-0000-0000-0000-000000000000": {
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
+				"client_address": "1.1.1.1",
 				"method": "GET",
 				"content": "fake content goes here<\/code><\/pre><script>alert(1)<\/script>",
 				"headers": {
@@ -79,8 +77,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 				"created_at_unix": 1595017226
 			},
 			"22222222-0000-0000-0000-000000000000": {
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
+				"client_address": "1.1.1.1",
 				"method": "PUT",
 				"content": "{\"foo\":1,\"bar\":\"baz\",\"a\":[1,2,3]}",
 				"headers": {
@@ -98,8 +95,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 				"created_at_unix": 1595017240
 			},
 			"33333333-0000-0000-0000-000000000000": {
-				"ip": "2.2.2.2",
-				"hostname": "another_host",
+				"client_address": "2.2.2.2",
 				"method": "DELETE",
 				"content": "",
 				"headers": {
@@ -125,8 +121,7 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 		Handle(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
 			stub.Handler(`{
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
+				"client_address": "1.1.1.1",
 				"method": "GET",
 				"content": "fake content goes here",
 				"headers": {

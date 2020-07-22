@@ -28,7 +28,7 @@
                             v-for="(request, uuid) in this.requests"
                             class="request-plate"
                             :uuid="uuid"
-                            :ip="request.ip"
+                            :client-address="request.client_address"
                             :method="request.method"
                             :when="request.when"
                             :key="uuid"
@@ -144,12 +144,11 @@
             return {
                 requests: {
                     // 'cd5e695f-1784-4dcf-9b3f-ef66c9a0aaaa': {
-                    //     ip: '1.1.1.1',
+                    //     client_address: 'some_host',
                     //     method: 'post',
                     //     when: pastDate,
                     //     content: 'foo bar',
                     //     url: 'https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar',
-                    //     hostname: 'some_host',
                     //     headers: {
                     //         "host": "foo.example.com",
                     //         "user-agent": "curl\/7.58.0",
@@ -256,12 +255,11 @@
                                     let request = requests[uuid];
 
                                     this.requests[uuid] = {
-                                        ip: request.ip,
+                                        client_address: request.client_address,
                                         method: request.method.toLowerCase(),
                                         when: new Date(request.created_at_unix * 1000),
                                         content: request.content,
                                         url: request.url,
-                                        hostname: request.hostname,
                                         headers: request.headers,
                                         __updated: true,
                                     };
@@ -443,9 +441,17 @@
             },
 
             /**
-             * @param {{statusCode: String|null, contentType: String|null, responseDelay: String|null, responseBody: String|null}} urlSettings
+             * @param {{statusCode: Number|null, contentType: String|null, responseDelay: Number|null, responseBody: String|null, destroyCurrentSession: bool}} urlSettings
              */
             newUrlHandler(urlSettings) {
+                if (urlSettings.destroyCurrentSession === true) {
+                    this.$api.deleteSession(this.sessionUUID)
+                        .catch((err) => this.$izitoast.error({
+                            title: `Cannot destroy current session: ${err.message}`,
+                            zindex: 10
+                        }))
+                }
+
                 this.$api.startNewSession({
                     content_type: urlSettings.contentType,
                     status_code: urlSettings.statusCode,

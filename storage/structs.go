@@ -23,6 +23,36 @@ type SessionData struct {
 	// WebHook response settings
 	WebHookResponse WebHookResponse
 
-	// When this session was created
+	// When session was created
+	CreatedAtUnix int64
+}
+
+// Request is a recorded request information.
+type Request struct {
+	// Client hostname or IP address (who sent this request)
+	ClientAddr string
+
+	// HTTP method name (eg.: 'GET', 'POST')
+	Method string
+
+	// Request body (payload)
+	Content string
+
+	// HTTP headers
+	Headers map[string]string
+
+	// Requested URI
+	URI string
+}
+
+// RequestData describes recorded request and additional meta-data.
+type RequestData struct {
+	// Unique request identifier
+	UUID string
+
+	// Request data
+	Request Request
+
+	// When request was created
 	CreatedAtUnix int64
 }

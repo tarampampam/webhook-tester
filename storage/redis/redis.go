@@ -11,9 +11,10 @@ import (
 )
 
 const sessionKeyPrefix string = "session:"
+const sessionRequestsKeyPrefix string = "requests:"
 
 type Storage struct {
-	ctx           context.Context
+	Context       context.Context
 	client        *redis.Client
 	json          jsoniter.API
 	uuidGenerator func() string
@@ -27,9 +28,18 @@ type sessionData struct {
 	CreatedAtUnix       int64  `json:"created_at_unix"`
 }
 
+type requestData struct {
+	ClientAddr    string            `json:"client_addr"`
+	Method        string            `json:"method"`
+	Content       string            `json:"content"`
+	Headers       map[string]string `json:"headers"`
+	URI           string            `json:"uri"`
+	CreatedAtUnix int64             `json:"created_at_unix"`
+}
+
 func NewStorage(addr, password string, dbNum, maxConn int) *Storage {
 	return &Storage{
-		ctx: context.Background(),
+		Context: context.Background(),
 		client: redis.NewClient(&redis.Options{
 			Addr:     addr,
 			Username: "",
@@ -48,7 +58,7 @@ func (s *Storage) Close() error {
 	return s.client.Close()
 }
 
-func (s *Storage) NewSession(wh *storage.WebHookResponse, ttl time.Duration) (*storage.SessionData, error) {
+func (s *Storage) CreateSession(wh *storage.WebHookResponse, ttl time.Duration) (*storage.SessionData, error) {
 	var (
 		sessionUUID = s.uuidGenerator()
 		sessionData = sessionData{
@@ -65,7 +75,7 @@ func (s *Storage) NewSession(wh *storage.WebHookResponse, ttl time.Duration) (*s
 		return nil, jsonErr
 	}
 
-	if err := s.client.Set(s.ctx, sessionKeyPrefix+sessionUUID, asJSON, ttl).Err(); err != nil {
+	if err := s.client.Set(s.Context, sessionKeyPrefix+sessionUUID, asJSON, ttl).Err(); err != nil {
 		return nil, err
 	}
 
@@ -78,5 +88,66 @@ func (s *Storage) NewSession(wh *storage.WebHookResponse, ttl time.Duration) (*s
 			DelaySec:    sessionData.ResponseDelaySec,
 		},
 		CreatedAtUnix: sessionData.CreatedAtUnix,
+	}, nil
+}
+
+func (s *Storage) deleteKeys(keys ...string) (bool, error) {
+	cmdResult := s.client.Del(s.Context, keys...)
+
+	if err := cmdResult.Err(); err != nil {
+		return false, err
+	}
+
+	if count, err := cmdResult.Result(); err != nil {
+		return false, err
+	} else if count == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *Storage) DeleteSession(sessionUUID string) (bool, error) {
+	return s.deleteKeys(sessionKeyPrefix + sessionUUID)
+}
+
+func (s *Storage) DeleteRequests(sessionUUID string) (bool, error) {
+	return s.deleteKeys(sessionRequestsKeyPrefix + sessionUUID)
+}
+
+func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storage.RequestData, error) {
+	var (
+		requestUUID = s.uuidGenerator()
+		requestData = requestData{
+			ClientAddr:    r.ClientAddr,
+			Method:        r.Method,
+			Content:       r.Content,
+			Headers:       r.Headers,
+			URI:           r.URI,
+			CreatedAtUnix: time.Now().Unix(),
+		}
+	)
+
+	asJSON, jsonErr := s.json.Marshal(requestData)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	if err := s.client.HSet(s.Context, sessionRequestsKeyPrefix+sessionUUID, requestUUID, asJSON).Err(); err != nil {
+		return nil, err
+	}
+
+	// @todo: append? ttl?
+
+	return &storage.RequestData{
+		UUID: requestUUID,
+		Request: storage.Request{
+			ClientAddr: requestData.ClientAddr,
+			Method:     requestData.Method,
+			Content:    requestData.Content,
+			Headers:    requestData.Headers,
+			URI:        requestData.URI,
+		},
+		CreatedAtUnix: requestData.CreatedAtUnix,
 	}, nil
 }

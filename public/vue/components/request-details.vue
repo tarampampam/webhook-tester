@@ -27,8 +27,8 @@
                         <td><code>{{ request.method.toUpperCase() }}</code></td>
                     </tr>
                     <tr>
-                        <td>Host</td>
-                        <td><code>{{ request.hostname }}</code></td>
+                        <td>Client address</td>
+                        <td><code>{{ request.client_address }}</code></td>
                     </tr>
                     <tr>
                         <td>Date</td>

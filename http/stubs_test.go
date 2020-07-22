@@ -7,7 +7,9 @@ import (
 
 type fakeStorage struct{}
 
-func (*fakeStorage) Close() error { return nil }
-func (*fakeStorage) NewSession(wh *storage.WebHookResponse, ttl time.Duration) (*storage.SessionData, error) {
+func (*fakeStorage) Close() error                                    { return nil }
+func (*fakeStorage) DeleteSession(sessionUUID string) (bool, error)  { return true, nil }
+func (*fakeStorage) DeleteRequests(sessionUUID string) (bool, error) { return true, nil }
+func (*fakeStorage) CreateSession(wh *storage.WebHookResponse, ttl time.Duration) (*storage.SessionData, error) {
 	return &storage.SessionData{}, nil
 }

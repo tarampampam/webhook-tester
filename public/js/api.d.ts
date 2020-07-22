@@ -33,8 +33,7 @@ export interface APINewSessionSettings {
 }
 
 export interface APIRecordedRequest {
-    ip: string
-    hostname: string
+    client_address: string
     method: string
     content: string
     headers: {
