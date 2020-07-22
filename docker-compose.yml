@@ -1,17 +1,43 @@
-version: '3.2'
+version: '3.4'
 
 volumes:
   tmp-data:
+  redis-data:
+
+x-app: &app-service
+  image: golang:1.14-stretch # Image page: <https://hub.docker.com/_/golang>
+  working_dir: /src
+  environment:
+    HOME: /tmp
+    GOPATH: /tmp
+  volumes:
+    - /etc/passwd:/etc/passwd:ro
+    - /etc/group:/etc/group:ro
+    - .:/src:cached
+    - tmp-data:/tmp:cached
 
 services:
   app:
-    image: golang:1.14-stretch # Image page: <https://hub.docker.com/_/golang>
-    working_dir: /src
-    environment:
-      HOME: /tmp
-      GOPATH: /tmp
+    <<: *app-service
+
+  web:
+    <<: *app-service
+    ports:
+      - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
+    command: go run . serve --port 8080 --redis-host redis
+
+  redis:
+    image: redis:6.0.5-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
-      - /etc/passwd:/etc/passwd:ro
-      - /etc/group:/etc/group:ro
-      - .:/src:cached
-      - tmp-data:/tmp:cached
+      - redis-data:/data:cached
+    ports:
+      - 6379
+      #- '6379:6379/tcp'
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=docker:redis:6379:1
+    ports:
+      - '8081:8081/tcp' # Open <http://127.0.0.1:8081>

@@ -60,7 +60,7 @@
                     </div>
                     <div class="modal-footer">
                         <p class="small">
-                            Current application version: <strong> v{{ version }}</strong>
+                            Current application version: <strong> {{ version }}</strong>
                         </p>
                     </div>
                 </div>

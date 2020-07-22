@@ -2,6 +2,8 @@ package http
 
 import (
 	"net/http"
+	sessionCreate "webhook-tester/http/api/session/create"
+	settingsGet "webhook-tester/http/api/settings/get"
 	"webhook-tester/http/fileserver"
 	"webhook-tester/http/ping"
 	"webhook-tester/http/stub"
@@ -32,32 +34,17 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 		PathPrefix("/api").
 		Subrouter()
 
-	apiRouter.Use(DisableCachingMiddleware)
+	apiRouter.Use(DisableCachingMiddleware, JSONResponseMiddleware)
 
 	// get application settings
 	apiRouter.
-		Handle("/settings", stub.Handler(`{
-			"version": "0.0.0",
-			"limits": {
-				"max_requests": 50,
-				"session_lifetime_sec": 604800
-			}
-		}`)).
+		Handle("/settings", settingsGet.NewHandler(s.appSettings)).
 		Methods(http.MethodGet).
 		Name("settings_get")
 
 	// create new session
 	apiRouter.
-		Handle("/session", stub.Handler(`{
-			"uuid": "%RAND_UUID%",
-			"response": {
-				"content": "\"foobar\"",
-				"code": 200,
-				"content_type": "text\/plain",
-				"delay_sec": 0,
-				"created_at_unix": 1595017026
-			}
-		}`)).
+		Handle("/session", sessionCreate.NewHandler(s.appSettings, s.storage)).
 		Methods(http.MethodPost).
 		Name("session_create")
 
@@ -190,6 +177,8 @@ func (s *Server) registerWebHookHandlers() {
 		http.MethodOptions,
 		http.MethodTrace,
 	}
+
+	// @todo: add CORS middleware
 
 	s.Router.
 		Handle("/{sessionUUID:"+uuidPattern+"}", stub.Handler(`"foobar"`)).

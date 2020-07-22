@@ -230,7 +230,7 @@
                             sessionUUID: this.sessionUUID,
                             requestUUID: this.requestUUID,
                         }
-                    });
+                    }).catch((err) => {});
                 }
             },
         },

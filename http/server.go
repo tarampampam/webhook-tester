@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"webhook-tester/settings"
+	"webhook-tester/storage"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -21,16 +23,18 @@ type (
 	}
 
 	Server struct {
-		settings *ServerSettings
-		Server   *http.Server
-		Router   *mux.Router
-		stdLog   *log.Logger
-		errLog   *log.Logger
+		settings    *ServerSettings
+		appSettings *settings.AppSettings
+		Server      *http.Server
+		Router      *mux.Router
+		storage     storage.Storage
+		stdLog      *log.Logger
+		errLog      *log.Logger
 	}
 )
 
 // NewServer creates new server instance.
-func NewServer(settings *ServerSettings) *Server {
+func NewServer(settings *ServerSettings, appSettings *settings.AppSettings, storage storage.Storage) *Server {
 	var (
 		router     = *mux.NewRouter()
 		stdLog     = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)
@@ -47,11 +51,13 @@ func NewServer(settings *ServerSettings) *Server {
 	httpServer.SetKeepAlivesEnabled(settings.KeepAliveEnabled)
 
 	return &Server{
-		settings: settings,
-		Server:   httpServer,
-		Router:   &router,
-		stdLog:   stdLog,
-		errLog:   errLog,
+		settings:    settings,
+		appSettings: appSettings,
+		Server:      httpServer,
+		Router:      &router,
+		storage:     storage,
+		stdLog:      stdLog,
+		errLog:      errLog,
 	}
 }
 

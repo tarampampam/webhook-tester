@@ -13,7 +13,8 @@ DC_RUN_ARGS = --rm --user "$(shell id -u):$(shell id -g)"
 APP_NAME = $(notdir $(CURDIR))
 
 .PHONY : help \
-         image build serve fmt lint gotest test cover \
+         image build fmt lint gotest test cover redis-cli \
+         up down restart \
          clean
 .DEFAULT_GOAL : help
 .SILENT : lint gotest
@@ -28,32 +29,39 @@ image: ## Build docker image with app
 	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):local ...`';
 
 build: ## Build app binary file
-	$(DC_BIN) run $(DC_RUN_ARGS) app go build -ldflags=$(LDFLAGS) .
-
-serve: ## Start static files serving
-	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now open in your favorite browser <http://127.0.0.1:8082> and press CTRL+C for stopping'
-	$(DC_BIN) run $(DC_RUN_ARGS) -p "8082:8080/tcp" app go run . serve --port 8080
+	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app go build -ldflags=$(LDFLAGS) .
 
 fmt: ## Run source code formatter tools
-	$(DC_BIN) run $(DC_RUN_ARGS) app sh -c 'GO111MODULE=off go get golang.org/x/tools/cmd/goimports && $$GOPATH/bin/goimports -d -w .'
-	$(DC_BIN) run $(DC_RUN_ARGS) app gofmt -s -w -d .
+	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app sh -c 'GO111MODULE=off go get golang.org/x/tools/cmd/goimports && $$GOPATH/bin/goimports -d -w .'
+	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app gofmt -s -w -d .
 
 lint: ## Run app linters
 	$(DOCKER_BIN) run --rm -t -v "$(cwd):/app" -w /app golangci/golangci-lint:v1.24-alpine golangci-lint run
 
 gotest: ## Run app tests
-	$(DC_BIN) run $(DC_RUN_ARGS) app go test -v -race -timeout 5s ./... \
+	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app go test -v -race -timeout 5s ./... \
 		&& printf "\n   \e[30;42m %s \033[0m\n\n" 'All tests passed!' \
 		|| ( printf "\n   \e[39;41m %s \033[0m\n\n" 'Some tests fails!'; exit 1 )
 
 test: lint gotest ## Run app tests and linters
 
 cover: ## Run app tests with coverage report
-	$(DC_BIN) run $(DC_RUN_ARGS) app sh -c 'go test -race -covermode=atomic -coverprofile /tmp/cp.out ./... && go tool cover -html=/tmp/cp.out -o ./coverage.html'
+	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app sh -c 'go test -race -covermode=atomic -coverprofile /tmp/cp.out ./... && go tool cover -html=/tmp/cp.out -o ./coverage.html'
 	-sensible-browser ./coverage.html && sleep 2 && rm -f ./coverage.html
 
 shell: ## Start shell into container with golang
 	$(DC_BIN) run $(DC_RUN_ARGS) app bash
+
+redis-cli: ## Start redis-cli
+	$(DC_BIN) run --rm --no-deps redis redis-cli -h redis -p 6379
+
+up: ## Create and start containers
+	$(DC_BIN) up --detach
+
+down: ## Stop all services
+	$(DC_BIN) down -t 5
+
+restart: down up ## Restart all containers
 
 clean: ## Make clean
 	$(DC_BIN) down -v -t 1
