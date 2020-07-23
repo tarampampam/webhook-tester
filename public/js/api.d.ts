@@ -39,7 +39,7 @@ export interface APIRecordedRequest {
     headers: {
         [key: string]: string;
     }
-    url: string
+    url: string // relative (`/foo/bar`, NOT `http://example.com/foo/bar`)
     created_at_unix: number
 }
 

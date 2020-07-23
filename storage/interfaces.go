@@ -1,17 +1,31 @@
 package storage
 
-import "time"
-
 type Storage interface {
 	// Close closes connections to the storage.
 	Close() error
 
-	// CreateSession creates new session in storage using passed options.
-	CreateSession(webHookSettings *WebHookResponse, ttl time.Duration) (*SessionData, error)
+	// GetSession returns session data.
+	// If session was not found - `nil, nil` will be returned.
+	GetSession(sessionUUID string) (*SessionData, error)
+
+	// CreateSession creates new session in storage using passed data.
+	CreateSession(webHookSettings *WebHookResponse) (*SessionData, error)
 
 	// DeleteSession deletes session with passed UUID.
 	DeleteSession(sessionUUID string) (bool, error)
 
 	// DeleteRequests deletes stored requests for session with passed UUID.
 	DeleteRequests(sessionUUID string) (bool, error)
+
+	// CreateRequest creates new request in storage using passed data.
+	// Session with passed UUID must exists.
+	CreateRequest(sessionUUID string, r *Request) (*RequestData, error)
+
+	// GetRequest returns request data.
+	// If request was not found - `nil, nil` will be returned.
+	GetRequest(sessionUUID, requestUUID string) (*RequestData, error)
+
+	// GetAllRequests returns all request as a slice of structures.
+	// If requests was not found - `nil, nil` will be returned.
+	GetAllRequests(sessionUUID string) (*[]RequestData, error)
 }

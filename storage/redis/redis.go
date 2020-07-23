@@ -10,36 +10,20 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-const sessionKeyPrefix string = "session:"
-const sessionRequestsKeyPrefix string = "requests:"
-
 type Storage struct {
 	Context       context.Context
+	ttl           time.Duration
+	maxRequests   uint16
 	client        *redis.Client
 	json          jsoniter.API
 	uuidGenerator func() string
 }
 
-type sessionData struct {
-	ResponseContent     string `json:"resp_content"`
-	ResponseCode        uint16 `json:"resp_code"`
-	ResponseContentType string `json:"resp_content_type"`
-	ResponseDelaySec    uint8  `json:"resp_delay_sec"`
-	CreatedAtUnix       int64  `json:"created_at_unix"`
-}
-
-type requestData struct {
-	ClientAddr    string            `json:"client_addr"`
-	Method        string            `json:"method"`
-	Content       string            `json:"content"`
-	Headers       map[string]string `json:"headers"`
-	URI           string            `json:"uri"`
-	CreatedAtUnix int64             `json:"created_at_unix"`
-}
-
-func NewStorage(addr, password string, dbNum, maxConn int) *Storage {
+func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Duration, maxRequests uint16) *Storage {
 	return &Storage{
-		Context: context.Background(),
+		Context:     context.Background(),
+		ttl:         sessionTTL,
+		maxRequests: maxRequests,
 		client: redis.NewClient(&redis.Options{
 			Addr:     addr,
 			Username: "",
@@ -58,7 +42,26 @@ func (s *Storage) Close() error {
 	return s.client.Close()
 }
 
-func (s *Storage) CreateSession(wh *storage.WebHookResponse, ttl time.Duration) (*storage.SessionData, error) {
+func (s *Storage) GetSession(sessionUUID string) (*storage.SessionData, error) {
+	value, err := s.client.Get(s.Context, newStorageKey(sessionUUID).session()).Bytes()
+
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil // not found
+		}
+
+		return nil, err
+	}
+
+	sessionData := sessionData{}
+	if err := s.json.Unmarshal(value, &sessionData); err != nil {
+		return nil, err
+	}
+
+	return sessionData.toSharedStruct(sessionUUID), nil
+}
+
+func (s *Storage) CreateSession(wh *storage.WebHookResponse) (*storage.SessionData, error) {
 	var (
 		sessionUUID = s.uuidGenerator()
 		sessionData = sessionData{
@@ -75,20 +78,11 @@ func (s *Storage) CreateSession(wh *storage.WebHookResponse, ttl time.Duration) 
 		return nil, jsonErr
 	}
 
-	if err := s.client.Set(s.Context, sessionKeyPrefix+sessionUUID, asJSON, ttl).Err(); err != nil {
+	if err := s.client.Set(s.Context, newStorageKey(sessionUUID).session(), asJSON, s.ttl).Err(); err != nil {
 		return nil, err
 	}
 
-	return &storage.SessionData{
-		UUID: sessionUUID,
-		WebHookResponse: storage.WebHookResponse{
-			Content:     sessionData.ResponseContent,
-			Code:        sessionData.ResponseCode,
-			ContentType: sessionData.ResponseContentType,
-			DelaySec:    sessionData.ResponseDelaySec,
-		},
-		CreatedAtUnix: sessionData.CreatedAtUnix,
-	}, nil
+	return sessionData.toSharedStruct(sessionUUID), nil
 }
 
 func (s *Storage) deleteKeys(keys ...string) (bool, error) {
@@ -108,11 +102,50 @@ func (s *Storage) deleteKeys(keys ...string) (bool, error) {
 }
 
 func (s *Storage) DeleteSession(sessionUUID string) (bool, error) {
-	return s.deleteKeys(sessionKeyPrefix + sessionUUID)
+	return s.deleteKeys(newStorageKey(sessionUUID).session())
 }
 
 func (s *Storage) DeleteRequests(sessionUUID string) (bool, error) {
-	return s.deleteKeys(sessionRequestsKeyPrefix + sessionUUID)
+	key := newStorageKey(sessionUUID)
+
+	return s.deleteKeys(key.requestsOrderKey(), key.requestsDataKey())
+}
+
+func (s *Storage) syncRequests(key storageKey) error {
+	// get keys from ordered requests set (key is request UUID)
+	orderedKeys, ordErr := s.client.LRange(s.Context, key.requestsOrderKey(), 0, int64(s.maxRequests)-1).Result()
+	if ordErr != nil {
+		return ordErr
+	}
+
+	// get all requests from data key (key also is request UUID)
+	requestKeys, reqErr := s.client.HKeys(s.Context, key.requestsDataKey()).Result()
+	if reqErr != nil {
+		return reqErr
+	}
+
+	// calculate difference between ordered keys set and data key
+	orderedMap := make(map[string]bool, len(orderedKeys))
+	for _, key := range orderedKeys {
+		orderedMap[key] = true
+	}
+
+	var diff []string
+
+	for _, key := range requestKeys {
+		if _, found := orderedMap[key]; !found {
+			diff = append(diff, key) // only if key exists in data key and not exists in ordered
+		}
+	}
+
+	if len(diff) > 0 {
+		// and remove them
+		if err := s.client.HDel(s.Context, key.requestsDataKey(), diff...).Err(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storage.RequestData, error) {
@@ -126,6 +159,7 @@ func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storag
 			URI:           r.URI,
 			CreatedAtUnix: time.Now().Unix(),
 		}
+		key = newStorageKey(sessionUUID)
 	)
 
 	asJSON, jsonErr := s.json.Marshal(requestData)
@@ -133,21 +167,70 @@ func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storag
 		return nil, jsonErr
 	}
 
-	if err := s.client.HSet(s.Context, sessionRequestsKeyPrefix+sessionUUID, requestUUID, asJSON).Err(); err != nil {
+	// execute pipeline <https://redis.io/topics/pipelining>
+	if _, err := s.client.Pipelined(s.Context, func(pipe redis.Pipeliner) error {
+		// save request uuid into ordered requests list
+		pipe.LPush(s.Context, key.requestsOrderKey(), requestUUID)
+		// trim requests list
+		pipe.LTrim(s.Context, key.requestsOrderKey(), 0, int64(s.maxRequests)-1)
+		// save request data
+		pipe.HSet(s.Context, key.requestsDataKey(), requestUUID, asJSON)
+
+		// update ttl for required keys
+		pipe.Expire(s.Context, key.requestsOrderKey(), s.ttl)
+		pipe.Expire(s.Context, key.requestsDataKey(), s.ttl)
+		pipe.Expire(s.Context, key.session(), s.ttl)
+
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
-	// @todo: append? ttl?
+	if err := s.syncRequests(key); err != nil {
+		return nil, err
+	}
 
-	return &storage.RequestData{
-		UUID: requestUUID,
-		Request: storage.Request{
-			ClientAddr: requestData.ClientAddr,
-			Method:     requestData.Method,
-			Content:    requestData.Content,
-			Headers:    requestData.Headers,
-			URI:        requestData.URI,
-		},
-		CreatedAtUnix: requestData.CreatedAtUnix,
-	}, nil
+	return requestData.toSharedStruct(requestUUID), nil
+}
+
+func (s *Storage) GetRequest(sessionUUID, requestUUID string) (*storage.RequestData, error) {
+	value, err := s.client.HGet(s.Context, newStorageKey(sessionUUID).requestsDataKey(), requestUUID).Bytes()
+
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil // not found
+		}
+
+		return nil, err
+	}
+
+	requestData := requestData{}
+	if err := s.json.Unmarshal(value, &requestData); err != nil {
+		return nil, err
+	}
+
+	return requestData.toSharedStruct(requestUUID), nil
+}
+
+func (s *Storage) GetAllRequests(sessionUUID string) (*[]storage.RequestData, error) {
+	data, err := s.client.HGetAll(s.Context, newStorageKey(sessionUUID).requestsDataKey()).Result()
+
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil // not found
+		}
+
+		return nil, err
+	}
+
+	result := make([]storage.RequestData, 0)
+
+	for requestUUID, json := range data {
+		requestData := requestData{}
+		if err := s.json.Unmarshal([]byte(json), &requestData); err == nil { // ignore errors with wrong json
+			result = append(result, *requestData.toSharedStruct(requestUUID))
+		}
+	}
+
+	return &result, nil
 }

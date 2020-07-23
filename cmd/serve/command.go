@@ -70,11 +70,18 @@ func (publicDir) IsValidValue(dir string) error {
 
 // Execute current command.
 func (cmd *Command) Execute(_ []string) error {
+	appSettings := &settings.AppSettings{
+		MaxRequests: cmd.MaxRequests,
+		SessionTTL:  time.Second * time.Duration(cmd.SessionTTLSec),
+	}
+
 	storage := redis.NewStorage(
 		cmd.RedisHost+":"+cmd.RedisPort.String(),
 		cmd.RedisPass,
 		int(cmd.RedisDBNum),
 		int(cmd.RedisMaxConn),
+		appSettings.SessionTTL,
+		appSettings.MaxRequests,
 	)
 
 	server := apphttp.NewServer(&apphttp.ServerSettings{
@@ -83,10 +90,7 @@ func (cmd *Command) Execute(_ []string) error {
 		ReadTimeout:               httpReadTimeout,
 		PublicAssetsDirectoryPath: cmd.PublicDir.String(),
 		KeepAliveEnabled:          false,
-	}, &settings.AppSettings{
-		MaxRequests: cmd.MaxRequests,
-		SessionTTL:  time.Second * time.Duration(cmd.SessionTTLSec),
-	}, storage)
+	}, appSettings, storage)
 
 	server.RegisterHandlers()
 

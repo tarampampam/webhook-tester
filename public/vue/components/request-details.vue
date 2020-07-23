@@ -19,7 +19,7 @@
                     <tbody>
                     <tr>
                         <td>URL</td>
-                        <td><code><a :href="request.url">{{ request.url }}</a></code>
+                        <td><code><a :href="getRequestURI">{{ getRequestURI }}</a></code>
                         </td>
                     </tr>
                     <tr>
@@ -80,6 +80,7 @@
                 intervalId: null,
                 formattedWhen: '',
                 permalink: window.location.href,
+                baseUrl: null,
             }
         },
 
@@ -91,8 +92,22 @@
         },
 
         mounted: function () {
+            this.baseURI = window.location.origin;
             this.updateFormattedWhen();
             this.intervalId = setInterval(() => this.updateFormattedWhen(), 1000);
+        },
+
+        computed: {
+            /**
+             * @returns {String}
+             */
+            getRequestURI: function () {
+                let uri = typeof this.request.url === 'string'
+                    ? this.request.url.replace(/^\/+/g, '')
+                    : '...';
+
+                return `${window.location.origin}/${uri}`;
+            },
         },
 
         beforeDestroy: function () {

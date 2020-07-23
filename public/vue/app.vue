@@ -138,15 +138,12 @@
         },
 
         data: function () {
-            let pastDate = new Date; // just for a test
-            pastDate.setHours(pastDate.getHours() - 2);
-
             return {
                 requests: {
                     // 'cd5e695f-1784-4dcf-9b3f-ef66c9a0aaaa': {
                     //     client_address: 'some_host',
                     //     method: 'post',
-                    //     when: pastDate,
+                    //     when: new Date,
                     //     content: 'foo bar',
                     //     url: 'https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar',
                     //     headers: {
@@ -250,6 +247,8 @@
                 return new Promise((resolve, reject) => {
                     this.$api.getAllSessionRequests(this.sessionUUID)
                         .then((requests) => {
+                            // @todo: make sort by `request.created_at_unix` (also headers must be sorted too)
+
                             for (let uuid in requests) {
                                 if (requests.hasOwnProperty(uuid)) {
                                     let request = requests[uuid];

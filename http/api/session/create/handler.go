@@ -4,23 +4,20 @@ import (
 	"io/ioutil"
 	"net/http"
 	"webhook-tester/http/errors"
-	"webhook-tester/settings"
 	"webhook-tester/storage"
 
 	jsoniter "github.com/json-iterator/go"
 )
 
 type Handler struct {
-	appSettings *settings.AppSettings
-	storage     storage.Storage
-	json        jsoniter.API
+	storage storage.Storage
+	json    jsoniter.API
 }
 
-func NewHandler(appSettings *settings.AppSettings, storage storage.Storage) http.Handler {
+func NewHandler(storage storage.Storage) http.Handler {
 	return &Handler{
-		appSettings: appSettings,
-		storage:     storage,
-		json:        jsoniter.ConfigFastest,
+		storage: storage,
+		json:    jsoniter.ConfigFastest,
 	}
 }
 
@@ -58,7 +55,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		DelaySec:    *request.ResponseDelaySec,
 	}
 
-	sessionData, sessionErr := h.storage.CreateSession(webHookResp, h.appSettings.SessionTTL)
+	sessionData, sessionErr := h.storage.CreateSession(webHookResp)
 	if sessionErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, sessionErr.Error()).ToJSON())
