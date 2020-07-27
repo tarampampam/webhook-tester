@@ -8,51 +8,58 @@
                 <div class="col-5 text-right">
                     <button class="btn btn-primary btn-sm"
                             v-bind:data-clipboard-text="permalink"
-                            target="_blank"
                             type="button"
                     >Copy permalink
                     </button>
                 </div>
             </div>
-            <div class="row mx-0">
-                <table class="table table-hover table-sm table-borderless">
-                    <tbody>
-                    <tr>
-                        <td>URL</td>
-                        <td><code><a :href="getRequestURI">{{ getRequestURI }}</a></code>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Method</td>
-                        <td><code>{{ request.method.toUpperCase() }}</code></td>
-                    </tr>
-                    <tr>
-                        <td>Client address</td>
-                        <td><code>{{ request.client_address }}</code></td>
-                    </tr>
-                    <tr>
-                        <td>Date</td>
-                        <td><code>{{ formattedWhen }}</code></td>
-                    </tr>
-                    <tr>
-                        <td>ID</td>
-                        <td><code>{{ uuid }}</code></td>
-                    </tr>
-                    </tbody>
-                </table>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">URL</div>
+                <div class="col-lg-9 text-break">
+                    <code><a :href="getRequestURI">{{ getRequestURI }}</a></code>
+                </div>
+            </div>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">Method</div>
+                <div class="col-lg-9">
+                    <code>{{ request.method.toUpperCase() }}</code>
+                </div>
+            </div>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">From</div>
+                <div class="col-lg-9">
+                    <code>{{ request.client_address }}</code>
+                </div>
+            </div>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">When</div>
+                <div class="col-lg-9">
+                    <code>{{ formattedWhen }}</code>
+                </div>
+            </div>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">ID</div>
+                <div class="col-lg-9">
+                    <code>{{ uuid }}</code>
+                </div>
             </div>
         </div>
-        <div class="col-md-12 col-lg-7 col-xl-8" v-if="this.request.headers">
+
+        <div class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0" v-if="this.request.headers">
             <h4>Headers</h4>
-            <div class="row mx-0">
-                <table class="table table-hover table-sm table-borderless">
-                    <tbody>
-                    <tr v-for="(value, name) in this.request.headers">
-                        <td>{{ name }}</td>
-                        <td class="text-break"><code>{{ value }}</code></td>
-                    </tr>
-                    </tbody>
-                </table>
+            <div v-for="(header) in this.request.headers"
+                 class="row pb-1">
+                <div class="col-lg-4 col-xl-2 text-lg-right">
+                    {{ header.name }}
+                </div>
+                <div class="col-lg-8 col-xl-10 text-break">
+                    <code>{{ header.value }}</code>
+                </div>
             </div>
         </div>
     </div>
@@ -80,7 +87,6 @@
                 intervalId: null,
                 formattedWhen: '',
                 permalink: window.location.href,
-                baseUrl: null,
             }
         },
 
@@ -92,7 +98,6 @@
         },
 
         mounted: function () {
-            this.baseURI = window.location.origin;
             this.updateFormattedWhen();
             this.intervalId = setInterval(() => this.updateFormattedWhen(), 1000);
         },
@@ -126,6 +131,6 @@
 
 <style scoped>
     .request-details .text-break {
-        word-break: break-all
+        word-break: break-all;
     }
 </style>

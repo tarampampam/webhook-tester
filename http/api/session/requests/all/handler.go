@@ -2,6 +2,7 @@ package all
 
 import (
 	"net/http"
+	"webhook-tester/http/api"
 	"webhook-tester/http/errors"
 	"webhook-tester/storage"
 
@@ -50,23 +51,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var (
+		encoder = h.json.NewEncoder(w)
+		result  = make(api.Requests, 0)
+	)
+
 	if data == nil {
-		_ = h.json.NewEncoder(w).Encode(response{}) // not 404 - just empty result
+		_ = encoder.Encode(result) // not 404 - just empty result
 		return
 	}
 
-	var result = response{}
-
 	for _, resp := range *data {
-		result[resp.UUID] = record{
+		result = append(result, api.Request{
+			UUID:          resp.UUID,
 			ClientAddr:    resp.Request.ClientAddr,
 			Method:        resp.Request.Method,
 			Content:       resp.Request.Content,
-			Headers:       resp.Request.Headers,
+			Headers:       api.MapToHeaders(resp.Request.Headers).Sorted(),
 			URI:           resp.Request.URI,
 			CreatedAtUnix: resp.CreatedAtUnix,
-		}
+		})
 	}
 
-	_ = h.json.NewEncoder(w).Encode(result)
+	_ = encoder.Encode(result.Sorted())
 }

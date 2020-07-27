@@ -2,6 +2,7 @@ package get
 
 import (
 	"net/http"
+	"webhook-tester/http/api"
 	"webhook-tester/http/errors"
 	"webhook-tester/storage"
 
@@ -43,11 +44,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.json.NewEncoder(w).Encode(response{
+	_ = h.json.NewEncoder(w).Encode(api.Request{
+		UUID:          requestUUID,
 		ClientAddr:    data.Request.ClientAddr,
 		Method:        data.Request.Method,
 		Content:       data.Request.Content,
-		Headers:       data.Request.Headers,
+		Headers:       api.MapToHeaders(data.Request.Headers).Sorted(),
 		URI:           data.Request.URI,
 		CreatedAtUnix: data.CreatedAtUnix,
 	})

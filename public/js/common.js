@@ -12,7 +12,7 @@ requirejs.config({
         // JS framework for UI
         // Docs: <https://vuejs.org/v2/api/>
         Vue: [
-            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.min', // remove `.min` for using with `vue.js devtools`
+            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue', // @todo: remove `.min` for production using (without `vue.js devtools`)
             'https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.min',
         ],
         // Router for VueJS
@@ -33,7 +33,7 @@ requirejs.config({
             'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/moment.min',
             'https://cdn.jsdelivr.net/npm/moment@2.27.0/dist/moment.min',
         ],
-        // Modern copy to clipboard. No Flash. Just 2kb
+        // Modern copy to clipboard
         // Docs: <https://clipboardjs.com>
         clipboard: [
             'https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min',

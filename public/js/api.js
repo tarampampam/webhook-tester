@@ -29,6 +29,7 @@ define(['axios'], (axios) => {
 
     /**
      * @param {APINewSessionSettings} settings
+     *
      * @returns {Promise<APINewSession>}
      */
     const startNewSession = (settings) => {
@@ -57,7 +58,7 @@ define(['axios'], (axios) => {
     /**
      * @param {String} uuid
      *
-     * @returns {Promise<Object.<string, APIRecordedRequest>>}
+     * @returns {Promise<APIRecordedRequest[]>}
      */
     const getAllSessionRequests = (uuid) => {
         return new Promise((resolve, reject) => {

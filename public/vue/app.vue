@@ -14,26 +14,26 @@
                         <div class="d-flex w-100 justify-content-between">
                             <h5 class="text-uppercase mb-0">Requests <span
                                 class="badge badge-primary badge-pill total-requests-count"
-                            >{{ getRequestsCount() }}</span></h5>
+                            >{{ requests.length }}</span></h5>
                             <button type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    v-if="getRequestsCount() > 0"
+                                    v-if="requests.length > 0"
                                     @click="deleteAllRequests()">Delete all
                             </button>
                         </div>
                     </div>
 
-                    <div class="list-group" v-if="getRequestsCount() > 0">
+                    <div class="list-group" v-if="requests.length > 0">
                         <request-plate
-                            v-for="(request, uuid) in this.requests"
+                            v-for="r in this.requests"
                             class="request-plate"
-                            :uuid="uuid"
-                            :client-address="request.client_address"
-                            :method="request.method"
-                            :when="request.when"
-                            :key="uuid"
-                            :class="{ active: requestUUID === uuid }"
-                            @click.native="requestUUID = uuid"
+                            :uuid="r.uuid"
+                            :client-address="r.client_address"
+                            :method="r.method"
+                            :when="r.when"
+                            :key="r.uuid"
+                            :class="{ active: requestUUID === r.uuid }"
+                            @click.native="requestUUID = r.uuid"
                             @on-delete="deleteRequestHandler"
                         ></request-plate>
                     </div>
@@ -43,33 +43,33 @@
                 </div>
 
                 <div class="col-sm-7 col-md-8 col-lg-9 col-xl-10 py-3 pl-md-4" role="main">
-                    <div v-if="getRequestsCount() > 0">
+                    <div v-if="requests.length > 0 && this.requestUUID !== null">
                         <div class="row pt-2">
                             <div class="col-6">
                                 <div class="btn-group pb-1" role="group">
                                     <button type="button" class="btn btn-secondary btn-sm"
                                             @click.prevent="navigateFirstRequest"
-                                            :class="{disabled: getRequestsCount() <= 1}"
+                                            :class="{disabled: requests.length <= 1}"
                                     >
                                         First request
                                     </button>
                                     <button type="button" class="btn btn-secondary btn-sm"
                                             @click="navigatePreviousRequest"
-                                            :class="{disabled: getRequestsCount() <= 1}"
+                                            :class="{disabled: requests.length <= 1 || this.requestUUID === null}"
                                     >
-                                        <i class="fas fa-arrow-left"></i> Previous
+                                        <i class="fas fa-arrow-left pr-1"></i>Previous
                                     </button>
                                 </div>
                                 <div class="btn-group pb-1" role="group">
                                     <button type="button" class="btn btn-secondary btn-sm"
                                             @click="navigateNextRequest"
-                                            :class="{disabled: getRequestsCount() <= 1}"
+                                            :class="{disabled: requests.length <= 1 || this.requestUUID === null}"
                                     >
-                                        Next <i class="fas fa-arrow-right"></i>
+                                        Next<i class="fas fa-arrow-right pl-1"></i>
                                     </button>
                                     <button type="button" class="btn btn-secondary btn-sm"
                                             @click="navigateLastRequest"
-                                            :class="{disabled: getRequestsCount() <= 1}"
+                                            :class="{disabled: requests.length <= 1}"
                                     >
                                         Last request
                                     </button>
@@ -97,13 +97,13 @@
                         <request-details
                             v-if="showRequestDetails"
                             class="pt-3"
-                            :request="this.requests[this.requestUUID]"
+                            :request="getRequestByUUID(this.requestUUID)"
                             :uuid="this.requestUUID"
                         ></request-details>
 
                         <div class="pt-3">
                             <h4>Body</h4>
-                            <pre v-highlightjs="requestsContent"><code class="javascript"></code></pre>
+                            <pre v-highlightjs="requestContent"><code class="javascript"></code></pre>
                         </div>
                     </div>
                     <index-empty
@@ -139,20 +139,8 @@
 
         data: function () {
             return {
-                requests: {
-                    // 'cd5e695f-1784-4dcf-9b3f-ef66c9a0aaaa': {
-                    //     client_address: 'some_host',
-                    //     method: 'post',
-                    //     when: new Date,
-                    //     content: 'foo bar',
-                    //     url: 'https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar',
-                    //     headers: {
-                    //         "host": "foo.example.com",
-                    //         "user-agent": "curl\/7.58.0",
-                    //         "accept": "text\/html,application\/xhtml+xml",
-                    //    },
-                    // },
-                },
+                /** @type {RecordedRequest[]} */
+                requests: [],
 
                 autoRequestNavigate: true,
                 showRequestDetails: true,
@@ -168,9 +156,7 @@
         created() {
             this.$api.getAppSettings()
                 .then((settings) => {
-                    if (settings.hasOwnProperty('version')) {
-                        this.appVersion = settings.version;
-                    }
+                    this.appVersion = settings.version;
                     this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
                 });
 
@@ -198,8 +184,8 @@
             /**
              * @returns {String}
              */
-            requestsContent: function () {
-                const request = this.requests[this.requestUUID];
+            requestContent: function () {
+                const request = this.getRequestByUUID(this.requestUUID);
 
                 if (typeof request === 'object' && request.hasOwnProperty('content') && request.content !== '') {
                     return request.content;
@@ -226,12 +212,60 @@
                             sessionUUID: this.sessionUUID,
                             requestUUID: this.requestUUID,
                         }
-                    }).catch((err) => {});
+                    }).catch((err) => {
+                    });
                 }
             },
         },
 
         methods: {
+            /**
+             * @param {String} uuid
+             * @returns {RecordedRequest|undefined}
+             */
+            getRequestByUUID(uuid) {
+                if (typeof uuid === 'string' && this.requests.length > 0) {
+                    for (let i = 0; i < this.requests.length; i++) {
+                        if (this.requests[i].uuid === uuid) {
+                            return this.requests[i];
+                        }
+                    }
+                }
+
+                return undefined;
+            },
+
+            /**
+             * @param {String} uuid
+             * @returns {Number|undefined}
+             */
+            getRequestIndexByUUID(uuid) {
+                if (typeof uuid === 'string' && this.requests.length > 0) {
+                    for (let i = 0; i < this.requests.length; i++) {
+                        if (this.requests[i].uuid === uuid) {
+                            return i;
+                        }
+                    }
+                }
+
+                return undefined;
+            },
+
+            /**
+             * @returns {Number|undefined}
+             */
+            getCurrentRequestIndex() {
+                if (this.requests.length > 0) {
+                    for (let i = 0; i < this.requests.length; i++) {
+                        if (this.requests[i].uuid === this.requestUUID) {
+                            return i;
+                        }
+                    }
+                }
+
+                return undefined;
+            },
+
             /**
              * @param {String} uuid
              * @returns {Boolean}
@@ -247,47 +281,19 @@
                 return new Promise((resolve, reject) => {
                     this.$api.getAllSessionRequests(this.sessionUUID)
                         .then((requests) => {
-                            // @todo: make sort by `request.created_at_unix` (also headers must be sorted too)
+                            this.requests.splice(0, this.requests.length); // make clear
 
-                            for (let uuid in requests) {
-                                if (requests.hasOwnProperty(uuid)) {
-                                    let request = requests[uuid];
-
-                                    this.requests[uuid] = {
-                                        client_address: request.client_address,
-                                        method: request.method.toLowerCase(),
-                                        when: new Date(request.created_at_unix * 1000),
-                                        content: request.content,
-                                        url: request.url,
-                                        headers: request.headers,
-                                        __updated: true,
-                                    };
-                                }
-                            }
-
-                            // remove non-updated objects and (or) special `__updated` property
-                            for (let uuid in this.requests) {
-                                if (this.requests.hasOwnProperty(uuid)) {
-                                    let request = this.requests[uuid];
-
-                                    if (request.hasOwnProperty('__updated') && request.__updated === true) {
-                                        delete request['__updated'];
-                                    } else {
-                                        delete this.requests[uuid];
-                                    }
-                                }
-                            }
-
-                            if (!this.requests.hasOwnProperty(this.requestUUID)) {
-                                /** @var {String|undefined} uuidToSet */
-                                const uuidToSet = Object.keys(this.requests)[0];
-
-                                if (this.isValidUUID(uuidToSet)) {
-                                    this.requestUUID = uuidToSet;
-                                }
-                            }
-
-                            this.$forceUpdate();
+                            requests.forEach((request) => {
+                                this.requests.push({
+                                    uuid: request.uuid,
+                                    client_address: request.client_address,
+                                    method: request.method.toLowerCase(),
+                                    when: new Date(request.created_at_unix * 1000),
+                                    content: request.content,
+                                    headers: request.headers,
+                                    url: request.url,
+                                });
+                            });
 
                             resolve();
                         })
@@ -309,21 +315,16 @@
                             this.$session.setLocalSessionUUID(newSessionData.uuid);
 
                             this.reloadRequests()
-                                .catch((err) => this.$izitoast.error({
-                                    title: `Cannot retrieve requests: ${err.message}`,
-                                    zindex: 10
-                                }))
+                                .catch((err) => this.$izitoast.error({title: `Cannot retrieve requests: ${err.message}`}))
                         })
-                        .catch((err) => this.$izitoast.error({
-                            title: `Cannot create new session: ${err.message}`,
-                            zindex: 10
-                        }))
+                        .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
                 };
 
                 if (sessionUUID !== null) {
                     this.sessionUUID = sessionUUID;
 
                     this.reloadRequests()
+                        .then(() => this.navigateFirstRequest())
                         .catch(() => startNewSession())
                 } else {
                     startNewSession()
@@ -338,49 +339,37 @@
                 }
             },
 
-            /**
-             * @returns {Number}
-             */
-            getRequestsCount() {
-                return Object.keys(this.requests).length;
-            },
-
             navigateFirstRequest() {
-                const firstUuid = Object.keys(this.requests)[0];
-                console.log(111);
-                if (firstUuid !== undefined && this.requestUUID !== firstUuid) {
-                    this.requestUUID = firstUuid;
+                const first = this.requests[0];
+
+                if (first !== undefined && first.uuid !== this.requestUUID) {
+                    this.requestUUID = first.uuid;
                 }
             },
             navigatePreviousRequest() {
-                const keys = Object.keys(this.requests), prev = keys[keys.indexOf(this.requestUUID) - 1];
+                const current = this.getCurrentRequestIndex(), prev = this.requests[current - 1];
 
-                if (prev !== undefined && this.requestUUID !== prev) {
-                    this.requestUUID = prev;
+                if (prev !== undefined && prev.uuid !== this.requestUUID) {
+                    this.requestUUID = prev.uuid;
                 }
             },
             navigateNextRequest() {
-                const keys = Object.keys(this.requests), next = keys[keys.indexOf(this.requestUUID) + 1];
+                const current = this.getCurrentRequestIndex(), next = this.requests[current + 1];
 
-                if (next !== undefined && this.requestUUID !== next) {
-                    this.requestUUID = next;
+                if (next !== undefined && next.uuid !== this.requestUUID) {
+                    this.requestUUID = next.uuid;
                 }
             },
             navigateLastRequest() {
-                const keys = Object.keys(this.requests), lastUuid = keys[keys.length - 1];
+                const last = this.requests[this.requests.length - 1];
 
-                if (lastUuid !== undefined && this.requestUUID !== lastUuid) {
-                    this.requestUUID = lastUuid;
+                if (last !== undefined && last.uuid !== this.requestUUID) {
+                    this.requestUUID = last.uuid;
                 }
             },
 
             clearRequests() {
-                for (let uuid in this.requests) {
-                    if (this.requests.hasOwnProperty(uuid)) {
-                        delete this.requests[uuid];
-                    }
-                }
-
+                this.requests.splice(0, this.requests.length);
                 this.requestUUID = null;
             },
 
@@ -388,18 +377,14 @@
                 this.$api.deleteAllSessionRequests(this.sessionUUID)
                     .then((status) => {
                         if (status.success === true) {
-                            this.$izitoast.success({title: 'All requests successfully removed!', zindex: 10});
+                            this.$izitoast.success({title: 'All requests successfully removed!'});
                         } else {
                             throw new Error(`I've got unsuccessful status`);
                         }
                     })
-                    .catch((err) => this.$izitoast.error({
-                        title: `Cannot remove all requests: ${err.message}`,
-                        zindex: 10
-                    }))
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove all requests: ${err.message}`}))
 
                 this.clearRequests();
-                this.$forceUpdate();
             },
 
             /**
@@ -409,46 +394,33 @@
                 this.$api.deleteSessionRequest(this.sessionUUID, uuid)
                     .then((status) => {
                         if (status.success === true) {
-                            this.$izitoast.success({
-                                title: `Request with UUID ${uuid} was successfully removed!`,
-                                zindex: 10
-                            });
+                            this.$izitoast.success({title: `Request with UUID ${uuid} was successfully removed!`});
                         } else {
-                            throw new Error(`I've got unsuccessful status`);
+                            throw new Error(`Unsuccessful status returned`);
                         }
                     })
-                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`, zindex: 10}))
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
 
-                // find next request for selection
-                const UUIDs = Object.keys(this.requests);
-                const currentIndexNum = UUIDs.indexOf(uuid);
-                let newCurrentRequestUUID = this.requestUUID; // do not change
+                const current = this.getRequestIndexByUUID(uuid);
 
                 if (uuid !== this.requestUUID) {
                     // do nothing
-                } else if (UUIDs[currentIndexNum + 1] !== undefined) {
-                    newCurrentRequestUUID = UUIDs[currentIndexNum + 1]; // select next
-                } else if (UUIDs[currentIndexNum - 1] !== undefined) {
-                    newCurrentRequestUUID = UUIDs[currentIndexNum - 1]; // select previous
+                } else if (this.requests[current + 1] !== undefined) {
+                    this.navigateNextRequest();
+                } else if (this.requests[current - 1] !== undefined) {
+                    this.navigatePreviousRequest();
                 }
 
-                this.requestUUID = newCurrentRequestUUID;
-
-                delete this.requests[uuid];
-
-                this.$forceUpdate();
+                this.requests.splice(current, 1); // remove request object from stack
             },
 
             /**
-             * @param {{statusCode: Number|null, contentType: String|null, responseDelay: Number|null, responseBody: String|null, destroyCurrentSession: bool}} urlSettings
+             * @param {NewSessionData} urlSettings
              */
             newUrlHandler(urlSettings) {
                 if (urlSettings.destroyCurrentSession === true) {
                     this.$api.deleteSession(this.sessionUUID)
-                        .catch((err) => this.$izitoast.error({
-                            title: `Cannot destroy current session: ${err.message}`,
-                            zindex: 10
-                        }))
+                        .catch((err) => this.$izitoast.error({title: `Cannot destroy current session: ${err.message}`}))
                 }
 
                 this.$api.startNewSession({
@@ -463,19 +435,21 @@
                         this.$session.setLocalSessionUUID(newSessionData.uuid);
 
                         this.clearRequests();
-                        this.$forceUpdate();
-                        this.$izitoast.success({title: 'New session started!', zindex: 10});
+                        this.$izitoast.success({title: 'New session started!'});
                     })
-                    .catch((err) => this.$izitoast.error({
-                        title: `Cannot create new session: ${err.message}`,
-                        zindex: 10
-                    }))
+                    .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
             },
         }
     }
 </script>
 
 <style scoped>
+    .btn:focus,
+    .btn:active {
+        outline: none !important;
+        box-shadow: none;
+    }
+
     .total-requests-count {
         position: relative;
         top: -.15em;
