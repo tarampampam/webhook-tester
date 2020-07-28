@@ -24,7 +24,7 @@ services:
     <<: *app-service
     ports:
       - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
-    command: go run . serve --port 8080 --redis-host redis --max-requests 10
+    command: go run . serve --port 8080 --redis-host redis --max-requests 3
 
   redis:
     image: redis:6.0.5-alpine # Image page: <https://hub.docker.com/_/redis>

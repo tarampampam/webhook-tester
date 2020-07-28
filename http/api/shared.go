@@ -2,6 +2,10 @@ package api
 
 import "sort"
 
+type Status struct {
+	Success bool `json:"success"`
+}
+
 type (
 	Header struct {
 		Name  string `json:"name"`

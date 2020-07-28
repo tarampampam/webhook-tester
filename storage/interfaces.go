@@ -28,4 +28,7 @@ type Storage interface {
 	// GetAllRequests returns all request as a slice of structures.
 	// If requests was not found - `nil, nil` will be returned.
 	GetAllRequests(sessionUUID string) (*[]RequestData, error)
+
+	// DeleteRequest deletes stored request with passed session and request UUIDs.
+	DeleteRequest(sessionUUID, requestUUID string) (bool, error)
 }

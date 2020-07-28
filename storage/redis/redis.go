@@ -14,7 +14,7 @@ type Storage struct {
 	Context       context.Context
 	ttl           time.Duration
 	maxRequests   uint16
-	client        *redis.Client
+	redis         *redis.Client
 	json          jsoniter.API
 	uuidGenerator func() string
 }
@@ -24,7 +24,7 @@ func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Durat
 		Context:     context.Background(),
 		ttl:         sessionTTL,
 		maxRequests: maxRequests,
-		client: redis.NewClient(&redis.Options{
+		redis: redis.NewClient(&redis.Options{
 			Addr:     addr,
 			Username: "",
 			Password: password,
@@ -39,11 +39,11 @@ func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Durat
 }
 
 func (s *Storage) Close() error {
-	return s.client.Close()
+	return s.redis.Close()
 }
 
 func (s *Storage) GetSession(sessionUUID string) (*storage.SessionData, error) {
-	value, err := s.client.Get(s.Context, newStorageKey(sessionUUID).session()).Bytes()
+	value, err := s.redis.Get(s.Context, newStorageKey(sessionUUID).session()).Bytes()
 
 	if err != nil {
 		if err == redis.Nil {
@@ -53,7 +53,8 @@ func (s *Storage) GetSession(sessionUUID string) (*storage.SessionData, error) {
 		return nil, err
 	}
 
-	sessionData := sessionData{}
+	var sessionData = sessionData{}
+
 	if err := s.json.Unmarshal(value, &sessionData); err != nil {
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func (s *Storage) CreateSession(wh *storage.WebHookResponse) (*storage.SessionDa
 		return nil, jsonErr
 	}
 
-	if err := s.client.Set(s.Context, newStorageKey(sessionUUID).session(), asJSON, s.ttl).Err(); err != nil {
+	if err := s.redis.Set(s.Context, newStorageKey(sessionUUID).session(), asJSON, s.ttl).Err(); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +87,7 @@ func (s *Storage) CreateSession(wh *storage.WebHookResponse) (*storage.SessionDa
 }
 
 func (s *Storage) deleteKeys(keys ...string) (bool, error) {
-	cmdResult := s.client.Del(s.Context, keys...)
+	cmdResult := s.redis.Del(s.Context, keys...)
 
 	if err := cmdResult.Err(); err != nil {
 		return false, err
@@ -108,56 +109,35 @@ func (s *Storage) DeleteSession(sessionUUID string) (bool, error) {
 func (s *Storage) DeleteRequests(sessionUUID string) (bool, error) {
 	key := newStorageKey(sessionUUID)
 
-	return s.deleteKeys(key.requestsOrderKey(), key.requestsDataKey())
+	// get request UUIDs, associated with session
+	requestUUIDs, readErr := s.redis.ZRangeByScore(s.Context, key.requests(), &redis.ZRangeBy{
+		Min: "-inf",
+		Max: "+inf",
+	}).Result()
+	if readErr != nil {
+		return false, readErr
+	}
+
+	// removing plan
+	var keys = []string{key.requests()}
+	for _, requestUUID := range requestUUIDs {
+		keys = append(keys, key.request(requestUUID))
+	}
+
+	return s.deleteKeys(keys...)
 }
 
-func (s *Storage) syncRequests(key storageKey) error {
-	// get keys from ordered requests set (key is request UUID)
-	orderedKeys, ordErr := s.client.LRange(s.Context, key.requestsOrderKey(), 0, int64(s.maxRequests)-1).Result()
-	if ordErr != nil {
-		return ordErr
-	}
-
-	// get all requests from data key (key also is request UUID)
-	requestKeys, reqErr := s.client.HKeys(s.Context, key.requestsDataKey()).Result()
-	if reqErr != nil {
-		return reqErr
-	}
-
-	// calculate difference between ordered keys set and data key
-	orderedMap := make(map[string]bool, len(orderedKeys))
-	for _, key := range orderedKeys {
-		orderedMap[key] = true
-	}
-
-	var diff []string
-
-	for _, key := range requestKeys {
-		if _, found := orderedMap[key]; !found {
-			diff = append(diff, key) // only if key exists in data key and not exists in ordered
-		}
-	}
-
-	if len(diff) > 0 {
-		// and remove them
-		if err := s.client.HDel(s.Context, key.requestsDataKey(), diff...).Err(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storage.RequestData, error) {
+func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storage.RequestData, error) { //nolint:funlen
 	var (
 		requestUUID = s.uuidGenerator()
+		now         = time.Now()
 		requestData = requestData{
 			ClientAddr:    r.ClientAddr,
 			Method:        r.Method,
 			Content:       r.Content,
 			Headers:       r.Headers,
 			URI:           r.URI,
-			CreatedAtUnix: time.Now().Unix(),
+			CreatedAtUnix: now.Unix(),
 		}
 		key = newStorageKey(sessionUUID)
 	)
@@ -167,18 +147,58 @@ func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storag
 		return nil, jsonErr
 	}
 
-	// execute pipeline <https://redis.io/topics/pipelining>
-	if _, err := s.client.Pipelined(s.Context, func(pipe redis.Pipeliner) error {
-		// save request uuid into ordered requests list
-		pipe.LPush(s.Context, key.requestsOrderKey(), requestUUID)
-		// trim requests list
-		pipe.LTrim(s.Context, key.requestsOrderKey(), 0, int64(s.maxRequests)-1)
-		// save request data
-		pipe.HSet(s.Context, key.requestsDataKey(), requestUUID, asJSON)
+	// save request data
+	if _, err := s.redis.Pipelined(s.Context, func(pipe redis.Pipeliner) error {
+		pipe.ZAdd(s.Context, key.requests(), &redis.Z{
+			Score:  float64(now.UnixNano()),
+			Member: requestUUID,
+		})
+		pipe.Set(s.Context, key.request(requestUUID), asJSON, s.ttl)
 
-		// update ttl for required keys
-		pipe.Expire(s.Context, key.requestsOrderKey(), s.ttl)
-		pipe.Expire(s.Context, key.requestsDataKey(), s.ttl)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	// read all stored request UUIDs
+	requestUUIDs, readErr := s.redis.ZRangeByScore(s.Context, key.requests(), &redis.ZRangeBy{
+		Min: "-inf",
+		Max: "+inf",
+	}).Result()
+	if readErr != nil {
+		return nil, readErr
+	}
+
+	// if currently we have more than allowed requests - remove unnecessary
+	if len(requestUUIDs) > int(s.maxRequests) {
+		if _, err := s.redis.Pipelined(s.Context, func(pipe redis.Pipeliner) error {
+			for _, k := range requestUUIDs[:len(requestUUIDs)-int(s.maxRequests)] {
+				pipe.ZRem(s.Context, key.requests(), k)
+				pipe.Del(s.Context, key.request(k))
+			}
+
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	// update expiring date
+	if _, err := s.redis.Pipelined(s.Context, func(pipe redis.Pipeliner) error {
+		if len(requestUUIDs) > 0 {
+			forUpdate := make([]string, 0)
+
+			if len(requestUUIDs) > int(s.maxRequests) {
+				forUpdate = requestUUIDs[len(requestUUIDs)-int(s.maxRequests):]
+			} else {
+				forUpdate = append(forUpdate, requestUUIDs...)
+			}
+
+			for _, k := range forUpdate {
+				pipe.Expire(s.Context, key.request(k), s.ttl)
+			}
+		}
+		pipe.Expire(s.Context, key.requests(), s.ttl)
 		pipe.Expire(s.Context, key.session(), s.ttl)
 
 		return nil
@@ -186,15 +206,11 @@ func (s *Storage) CreateRequest(sessionUUID string, r *storage.Request) (*storag
 		return nil, err
 	}
 
-	if err := s.syncRequests(key); err != nil {
-		return nil, err
-	}
-
 	return requestData.toSharedStruct(requestUUID), nil
 }
 
 func (s *Storage) GetRequest(sessionUUID, requestUUID string) (*storage.RequestData, error) {
-	value, err := s.client.HGet(s.Context, newStorageKey(sessionUUID).requestsDataKey(), requestUUID).Bytes()
+	value, err := s.redis.Get(s.Context, newStorageKey(sessionUUID).request(requestUUID)).Bytes()
 
 	if err != nil {
 		if err == redis.Nil {
@@ -213,24 +229,62 @@ func (s *Storage) GetRequest(sessionUUID, requestUUID string) (*storage.RequestD
 }
 
 func (s *Storage) GetAllRequests(sessionUUID string) (*[]storage.RequestData, error) {
-	data, err := s.client.HGetAll(s.Context, newStorageKey(sessionUUID).requestsDataKey()).Result()
+	var key = newStorageKey(sessionUUID)
 
-	if err != nil {
-		if err == redis.Nil {
+	UUIDs, allErr := s.redis.ZRangeByScore(s.Context, key.requests(), &redis.ZRangeBy{
+		Min: "-inf",
+		Max: "+inf",
+	}).Result()
+
+	if allErr != nil {
+		if allErr == redis.Nil {
 			return nil, nil // not found
 		}
 
-		return nil, err
+		return nil, allErr
 	}
 
 	result := make([]storage.RequestData, 0)
 
-	for requestUUID, json := range data {
-		requestData := requestData{}
-		if err := s.json.Unmarshal([]byte(json), &requestData); err == nil { // ignore errors with wrong json
-			result = append(result, *requestData.toSharedStruct(requestUUID))
+	if len(UUIDs) > 0 {
+		// convert request UUIDs into storage keys
+		keys := make([]string, len(UUIDs))
+		for i, UUID := range UUIDs {
+			keys[i] = key.request(UUID)
+		}
+
+		// read all requests in a one request
+		rawRequests, gettingErr := s.redis.MGet(s.Context, keys...).Result()
+		if gettingErr != nil {
+			return nil, gettingErr
+		}
+
+		// convert response into a map, where key is request UUID and data is a raw json string
+		requestsMap := make(map[string]string, len(UUIDs))
+		for i, UUID := range UUIDs { //nolint:wsl
+			if asJSON, ok := rawRequests[i].(string); ok {
+				requestsMap[UUID] = asJSON
+			}
+		}
+
+		// convert responses map into result response
+		for UUID, asJSON := range requestsMap {
+			requestData := requestData{}
+			if err := s.json.Unmarshal([]byte(asJSON), &requestData); err == nil { // ignore errors with wrong json
+				result = append(result, *requestData.toSharedStruct(UUID))
+			}
 		}
 	}
 
 	return &result, nil
+}
+
+func (s *Storage) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
+	var key = newStorageKey(sessionUUID)
+
+	if _, err := s.redis.ZRem(s.Context, key.requests(), requestUUID).Result(); err != nil {
+		return false, err
+	}
+
+	return s.deleteKeys(key.request(requestUUID))
 }

@@ -56,15 +56,15 @@ func newStorageKey(sessionUUID string) storageKey {
 
 // session data [session-UUID]:[session-data]
 func (s storageKey) session() string {
-	return "session:" + s.sessionUUID
+	return "webhook-tester:session:" + s.sessionUUID
 }
 
-// ordered requests list [request-UUID]
-func (s storageKey) requestsOrderKey() string {
-	return s.session() + ":requests:list"
+// requests list [timestamp]:[request-UUID]
+func (s storageKey) requests() string {
+	return s.session() + ":requests"
 }
 
-// requests data [request-UUID]:[request-data]
-func (s storageKey) requestsDataKey() string {
-	return s.session() + ":requests:data"
+// request data [request-UUID]:[request-data]
+func (s storageKey) request(requestUUID string) string {
+	return s.session() + ":requests:" + requestUUID
 }

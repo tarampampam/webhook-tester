@@ -37,7 +37,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sessionData == nil {
-		h.respondWithError(w, http.StatusNotFound, "session with passed UUID was not found")
+		h.respondWithError(w, http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID))
 		return
 	}
 

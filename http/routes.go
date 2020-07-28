@@ -5,11 +5,12 @@ import (
 	sessionCreate "webhook-tester/http/api/session/create"
 	sessionDelete "webhook-tester/http/api/session/delete"
 	getAllRequests "webhook-tester/http/api/session/requests/all"
+	clearRequests "webhook-tester/http/api/session/requests/clear"
+	deleteRequest "webhook-tester/http/api/session/requests/delete"
 	getRequest "webhook-tester/http/api/session/requests/get"
 	settingsGet "webhook-tester/http/api/settings/get"
 	"webhook-tester/http/fileserver"
 	"webhook-tester/http/ping"
-	"webhook-tester/http/stub"
 	"webhook-tester/http/webhook"
 )
 
@@ -33,7 +34,7 @@ func (s *Server) registerServiceHandlers() {
 }
 
 // Register API handlers.
-func (s *Server) registerAPIHandlers() { //nolint:funlen
+func (s *Server) registerAPIHandlers() {
 	apiRouter := s.Router.
 		PathPrefix("/api").
 		Subrouter()
@@ -75,17 +76,16 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 
 	// delete request by UUID for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle(
+			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
+			deleteRequest.NewHandler(s.storage),
+		).
 		Methods(http.MethodDelete).
 		Name("delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage)).
 		Methods(http.MethodDelete).
 		Name("delete_all_session_requests")
 }

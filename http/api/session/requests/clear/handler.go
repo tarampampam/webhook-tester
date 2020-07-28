@@ -1,4 +1,4 @@
-package delete
+package clear
 
 import (
 	"fmt"
@@ -26,26 +26,17 @@ func NewHandler(storage storage.Storage) http.Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID := mux.Vars(r)["sessionUUID"]
 
-	// delete session
-	if result, err := h.storage.DeleteSession(sessionUUID); err != nil {
+	if deleted, err := h.storage.DeleteRequests(sessionUUID); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
 
 		return
-	} else if !result {
+	} else if !deleted {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(errors.NewServerError(
 			http.StatusNotFound,
-			fmt.Sprintf("Session with UUID %s was not found", sessionUUID),
+			fmt.Sprintf("Requests for session with UUID %s was not found", sessionUUID),
 		).ToJSON())
-
-		return
-	}
-
-	// and recorded session requests
-	if _, err := h.storage.DeleteRequests(sessionUUID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
 
 		return
 	}

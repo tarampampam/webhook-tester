@@ -1,6 +1,7 @@
 package all
 
 import (
+	"fmt"
 	"net/http"
 	"webhook-tester/http/api"
 	"webhook-tester/http/errors"
@@ -36,7 +37,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(uint16(http.StatusNotFound), "session was not found").ToJSON())
+		_, _ = w.Write(errors.NewServerError(
+			uint16(http.StatusNotFound),
+			fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+		).ToJSON())
 
 		return
 	}
