@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDisableCachingMiddleware(t *testing.T) {
@@ -48,4 +50,28 @@ func TestDisableCachingMiddleware(t *testing.T) {
 	if handled != true {
 		t.Error("next handler was not executed")
 	}
+}
+
+func TestAllowCORSMiddleware(t *testing.T) {
+	var handled bool = false
+
+	// create a handler to use as "next" which will verify the request
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
+
+		handled = true
+	})
+
+	middlewareHandler := AllowCORSMiddleware(nextHandler)
+
+	var (
+		req, _ = http.NewRequest("GET", "http://testing", nil)
+		rr     = httptest.NewRecorder()
+	)
+
+	assert.Empty(t, rr.Header().Get("Access-Control-Allow-Origin"))
+
+	middlewareHandler.ServeHTTP(rr, req)
+
+	assert.True(t, handled)
 }

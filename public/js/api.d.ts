@@ -33,14 +33,15 @@ export interface APINewSessionSettings {
 }
 
 export interface APIRecordedRequest {
-    ip: string
-    hostname: string
+    uuid: string
+    client_address: string
     method: string
     content: string
     headers: {
-        [key: string]: string;
-    }
-    url: string
+        name: string
+        value: string
+    }[]
+    url: string // relative (`/foo/bar`, NOT `http://example.com/foo/bar`)
     created_at_unix: number
 }
 

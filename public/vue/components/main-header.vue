@@ -60,7 +60,7 @@
                     </div>
                     <div class="modal-footer">
                         <p class="small">
-                            Current application version: <strong> v{{ version }}</strong>
+                            Current application version: <strong> {{ version }}</strong>
                         </p>
                     </div>
                 </div>
@@ -144,6 +144,20 @@
                                               v-model="newUrlData.responseBody"></textarea>
                                 </div>
                             </div>
+                            <div class="form-group row pt-2">
+                                <div class="col-md-4"></div>
+                                <div class="col-md-8">
+                                    <div class="custom-control custom-checkbox">
+                                        <input type="checkbox"
+                                               class="custom-control-input"
+                                               id="new-session-destroy-current"
+                                               v-model="newUrlData.destroyCurrentSession">
+                                        <label class="custom-control-label d-inline-block" for="new-session-destroy-current">
+                                            Destroy current session
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -184,6 +198,7 @@
                     contentType: null,
                     responseDelay: null,
                     responseBody: null,
+                    destroyCurrentSession: true,
                 },
             }
         },
@@ -203,13 +218,36 @@
 
         methods: {
             newURL() {
-                // <https://michaelnthiessen.com/pass-function-as-prop/>
-                this.$emit('on-new-url', {
+                let data = {
                     statusCode: this.newUrlData.statusCode,
                     contentType: this.newUrlData.contentType,
                     responseDelay: this.newUrlData.responseDelay,
                     responseBody: this.newUrlData.responseBody,
-                });
+                    destroyCurrentSession: this.newUrlData.destroyCurrentSession,
+                }
+
+                if (data.statusCode != null) {
+                    data.statusCode = Number(data.statusCode);
+                }
+
+                if (data.contentType != null) {
+                    data.contentType = String(data.contentType);
+                }
+
+                if (data.responseDelay != null) {
+                    data.responseDelay = Number(data.responseDelay);
+                }
+
+                if (data.responseBody != null) {
+                    data.responseBody = String(data.responseBody);
+                }
+
+                if (data.destroyCurrentSession != null) {
+                    data.destroyCurrentSession = Boolean(data.destroyCurrentSession);
+                }
+
+                // <https://michaelnthiessen.com/pass-function-as-prop/>
+                this.$emit('on-new-url', data);
             },
         }
     }

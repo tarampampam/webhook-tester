@@ -2,9 +2,16 @@ package http
 
 import (
 	"net/http"
+	sessionCreate "webhook-tester/http/api/session/create"
+	sessionDelete "webhook-tester/http/api/session/delete"
+	getAllRequests "webhook-tester/http/api/session/requests/all"
+	clearRequests "webhook-tester/http/api/session/requests/clear"
+	deleteRequest "webhook-tester/http/api/session/requests/delete"
+	getRequest "webhook-tester/http/api/session/requests/get"
+	settingsGet "webhook-tester/http/api/settings/get"
 	"webhook-tester/http/fileserver"
 	"webhook-tester/http/ping"
-	"webhook-tester/http/stub"
+	"webhook-tester/http/webhook"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -27,109 +34,34 @@ func (s *Server) registerServiceHandlers() {
 }
 
 // Register API handlers.
-func (s *Server) registerAPIHandlers() { //nolint:funlen
+func (s *Server) registerAPIHandlers() {
 	apiRouter := s.Router.
 		PathPrefix("/api").
 		Subrouter()
 
-	apiRouter.Use(DisableCachingMiddleware)
+	apiRouter.Use(DisableCachingMiddleware, JSONResponseMiddleware)
 
 	// get application settings
 	apiRouter.
-		Handle("/settings", stub.Handler(`{
-			"version": "0.0.0",
-			"limits": {
-				"max_requests": 50,
-				"session_lifetime_sec": 604800
-			}
-		}`)).
+		Handle("/settings", settingsGet.NewHandler(s.appSettings)).
 		Methods(http.MethodGet).
 		Name("settings_get")
 
 	// create new session
 	apiRouter.
-		Handle("/session", stub.Handler(`{
-			"uuid": "%RAND_UUID%",
-			"response": {
-				"content": "\"foobar\"",
-				"code": 200,
-				"content_type": "text\/plain",
-				"delay_sec": 0,
-				"created_at_unix": 1595017026
-			}
-		}`)).
+		Handle("/session", sessionCreate.NewHandler(s.storage)).
 		Methods(http.MethodPost).
 		Name("session_create")
 
 	// delete session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(s.storage)).
 		Methods(http.MethodDelete).
 		Name("session_delete")
 
 	// get requests list for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", stub.Handler(`{
-			"11111111-0000-0000-0000-000000000000": {
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
-				"method": "GET",
-				"content": "fake content goes here<\/code><\/pre><script>alert(1)<\/script>",
-				"headers": {
-					"host": "foo.example.com",
-					"user-agent": "curl\/7.58.0",
-					"accept": "text\/html,application\/xhtml+xml",
-					"accept-encoding": "gzip",
-					"accept-language": "en,ru;q=0.9",
-					"cdn-loop": "cloudflare",
-					"cf-connecting-ip": "111.111.111.111",
-					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
-					"dnt": "1"
-				},
-				"url": "https://foo.example.com/%RAND_UUID%/foobar",
-				"created_at_unix": 1595017226
-			},
-			"22222222-0000-0000-0000-000000000000": {
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
-				"method": "PUT",
-				"content": "{\"foo\":1,\"bar\":\"baz\",\"a\":[1,2,3]}",
-				"headers": {
-					"host": "foo.example.com",
-					"user-agent": "curl\/7.58.0",
-					"accept": "text\/html,application\/xhtml+xml",
-					"accept-encoding": "gzip",
-					"accept-language": "en,ru;q=0.9",
-					"cdn-loop": "cloudflare",
-					"cf-connecting-ip": "111.111.111.111",
-					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
-					"dnt": "1"
-				},
-				"url": "https://foo.example.com/%RAND_UUID%/barbaz",
-				"created_at_unix": 1595017240
-			},
-			"33333333-0000-0000-0000-000000000000": {
-				"ip": "2.2.2.2",
-				"hostname": "another_host",
-				"method": "DELETE",
-				"content": "",
-				"headers": {
-					"host": "foo.example.boo",
-					"user-agent": "curl\/7.58.0",
-					"accept": "text\/html,application\/xhtml+xml",
-					"accept-encoding": "gzip",
-					"accept-language": "en,ru;q=0.9",
-					"cdn-loop": "cloudflare",
-					"cf-connecting-ip": "22.22.22.22",
-					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
-					"dnt": "0"
-				},
-				"url": "https://foo.example.com/%RAND_UUID%/blah",
-				"created_at_unix": 1595017340
-			}
-		}`)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(s.storage)).
 		Methods(http.MethodGet).
 		Name("session_requests_all_get")
 
@@ -137,49 +69,30 @@ func (s *Server) registerAPIHandlers() { //nolint:funlen
 	apiRouter.
 		Handle(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			stub.Handler(`{
-				"ip": "1.1.1.1",
-				"hostname": "some_host",
-				"method": "GET",
-				"content": "fake content goes here",
-				"headers": {
-					"host": "foo.example.com",
-					"user-agent": "curl\/7.58.0",
-					"accept": "text\/html,application\/xhtml+xml",
-					"accept-encoding": "gzip",
-					"accept-language": "en,ru;q=0.9",
-					"cdn-loop": "cloudflare",
-					"cf-connecting-ip": "111.111.111.111",
-					"cookie": "__cfduid=d0bca19992c54486ae9372d7d4d3096531595016640",
-					"dnt": "1"
-				},
-				"url": "https://foo.example.com/aaaaaaaa-bbbb-cccc-dddd-000000000000/foobar",
-				"created_at_unix": 1595017226
-			}`),
+			getRequest.NewHandler(s.storage),
 		).
 		Methods(http.MethodGet).
 		Name("session_request_get")
 
 	// delete request by UUID for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle(
+			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
+			deleteRequest.NewHandler(s.storage),
+		).
 		Methods(http.MethodDelete).
 		Name("delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", stub.Handler(`{
-			"success": true
-		}`)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage)).
 		Methods(http.MethodDelete).
 		Name("delete_all_session_requests")
 }
 
 // Register incoming webhook handlers.
 func (s *Server) registerWebHookHandlers() {
-	allMethods := []string{
+	allowedMethods := []string{
 		http.MethodGet,
 		http.MethodHead,
 		http.MethodPost,
@@ -191,19 +104,25 @@ func (s *Server) registerWebHookHandlers() {
 		http.MethodTrace,
 	}
 
-	s.Router.
-		Handle("/{sessionUUID:"+uuidPattern+"}", stub.Handler(`"foobar"`)).
-		Methods(allMethods...).
+	webhookRouter := s.Router.
+		PathPrefix("").
+		Subrouter()
+
+	webhookRouter.Use(AllowCORSMiddleware)
+
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}", webhook.NewHandler(s.storage)).
+		Methods(allowedMethods...).
 		Name("webhook")
 
-	s.Router.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", stub.Handler(`"foobar"`)).
-		Methods(allMethods...).
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", webhook.NewHandler(s.storage)).
+		Methods(allowedMethods...).
 		Name("webhook_with_status_code")
 
-	s.Router.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", stub.Handler(`"foobar"`)).
-		Methods(allMethods...).
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", webhook.NewHandler(s.storage)).
+		Methods(allowedMethods...).
 		Name("webhook_any")
 }
 

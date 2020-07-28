@@ -149,7 +149,7 @@ func TestFileServer_ServeHTTP(t *testing.T) {
 			giveRequestMethod:  "GET",
 			giveRequestHeaders: map[string]string{"accept": "application/json"},
 			wantResponseCode:   http.StatusNotFound,
-			wantResponseBody:   []byte(`{"error":true,"code":404,"message":"Not found"}` + "\n"),
+			wantResponseBody:   []byte(`{"success":false,"code":404,"message":"Not found"}` + "\n"),
 			wantContentType:    "application/json; charset=utf-8",
 		},
 		{

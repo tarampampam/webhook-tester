@@ -117,7 +117,7 @@ func (fileServer *FileServer) handle404(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusNotFound)
 
 		_ = fileServer.json.NewEncoder(w).Encode(
-			errors.NewJSONError(http.StatusNotFound, "Not found"),
+			errors.NewServerError(http.StatusNotFound, "Not found"),
 		)
 
 		return

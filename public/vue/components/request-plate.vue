@@ -1,7 +1,7 @@
 <template>
     <div class="list-group-item list-group-item-action flex-column">
         <div class="d-flex w-100 justify-content-between">
-            <h5 class="mb-1 text-nowrap">{{ ip }}<span
+            <h5 class="mb-1 text-nowrap">{{ clientAddress }}<span
                 class="badge text-uppercase ml-2 http-method"
                 :class="methodClass"
                 :v-if="method"
@@ -24,7 +24,7 @@
                 type: String,
                 default: null,
             },
-            ip: {
+            clientAddress: {
                 type: String,
                 default: 'X.X.X.X',
             },
