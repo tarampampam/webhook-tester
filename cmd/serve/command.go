@@ -75,7 +75,7 @@ func (publicDir) IsValidValue(dir string) error {
 }
 
 // Execute current command.
-func (cmd *Command) Execute(_ []string) error {
+func (cmd *Command) Execute(_ []string) error { //nolint:funlen
 	appSettings := &settings.AppSettings{
 		MaxRequests:   cmd.MaxRequests,
 		SessionTTL:    time.Second * time.Duration(cmd.SessionTTLSec),

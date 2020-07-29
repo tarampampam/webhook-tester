@@ -18,7 +18,7 @@ func TestNewServer(t *testing.T) {
 		KeepAliveEnabled: true,
 	}
 
-	server := NewServer(&settings, &appSettings.AppSettings{}, &fakeStorage{})
+	server := NewServer(&settings, &appSettings.AppSettings{}, &fakeStorage{}, &fakeBroadcaster{})
 
 	assert.Equal(t, &settings, server.settings)
 	assert.Equal(t, "1.2.3.4:321", server.Server.Addr)
