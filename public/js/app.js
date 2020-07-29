@@ -8,6 +8,13 @@ define(
     (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session, pusher) => {
         let isProduction = true;
 
+        if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
+            // @link <https://github.com/vuejs/vue-devtools/issues/190#issuecomment-264203810>
+            Vue.config.devtools = true;
+            pusher.logToConsole = true;
+            isProduction = false;
+        }
+
         const clip = new clipboard('.btn');
 
         // <https://clipboardjs.com/#events>
@@ -17,13 +24,6 @@ define(
             izitoast.success({title: 'Copied!', message: e.text, icon: 'fas fa-copy', timeout: 4000});
             e.clearSelection();
         });
-
-        if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
-            // @link <https://github.com/vuejs/vue-devtools/issues/190#issuecomment-264203810>
-            Vue.config.devtools = true;
-            pusher.logToConsole = true;
-            isProduction = false;
-        }
 
         try {
             window.localStorage.getItem('test');
