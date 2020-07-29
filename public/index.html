@@ -130,6 +130,12 @@
     </div>
 </noscript>
 
+<div class="text-center" id="outdated-browser-alert" style="display: none">
+    <div class="alert alert-danger mt-3 d-inline-block">
+        <strong>Your web browser is out of date.</strong> Please, update your browser.
+    </div>
+</div>
+
 <div class="vh-100 d-flex justify-content-center align-items-center" id="main-loader">
     <div class="ml">
         <div class="i1"></div>
@@ -139,6 +145,13 @@
 </div>
 
 <div id="app"></div>
+
+<script>
+    // detect IE 10 and 11
+    if (navigator.appVersion.indexOf('MSIE 10') !== -1 || (navigator.userAgent.indexOf('Trident') !== -1 && navigator.userAgent.indexOf('rv:11') !== -1)) {
+        document.getElementById('outdated-browser-alert').style.display = 'block';
+    }
+</script>
 
 <!-- Documentation: <https://api.jquery.com/> (required for Bootstrap) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"
