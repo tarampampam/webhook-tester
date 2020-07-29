@@ -19,6 +19,9 @@
                :href="currentWebHookUrl">
                 <i class="fas fa-external-link-alt pr-1"></i> Open in a new tab
             </a>
+            <button class="btn btn-primary btn-sm" @click="testXHR" title="Using random HTTP method">
+                <i class="fas fa-running mr-1"></i> XHR
+            </button>
         </p>
         <p>
             Send simple POST request (execute next command in your terminal without leaving this page):
@@ -56,6 +59,26 @@
                 default: 'URL was not defined',
             },
         },
+
+        data: function () {
+            return {
+                xhrMethods: ['post', 'put', 'delete', 'patch'],
+            }
+        },
+
+        methods: {
+            testXHR() {
+                const method = this.xhrMethods[Math.floor(Math.random() * this.xhrMethods.length)];
+
+                const payload = {
+                    xhr: 'test',
+                    now: Math.floor(Date.now() / 1000),
+                };
+
+                this.$axios({method: method, url: this.currentWebHookUrl, data: payload})
+                    .catch((err) => this.$izitoast.error({title: err.message}))
+            },
+        }
     }
 </script>
 

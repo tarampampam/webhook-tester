@@ -3,7 +3,7 @@
         <div class="col-md-12 col-lg-5 col-xl-4">
             <div class="row">
                 <div class="col-7">
-                    <h4>Request Details</h4>
+                    <h4>Request details</h4>
                 </div>
                 <div class="col-5 text-right">
                     <button class="btn btn-primary btn-sm"
@@ -24,27 +24,43 @@
             <div class="row pb-1">
                 <div class="col-lg-3 text-lg-right">Method</div>
                 <div class="col-lg-9">
-                    <code>{{ request.method.toUpperCase() }}</code>
+                    <span class="badge text-uppercase"
+                          :class="methodClass"
+                    >{{ request.method.toUpperCase() }}</span>
                 </div>
             </div>
 
             <div class="row pb-1">
                 <div class="col-lg-3 text-lg-right">From</div>
                 <div class="col-lg-9">
-                    <code>{{ request.client_address }}</code>
+                    <a :href="'https://who.is/whois-ip/ip-address/' + request.client_address"
+                       target="_blank"
+                       rel="noreferrer"
+                       title="WhoIs?"
+                    >
+                        <strong>{{ request.client_address }}</strong>
+                    </a>
                 </div>
             </div>
 
             <div class="row pb-1">
                 <div class="col-lg-3 text-lg-right">When</div>
                 <div class="col-lg-9">
-                    <code>{{ formattedWhen }}</code>
+                    <span>{{ formattedWhen }}</span>
+                </div>
+            </div>
+
+            <div class="row pb-1">
+                <div class="col-lg-3 text-lg-right">Size</div>
+                <div class="col-lg-9">
+                    <span v-if="contentLength">{{ contentLength }} bytes</span>
+                    <span v-else class="text-muted">&mdash;</span>
                 </div>
             </div>
 
             <div class="row pb-1">
                 <div class="col-lg-3 text-lg-right">ID</div>
-                <div class="col-lg-9">
+                <div class="col-lg-9 text-break">
                     <code>{{ uuid }}</code>
                 </div>
             </div>
@@ -54,10 +70,10 @@
             <h4>Headers</h4>
             <div v-for="(header) in this.request.headers"
                  class="row pb-1">
-                <div class="col-lg-4 col-xl-2 text-lg-right">
+                <div class="col-lg-4 col-xl-3 text-lg-right">
                     {{ header.name }}
                 </div>
-                <div class="col-lg-8 col-xl-10 text-break">
+                <div class="col-lg-8 col-xl-9 text-break">
                     <code>{{ header.value }}</code>
                 </div>
             </div>
@@ -112,6 +128,33 @@
                     : '...';
 
                 return `${window.location.origin}/${uri}`;
+            },
+
+            methodClass: function () {
+                if (typeof this.request === 'object' && typeof this.request.method === 'string') {
+                    switch (this.request.method.toLowerCase()) {
+                        case 'get':
+                            return 'badge-success';
+                        case 'post':
+                        case 'put':
+                            return 'badge-info';
+                        case 'delete':
+                            return 'badge-danger';
+                    }
+                }
+
+                return 'badge-light';
+            },
+
+            /**
+             * @returns {Number}
+             */
+            contentLength() {
+                if (typeof this.request === 'object' && typeof this.request.content === 'string') {
+                    return (new TextEncoder().encode(this.request.content)).length;
+                }
+
+                return 0;
             },
         },
 

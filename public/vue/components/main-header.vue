@@ -6,8 +6,17 @@
 
         <div class="mr-auto">
             <ul class="navbar-nav flex-row d-none d-sm-block">
-                <li class="nav-item" data-toggle="modal" data-target="#help-modal">
+                <li class="nav-item d-inline-block" data-toggle="modal" data-target="#help-modal">
                     <span class="nav-link"><i class="fas fa-question mr-1"></i> Help</span>
+                </li>
+                <li class="nav-item d-inline-block">
+                    <a class="nav-link"
+                       href="https://github.com/tarampampam/webhook-tester"
+                       target="_blank"
+                       rel="noopener"
+                    >
+                        <i class="fab fa-github mr-1"></i> GitHub
+                    </a>
                 </li>
             </ul>
         </div>
@@ -26,8 +35,9 @@
                             <strong>Webhook Tester</strong> allows you to easily test webhooks and other types of HTTP
                             requests. Here's your unique URL:
                         <p>
-                            <code>{{ currentWebHookUrl }}</code>
-                            <button class="btn btn-outline-info btn-sm ml-2" v-bind:data-clipboard-text="currentWebHookUrl">
+                            <code id="help-modal-current-url">{{ currentWebHookUrl }}</code>
+                            <button class="btn btn-outline-info btn-sm ml-2"
+                                    data-clipboard-target="#help-modal-current-url">
                                 <i class="fas fa-copy mr-1"></i> Copy
                             </button>
                             <a target="_blank"
@@ -40,9 +50,9 @@
                         <hr/>
                         <p>Append a status code to the url, e.g.:</p>
                         <p>
-                            <code>{{ currentWebHookUrl }}/404</code>
+                            <code id="help-modal-current-url-custom-status">{{ currentWebHookUrl }}/404</code>
                             <button class="btn btn-outline-info btn-sm ml-2"
-                                    v-bind:data-clipboard-text="currentWebHookUrl + '/404'">
+                                    data-clipboard-target="#help-modal-current-url-custom-status">
                                 <i class="fas fa-copy mr-1"></i> Copy
                             </button>
                             <a target="_blank"
@@ -68,7 +78,9 @@
         </div>
 
         <div class="form-inline my-2 my-lg-0">
-            <button class="btn btn-success my-2 my-sm-0 border-0" v-bind:data-clipboard-text="currentWebHookUrl">
+            <button class="btn btn-success my-2 my-sm-0 border-0"
+                    v-bind:data-clipboard-text="currentWebHookUrl"
+                    @mouseDown.middle="openInNewTab">
                 <i class="fas fa-copy mr-1"></i> Copy URL
             </button>
             <button class="btn btn-info my-2 ml-2 my-sm-0 border-0" data-toggle="modal" data-target="#new-url-modal">
@@ -152,7 +164,8 @@
                                                class="custom-control-input"
                                                id="new-session-destroy-current"
                                                v-model="newUrlData.destroyCurrentSession">
-                                        <label class="custom-control-label d-inline-block" for="new-session-destroy-current">
+                                        <label class="custom-control-label d-inline-block"
+                                               for="new-session-destroy-current">
                                             Destroy current session
                                         </label>
                                     </div>
@@ -161,7 +174,8 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" data-dismiss="modal" @click="newURL">Create</button>
+                            <button type="button" class="btn btn-primary" data-dismiss="modal" @click="newURL">Create
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -248,6 +262,10 @@
 
                 // <https://michaelnthiessen.com/pass-function-as-prop/>
                 this.$emit('on-new-url', data);
+            },
+
+            openInNewTab() {
+                window.open(this.currentWebHookUrl, '_blank');
             },
         }
     }

@@ -4,6 +4,10 @@
 
 export interface APISettings {
     version: string
+    pusher: {
+        key: string
+        cluster: string
+    }
     limits: {
         session_lifetime_sec: number
         max_requests: number

@@ -8,4 +8,10 @@ type AppSettings struct {
 
 	// Session lifetime (TTL)
 	SessionTTL time.Duration
+
+	// pusher.com key
+	PusherKey string
+
+	// pusher.com cluster
+	PusherCluster string
 }
