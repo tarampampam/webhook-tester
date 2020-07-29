@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"webhook-tester/broadcast"
 	"webhook-tester/http/errors"
 	"webhook-tester/storage"
 
@@ -17,12 +18,14 @@ import (
 const maxBodyLength = 8192
 
 type Handler struct {
-	storage storage.Storage
+	storage     storage.Storage
+	broadcaster broadcast.Broadcaster
 }
 
-func NewHandler(storage storage.Storage) http.Handler {
+func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http.Handler {
 	return &Handler{
-		storage: storage,
+		storage:     storage,
+		broadcaster: broadcaster,
 	}
 }
 
@@ -56,15 +59,23 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.storage.CreateRequest(sessionUUID, &storage.Request{
+	requestData, creationErr := h.storage.CreateRequest(sessionUUID, &storage.Request{
 		ClientAddr: h.getRealClientAddress(r),
 		Method:     r.Method,
 		Content:    string(body),
 		Headers:    h.headerToStringsMap(r.Header),
 		URI:        r.RequestURI,
-	}); err != nil {
-		h.respondWithError(w, http.StatusNotFound, "cannot put request data into storage: "+err.Error())
+	})
+
+	if creationErr != nil {
+		h.respondWithError(w, http.StatusNotFound, "cannot put request data into storage: "+creationErr.Error())
 		return
+	}
+
+	if h.broadcaster != nil {
+		go func(sessionUUID, requestUUID string) {
+			_ = h.broadcaster.Publish(sessionUUID, broadcast.RequestRegistered, requestUUID)
+		}(sessionUUID, requestData.UUID)
 	}
 
 	if delay := sessionData.WebHookResponse.DelaySec; delay > 0 {

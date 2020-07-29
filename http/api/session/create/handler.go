@@ -34,14 +34,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.json.Unmarshal(body, &request); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, err.Error()).ToJSON())
+		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, "cannot parse passed json").ToJSON())
 
 		return
 	}
 
 	if err := request.validate(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, err.Error()).ToJSON())
+		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, "invalid value passed: "+err.Error()).ToJSON())
 
 		return
 	}

@@ -1,15 +1,10 @@
 <template>
-    <div class="list-group-item list-group-item-action flex-column">
+    <div class="request-plate list-group-item list-group-item-action flex-column py-3 px-3" :class="methodClass">
         <div class="d-flex w-100 justify-content-between">
-            <h5 class="mb-1 text-nowrap">{{ clientAddress }}<span
-                class="badge text-uppercase ml-2 http-method"
-                :class="methodClass"
-                :v-if="method"
-            >{{ method }}</span>
-            </h5>
-            <button type="button" class="close" title="Delete" @click="remove">&times;</button>
+            <h5 class="mb-1 text-nowrap">{{ clientAddress }}</h5>
+            <button type="button" class="close position-relative" title="Delete" @click="remove">&times;</button>
         </div>
-        <small>{{ formattedWhen }}</small>
+        <p class="when small m-0">{{ formattedWhen }}</p>
     </div>
 </template>
 
@@ -60,23 +55,34 @@
                 if (typeof this.method === 'string') {
                     switch (this.method.toLowerCase()) {
                         case 'get':
-                            return 'badge-success';
+                            return 'border-success';
+                        case 'head':
+                            return 'border-light';
                         case 'post':
+                            return 'border-primary';
                         case 'put':
-                            return 'badge-info';
+                            return 'border-info';
+                        case 'patch':
+                            return 'border-dark';
                         case 'delete':
-                            return 'badge-danger';
+                            return 'border-danger';
+                        case 'connect':
+                            return 'border-warning';
+                        case 'options':
+                            return 'border-secondary';
+                        case 'trace':
+                            return 'border-light';
                     }
                 }
 
-                return 'badge-light';
+                return '';
             }
         },
 
         methods: {
             remove(e) {
                 // <https://michaelnthiessen.com/pass-function-as-prop/>
-                this.$emit('on-delete', this.uuid);
+                this.$emit('on-delete', this.uuid, true);
 
                 e.preventDefault();
                 e.stopPropagation();
@@ -86,7 +92,7 @@
 
             updateFormattedWhen() {
                 this.formattedWhen = this.when != null
-                    ? `${this.$moment(this.when).format('YYYY-MM-D h:mm:ss a')} (${this.$moment(this.when).fromNow()})`
+                    ? `${this.$moment(this.when).format('h:mm:ss a')} (${this.$moment(this.when).fromNow()})`
                     : '';
             }
         }
@@ -94,8 +100,19 @@
 </script>
 
 <style scoped>
-    .http-method {
-        position: relative;
-        top: -.15em;
+    .request-plate {
+        border-width: 0 0 0 0.3em;
+        border-top-color: transparent !important;
+        border-right-color: transparent !important;
+        border-bottom-color: transparent !important;
+    }
+
+    .request-plate .when {
+        line-height: 1em;
+        opacity: 0.8;
+    }
+
+    .request-plate .close {
+        top: -5px;
     }
 </style>

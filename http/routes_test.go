@@ -12,7 +12,7 @@ import (
 func TestServer_RegisterHandlers(t *testing.T) {
 	t.Parallel()
 
-	var s = NewServer(&ServerSettings{}, &settings.AppSettings{}, &fakeStorage{})
+	var s = NewServer(&ServerSettings{}, &settings.AppSettings{}, &fakeStorage{}, &fakeBroadcaster{})
 
 	var cases = []struct {
 		giveName         string

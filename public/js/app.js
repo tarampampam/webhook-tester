@@ -4,9 +4,16 @@
 /** @typedef {Object} httpVueLoader */
 
 define(
-    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'highlightjs', 'vue-loader'],
-    (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session) => {
+    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'pusher', 'highlightjs', 'vue-loader'],
+    (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session, pusher) => {
         let isProduction = true;
+
+        if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
+            // @link <https://github.com/vuejs/vue-devtools/issues/190#issuecomment-264203810>
+            Vue.config.devtools = true;
+            pusher.logToConsole = true;
+            isProduction = false;
+        }
 
         const clip = new clipboard('.btn');
 
@@ -18,10 +25,20 @@ define(
             e.clearSelection();
         });
 
-        if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
-            // @link <https://github.com/vuejs/vue-devtools/issues/190#issuecomment-264203810>
-            Vue.config.devtools = true; // Disable on "production"
-            isProduction = false;
+        try {
+            window.localStorage.getItem('test');
+        } catch (e) {
+            izitoast.error({
+                title: 'Local storage not accessible!',
+                message: 'Please, allow this site to use browser local storage',
+                icon: 'fas fa-times',
+                close: false,
+                progressBar: false,
+                drag: false,
+                timeout: 0,
+                position: 'center',
+                overlay: true,
+            });
         }
 
         const router = new VueRouter({
@@ -37,6 +54,7 @@ define(
         Vue.prototype.$izitoast = Vue.$izitoast = izitoast;
         Vue.prototype.$clipboard = Vue.$clipboard = clip;
         Vue.prototype.$session = Vue.$session = session;
+        Vue.prototype.$pusher = Vue.$pusher = pusher;
         Vue.prototype.$moment = Vue.$moment = moment;
         Vue.prototype.$axios = Vue.$axios = axios;
         Vue.prototype.$api = Vue.$api = api;

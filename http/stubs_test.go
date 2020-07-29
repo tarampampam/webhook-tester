@@ -25,3 +25,7 @@ func (*fakeStorage) GetRequest(sessionUUID, requestUUID string) (*storage.Reques
 func (*fakeStorage) GetAllRequests(sessionUUID string) (*[]storage.RequestData, error) {
 	return new([]storage.RequestData), nil
 }
+
+type fakeBroadcaster struct{}
+
+func (*fakeBroadcaster) Publish(channel, eventName string, data interface{}) error { return nil }

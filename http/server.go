@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"webhook-tester/broadcast"
 	"webhook-tester/settings"
 	"webhook-tester/storage"
 
@@ -28,13 +29,19 @@ type (
 		Server      *http.Server
 		Router      *mux.Router
 		storage     storage.Storage
+		broadcaster broadcast.Broadcaster // optional, can be nil
 		stdLog      *log.Logger
 		errLog      *log.Logger
 	}
 )
 
 // NewServer creates new server instance.
-func NewServer(settings *ServerSettings, appSettings *settings.AppSettings, storage storage.Storage) *Server {
+func NewServer(
+	settings *ServerSettings,
+	appSettings *settings.AppSettings,
+	storage storage.Storage,
+	broadcaster broadcast.Broadcaster,
+) *Server {
 	var (
 		router     = *mux.NewRouter()
 		stdLog     = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)
@@ -56,6 +63,7 @@ func NewServer(settings *ServerSettings, appSettings *settings.AppSettings, stor
 		Server:      httpServer,
 		Router:      &router,
 		storage:     storage,
+		broadcaster: broadcaster,
 		stdLog:      stdLog,
 		errLog:      errLog,
 	}
