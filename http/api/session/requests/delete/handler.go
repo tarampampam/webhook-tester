@@ -3,6 +3,7 @@ package delete
 import (
 	"fmt"
 	"net/http"
+	"webhook-tester/broadcast"
 	"webhook-tester/http/api"
 	"webhook-tester/http/errors"
 	"webhook-tester/storage"
@@ -12,14 +13,16 @@ import (
 )
 
 type Handler struct {
-	storage storage.Storage
-	json    jsoniter.API
+	storage     storage.Storage
+	broadcaster broadcast.Broadcaster
+	json        jsoniter.API
 }
 
-func NewHandler(storage storage.Storage) http.Handler {
+func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http.Handler {
 	return &Handler{
-		storage: storage,
-		json:    jsoniter.ConfigFastest,
+		storage:     storage,
+		broadcaster: broadcaster,
+		json:        jsoniter.ConfigFastest,
 	}
 }
 
@@ -40,6 +43,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		).ToJSON())
 
 		return
+	}
+
+	if h.broadcaster != nil {
+		go func(sessionUUID, requestUUID string) {
+			_ = h.broadcaster.Publish(sessionUUID, broadcast.RequestDeleted, requestUUID)
+		}(sessionUUID, requestUUID)
 	}
 
 	_ = h.json.NewEncoder(w).Encode(api.Status{

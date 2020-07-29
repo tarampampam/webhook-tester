@@ -78,14 +78,14 @@ func (s *Server) registerAPIHandlers() {
 	apiRouter.
 		Handle(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			deleteRequest.NewHandler(s.storage),
+			deleteRequest.NewHandler(s.storage, s.broadcaster),
 		).
 		Methods(http.MethodDelete).
 		Name("delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage, s.broadcaster)).
 		Methods(http.MethodDelete).
 		Name("delete_all_session_requests")
 }
@@ -111,17 +111,20 @@ func (s *Server) registerWebHookHandlers() {
 	webhookRouter.Use(AllowCORSMiddleware)
 
 	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}", webhook.NewHandler(s.storage)).
+		Handle("/{sessionUUID:"+uuidPattern+"}", webhook.NewHandler(s.storage, s.broadcaster)).
 		Methods(allowedMethods...).
 		Name("webhook")
 
 	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", webhook.NewHandler(s.storage)).
+		Handle(
+			"/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}",
+			webhook.NewHandler(s.storage, s.broadcaster),
+		).
 		Methods(allowedMethods...).
 		Name("webhook_with_status_code")
 
 	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", webhook.NewHandler(s.storage)).
+		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", webhook.NewHandler(s.storage, s.broadcaster)).
 		Methods(allowedMethods...).
 		Name("webhook_any")
 }

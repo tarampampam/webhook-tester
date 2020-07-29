@@ -12,7 +12,7 @@ requirejs.config({
         // JS framework for UI
         // Docs: <https://vuejs.org/v2/api/>
         Vue: [
-            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue', // @todo: remove `.min` for production using (without `vue.js devtools`)
+            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.min', // @todo: remove `.min` for production using (without `vue.js devtools`)
             'https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.min',
         ],
         // Router for VueJS
@@ -49,7 +49,13 @@ requirejs.config({
         // Docs: <https://highlightjs.org/>
         hljs: [
             'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min',
-            'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@10.1.1/build/highlight.min'
+            'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@10.1.1/build/highlight.min',
+        ],
+        // Pusher JavaScript library for the browser
+        // Docs: <http://pusher.com/>
+        pusher: [
+            'https://cdnjs.cloudflare.com/ajax/libs/pusher/6.0.3/pusher.min',
+            'https://js.pusher.com/6.0.3/pusher.min',
         ]
     },
     map: {

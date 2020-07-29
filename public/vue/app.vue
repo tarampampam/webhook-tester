@@ -4,7 +4,7 @@
             :current-web-hook-url="sessionRequestURI"
             :session-lifetime-sec="sessionLifetimeSec"
             :version="appVersion"
-            @on-new-url="newUrlHandler"
+            @on-new-url="newSessionHandler"
         ></main-header>
 
         <div class="container-fluid">
@@ -16,7 +16,7 @@
                                 class="badge badge-primary badge-pill total-requests-count"
                             >{{ requests.length }}</span></h5>
                             <button type="button"
-                                    class="btn btn-outline-danger btn-sm"
+                                    class="btn btn-outline-danger btn-sm position-relative button-delete-all"
                                     v-if="requests.length > 0"
                                     @click="deleteAllRequests()">Delete all
                             </button>
@@ -102,7 +102,7 @@
                         ></request-details>
 
                         <div class="pt-3">
-                            <h4>Body</h4>
+                            <h4>Request body</h4>
                             <pre v-highlightjs="requestContent"><code class="javascript"></code></pre>
                         </div>
                     </div>
@@ -147,9 +147,16 @@
 
                 appVersion: null,
                 sessionLifetimeSec: null,
+                maxRequests: 50,
 
                 sessionUUID: null,
                 requestUUID: null,
+
+                pusher: {
+                    client: null,
+                    channel: null,
+                    channelName: null,
+                },
             }
         },
 
@@ -157,7 +164,18 @@
             this.$api.getAppSettings()
                 .then((settings) => {
                     this.appVersion = settings.version;
+                    this.maxRequests = settings.limits.max_requests;
                     this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
+
+                    if (settings.pusher.key !== "") {
+                        this.pusher.client = new this.$pusher(settings.pusher.key, {
+                            cluster: settings.pusher.cluster,
+                            forceTLS: true,
+                            encrypted: true,
+                        });
+
+                        this.refreshPusherSubscription();
+                    }
                 });
 
             this.initSession();
@@ -204,6 +222,8 @@
                         }
                     });
                 }
+
+                this.refreshPusherSubscription();
             },
             requestUUID: function () {
                 if (this.$route.params.requestUUID !== this.requestUUID) {
@@ -213,12 +233,46 @@
                             requestUUID: this.requestUUID,
                         }
                     }).catch((err) => {
+                        // do nothing
                     });
+                }
+            },
+            requests: function () {
+                // limit maximal requests length
+                if (this.requests.length > this.maxRequests) {
+                    this.requests.splice(this.maxRequests, this.requests.length);
                 }
             },
         },
 
         methods: {
+            refreshPusherSubscription() {
+                const requestRegistered = 'request-registered',
+                    requestDeleted = 'request-deleted',
+                    requestsDeleted = 'requests-deleted';
+
+                // unsubscribe first
+                if (this.pusher.channel !== null && this.pusher.channelName !== null) {
+                    this.pusher.channel.unsubscribe(this.pusher.channelName);
+                    this.pusher.channel = null;
+                }
+
+                // unset subscribed channel name
+                this.pusher.channelName = null;
+
+                // subscribe and bind handler
+                if (this.pusher.client !== null && this.sessionUUID !== null) {
+                    this.pusher.channelName = this.sessionUUID;
+                    this.pusher.channel = this.pusher.client.subscribe(this.pusher.channelName);
+
+                    this.pusher.channel.bind(requestRegistered, this.pusherRegisteredRequestHandler);
+                    this.pusher.channel.bind(requestDeleted, (uuid) => {
+                        this.deleteRequestHandler(uuid, false);
+                    });
+                    this.pusher.channel.bind(requestsDeleted, this.clearRequests);
+                }
+            },
+
             /**
              * @param {String} uuid
              * @returns {RecordedRequest|undefined}
@@ -234,7 +288,6 @@
 
                 return undefined;
             },
-
             /**
              * @param {String} uuid
              * @returns {Number|undefined}
@@ -250,7 +303,6 @@
 
                 return undefined;
             },
-
             /**
              * @returns {Number|undefined}
              */
@@ -275,6 +327,23 @@
             },
 
             /**
+             * @param {APIRecordedRequest} rawRequest
+             *
+             * @returns {RecordedRequest}
+             */
+            formatRequestObject(rawRequest) {
+                return {
+                    uuid: rawRequest.uuid,
+                    client_address: rawRequest.client_address,
+                    method: rawRequest.method.toLowerCase(),
+                    when: new Date(rawRequest.created_at_unix * 1000),
+                    content: rawRequest.content,
+                    headers: rawRequest.headers,
+                    url: rawRequest.url,
+                }
+            },
+
+            /**
              * @returns {Promise<undefined>}
              */
             reloadRequests() {
@@ -282,19 +351,7 @@
                     this.$api.getAllSessionRequests(this.sessionUUID)
                         .then((requests) => {
                             this.requests.splice(0, this.requests.length); // make clear
-
-                            requests.forEach((request) => {
-                                this.requests.push({
-                                    uuid: request.uuid,
-                                    client_address: request.client_address,
-                                    method: request.method.toLowerCase(),
-                                    when: new Date(request.created_at_unix * 1000),
-                                    content: request.content,
-                                    headers: request.headers,
-                                    url: request.url,
-                                });
-                            });
-
+                            requests.forEach((request) => this.requests.push(this.formatRequestObject(request)));
                             resolve();
                         })
                         .catch((err) => reject(err))
@@ -324,13 +381,16 @@
                     this.sessionUUID = sessionUUID;
 
                     this.reloadRequests()
-                        .then(() => this.navigateFirstRequest())
+                        .then(() => {
+                            if (this.requestUUID === null || this.getRequestIndexByUUID(this.requestUUID) === undefined) {
+                                this.navigateFirstRequest();
+                            }
+                        })
                         .catch(() => startNewSession())
                 } else {
                     startNewSession()
                 }
             },
-
             initRequest() {
                 const routeRequestUUID = this.$route.params.requestUUID;
 
@@ -389,40 +449,37 @@
 
             /**
              * @param {String} uuid
+             * @param {Boolean} makeApiCall
              */
-            deleteRequestHandler(uuid) {
-                this.$api.deleteSessionRequest(this.sessionUUID, uuid)
-                    .then((status) => {
-                        if (status.success === true) {
-                            this.$izitoast.success({title: `Request with UUID ${uuid} was successfully removed!`});
-                        } else {
-                            throw new Error(`Unsuccessful status returned`);
-                        }
-                    })
-                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
+            deleteRequestHandler(uuid, makeApiCall) {
+                if (makeApiCall === true) {
+                    this.$api.deleteSessionRequest(this.sessionUUID, uuid)
+                        .then((status) => {
+                            if (status.success !== true) {
+                                throw new Error(`Unsuccessful status returned`);
+                            }
+                        })
+                        .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
+                }
 
                 const current = this.getRequestIndexByUUID(uuid);
 
-                if (uuid !== this.requestUUID) {
-                    // do nothing
-                } else if (this.requests[current + 1] !== undefined) {
-                    this.navigateNextRequest();
-                } else if (this.requests[current - 1] !== undefined) {
-                    this.navigatePreviousRequest();
+                if (current !== undefined) {
+                    if (uuid !== this.requestUUID) {
+                        // do nothing
+                    } else if (this.requests[current + 1] !== undefined) {
+                        this.navigateNextRequest();
+                    } else if (this.requests[current - 1] !== undefined) {
+                        this.navigatePreviousRequest();
+                    }
+
+                    this.requests.splice(current, 1); // remove request object from stack
                 }
-
-                this.requests.splice(current, 1); // remove request object from stack
             },
-
             /**
              * @param {NewSessionData} urlSettings
              */
-            newUrlHandler(urlSettings) {
-                if (urlSettings.destroyCurrentSession === true) {
-                    this.$api.deleteSession(this.sessionUUID)
-                        .catch((err) => this.$izitoast.error({title: `Cannot destroy current session: ${err.message}`}))
-                }
-
+            newSessionHandler(urlSettings) {
                 this.$api.startNewSession({
                     content_type: urlSettings.contentType,
                     status_code: urlSettings.statusCode,
@@ -430,7 +487,11 @@
                     response_body: urlSettings.responseBody,
                 })
                     .then((newSessionData) => {
-                        newSessionData.uuid
+                        if (urlSettings.destroyCurrentSession === true) {
+                            this.$api.deleteSession(this.sessionUUID)
+                                .catch((err) => this.$izitoast.error({title: `Cannot destroy current session: ${err.message}`}))
+                        }
+
                         this.sessionUUID = newSessionData.uuid;
                         this.$session.setLocalSessionUUID(newSessionData.uuid);
 
@@ -438,6 +499,29 @@
                         this.$izitoast.success({title: 'New session started!'});
                     })
                     .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
+            },
+
+            /**
+             * @param {String} requestUUID
+             */
+            pusherRegisteredRequestHandler(requestUUID) {
+                this.$izitoast.info({
+                    title: 'New request',
+                    message: 'New incoming webhook request',
+                    timeout: 2000,
+                    closeOnClick: true
+                });
+
+                this.$api.getSessionRequest(this.sessionUUID, requestUUID)
+                    .then((request) => {
+                        // push at the first position
+                        this.requests.unshift(this.formatRequestObject(request))
+
+                        if (this.requestUUID === null || this.autoRequestNavigate === true) {
+                            this.navigateFirstRequest();
+                        }
+                    })
+                    .catch((err) => this.$izitoast.error({title: `Cannot load request with UUID ${requestUUID}: ${err.message}`}))
             },
         }
     }
@@ -457,6 +541,10 @@
 
     .request-plate {
         cursor: pointer;
+    }
+
+    .button-delete-all {
+        top: -2px;
     }
 
     .hljs {

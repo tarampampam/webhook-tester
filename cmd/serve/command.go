@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	"webhook-tester/broadcast"
+	"webhook-tester/broadcast/pusher"
 	apphttp "webhook-tester/http"
 	"webhook-tester/settings"
 	"webhook-tester/storage/redis"
@@ -21,8 +23,8 @@ const (
 	shutdownTimeout = time.Second * 5
 
 	// HTTP read/write timeouts
-	httpReadTimeout  = time.Second * 3
-	httpWriteTimeout = time.Second * 3
+	httpReadTimeout  = time.Second * 5
+	httpWriteTimeout = time.Second * 35
 )
 
 type (
@@ -43,6 +45,10 @@ type Command struct {
 	RedisPass     string    `long:"redis-password" default:"" env:"REDIS_PASSWORD" description:"Optional redis server password"`                     //nolint:lll
 	RedisDBNum    uint16    `required:"true" long:"redis-db-num" default:"1" env:"REDIS_DB_NUM" description:"Redis database number"`                 //nolint:lll
 	RedisMaxConn  uint16    `required:"true" long:"redis-max-conn" default:"10" env:"REDIS_MAX_CONN" description:"Maximum redis connections"`        //nolint:lll
+	PusherAppID   string    `long:"pusher-app-id" env:"PUSHER_APP_ID" description:"Pusher application ID"`
+	PusherKey     string    `long:"pusher-key" env:"PUSHER_KEY" description:"Pusher key"`
+	PusherSecret  string    `long:"pusher-secret" env:"PUSHER_SECRET" description:"Pusher secret"`
+	PusherCluster string    `long:"pusher-cluster" default:"eu" env:"PUSHER_CLUSTER" description:"Pusher cluster"`
 }
 
 // Convert struct into string representation.
@@ -69,10 +75,12 @@ func (publicDir) IsValidValue(dir string) error {
 }
 
 // Execute current command.
-func (cmd *Command) Execute(_ []string) error {
+func (cmd *Command) Execute(_ []string) error { //nolint:funlen
 	appSettings := &settings.AppSettings{
-		MaxRequests: cmd.MaxRequests,
-		SessionTTL:  time.Second * time.Duration(cmd.SessionTTLSec),
+		MaxRequests:   cmd.MaxRequests,
+		SessionTTL:    time.Second * time.Duration(cmd.SessionTTLSec),
+		PusherKey:     cmd.PusherKey,
+		PusherCluster: cmd.PusherCluster,
 	}
 
 	storage := redis.NewStorage(
@@ -84,13 +92,21 @@ func (cmd *Command) Execute(_ []string) error {
 		appSettings.MaxRequests,
 	)
 
+	var broadcaster broadcast.Broadcaster
+
+	if cmd.PusherAppID != "" && cmd.PusherKey != "" && cmd.PusherSecret != "" && cmd.PusherCluster != "" {
+		broadcaster = pusher.NewBroadcaster(cmd.PusherAppID, cmd.PusherKey, cmd.PusherSecret, cmd.PusherCluster)
+	} else {
+		_, _ = fmt.Fprintf(os.Stderr, "pusher.com was not registered (wrong configuration)\n")
+	}
+
 	server := apphttp.NewServer(&apphttp.ServerSettings{
 		Address:                   cmd.Address.String() + ":" + cmd.Port.String(),
 		WriteTimeout:              httpWriteTimeout,
 		ReadTimeout:               httpReadTimeout,
 		PublicAssetsDirectoryPath: cmd.PublicDir.String(),
 		KeepAliveEnabled:          false,
-	}, appSettings, storage)
+	}, appSettings, storage, broadcaster)
 
 	server.RegisterHandlers()
 

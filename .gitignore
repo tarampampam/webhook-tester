@@ -6,6 +6,7 @@
 # Temp dirs & trash
 /temp
 /tmp
+*.env
 .DS_Store
 *.cache
 *.out
