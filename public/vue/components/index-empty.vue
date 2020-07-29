@@ -68,15 +68,19 @@
 
         methods: {
             testXHR() {
-                const method = this.xhrMethods[Math.floor(Math.random() * this.xhrMethods.length)];
-
                 const payload = {
                     xhr: 'test',
                     now: Math.floor(Date.now() / 1000),
                 };
 
-                this.$axios({method: method, url: this.currentWebHookUrl, data: payload})
-                    .catch((err) => this.$izitoast.error({title: err.message}))
+                this.$axios({
+                    method: this.xhrMethods[Math.floor(Math.random() * this.xhrMethods.length)],
+                    url: this.currentWebHookUrl,
+                    data: payload
+                })
+                    .catch((err) => this.$izitoast.error({title: err.message}));
+
+                this.$izitoast.success({title: 'Background request was sent', timeout: 2000});
             },
         }
     }
