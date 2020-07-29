@@ -21,7 +21,7 @@ type Storage struct {
 
 func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Duration, maxRequests uint16) *Storage {
 	return &Storage{
-		Context:     context.Background(),
+		Context:     context.TODO(),
 		ttl:         sessionTTL,
 		maxRequests: maxRequests,
 		redis: redis.NewClient(&redis.Options{

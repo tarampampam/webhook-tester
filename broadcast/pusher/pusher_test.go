@@ -2,10 +2,11 @@ package pusher
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type roundTripFunc func(req *http.Request) *http.Response
