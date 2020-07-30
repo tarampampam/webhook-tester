@@ -3,7 +3,9 @@ package http
 import (
 	"testing"
 	"time"
+	nullBroadcast "webhook-tester/broadcast/null"
 	appSettings "webhook-tester/settings"
+	nullStorage "webhook-tester/storage/null"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +20,7 @@ func TestNewServer(t *testing.T) {
 		KeepAliveEnabled: true,
 	}
 
-	server := NewServer(&settings, &appSettings.AppSettings{}, &fakeStorage{}, &fakeBroadcaster{})
+	server := NewServer(&settings, &appSettings.AppSettings{}, &nullStorage.Storage{}, &nullBroadcast.Broadcaster{})
 
 	assert.Equal(t, &settings, server.settings)
 	assert.Equal(t, "1.2.3.4:321", server.Server.Addr)

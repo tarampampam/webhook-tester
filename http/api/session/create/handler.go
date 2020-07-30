@@ -22,27 +22,26 @@ func NewHandler(storage storage.Storage) http.Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		h.respondWithError(w, http.StatusBadRequest, "empty request body")
+		return
+	}
+
 	body, readErr := ioutil.ReadAll(r.Body)
 	if readErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, readErr.Error()).ToJSON())
-
+		h.respondWithError(w, http.StatusInternalServerError, readErr.Error())
 		return
 	}
 
 	var request = request{}
 
 	if err := h.json.Unmarshal(body, &request); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, "cannot parse passed json").ToJSON())
-
+		h.respondWithError(w, http.StatusBadRequest, "cannot parse passed json")
 		return
 	}
 
 	if err := request.validate(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(errors.NewServerError(http.StatusBadRequest, "invalid value passed: "+err.Error()).ToJSON())
-
+		h.respondWithError(w, http.StatusBadRequest, "invalid value passed: "+err.Error())
 		return
 	}
 
@@ -57,9 +56,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	sessionData, sessionErr := h.storage.CreateSession(webHookResp)
 	if sessionErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, sessionErr.Error()).ToJSON())
-
+		h.respondWithError(w, http.StatusInternalServerError, sessionErr.Error())
 		return
 	}
 
@@ -75,4 +72,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			CreatedAtUnix: sessionData.CreatedAtUnix,
 		},
 	})
+}
+
+func (h *Handler) respondWithError(w http.ResponseWriter, code int, message string) {
+	w.WriteHeader(code)
+
+	_, _ = w.Write(errors.NewServerError(uint16(code), message).ToJSON())
 }

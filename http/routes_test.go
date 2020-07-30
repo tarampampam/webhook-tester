@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	nullBroadcast "webhook-tester/broadcast/null"
 	"webhook-tester/settings"
+	nullStorage "webhook-tester/storage/null"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +14,7 @@ import (
 func TestServer_RegisterHandlers(t *testing.T) {
 	t.Parallel()
 
-	var s = NewServer(&ServerSettings{}, &settings.AppSettings{}, &fakeStorage{}, &fakeBroadcaster{})
+	var s = NewServer(&ServerSettings{}, &settings.AppSettings{}, &nullStorage.Storage{}, &nullBroadcast.Broadcaster{})
 
 	var cases = []struct {
 		giveName         string

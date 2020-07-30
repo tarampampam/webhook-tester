@@ -1,8 +1,9 @@
 package storage
 
+import "io"
+
 type Storage interface {
-	// Close closes connections to the storage.
-	Close() error
+	io.Closer
 
 	// GetSession returns session data.
 	// If session was not found - `nil, nil` will be returned.

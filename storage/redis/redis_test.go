@@ -13,7 +13,7 @@ import (
 func TestStorage_SessionCreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	s, miniRedis := NewFakeRedisStorage(t, 1)
+	s, miniRedis := newFakeRedisStorage(t, 1)
 
 	defer func() {
 		assert.Nil(t, s.Close())
@@ -58,7 +58,7 @@ func TestStorage_SessionCreateReadDelete(t *testing.T) {
 func TestStorage_RequestCreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	s, miniRedis := NewFakeRedisStorage(t, 10)
+	s, miniRedis := newFakeRedisStorage(t, 10)
 
 	defer func() {
 		assert.Nil(t, s.Close())
@@ -108,7 +108,7 @@ func TestStorage_RequestCreateReadDelete(t *testing.T) {
 func TestStorage_RequestCreationLimit(t *testing.T) {
 	t.Parallel()
 
-	s, miniRedis := NewFakeRedisStorage(t, 2)
+	s, miniRedis := newFakeRedisStorage(t, 2)
 
 	defer func() {
 		assert.Nil(t, s.Close())
@@ -142,7 +142,7 @@ func TestStorage_RequestCreationLimit(t *testing.T) {
 func TestStorage_GetAllRequests(t *testing.T) {
 	t.Parallel()
 
-	s, miniRedis := NewFakeRedisStorage(t, 10)
+	s, miniRedis := newFakeRedisStorage(t, 10)
 
 	defer func() {
 		assert.Nil(t, s.Close())
@@ -173,7 +173,7 @@ func TestStorage_GetAllRequests(t *testing.T) {
 func TestStorage_DeleteRequests(t *testing.T) {
 	t.Parallel()
 
-	s, miniRedis := NewFakeRedisStorage(t, 10)
+	s, miniRedis := newFakeRedisStorage(t, 10)
 
 	defer func() {
 		assert.Nil(t, s.Close())
@@ -285,7 +285,7 @@ func TestStorage_DeleteRequests(t *testing.T) {
 //	}
 //}
 
-func NewFakeRedisStorage(t *testing.T, maxRequests uint16) (*Storage, *miniredis.Miniredis) {
+func newFakeRedisStorage(t *testing.T, maxRequests uint16) (*Storage, *miniredis.Miniredis) {
 	miniRedis, err := miniredis.Run()
 
 	assert.Nil(t, err)
