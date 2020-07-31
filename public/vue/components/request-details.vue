@@ -123,7 +123,7 @@
              * @returns {String}
              */
             getRequestURI: function () {
-                let uri = typeof this.request.url === 'string'
+                let uri = (typeof this.request === 'object' && typeof this.request.url === 'string')
                     ? this.request.url.replace(/^\/+/g, '')
                     : '...';
 

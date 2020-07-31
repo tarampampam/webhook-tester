@@ -15,6 +15,7 @@ import (
 	"webhook-tester/broadcast/pusher"
 	apphttp "webhook-tester/http"
 	"webhook-tester/settings"
+	"webhook-tester/storage"
 	"webhook-tester/storage/redis"
 )
 
@@ -75,29 +76,16 @@ func (publicDir) IsValidValue(dir string) error {
 }
 
 // Execute current command.
-func (cmd *Command) Execute(_ []string) error { //nolint:funlen
-	appSettings := &settings.AppSettings{
-		MaxRequests:   cmd.MaxRequests,
-		SessionTTL:    time.Second * time.Duration(cmd.SessionTTLSec),
-		PusherKey:     cmd.PusherKey,
-		PusherCluster: cmd.PusherCluster,
-	}
-
-	storage := redis.NewStorage(
-		cmd.RedisHost+":"+cmd.RedisPort.String(),
-		cmd.RedisPass,
-		int(cmd.RedisDBNum),
-		int(cmd.RedisMaxConn),
-		appSettings.SessionTTL,
-		appSettings.MaxRequests,
+func (cmd *Command) Execute(_ []string) error {
+	var (
+		appSettings       = cmd.getAppSettings()
+		ctx, cancel       = context.WithTimeout(context.Background(), shutdownTimeout)
+		dataStorage       = cmd.getStorage(ctx, appSettings)
+		broadcaster, bErr = cmd.getBroadcaster()
 	)
 
-	var broadcaster broadcast.Broadcaster
-
-	if cmd.PusherAppID != "" && cmd.PusherKey != "" && cmd.PusherSecret != "" && cmd.PusherCluster != "" {
-		broadcaster = pusher.NewBroadcaster(cmd.PusherAppID, cmd.PusherKey, cmd.PusherSecret, cmd.PusherCluster)
-	} else {
-		_, _ = fmt.Fprintf(os.Stderr, "pusher.com was not registered (wrong configuration)\n")
+	if bErr != nil {
+		_, _ = fmt.Fprintln(os.Stderr, bErr.Error())
 	}
 
 	server := apphttp.NewServer(&apphttp.ServerSettings{
@@ -106,7 +94,7 @@ func (cmd *Command) Execute(_ []string) error { //nolint:funlen
 		ReadTimeout:               httpReadTimeout,
 		PublicAssetsDirectoryPath: cmd.PublicDir.String(),
 		KeepAliveEnabled:          false,
-	}, appSettings, storage, broadcaster)
+	}, appSettings, dataStorage, broadcaster)
 
 	server.RegisterHandlers()
 
@@ -123,13 +111,11 @@ func (cmd *Command) Execute(_ []string) error { //nolint:funlen
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-
 	// listen for a signal
 	<-signals
 
 	defer func() {
-		if err := storage.Close(); err != nil {
+		if err := dataStorage.Close(); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "storage closing error: %s\n", err)
 		}
 
@@ -141,4 +127,32 @@ func (cmd *Command) Execute(_ []string) error { //nolint:funlen
 	}
 
 	return nil
+}
+
+func (cmd *Command) getAppSettings() *settings.AppSettings {
+	return &settings.AppSettings{
+		MaxRequests:   cmd.MaxRequests,
+		SessionTTL:    time.Second * time.Duration(cmd.SessionTTLSec),
+		PusherKey:     cmd.PusherKey,
+		PusherCluster: cmd.PusherCluster,
+	}
+}
+
+func (cmd *Command) getStorage(_ context.Context, appSettings *settings.AppSettings) storage.Storage {
+	return redis.NewStorage(
+		cmd.RedisHost+":"+cmd.RedisPort.String(),
+		cmd.RedisPass,
+		int(cmd.RedisDBNum),
+		int(cmd.RedisMaxConn),
+		appSettings.SessionTTL,
+		appSettings.MaxRequests,
+	)
+}
+
+func (cmd *Command) getBroadcaster() (broadcast.Broadcaster, error) {
+	if cmd.PusherAppID != "" && cmd.PusherKey != "" && cmd.PusherSecret != "" && cmd.PusherCluster != "" {
+		return pusher.NewBroadcaster(cmd.PusherAppID, cmd.PusherKey, cmd.PusherSecret, cmd.PusherCluster), nil
+	}
+
+	return nil, errors.New("pusher.com cannot be registered (wrong configuration)")
 }

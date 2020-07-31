@@ -2,30 +2,30 @@ package api
 
 import "sort"
 
-type Status struct {
+type StatusResponse struct {
 	Success bool `json:"success"`
 }
 
 type (
-	Header struct {
+	RequestHeader struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
 	}
 
-	Request struct {
-		UUID          string  `json:"uuid"`
-		ClientAddr    string  `json:"client_address"`
-		Method        string  `json:"method"`
-		Content       string  `json:"content"`
-		Headers       Headers `json:"headers"`
-		URI           string  `json:"url"`
-		CreatedAtUnix int64   `json:"created_at_unix"`
+	StoredRequest struct {
+		UUID          string         `json:"uuid"`
+		ClientAddr    string         `json:"client_address"`
+		Method        string         `json:"method"`
+		Content       string         `json:"content"`
+		Headers       RequestHeaders `json:"headers"`
+		URI           string         `json:"url"`
+		CreatedAtUnix int64          `json:"created_at_unix"`
 	}
 )
 
-type Requests []Request
+type StoredRequests []StoredRequest
 
-func (r Requests) Sorted() Requests {
+func (r StoredRequests) Sorted() StoredRequests {
 	sort.SliceStable(r, func(i, j int) bool {
 		return r[i].CreatedAtUnix > r[j].CreatedAtUnix
 	})
@@ -33,9 +33,9 @@ func (r Requests) Sorted() Requests {
 	return r
 }
 
-type Headers []Header
+type RequestHeaders []RequestHeader
 
-func (h Headers) Sorted() Headers {
+func (h RequestHeaders) Sorted() RequestHeaders {
 	sort.SliceStable(h, func(i, j int) bool {
 		return h[i].Name < h[j].Name
 	})
@@ -43,11 +43,11 @@ func (h Headers) Sorted() Headers {
 	return h
 }
 
-func MapToHeaders(in map[string]string) *Headers {
-	result := make(Headers, 0)
+func MapToHeaders(in map[string]string) *RequestHeaders {
+	result := make(RequestHeaders, 0)
 
 	for name, value := range in {
-		result = append(result, Header{Name: name, Value: value})
+		result = append(result, RequestHeader{Name: name, Value: value})
 	}
 
 	return &result
