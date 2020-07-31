@@ -138,8 +138,8 @@ func (cmd *Command) getAppSettings() *settings.AppSettings {
 	}
 }
 
-func (cmd *Command) getStorage(ctx context.Context, appSettings *settings.AppSettings) storage.Storage {
-	s := redis.NewStorage(
+func (cmd *Command) getStorage(_ context.Context, appSettings *settings.AppSettings) storage.Storage {
+	return redis.NewStorage(
 		cmd.RedisHost+":"+cmd.RedisPort.String(),
 		cmd.RedisPass,
 		int(cmd.RedisDBNum),
@@ -147,10 +147,6 @@ func (cmd *Command) getStorage(ctx context.Context, appSettings *settings.AppSet
 		appSettings.SessionTTL,
 		appSettings.MaxRequests,
 	)
-
-	s.Context = ctx
-
-	return s
 }
 
 func (cmd *Command) getBroadcaster() (broadcast.Broadcaster, error) {

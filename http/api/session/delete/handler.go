@@ -24,33 +24,30 @@ func NewHandler(storage storage.Storage) http.Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	sessionUUID := mux.Vars(r)["sessionUUID"]
+	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
+	if !sessionFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		return
+	}
 
 	// delete session
 	if result, err := h.storage.DeleteSession(sessionUUID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
-
+		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
 		return
 	} else if !result {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(
-			http.StatusNotFound,
-			fmt.Sprintf("Session with UUID %s was not found", sessionUUID),
-		).ToJSON())
-
+		errors.NewServerError(
+			uint16(http.StatusNotFound), fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+		).RespondWithJSON(w)
 		return
 	}
 
 	// and recorded session requests
 	if _, err := h.storage.DeleteRequests(sessionUUID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
-
+		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
 		return
 	}
 
-	_ = h.json.NewEncoder(w).Encode(api.Status{
+	_ = h.json.NewEncoder(w).Encode(api.StatusResponse{
 		Success: true,
 	})
 }

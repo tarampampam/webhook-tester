@@ -48,7 +48,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.json.NewEncoder(w).Encode(api.Request{
+	_ = h.json.NewEncoder(w).Encode(api.StoredRequest{
 		UUID:          requestUUID,
 		ClientAddr:    data.Request.ClientAddr,
 		Method:        data.Request.Method,

@@ -39,7 +39,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(errors.NewServerError(
 			http.StatusNotFound,
-			fmt.Sprintf("Request with UUID %s was not found", requestUUID),
+			fmt.Sprintf("StoredRequest with UUID %s was not found", requestUUID),
 		).ToJSON())
 
 		return
@@ -51,7 +51,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}(sessionUUID, requestUUID)
 	}
 
-	_ = h.json.NewEncoder(w).Encode(api.Status{
+	_ = h.json.NewEncoder(w).Encode(api.StatusResponse{
 		Success: true,
 	})
 }
