@@ -12,6 +12,7 @@ type Storage struct {
 	Boolean     bool
 }
 
+func (s *Storage) Test() error                                        { return s.Error }
 func (s *Storage) Close() error                                       { return s.Error }
 func (s *Storage) DeleteSession(_ string) (bool, error)               { return s.Boolean, s.Error }
 func (s *Storage) DeleteRequests(_ string) (bool, error)              { return s.Boolean, s.Error }

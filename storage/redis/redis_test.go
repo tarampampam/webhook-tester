@@ -10,6 +10,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestStorage_Test(t *testing.T) {
+	t.Parallel()
+
+	s, miniRedis := newFakeRedisStorage(t, 1)
+
+	defer func() {
+		assert.Nil(t, s.Close())
+		miniRedis.Close()
+	}()
+
+	assert.Nil(t, s.Test())
+}
+
 func TestStorage_SessionCreateReadDelete(t *testing.T) {
 	t.Parallel()
 

@@ -10,7 +10,7 @@ import (
 	getRequest "webhook-tester/http/api/session/requests/get"
 	settingsGet "webhook-tester/http/api/settings/get"
 	"webhook-tester/http/fileserver"
-	"webhook-tester/http/ping"
+	"webhook-tester/http/probes"
 	"webhook-tester/http/webhook"
 )
 
@@ -26,11 +26,17 @@ func (s *Server) RegisterHandlers() {
 
 // Register "service" handlers.
 func (s *Server) registerServiceHandlers() {
-	// just a ping, no more
+	// liveness probe
 	s.Router.
-		Handle("/ping", DisableCachingMiddleware(ping.NewHandler())).
+		Handle("/live", probes.NewLivenessHandler()).
 		Methods(http.MethodGet).
-		Name("ping")
+		Name("liveness_probe")
+
+	// readiness probe
+	s.Router.
+		Handle("/ready", probes.NewReadinessHandler(s.storage)).
+		Methods(http.MethodGet).
+		Name("readiness_probe")
 }
 
 // Register API handlers.
@@ -45,25 +51,25 @@ func (s *Server) registerAPIHandlers() {
 	apiRouter.
 		Handle("/settings", settingsGet.NewHandler(s.appSettings)).
 		Methods(http.MethodGet).
-		Name("settings_get")
+		Name("api_settings_get")
 
 	// create new session
 	apiRouter.
 		Handle("/session", sessionCreate.NewHandler(s.storage)).
 		Methods(http.MethodPost).
-		Name("session_create")
+		Name("api_session_create")
 
 	// delete session with passed UUID
 	apiRouter.
 		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(s.storage)).
 		Methods(http.MethodDelete).
-		Name("session_delete")
+		Name("api_session_delete")
 
 	// get requests list for session with passed UUID
 	apiRouter.
 		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(s.storage)).
 		Methods(http.MethodGet).
-		Name("session_requests_all_get")
+		Name("api_session_requests_all_get")
 
 	// get request details by UUID for session with passed UUID
 	apiRouter.
@@ -72,7 +78,7 @@ func (s *Server) registerAPIHandlers() {
 			getRequest.NewHandler(s.storage),
 		).
 		Methods(http.MethodGet).
-		Name("session_request_get")
+		Name("api_session_request_get")
 
 	// delete request by UUID for session with passed UUID
 	apiRouter.
@@ -81,13 +87,13 @@ func (s *Server) registerAPIHandlers() {
 			deleteRequest.NewHandler(s.storage, s.broadcaster),
 		).
 		Methods(http.MethodDelete).
-		Name("delete_session_request")
+		Name("api_delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
 		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage, s.broadcaster)).
 		Methods(http.MethodDelete).
-		Name("delete_all_session_requests")
+		Name("api_delete_all_session_requests")
 }
 
 // Register incoming webhook handlers.

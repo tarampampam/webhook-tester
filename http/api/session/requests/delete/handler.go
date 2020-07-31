@@ -27,20 +27,25 @@ func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	sessionUUID := mux.Vars(r)["sessionUUID"]
-	requestUUID := mux.Vars(r)["requestUUID"]
+	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
+	if !sessionFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		return
+	}
+
+	requestUUID, requestFound := mux.Vars(r)["requestUUID"]
+	if !requestFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract request UUID").RespondWithJSON(w)
+		return
+	}
 
 	if deleted, err := h.storage.DeleteRequest(sessionUUID, requestUUID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
-
+		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
 		return
 	} else if !deleted {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(
-			http.StatusNotFound,
-			fmt.Sprintf("StoredRequest with UUID %s was not found", requestUUID),
-		).ToJSON())
+		errors.NewServerError(
+			uint16(http.StatusNotFound), fmt.Sprintf("request with UUID %s was not found", requestUUID),
+		).RespondWithJSON(w)
 
 		return
 	}

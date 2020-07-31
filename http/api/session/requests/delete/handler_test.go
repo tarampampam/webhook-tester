@@ -1,4 +1,4 @@
-package clear
+package delete
 
 import (
 	"errors"
@@ -34,8 +34,18 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:        "emulate storage error",
+			name:        "without registered request UUID",
 			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, _ *nullBroadcast.Broadcaster) {
+				assert.Equal(t, http.StatusInternalServerError, rr.Code)
+				assert.JSONEq(t,
+					`{"code":500,"success":false,"message":"cannot extract request UUID"}`, rr.Body.String(),
+				)
+			},
+		},
+		{
+			name:        "emulate storage error",
+			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd", "requestUUID": "11-22-33-44"},
 			setUp: func(s *nullStorage.Storage, b *nullBroadcast.Broadcaster) {
 				s.Error = errors.New("foo")
 			},
@@ -48,7 +58,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 		},
 		{
 			name:        "emulate 'not found'",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd", "requestUUID": "11-22-33-44"},
 			setUp: func(s *nullStorage.Storage, b *nullBroadcast.Broadcaster) {
 				s.Error = nil
 				s.Boolean = false
@@ -56,14 +66,14 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, _ *nullBroadcast.Broadcaster) {
 				assert.Equal(t, http.StatusNotFound, rr.Code)
 				assert.JSONEq(t,
-					`{"code":404,"success":false,"message":"requests for session with UUID aa-bb-cc-dd was not found"}`,
+					`{"code":404,"success":false,"message":"request with UUID 11-22-33-44 was not found"}`,
 					rr.Body.String(),
 				)
 			},
 		},
 		{
 			name:        "success",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd", "requestUUID": "11-22-33-44"},
 			setUp: func(s *nullStorage.Storage, b *nullBroadcast.Broadcaster) {
 				s.Error = nil
 				s.Boolean = true
@@ -75,8 +85,8 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 				assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 
 				assert.Equal(t, "aa-bb-cc-dd", b.GetLastPublishedChannel())
-				assert.Equal(t, broadcast.RequestsDeleted, b.GetLastPublishedEventName())
-				assert.Equal(t, "*", b.GetLastPublishedData())
+				assert.Equal(t, broadcast.RequestDeleted, b.GetLastPublishedEventName())
+				assert.Equal(t, "11-22-33-44", b.GetLastPublishedData())
 			},
 		},
 	}

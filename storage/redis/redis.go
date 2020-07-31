@@ -38,6 +38,10 @@ func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Durat
 	}
 }
 
+func (s *Storage) Test() error {
+	return s.redis.Ping(s.Context).Err()
+}
+
 func (s *Storage) Close() error {
 	return s.redis.Close()
 }
