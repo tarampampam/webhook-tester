@@ -37,33 +37,33 @@ type (
 
 // NewServer creates new server instance.
 func NewServer(
-	settings *ServerSettings,
+	srvSettings *ServerSettings,
 	appSettings *settings.AppSettings,
 	storage storage.Storage,
-	broadcaster broadcast.Broadcaster,
+	br broadcast.Broadcaster,
 ) *Server {
 	var (
 		router     = *mux.NewRouter()
 		stdLog     = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)
 		errLog     = log.New(os.Stderr, "[error] ", log.LstdFlags)
 		httpServer = &http.Server{
-			Addr:         settings.Address,
+			Addr:         srvSettings.Address,
 			Handler:      handlers.CombinedLoggingHandler(os.Stdout, &router),
 			ErrorLog:     errLog,
-			WriteTimeout: settings.WriteTimeout,
-			ReadTimeout:  settings.ReadTimeout,
+			WriteTimeout: srvSettings.WriteTimeout,
+			ReadTimeout:  srvSettings.ReadTimeout,
 		}
 	)
 
-	httpServer.SetKeepAlivesEnabled(settings.KeepAliveEnabled)
+	httpServer.SetKeepAlivesEnabled(srvSettings.KeepAliveEnabled)
 
 	return &Server{
-		settings:    settings,
+		settings:    srvSettings,
 		appSettings: appSettings,
 		Server:      httpServer,
 		Router:      &router,
 		storage:     storage,
-		broadcaster: broadcaster,
+		broadcaster: br,
 		stdLog:      stdLog,
 		errLog:      errLog,
 	}

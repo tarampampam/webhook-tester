@@ -7,7 +7,7 @@
             @on-new-url="newSessionHandler"
         ></main-header>
 
-        <div class="container-fluid">
+        <div class="container-fluid mb-2">
             <div class="row flex-xl-nowrap">
                 <div class="sidebar col-sm-5 col-md-4 col-lg-3 col-xl-2 px-2 py-0">
                     <div class="pl-3 pt-4 pr-3 pb-3">
@@ -18,7 +18,7 @@
                             <button type="button"
                                     class="btn btn-outline-danger btn-sm position-relative button-delete-all"
                                     v-if="requests.length > 0"
-                                    @click="deleteAllRequests()">Delete all
+                                    @click="deleteAllRequestsHandler">Delete all
                             </button>
                         </div>
                     </div>
@@ -241,6 +241,10 @@
                 // limit maximal requests length
                 if (this.requests.length > this.maxRequests) {
                     this.requests.splice(this.maxRequests, this.requests.length);
+
+                    if (this.getRequestByUUID(this.requestUUID) === undefined) {
+                        this.requestUUID = null;
+                    }
                 }
             },
         },
@@ -267,7 +271,7 @@
 
                     this.pusher.channel.bind(requestRegistered, this.pusherRegisteredRequestHandler);
                     this.pusher.channel.bind(requestDeleted, (uuid) => {
-                        this.deleteRequestHandler(uuid, false);
+                        this.deleteRequest(uuid);
                     });
                     this.pusher.channel.bind(requestsDeleted, this.clearRequests);
                 }
@@ -428,12 +432,30 @@
                 }
             },
 
+            /**
+             * @param {String} uuid
+             */
+            deleteRequest(uuid) {
+                const currentIndex = this.getRequestIndexByUUID(uuid);
+
+                if (currentIndex !== undefined) {
+                    if (uuid !== this.requestUUID) {
+                        // do nothing
+                    } else if (this.requests[currentIndex + 1] !== undefined) {
+                        this.navigateNextRequest();
+                    } else if (this.requests[currentIndex - 1] !== undefined) {
+                        this.navigatePreviousRequest();
+                    }
+
+                    this.requests.splice(currentIndex, 1); // remove request object from stack
+                }
+            },
             clearRequests() {
                 this.requests.splice(0, this.requests.length);
                 this.requestUUID = null;
             },
 
-            deleteAllRequests() {
+            deleteAllRequestsHandler() {
                 this.$api.deleteAllSessionRequests(this.sessionUUID)
                     .then((status) => {
                         if (status.success === true) {
@@ -446,35 +468,19 @@
 
                 this.clearRequests();
             },
-
             /**
              * @param {String} uuid
-             * @param {Boolean} makeApiCall
              */
-            deleteRequestHandler(uuid, makeApiCall) {
-                if (makeApiCall === true) {
-                    this.$api.deleteSessionRequest(this.sessionUUID, uuid)
-                        .then((status) => {
-                            if (status.success !== true) {
-                                throw new Error(`Unsuccessful status returned`);
-                            }
-                        })
-                        .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
-                }
+            deleteRequestHandler(uuid) {
+                this.$api.deleteSessionRequest(this.sessionUUID, uuid)
+                    .then((status) => {
+                        if (status.success !== true) {
+                            throw new Error(`Unsuccessful status returned`);
+                        }
+                    })
+                    .catch((err) => this.$izitoast.error({title: `Cannot remove request: ${err.message}`}))
 
-                const current = this.getRequestIndexByUUID(uuid);
-
-                if (current !== undefined) {
-                    if (uuid !== this.requestUUID) {
-                        // do nothing
-                    } else if (this.requests[current + 1] !== undefined) {
-                        this.navigateNextRequest();
-                    } else if (this.requests[current - 1] !== undefined) {
-                        this.navigatePreviousRequest();
-                    }
-
-                    this.requests.splice(current, 1); // remove request object from stack
-                }
+                this.deleteRequest(uuid);
             },
             /**
              * @param {NewSessionData} urlSettings
@@ -500,7 +506,6 @@
                     })
                     .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
             },
-
             /**
              * @param {String} requestUUID
              */

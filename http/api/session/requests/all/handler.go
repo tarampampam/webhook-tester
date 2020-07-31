@@ -24,40 +24,40 @@ func NewHandler(storage storage.Storage) http.Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	sessionUUID := mux.Vars(r)["sessionUUID"]
+	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
+	if !sessionFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		return
+	}
 
 	if session, err := h.storage.GetSession(sessionUUID); session == nil {
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write(errors.NewServerError(
+			errors.NewServerError(
 				uint16(http.StatusInternalServerError), "cannot get session data: "+err.Error(),
-			).ToJSON())
+			).RespondWithJSON(w)
 
 			return
 		}
 
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(
-			uint16(http.StatusNotFound),
-			fmt.Sprintf("session with UUID %s was not found", sessionUUID),
-		).ToJSON())
+		errors.NewServerError(
+			uint16(http.StatusNotFound), fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+		).RespondWithJSON(w)
 
 		return
 	}
 
 	data, err := h.storage.GetAllRequests(sessionUUID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(
+		errors.NewServerError(
 			uint16(http.StatusInternalServerError), "cannot get requests data: "+err.Error(),
-		).ToJSON())
+		).RespondWithJSON(w)
 
 		return
 	}
 
 	var (
 		encoder = h.json.NewEncoder(w)
-		result  = make(api.Requests, 0)
+		result  = make(api.StoredRequests, 0)
 	)
 
 	if data == nil {
@@ -66,7 +66,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, resp := range *data {
-		result = append(result, api.Request{
+		result = append(result, api.StoredRequest{
 			UUID:          resp.UUID,
 			ClientAddr:    resp.Request.ClientAddr,
 			Method:        resp.Request.Method,

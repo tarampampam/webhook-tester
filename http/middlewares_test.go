@@ -52,6 +52,30 @@ func TestDisableCachingMiddleware(t *testing.T) {
 	}
 }
 
+func TestJSONResponseMiddleware(t *testing.T) {
+	var handled bool = false
+
+	// create a handler to use as "next" which will verify the request
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		handled = true
+	})
+
+	middlewareHandler := JSONResponseMiddleware(nextHandler)
+
+	var (
+		req, _ = http.NewRequest("GET", "http://testing", nil)
+		rr     = httptest.NewRecorder()
+	)
+
+	assert.Empty(t, rr.Header().Get("Content-Type"))
+
+	middlewareHandler.ServeHTTP(rr, req)
+
+	assert.True(t, handled)
+}
+
 func TestAllowCORSMiddleware(t *testing.T) {
 	var handled bool = false
 

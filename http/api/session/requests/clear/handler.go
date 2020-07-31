@@ -27,19 +27,19 @@ func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	sessionUUID := mux.Vars(r)["sessionUUID"]
+	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
+	if !sessionFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		return
+	}
 
 	if deleted, err := h.storage.DeleteRequests(sessionUUID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(http.StatusInternalServerError, err.Error()).ToJSON())
-
+		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
 		return
 	} else if !deleted {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(
-			http.StatusNotFound,
-			fmt.Sprintf("Requests for session with UUID %s was not found", sessionUUID),
-		).ToJSON())
+		errors.NewServerError(
+			uint16(http.StatusNotFound), fmt.Sprintf("requests for session with UUID %s was not found", sessionUUID),
+		).RespondWithJSON(w)
 
 		return
 	}
@@ -50,7 +50,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}(sessionUUID)
 	}
 
-	_ = h.json.NewEncoder(w).Encode(api.Status{
+	_ = h.json.NewEncoder(w).Encode(api.StatusResponse{
 		Success: true,
 	})
 }

@@ -1,6 +1,10 @@
 package errors
 
-import jsoniter "github.com/json-iterator/go"
+import (
+	"net/http"
+
+	jsoniter "github.com/json-iterator/go"
+)
 
 type ServerError struct {
 	Success bool   `json:"success"`
@@ -27,4 +31,12 @@ func (e *ServerError) ToJSON() []byte {
 	}
 
 	return []byte(`{"error cannot be converted into JSON representation"}`)
+}
+
+func (e *ServerError) RespondWithJSON(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(int(e.Code))
+
+	_, _ = w.Write(e.ToJSON())
 }

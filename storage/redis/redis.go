@@ -21,7 +21,7 @@ type Storage struct {
 
 func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Duration, maxRequests uint16) *Storage {
 	return &Storage{
-		Context:     context.Background(),
+		Context:     context.TODO(),
 		ttl:         sessionTTL,
 		maxRequests: maxRequests,
 		redis: redis.NewClient(&redis.Options{
@@ -36,6 +36,10 @@ func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Durat
 			return uuid.New().String()
 		},
 	}
+}
+
+func (s *Storage) Test() error {
+	return s.redis.Ping(s.Context).Err()
 }
 
 func (s *Storage) Close() error {
@@ -231,16 +235,18 @@ func (s *Storage) GetRequest(sessionUUID, requestUUID string) (*storage.RequestD
 func (s *Storage) GetAllRequests(sessionUUID string) (*[]storage.RequestData, error) {
 	var key = newStorageKey(sessionUUID)
 
+	if exists, existsErr := s.redis.Exists(s.Context, key.requests()).Result(); existsErr != nil {
+		return nil, existsErr
+	} else if exists == 0 {
+		return nil, nil // not found
+	}
+
 	UUIDs, allErr := s.redis.ZRangeByScore(s.Context, key.requests(), &redis.ZRangeBy{
 		Min: "-inf",
 		Max: "+inf",
 	}).Result()
 
 	if allErr != nil {
-		if allErr == redis.Nil {
-			return nil, nil // not found
-		}
-
 		return nil, allErr
 	}
 
@@ -259,19 +265,12 @@ func (s *Storage) GetAllRequests(sessionUUID string) (*[]storage.RequestData, er
 			return nil, gettingErr
 		}
 
-		// convert response into a map, where key is request UUID and data is a raw json string
-		requestsMap := make(map[string]string, len(UUIDs))
-		for i, UUID := range UUIDs { //nolint:wsl
-			if asJSON, ok := rawRequests[i].(string); ok {
-				requestsMap[UUID] = asJSON
-			}
-		}
-
-		// convert responses map into result response
-		for UUID, asJSON := range requestsMap {
-			requestData := requestData{}
-			if err := s.json.Unmarshal([]byte(asJSON), &requestData); err == nil { // ignore errors with wrong json
-				result = append(result, *requestData.toSharedStruct(UUID))
+		for i, UUID := range UUIDs {
+			if json, ok := rawRequests[i].(string); ok {
+				requestData := requestData{}
+				if err := s.json.Unmarshal([]byte(json), &requestData); err == nil { // ignore errors with wrong json
+					result = append(result, *requestData.toSharedStruct(UUID))
+				}
 			}
 		}
 	}
