@@ -62,6 +62,9 @@ USER appuser:appuser
 
 # Import from builder
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /tmp/webhook-tester /bin/webhook-tester
+COPY --from=builder /tmp/webhook-tester /app/webhook-tester
+COPY --chown=appuser ./public /app/public
 
-ENTRYPOINT ["/bin/webhook-tester"]
+WORKDIR /app
+
+ENTRYPOINT ["/app/webhook-tester"]
