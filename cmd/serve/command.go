@@ -38,12 +38,12 @@ type (
 type Command struct {
 	Address       address   `required:"true" long:"listen" env:"LISTEN_ADDR" default:"0.0.0.0" description:"IP address to listen on"`                //nolint:lll
 	Port          port      `required:"true" long:"port" env:"LISTEN_PORT" default:"8080" description:"TCP port number"`                             //nolint:lll
-	PublicDir     publicDir `required:"true" long:"public" default:"./public" description:"Directory with public assets"`                            //nolint:lll
+	PublicDir     publicDir `required:"true" long:"public" env:"PUBLIC_DIR" default:"./public" description:"Directory with public assets"`           //nolint:lll
 	MaxRequests   uint16    `required:"true" long:"max-requests" default:"128" env:"MAX_REQUESTS" description:"Maximum stored requests per session"` //nolint:lll
 	SessionTTLSec uint32    `required:"true" long:"session-ttl" default:"604800" env:"SESSION_TTL" description:"Session lifetime (in seconds)"`      //nolint:lll
 	RedisHost     string    `required:"true" long:"redis-host" env:"REDIS_HOST" description:"Redis server hostname or IP address"`                   //nolint:lll
 	RedisPort     port      `required:"true" long:"redis-port" default:"6379" env:"REDIS_PORT" description:"Redis server TCP port number"`           //nolint:lll
-	RedisPass     string    `long:"redis-password" default:"" env:"REDIS_PASSWORD" description:"Optional redis server password"`                     //nolint:lll
+	RedisPass     string    `long:"redis-password" default:"" env:"REDIS_PASSWORD" description:"Redis server password (optional)"`                   //nolint:lll
 	RedisDBNum    uint16    `required:"true" long:"redis-db-num" default:"1" env:"REDIS_DB_NUM" description:"Redis database number"`                 //nolint:lll
 	RedisMaxConn  uint16    `required:"true" long:"redis-max-conn" default:"10" env:"REDIS_MAX_CONN" description:"Maximum redis connections"`        //nolint:lll
 	PusherAppID   string    `long:"pusher-app-id" env:"PUSHER_APP_ID" description:"Pusher application ID"`

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://hsto.org/webt/mn/fz/q-/mnfzq-lgdnbmv-3xv-1qm6gn82e.png" alt="Logo" width="128" />
+  <img src="https://hsto.org/webt/mn/fz/q-/mnfzq-lgdnbmv-3xv-1qm6gn82e.png" alt="Logo" width=128" />
 </p>
 
 # WebHook Tester
@@ -11,21 +11,93 @@
 [![Coverage][badge_coverage]][link_coverage]
 [![License][badge_license]][link_license]
 
-WIP
+With this application you instantly get a unique, random URL that you can use to test and debug Webhooks and HTTP requests.
 
-## Usage example
+<p align="center">
+  <img src="https://hsto.org/webt/_r/ne/yt/_rneytazmfi6nqrka9r5nkdramc.png" alt="screenshot" width="925" />
+</p>
 
-WIP
+### Dependencies
 
-## Docker image
+All what you need to start this application - is a [redis server](https://redis.io/), which is running on your host or in docker container.
+
+## Starting
+
+Download compiled application from [releases page][link_releases] _(also you will need to download `./public` directory from this repository)_ or compile from sources and run it locally:
+
+```bash
+$ git clone https://github.com/tarampampam/webhook-tester.git ./webhook-tester && cd $_
+$ go build -ldflags="-s -w" .
+$ ./webhook-tester serve --port 8080 --redis-host 127.0.0.1 --redis-port 6379
+```
+
+> For this `redis` server must be installed and started locally on `6379` port. Or you can try to use [cloud version](https://redislabs.com/try-free/) of `redis`.
+
+Or use ready docker image for this. Simple `docker-compose` file below:
+
+```yaml
+version: '3.4'
+
+volumes:
+  redis-data:
+
+services:
+  app:
+    image: tarampampam/webhook-tester:latest
+    command: serve --port 8080 --redis-host redis
+    ports:
+      - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
+
+  redis:
+    image: redis:6.0.5-alpine
+    volumes:
+      - redis-data:/data:cached
+    ports:
+      - 6379
+```
+
+> Important notice: do **not** use `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
 
 [![image stats](https://dockeri.co/image/tarampampam/webhook-tester)][link_docker_tags]
 
 All supported image tags [can be found here][link_docker_tags].
 
+### Additional configuration
+
+#### Pusher.com
+
+For incoming webhook notifications without index page refreshing, you can setup `pusher.com` as websocket provider. For this - [register new app](https://dashboard.pusher.com/channels) and start serving with following arguments: `./webhook-tester serve ... --pusher-app-id=YOUR_APP_ID --pusher-key=YOUR_KEY --pusher-secret=YOUR_SECRET --pusher-cluster=YOUR_CLUSTER`.
+
+### Allowed environment variables
+
+Variable name    | Description
+:--------------: | :---------:
+`LISTEN_ADDR`    | IP address to listen on
+`LISTEN_PORT`    | TCP port number
+`PUBLIC_DIR`     | Directory with public assets
+`MAX_REQUESTS`   | Maximum stored requests per session
+`SESSION_TTL`    | Session lifetime (in seconds)
+`REDIS_HOST`     | Redis server hostname or IP address
+`REDIS_PORT`     | Redis server TCP port number
+`REDIS_PASSWORD` | Redis server password (optional)
+`REDIS_DB_NUM`   | Redis database number
+`REDIS_MAX_CONN` | Maximum redis connections
+`PUSHER_APP_ID`  | Pusher application ID
+`PUSHER_KEY`     | Pusher key
+`PUSHER_SECRET`  | Pusher secret
+`PUSHER_CLUSTER` | Pusher cluster
+
+### Liveness/readiness probes
+
+HTTP get `/live` and `/ready` respectively.
+
 ### Testing
 
-WIP
+For application testing we use built-in golang testing feature and `docker-ce` + `docker-compose` as develop environment. So, just write into your terminal after repository cloning:
+
+```shell
+$ make test
+```
 
 ## Changes log
 
@@ -33,6 +105,12 @@ WIP
 [![Commits since latest release][badge_commits_since_release]][link_commits]
 
 Changes log can be [found here][link_changes_log].
+
+## Releasing
+
+New versions publishing is very simple - just "publish" new release using repo releases page.
+
+> Release version _(and git tag, of course)_ MUST starts with `v` prefix (eg.: `v0.0.1` or `v1.2.3-RC1`)
 
 ## Support
 
