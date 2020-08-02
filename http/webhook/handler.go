@@ -32,32 +32,50 @@ func NewHandler(set *settings.AppSettings, storage storage.Storage, br broadcast
 	}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	sessionUUID := mux.Vars(r)["sessionUUID"]
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:funlen
+	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
+	if !sessionFound {
+		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		return
+	}
 
 	sessionData, sessionErr := h.storage.GetSession(sessionUUID)
 
 	if sessionErr != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "cannot read session data from storage: "+sessionErr.Error())
+		errors.NewServerError(
+			uint16(http.StatusInternalServerError), "cannot read session data from storage: "+sessionErr.Error(),
+		).RespondWithJSON(w)
+
 		return
 	}
 
 	if sessionData == nil {
-		h.respondWithError(w, http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID))
+		errors.NewServerError(
+			uint16(http.StatusNotFound), fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+		).RespondWithJSON(w)
+
 		return
 	}
 
-	body, readErr := ioutil.ReadAll(r.Body)
-	if readErr != nil {
-		h.respondWithError(w, http.StatusInternalServerError, readErr.Error())
-		return
+	var body []byte
+
+	if r.Body != nil {
+		b, readErr := ioutil.ReadAll(r.Body)
+		if readErr != nil {
+			errors.NewServerError(uint16(http.StatusInternalServerError), readErr.Error()).RespondWithJSON(w)
+			return
+		}
+
+		body = b
+	} else {
+		body = []byte{}
 	}
 
 	if l := len(body); l > maxBodyLength {
-		h.respondWithError(w,
-			http.StatusBadRequest,
+		errors.NewServerError(
+			uint16(http.StatusBadRequest),
 			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", l, maxBodyLength),
-		)
+		).RespondWithJSON(w)
 
 		return
 	}
@@ -71,7 +89,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if creationErr != nil {
-		h.respondWithError(w, http.StatusNotFound, "cannot put request data into storage: "+creationErr.Error())
+		errors.NewServerError(
+			uint16(http.StatusInternalServerError), "cannot put session data into storage: "+creationErr.Error(),
+		).RespondWithJSON(w)
+
 		return
 	}
 
@@ -153,11 +174,4 @@ func (h *Handler) getRealClientAddress(r *http.Request) string {
 	}
 
 	return strings.Split(r.RemoteAddr, ":")[0]
-}
-
-func (h *Handler) respondWithError(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-
-	_, _ = w.Write(errors.NewServerError(uint16(code), message).ToJSON())
 }
