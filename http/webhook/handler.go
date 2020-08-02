@@ -10,6 +10,7 @@ import (
 	"time"
 	"webhook-tester/broadcast"
 	"webhook-tester/http/errors"
+	"webhook-tester/settings"
 	"webhook-tester/storage"
 
 	"github.com/gorilla/mux"
@@ -18,14 +19,16 @@ import (
 const maxBodyLength = 8192
 
 type Handler struct {
+	appSettings *settings.AppSettings
 	storage     storage.Storage
 	broadcaster broadcast.Broadcaster
 }
 
-func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http.Handler {
+func NewHandler(set *settings.AppSettings, storage storage.Storage, br broadcast.Broadcaster) http.Handler {
 	return &Handler{
+		appSettings: set,
 		storage:     storage,
-		broadcaster: broadcaster,
+		broadcaster: br,
 	}
 }
 
@@ -106,7 +109,18 @@ func (h *Handler) getRequiredHTTPCode(r *http.Request, sessionData *storage.Sess
 func (h *Handler) headerToStringsMap(header http.Header) map[string]string {
 	result := make(map[string]string)
 
+	shouldBeIgnored := make([]string, len(h.appSettings.IgnoreHeaderPrefixes))
+	for i, value := range h.appSettings.IgnoreHeaderPrefixes {
+		shouldBeIgnored[i] = strings.ToUpper(strings.TrimSpace(value))
+	}
+
+main:
 	for name, values := range header {
+		for _, ignore := range shouldBeIgnored {
+			if strings.HasPrefix(strings.ToUpper(name), ignore) {
+				continue main
+			}
+		}
 		result[name] = strings.Join(values, "; ")
 	}
 
