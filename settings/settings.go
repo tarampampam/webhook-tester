@@ -9,6 +9,9 @@ type AppSettings struct {
 	// Session lifetime (TTL)
 	SessionTTL time.Duration
 
+	// Declared here HTTP header prefixes will be ignored for incoming webhook headers recording
+	IgnoreHeaderPrefixes []string
+
 	// pusher.com key
 	PusherKey string
 

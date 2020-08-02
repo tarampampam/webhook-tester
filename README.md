@@ -64,6 +64,8 @@ All supported image tags [can be found here][link_docker_tags].
 
 ### Additional configuration
 
+All supported `serve` command flags can be found by running `docker run --rm -t tarampampam/webhook-tester serve -h`.
+
 #### Pusher.com
 
 For incoming webhook notifications without index page refreshing, you can setup `pusher.com` as websocket provider. For this - [register new app](https://dashboard.pusher.com/channels) and start serving with following arguments: `./webhook-tester serve ... --pusher-app-id=YOUR_APP_ID --pusher-key=YOUR_KEY --pusher-secret=YOUR_SECRET --pusher-cluster=YOUR_CLUSTER`.
