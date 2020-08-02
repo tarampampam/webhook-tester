@@ -116,21 +116,20 @@ func (s *Server) registerWebHookHandlers() {
 
 	webhookRouter.Use(AllowCORSMiddleware)
 
+	handler := webhook.NewHandler(s.appSettings, s.storage, s.broadcaster)
+
 	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}", webhook.NewHandler(s.storage, s.broadcaster)).
+		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
 		Methods(allowedMethods...).
 		Name("webhook")
 
 	webhookRouter.
-		Handle(
-			"/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}",
-			webhook.NewHandler(s.storage, s.broadcaster),
-		).
+		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", handler).
 		Methods(allowedMethods...).
 		Name("webhook_with_status_code")
 
 	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", webhook.NewHandler(s.storage, s.broadcaster)).
+		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", handler).
 		Methods(allowedMethods...).
 		Name("webhook_any")
 }
