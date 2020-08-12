@@ -1,5 +1,5 @@
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.14-alpine as builder
+FROM golang:1.15.0-alpine as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
