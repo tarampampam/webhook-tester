@@ -1,5 +1,5 @@
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.14-alpine as builder
+FROM golang:1.15-alpine as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
@@ -32,7 +32,7 @@ RUN set -x \
     && /tmp/webhook-tester -h
 
 # Image page: <https://hub.docker.com/_/alpine>
-FROM alpine:3.12 as runtime
+FROM alpine:latest as runtime
 
 ARG APP_VERSION="undefined@docker"
 
