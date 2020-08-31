@@ -5,7 +5,7 @@ volumes:
   redis-data:
 
 x-app: &app-service
-  image: golang:1.14-stretch # Image page: <https://hub.docker.com/_/golang>
+  image: golang:1.15 # Image page: <https://hub.docker.com/_/golang>
   working_dir: /src
   environment:
     HOME: /tmp
