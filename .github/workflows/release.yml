@@ -31,9 +31,13 @@ jobs:
           fetch-depth: 1
 
       - name: Generate version value
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
 
       - name: Generate target file name
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=TARGET_FILE::webhook-tester-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
 
       - name: Build application
@@ -63,9 +67,13 @@ jobs:
           fetch-depth: 1
 
       - name: Generate version value
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
 
       - name: Generate image tag value
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=IMAGE_TAG::${GITHUB_REF##*/[vV]}" # `/refs/tags/v1.2.3` -> `1.2.3`
 
       - name: Make docker login
