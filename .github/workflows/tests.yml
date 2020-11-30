@@ -44,6 +44,8 @@ jobs:
         run: go get golang.org/x/tools/cmd/goimports
 
       - name: Update PATH environment variable
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=PATH::$HOME/go/bin:$PATH"
 
       - name: Run goimports
