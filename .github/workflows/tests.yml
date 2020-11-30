@@ -44,6 +44,8 @@ jobs:
         run: go get golang.org/x/tools/cmd/goimports
 
       - name: Update PATH environment variable
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=PATH::$HOME/go/bin:$PATH"
 
       - name: Run goimports
@@ -104,6 +106,8 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Generate version value
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
         run: echo "::set-env name=APP_VERSION::${GITHUB_REF##*/}@`echo ${GITHUB_SHA} | cut -c1-8`"
 
       - name: Build application
