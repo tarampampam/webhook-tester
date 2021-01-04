@@ -7,7 +7,7 @@ require (
 	github.com/alicebob/miniredis v2.5.0+incompatible
 	github.com/go-redis/redis/v8 v8.4.4
 	github.com/gomodule/redigo v1.8.2 // indirect
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.1.3
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/jessevdk/go-flags v1.4.1-0.20181221193153-c0795c8afcf4
