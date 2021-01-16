@@ -172,7 +172,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 					"uuid":"aa-bb-cc-dd",
 					"response":{
 						"code":200,
-						"content":"foo/bar",
+						"content":"aa",
 						"content_type":"foo/bar",
 						"delay_sec":5,
 						"created_at_unix":123
