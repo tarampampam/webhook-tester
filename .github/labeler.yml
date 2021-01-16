@@ -1,0 +1,39 @@
+docs:
+  - '**/*.md'
+  - '**/*.MD'
+
+.github:
+  - '.github/**/*'
+
+CI:
+  - '.github/workflows/**/*'
+  - '.github/actions/**/*'
+
+go:
+  - '**/*.go'
+
+tests:
+  - '**/*.spec.js'
+  - '**/*.spec.ts'
+  - '**/*.test.js'
+  - '**/*.test.ts'
+  - '**/*_test.go'
+  - '**/testdata/**/*'
+  - 'test/**/*'
+  - '.golangci.yml'
+  - 'codecov.yml'
+
+frontend:
+  - 'web/**/*'
+  - 'public/**/*' # TODO remove after layout deploy
+
+docker:
+  - 'Dockerfile'
+  - 'docker/**/*'
+  - '.dockerignore'
+
+dev:
+  - 'Makefile'
+  - 'docker-compose.yml'
+  - '.gitignore'
+  - '.editorconfig'
