@@ -1,0 +1,604 @@
+{
+	"info": {
+		"_postman_id": "ab33f9e7-8c46-45c9-831d-1b1cb267545f",
+		"name": "default",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Static assets",
+			"item": [
+				{
+					"name": "favicon.ico",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Content-Type header is image', () => {\r",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('image')\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/favicon.ico",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"favicon.ico"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "robots.txt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Content-Type header is text/plain', () => {\r",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('text/plain')\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/robots.txt",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"robots.txt"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "sitemap.xml",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Content-Type header is application/xml', () => {\r",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('application/xml')\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sitemap.xml",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"sitemap.xml"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Service endpoints",
+			"item": [
+				{
+					"name": "ready",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Empty response body', () => {\r",
+									"    pm.expect(pm.response.responseSize).to.be.equal(0)\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ready",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ready"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "live",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Empty response body', () => {\r",
+									"    pm.expect(pm.response.responseSize).to.be.equal(0)\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/live",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"live"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "API",
+			"item": [
+				{
+					"name": "Session",
+					"item": [
+						{
+							"name": "Requests",
+							"item": [
+								{
+									"name": "Get request details by UUID for session with passed UUID (TODO)",
+									"request": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests/{{$randomUUID}}",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"session",
+												"{{$randomUUID}}",
+												"requests",
+												"{{$randomUUID}}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Delete request by UUID for session with passed UUID (TODO)",
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests/{{$randomUUID}}",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"session",
+												"{{$randomUUID}}",
+												"requests",
+												"{{$randomUUID}}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get requests list for session with passed UUID (TODO)",
+									"request": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"session",
+												"{{$randomUUID}}",
+												"requests"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Delete all requests for session with passed UUID (TODO)",
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"session",
+												"{{$randomUUID}}",
+												"requests"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Create new session (TODO)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status_code\": 200,\n    \"content_type\": \"application/json\",\n    \"response_delay\": 0,\n    \"response_body\": \"\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/session",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"session"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete session with passed UUID(TODO)",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/session/{{$randomUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"session",
+										"{{$randomUUID}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Get application settings",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Content-Type header is application/json', () => {\r",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('application/json')\r",
+									"});\r",
+									"\r",
+									"pm.test('JSON object has correct structure', () => {\r",
+									"    var data = pm.response.json()\r",
+									"\r",
+									"    pm.expect(data).to.have.all.keys('version', 'pusher', 'limits')\r",
+									"\r",
+									"    pm.expect(data.version).to.be.a('string')\r",
+									"\r",
+									"    pm.expect(data.pusher).to.have.all.keys('key', 'cluster')\r",
+									"    pm.expect(data.pusher.key).to.be.a('string')\r",
+									"    pm.expect(data.pusher.cluster).to.be.a('string')\r",
+									"\r",
+									"    pm.expect(data.limits).to.have.all.keys('max_requests', 'session_lifetime_sec')\r",
+									"    pm.expect(data.limits.max_requests).to.be.a('number')\r",
+									"    pm.expect(data.limits.session_lifetime_sec).to.be.a('number')\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"settings"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Webhook",
+			"item": [
+				{
+					"name": "Webhook (TODO + different methods)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 202', () => {",
+									"    pm.response.to.have.status(202)",
+									"})",
+									"",
+									"pm.test('Body is correct', () => {",
+									"    pm.response.to.have.body('foo content')",
+									"})",
+									"",
+									"pm.test('Content-Type header is text/foo', () => {",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
+									"})"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"{{webhooksSessionUUID}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Webhook with status code (TODO + different methods)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const randomStatusCode = Math.floor(Math.random() * (599 - 200 + 1) + 200)",
+									"",
+									"// Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
+									"pm.variables.set('random_status_code', randomStatusCode)"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const expectedStatusCode = pm.variables.get('random_status_code')",
+									"",
+									"pm.test('Status code is ' + expectedStatusCode, () => {",
+									"    pm.response.to.have.status(expectedStatusCode)",
+									"})",
+									"",
+									"pm.test('Body is correct', () => {",
+									"    pm.response.to.have.body('foo content')",
+									"})",
+									"",
+									"pm.test('Content-Type header is text/foo', () => {",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
+									"})"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"{{webhooksSessionUUID}}",
+								"{{random_status_code}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Webhook with any string after session UUID (TODO + different methods)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const allowed = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдёйАБВГДЁЙ0123456789///?\"",
+									"const randomPath = allowed.split('').sort(() => {return 0.5-Math.random()}).join('')",
+									"",
+									"// Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
+									"pm.variables.set('random_path', randomPath)"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const expectedStatusCode = pm.variables.get('random_status_code')",
+									"",
+									"pm.test('Status code is 202', () => {",
+									"    pm.response.to.have.status(202)",
+									"})",
+									"",
+									"pm.test('Body is correct', () => {",
+									"    pm.response.to.have.body('foo content')",
+									"})",
+									"",
+									"pm.test('Content-Type header is text/foo', () => {",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
+									"})"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"{{webhooksSessionUUID}}",
+								"{{random_path}}"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"const webhooksSessionUUID = pm.collectionVariables.get('webhooksSessionUUID')",
+							"",
+							"if (webhooksSessionUUID == undefined || webhooksSessionUUID == \"\") {",
+							"    console.info('create new session for webhook tests')",
+							"",
+							"    pm.sendRequest({",
+							"        url: pm.environment.get('base_url') + '/api/session',",
+							"        method: 'POST',",
+							"        body: {",
+							"            mode: 'raw',",
+							"            raw: JSON.stringify({",
+							"                content_type: 'text/foo',",
+							"                response_body: 'foo content',",
+							"                status_code: 202,",
+							"            }),",
+							"        },",
+							"    }, (err, res) => {",
+							"        if (err) {",
+							"            throw err",
+							"        }",
+							"",
+							"        pm.expect(res.code).to.equal(200)",
+							"        pm.collectionVariables.set('webhooksSessionUUID', res.json().uuid)",
+							"    });",
+							"}"
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "webhooksSessionUUID",
+			"value": ""
+		}
+	]
+}

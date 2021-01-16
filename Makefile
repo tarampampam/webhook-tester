@@ -56,7 +56,8 @@ redis-cli: ## Start redis-cli
 	$(DC_BIN) run --rm --no-deps redis redis-cli -h redis -p 6379
 
 up: ## Create and start containers
-	$(DC_BIN) up --detach
+	$(DC_BIN) up --detach web
+	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Navigate your browser to ⇒ http://127.0.0.1:8082';
 
 down: ## Stop all services
 	$(DC_BIN) down -t 5

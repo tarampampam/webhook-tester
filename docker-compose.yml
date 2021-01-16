@@ -5,7 +5,7 @@ volumes:
   redis-data:
 
 x-app: &app-service
-  image: golang:1.15 # Image page: <https://hub.docker.com/_/golang>
+  image: golang:1.15-buster # Image page: <https://hub.docker.com/_/golang>
   working_dir: /src
   environment:
     HOME: /tmp
@@ -25,9 +25,12 @@ services:
     ports:
       - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
     command: go run . serve --port 8080 --redis-host redis --max-requests 12 --ignore-header-prefix foo
+    depends_on:
+      - redis
+      - redis-commander
 
   redis:
-    image: redis:6.0.5-alpine # Image page: <https://hub.docker.com/_/redis>
+    image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
       - redis-data:/data:cached
     ports:

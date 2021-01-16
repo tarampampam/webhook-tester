@@ -1,0 +1,43 @@
+# https://help.github.com/en/articles/metadata-syntax-for-github-actions
+name: Run Newman
+description: Newman is CLI collection runner for Postman
+
+inputs:
+  collection:
+    description: 'Path to the file with postman collection'
+    required: true
+    default: './test/postman/default.postman_collection.json'
+  environment:
+    description: 'Path to the file with postman environment'
+    required: true
+    default: './test/postman/default.postman_environment.json'
+  baseurl:
+    description: 'Application base url'
+    required: true
+    default: 'http://127.0.0.1:8080'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Pull newman docker image
+      shell: bash
+      run: |
+        if [[ "$(docker images -q postman/newman:5.2-alpine 2> /dev/null)" == "" ]]; then
+          docker pull postman/newman:5.2-alpine 1>/dev/null
+        fi
+
+    # Image page: <https://hub.docker.com/r/postman/newman>,
+    # CLI options: <https://www.npmjs.com/package/newman#command-line-options>
+    - name: Run Newman
+      shell: bash
+      run: |
+        docker run \
+          --rm \
+          --tty \
+          --net host \
+          --volume "$(pwd):/rootfs:ro" \
+          --workdir "/rootfs" \
+            postman/newman:5.2-alpine run "${{ inputs.collection }}" \
+              --environment "${{ inputs.environment }}" \
+              --env-var "base_url=${{ inputs.baseurl }}" \
+              --color on

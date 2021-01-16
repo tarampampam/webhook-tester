@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Fixed
+
+- Wrong `content` property value for session creation HTTP handler
+- Wrong `Content-Type` header value for webhook handler
+
 ## v0.2.0
 
 ### Changed
