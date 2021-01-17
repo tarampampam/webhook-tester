@@ -6,10 +6,19 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ## UNRELEASED
 
+### Added
+
+- E2E test using postman
+
+### Removed
+
+- Binary file packing using `upx`
+
 ### Fixed
 
 - Wrong `content` property value for session creation HTTP handler
 - Wrong `Content-Type` header value for webhook handler
+- Correct file mime-types for docker image
 
 ## v0.2.0
 
