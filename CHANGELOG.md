@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - E2E test using postman
 
+### Changed
+
+- Docker image based on `scratch` (not `alpine` image)
+
 ### Removed
 
 - Binary file packing using `upx`
