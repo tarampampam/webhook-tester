@@ -1,5 +1,7 @@
+# syntax=docker/dockerfile:1.2
+
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.15-alpine as builder
+FROM --platform=${TARGETPLATFORM:-linux/amd64} golang:1.15.6-alpine as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
@@ -14,24 +16,32 @@ RUN set -x \
 
 WORKDIR /src
 
-COPY ./go.mod ./go.sum ./
-
-# Burn modules cache
-RUN set -x \
-    && go version \
-    && go mod download \
-    && go mod verify
-
 COPY . /src
 
+# arguments to pass on each go tool link invocation
+ENV LDFLAGS="-s -w -X webhook-tester/version.version=$APP_VERSION"
+
 RUN set -x \
     && go version \
-    && GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X webhook-tester/version.version=${APP_VERSION}" -o /tmp/webhook-tester . \
+    && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester . \
     && /tmp/webhook-tester version \
     && /tmp/webhook-tester -h
 
-# Image page: <https://hub.docker.com/_/alpine>
-FROM alpine:latest as runtime
+# prepare rootfs for runtime
+RUN set -x \
+    && mkdir -p /tmp/rootfs/etc/ssl /tmp/rootfs/etc/apache2 \
+    && mkdir -p /tmp/rootfs/bin \
+    && mkdir -p /tmp/rootfs/opt/webhook-tester \
+    && cp -R /etc/ssl/certs /tmp/rootfs/etc/ssl/certs \
+    && cp /etc/mime.types /tmp/rootfs/etc/mime.types \
+    && cp /etc/apache2/mime.types /tmp/rootfs/etc/apache2/mime.types \
+    && cp -R /src/public /tmp/rootfs/opt/webhook-tester/public \
+    && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > /tmp/rootfs/etc/passwd \
+    && echo 'appuser:x:10001:' > /tmp/rootfs/etc/group \
+    && mv /tmp/webhook-tester /tmp/rootfs/bin/webhook-tester
+
+# use empty filesystem
+FROM scratch
 
 ARG APP_VERSION="undefined@docker"
 
@@ -45,29 +55,24 @@ LABEL \
     org.opencontainers.version="$APP_VERSION" \
     org.opencontainers.image.licenses="MIT"
 
-RUN set -x \
-    # Unprivileged user creation <https://stackoverflow.com/a/55757473/12429735RUN>
-    && adduser \
-        --disabled-password \
-        --gecos "" \
-        --home /nonexistent \
-        --shell /sbin/nologin \
-        --no-create-home \
-        --uid 10001 \
-        appuser
+# Import from builder
+COPY --from=builder /tmp/rootfs /
 
 # Use an unprivileged user
 USER appuser:appuser
 
-# Import from builder
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /tmp/webhook-tester /app/webhook-tester
-COPY --from=builder /etc/mime.types /etc/mime.types
-COPY --from=builder /etc/apache2/mime.types /etc/apache2/mime.types
-COPY --chown=appuser ./public /app/public
+# Docs: <https://docs.docker.com/engine/reference/builder/#healthcheck>
+# TODO add healthcheck
+#HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
+#    "/bin/webhook-tester", "healthcheck", \
+#    "--log-json", \
+#    "--port", "8080" \
+#]
 
-WORKDIR /app
+ENTRYPOINT ["/bin/webhook-tester"]
 
-ENTRYPOINT ["/app/webhook-tester"]
-
-CMD ["serve"]
+# TODO append "--log-json" flag
+CMD [ \
+    "serve", \
+    "--public", "/opt/webhook-tester/public" \
+]
