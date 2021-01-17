@@ -39,7 +39,7 @@ type (
 type Command struct {
 	Address            address   `required:"true" long:"listen" env:"LISTEN_ADDR" default:"0.0.0.0" description:"IP address to listen on"`                 //nolint:lll
 	Port               port      `required:"true" long:"port" env:"LISTEN_PORT" default:"8080" description:"TCP port number"`                              //nolint:lll
-	PublicDir          publicDir `required:"true" long:"public" env:"PUBLIC_DIR" default:"./public" description:"Directory with public assets"`            //nolint:lll
+	PublicDir          publicDir `required:"true" long:"public" env:"PUBLIC_DIR" default:"./web" description:"Directory with public assets"`               //nolint:lll
 	MaxRequests        uint16    `required:"true" long:"max-requests" default:"128" env:"MAX_REQUESTS" description:"Maximum stored requests per session"`  //nolint:lll
 	SessionTTLSec      uint32    `required:"true" long:"session-ttl" default:"604800" env:"SESSION_TTL" description:"Session lifetime (in seconds)"`       //nolint:lll
 	IgnoreHeaderPrefix []string  `long:"ignore-header-prefix" description:"Ignore incoming webhook header prefix, case insensitive (like 'X-Forwarded-')"` //nolint:lll

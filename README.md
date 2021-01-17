@@ -23,11 +23,11 @@ All what you need to start this application - is a [redis server](https://redis.
 
 ## Starting
 
-Download compiled application from [releases page][link_releases] _(also you will need to download `./public` directory from this repository)_ or compile from sources and run it locally:
+Download compiled application from [releases page][link_releases] _(also you will need to download `./web` directory from this repository)_ or compile from sources and run it locally:
 
 ```bash
 $ git clone https://github.com/tarampampam/webhook-tester.git ./webhook-tester && cd $_
-$ go build -ldflags="-s -w" .
+$ go build -ldflags="-s -w" ./cmd/webhook-tester/
 $ ./webhook-tester serve --port 8080 --redis-host 127.0.0.1 --redis-port 6379
 ```
 

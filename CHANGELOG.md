@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Changed
 
 - Docker image based on `scratch` (not `alpine` image)
+- Directory `public` renamed to `web`
 
 ### Removed
 

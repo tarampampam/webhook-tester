@@ -115,7 +115,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.version.outputs.value }}
-        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester .
+        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
 
       - name: Try to execute
         if: matrix.os == 'linux'
@@ -151,7 +151,7 @@ jobs:
         run: mv ./webhook-tester ./../app && chmod +x ./../app
 
       - name: Start HTTP server
-        run: ./app serve --port 8081 --public ./public --redis-host 127.0.0.1 --redis-port 6379 --redis-db-num 0 &
+        run: ./app serve --port 8081 --public ./web --redis-host 127.0.0.1 --redis-port 6379 --redis-db-num 0 &
 
       - name: Run Newman
         uses: ./.github/actions/newman
