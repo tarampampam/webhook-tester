@@ -489,15 +489,8 @@
 													"    pm.variables.set('session_uuid', sessionUuid)",
 													"",
 													"    // make two simple requests to the webhook endpoint (for just created session)",
-													"    pm.sendRequest({",
-													"        url: baseUrl + '/' + sessionUuid,",
-													"        method: 'GET',",
-													"    })",
-													"",
-													"    pm.sendRequest({",
-													"        url: baseUrl + '/' + sessionUuid + '/two',",
-													"        method: 'GET',",
-													"    })",
+													"    pm.sendRequest({ url: baseUrl + '/' + sessionUuid, method: 'GET' })",
+													"    pm.sendRequest({ url: baseUrl + '/' + sessionUuid + '/two', method: 'GET' })",
 													"})"
 												],
 												"type": "text/javascript"
@@ -553,19 +546,72 @@
 									"response": []
 								},
 								{
-									"name": "Delete all requests for session with passed UUID (TODO)",
+									"name": "Delete all requests for session with passed UUID",
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													"const baseUrl = pm.environment.get('base_url')",
+													"",
+													"// create session",
+													"pm.sendRequest({",
+													"    url: baseUrl + '/api/session',",
+													"    method: 'POST',",
+													"    body: {",
+													"        mode: 'raw',",
+													"        raw: '{}',",
+													"    },",
+													"}, (err, res) => {",
+													"    if (err) {",
+													"        throw err",
+													"    }",
+													"",
+													"    pm.expect(res.code).to.equal(200)",
+													"",
+													"    let sessionUuid = res.json().uuid;",
+													"    pm.variables.set('session_uuid', sessionUuid)",
+													"",
+													"    // make two simple requests to the webhook endpoint (for just created session)",
+													"    pm.sendRequest({ url: baseUrl + '/' + sessionUuid, method: 'GET' })",
+													"    pm.sendRequest({ url: baseUrl + '/' + sessionUuid + '/two', method: 'GET' })",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Status code is 200', () => {",
+													"    pm.response.to.have.status(200)",
+													"})",
+													"",
+													"pm.test('JSON object has correct structure', () => {",
+													"    var data = pm.response.json()",
+													"",
+													"    pm.expect(data).to.have.all.keys('success')",
+													"",
+													"    pm.expect(data.success).to.be.true",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
 									"request": {
 										"method": "DELETE",
 										"header": [],
 										"url": {
-											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests",
+											"raw": "{{base_url}}/api/session/{{session_uuid}}/requests",
 											"host": [
 												"{{base_url}}"
 											],
 											"path": [
 												"api",
 												"session",
-												"{{$randomUUID}}",
+												"{{session_uuid}}",
 												"requests"
 											]
 										}
