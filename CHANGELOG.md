@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Docker image based on `scratch` (not `alpine` image)
 - Directory `public` renamed to `web`
+- Package name changed from `webhook-tester` to `github.com/tarampampam/webhook-tester`
 
 ### Removed
 
