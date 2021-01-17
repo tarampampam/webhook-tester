@@ -65,7 +65,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = h.json.NewEncoder(w).Encode(response{
 		UUID: sessionData.UUID,
 		ResponseSettings: responseSettings{
-			Content:       sessionData.WebHookResponse.ContentType,
+			Content:       sessionData.WebHookResponse.Content,
 			Code:          sessionData.WebHookResponse.Code,
 			ContentType:   sessionData.WebHookResponse.ContentType,
 			DelaySec:      sessionData.WebHookResponse.DelaySec,

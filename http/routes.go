@@ -105,7 +105,6 @@ func (s *Server) registerWebHookHandlers() {
 		http.MethodPut,
 		http.MethodPatch,
 		http.MethodDelete,
-		http.MethodConnect,
 		http.MethodOptions,
 		http.MethodTrace,
 	}

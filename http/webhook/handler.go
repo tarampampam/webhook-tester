@@ -106,8 +106,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		time.Sleep(time.Second * time.Duration(delay))
 	}
 
-	w.WriteHeader(h.getRequiredHTTPCode(r, sessionData))
 	w.Header().Set("Content-Type", sessionData.WebHookResponse.ContentType)
+	w.WriteHeader(h.getRequiredHTTPCode(r, sessionData))
 
 	_, _ = w.Write([]byte(sessionData.WebHookResponse.Content))
 }
