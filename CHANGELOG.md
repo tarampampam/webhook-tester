@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Removed
 
 - Binary file packing using `upx`
+- HTTP method `CONNECT` for webhook endpoint
 
 ### Fixed
 

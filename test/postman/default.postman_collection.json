@@ -9,6 +9,49 @@
 			"name": "Static assets",
 			"item": [
 				{
+					"name": "index",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => {\r",
+									"    pm.response.to.have.status(200)\r",
+									"});\r",
+									"\r",
+									"pm.test('Content-Type header is text/html', () => {\r",
+									"    pm.expect(pm.response.headers.get('Content-Type')).to.contains('text/html')\r",
+									"});\r",
+									"\r",
+									"pm.test('HTML is correct', () => {\r",
+									"    // docs: <https://learning.postman.com/docs/writing-scripts/script-references/test-examples/#parsing-response-body-data>\r",
+									"    const $ = cheerio.load(pm.response.text());\r",
+									"\r",
+									"    pm.expect($('title').html()).to.contains('WebHook Tester')\r",
+									"});\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "favicon.ico",
 					"event": [
 						{
@@ -384,61 +427,600 @@
 			"name": "Webhook",
 			"item": [
 				{
-					"name": "Webhook (TODO + different methods)",
-					"event": [
+					"name": "Simple webhook",
+					"item": [
 						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 202', () => {",
-									"    pm.response.to.have.status(202)",
-									"})",
-									"",
-									"pm.test('Body is correct', () => {",
-									"    pm.response.to.have.body('foo content')",
-									"})",
-									"",
-									"pm.test('Content-Type header is text/foo', () => {",
-									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
-									"})"
-								],
-								"type": "text/javascript"
-							}
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "HEAD",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "OPTIONS",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "TRACE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}"
+									]
+								}
+							},
+							"response": []
 						}
 					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/{{webhooksSessionUUID}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"{{webhooksSessionUUID}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Webhook with status code (TODO + different methods)",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
+								"type": "text/javascript",
 								"exec": [
-									"const randomStatusCode = Math.floor(Math.random() * (599 - 200 + 1) + 200)",
-									"",
-									"// Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
-									"pm.variables.set('random_status_code', randomStatusCode)"
-								],
-								"type": "text/javascript"
+									""
+								]
 							}
 						},
 						{
 							"listen": "test",
 							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 202', () => {",
+									"    pm.response.to.have.status(202)",
+									"})",
+									"",
+									"if (pm.request.method !== 'HEAD') {",
+									"    pm.test('Body is correct', () => {",
+									"        pm.response.to.have.body('foo content')",
+									"    })",
+									"}",
+									"",
+									"pm.test('Content-Type header is text/foo', () => {",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
+									"})"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Webhook with status code",
+					"item": [
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "HEAD",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "OPTIONS",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with status code",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "TRACE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_status_code}}"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const skipStatusCodes = [",
+									"    204, // No Content",
+									"    304, // Not Modified",
+									"]",
+									"",
+									"let randomStatusCode = Math.floor(Math.random() * (599 - 200 + 1) + 200)",
+									"",
+									"if (skipStatusCodes.indexOf(randomStatusCode) !== -1) {",
+									"    randomStatusCode = 201 // fallback",
+									"}",
+									"",
+									"// Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
+									"pm.variables.set('random_status_code', randomStatusCode)"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
 								"exec": [
 									"const expectedStatusCode = pm.variables.get('random_status_code')",
 									"",
@@ -446,53 +1028,346 @@
 									"    pm.response.to.have.status(expectedStatusCode)",
 									"})",
 									"",
-									"pm.test('Body is correct', () => {",
-									"    pm.response.to.have.body('foo content')",
-									"})",
+									"if (pm.request.method !== 'HEAD') {",
+									"    pm.test('Body is correct', () => {",
+									"        pm.response.to.have.body('foo content')",
+									"    })",
+									"}",
 									"",
 									"pm.test('Content-Type header is text/foo', () => {",
 									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
 									"})"
-								],
-								"type": "text/javascript"
+								]
 							}
 						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_status_code}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"{{webhooksSessionUUID}}",
-								"{{random_status_code}}"
-							]
-						}
-					},
-					"response": []
+					]
 				},
 				{
-					"name": "Webhook with any string after session UUID (TODO + different methods)",
+					"name": "Webhook with any string after session UUID",
+					"item": [
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "HEAD",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "OPTIONS",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Webhook with any string after session UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "TRACE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"{{webhooksSessionUUID}}",
+										"{{random_path}}"
+									]
+								}
+							},
+							"response": []
+						}
+					],
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
+								"type": "text/javascript",
 								"exec": [
 									"const allowed = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдёйАБВГДЁЙ0123456789///?\"",
 									"const randomPath = allowed.split('').sort(() => {return 0.5-Math.random()}).join('')",
 									"",
 									"// Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
 									"pm.variables.set('random_path', randomPath)"
-								],
-								"type": "text/javascript"
+								]
 							}
 						},
 						{
 							"listen": "test",
 							"script": {
+								"type": "text/javascript",
 								"exec": [
 									"const expectedStatusCode = pm.variables.get('random_status_code')",
 									"",
@@ -500,13 +1375,45 @@
 									"    pm.response.to.have.status(202)",
 									"})",
 									"",
-									"pm.test('Body is correct', () => {",
-									"    pm.response.to.have.body('foo content')",
-									"})",
+									"if (pm.request.method !== 'HEAD') {",
+									"    pm.test('Body is correct', () => {",
+									"        pm.response.to.have.body('foo content')",
+									"    })",
+									"}",
 									"",
 									"pm.test('Content-Type header is text/foo', () => {",
 									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('text/foo')",
 									"})"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Invalid session UUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 404', () => {",
+									"    pm.response.to.have.status(404)",
+									"})",
+									"",
+									"pm.test('Content-Type header is application/json', () => {",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('application/json')",
+									"})",
+									"",
+									"pm.test('JSON object has correct structure', () => {",
+									"    var data = pm.response.json()",
+									"",
+									"    pm.expect(data).to.have.all.keys('success', 'code', 'message')",
+									"",
+									"    pm.expect(data.success).to.be.false",
+									"    pm.expect(data.code).to.be.eql(404)",
+									"    pm.expect(data.message).to.contains('not found')",
+									"});",
+									""
 								],
 								"type": "text/javascript"
 							}
@@ -516,13 +1423,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/{{webhooksSessionUUID}}/{{random_path}}",
+							"raw": "{{base_url}}/{{$randomUUID}}",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
-								"{{webhooksSessionUUID}}",
-								"{{random_path}}"
+								"{{$randomUUID}}"
 							]
 						}
 					},
@@ -537,7 +1443,7 @@
 						"exec": [
 							"const webhooksSessionUUID = pm.collectionVariables.get('webhooksSessionUUID')",
 							"",
-							"if (webhooksSessionUUID == undefined || webhooksSessionUUID == \"\") {",
+							"if (webhooksSessionUUID == undefined || webhooksSessionUUID == '') {",
 							"    console.info('create new session for webhook tests')",
 							"",
 							"    pm.sendRequest({",
