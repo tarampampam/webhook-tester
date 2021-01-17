@@ -36,7 +36,7 @@ fmt: ## Run source code formatter tools
 	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app gofmt -s -w -d .
 
 lint: ## Run app linters
-	$(DOCKER_BIN) run --rm -t -v "$(cwd):/app" -w /app golangci/golangci-lint:v1.24-alpine golangci-lint run
+	$(DOCKER_BIN) run --rm -t -v "$(cwd):/app" -w /app golangci/golangci-lint:v1.33-alpine golangci-lint run
 
 gotest: ## Run app tests
 	$(DC_BIN) run $(DC_RUN_ARGS) --no-deps app go test -v -race -timeout 5s ./... \
@@ -56,7 +56,8 @@ redis-cli: ## Start redis-cli
 	$(DC_BIN) run --rm --no-deps redis redis-cli -h redis -p 6379
 
 up: ## Create and start containers
-	$(DC_BIN) up --detach
+	$(DC_BIN) up --detach web
+	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Navigate your browser to ⇒ http://127.0.0.1:8082';
 
 down: ## Stop all services
 	$(DC_BIN) down -t 5
