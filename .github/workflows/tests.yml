@@ -114,7 +114,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X webhook-tester/version.version=${{ steps.version.outputs.value }}
+          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.version.outputs.value }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester .
 
       - name: Try to execute

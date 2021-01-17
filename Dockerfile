@@ -19,7 +19,7 @@ WORKDIR /src
 COPY . /src
 
 # arguments to pass on each go tool link invocation
-ENV LDFLAGS="-s -w -X webhook-tester/version.version=$APP_VERSION"
+ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
 
 RUN set -x \
     && go version \

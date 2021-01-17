@@ -3,7 +3,7 @@
 # Makefile readme (en): <https://www.gnu.org/software/make/manual/html_node/index.html#SEC_Contents>
 
 SHELL = /bin/sh
-LDFLAGS = "-s -w -X webhook-tester/version.version=$(shell git rev-parse HEAD)"
+LDFLAGS = "-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$(shell git rev-parse HEAD)"
 
 DC_RUN_ARGS = --rm --user "$(shell id -u):$(shell id -g)"
 APP_NAME = $(notdir $(CURDIR))
