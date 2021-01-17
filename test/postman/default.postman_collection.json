@@ -238,61 +238,314 @@
 							"name": "Requests",
 							"item": [
 								{
-									"name": "Get request details by UUID for session with passed UUID (TODO)",
+									"name": "Get request details by UUID for session with passed UUID",
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													"const baseUrl = pm.environment.get('base_url')",
+													"",
+													"// create session",
+													"pm.sendRequest({",
+													"    url: baseUrl + '/api/session',",
+													"    method: 'POST',",
+													"    body: {",
+													"        mode: 'raw',",
+													"        raw: '{\"status_code\": 203}',",
+													"    },",
+													"}, (err, res) => {",
+													"    if (err) {",
+													"        throw err",
+													"    }",
+													"",
+													"    pm.expect(res.code).to.equal(200)",
+													"",
+													"    let sessionUuid = res.json().uuid;",
+													"    pm.variables.set('session_uuid', sessionUuid)",
+													"",
+													"    // make simple request to the webhook endpoint (for just created session)",
+													"    pm.sendRequest({",
+													"        url: baseUrl + '/' + sessionUuid + '/baz-url',",
+													"        method: 'POST',",
+													"        header: {",
+													"            'X-Foo': 'foo'",
+													"        },",
+													"        body: {",
+													"            mode: 'raw',",
+													"            raw: 'bar content',",
+													"        },",
+													"    }, (err, res) => {",
+													"        if (err) {",
+													"            throw err",
+													"        }",
+													"",
+													"        pm.expect(res.code).to.equal(203)",
+													"",
+													"        // get requests list",
+													"        pm.sendRequest({",
+													"            url: baseUrl + '/api/session/'+sessionUuid+'/requests',",
+													"            method: 'GET',",
+													"        }, (err, res) => {",
+													"            if (err) {",
+													"                throw err",
+													"            }",
+													"",
+													"            pm.expect(res.code).to.equal(200)",
+													"            let data = res.json()",
+													"            pm.expect(data.length).to.eql(1)",
+													"",
+													"            // take first recorded request uuid",
+													"            pm.variables.set('request_uuid', data[0].uuid)",
+													"        })",
+													"    })",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Status code is 200', () => {",
+													"    pm.response.to.have.status(200)",
+													"})",
+													"",
+													"pm.test('JSON object has correct structure', () => {",
+													"    const data = pm.response.json()",
+													"    const sessionUuid = pm.variables.get('session_uuid')",
+													"    const requestUuid = pm.variables.get('request_uuid')",
+													"",
+													"    pm.expect(data).to.have.all.keys('uuid', 'client_address', 'method', 'content', 'headers', 'url', 'created_at_unix')",
+													"",
+													"    pm.expect(data.uuid).to.be.eql(requestUuid)",
+													"    pm.expect(data.client_address).to.be.a('string')",
+													"    pm.expect(data.method).to.be.eql('POST')",
+													"    pm.expect(data.content).to.be.eql('bar content')",
+													"    pm.expect(data.url).to.be.eql('/' + sessionUuid + '/baz-url')",
+													"    pm.expect(data.created_at_unix).to.be.a('number')",
+													"})",
+													"",
+													"pm.test('JSON object contains required HTTP header', () => {",
+													"    const data = pm.response.json()",
+													"",
+													"    let headerFound = false",
+													"",
+													"    data.headers.each((v) => {",
+													"        if (v.name === 'X-Foo' && v.value === 'foo') {",
+													"            headerFound = true",
+													"        }",
+													"    })",
+													"",
+													"    pm.expect(headerFound).to.be.true",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
 									"request": {
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests/{{$randomUUID}}",
+											"raw": "{{base_url}}/api/session/{{session_uuid}}/requests/{{request_uuid}}",
 											"host": [
 												"{{base_url}}"
 											],
 											"path": [
 												"api",
 												"session",
-												"{{$randomUUID}}",
+												"{{session_uuid}}",
 												"requests",
-												"{{$randomUUID}}"
+												"{{request_uuid}}"
 											]
 										}
 									},
 									"response": []
 								},
 								{
-									"name": "Delete request by UUID for session with passed UUID (TODO)",
+									"name": "Delete request by UUID for session with passed UUID",
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													"const baseUrl = pm.environment.get('base_url')",
+													"",
+													"// create session",
+													"pm.sendRequest({",
+													"    url: baseUrl + '/api/session',",
+													"    method: 'POST',",
+													"    body: {",
+													"        mode: 'raw',",
+													"        raw: '{}',",
+													"    },",
+													"}, (err, res) => {",
+													"    if (err) {",
+													"        throw err",
+													"    }",
+													"",
+													"    pm.expect(res.code).to.equal(200)",
+													"",
+													"    let sessionUuid = res.json().uuid;",
+													"    pm.variables.set('session_uuid', sessionUuid)",
+													"",
+													"    // make simple request to the webhook endpoint (for just created session)",
+													"    pm.sendRequest({",
+													"        url: baseUrl + '/' + sessionUuid,",
+													"        method: 'GET',",
+													"    }, (err, res) => {",
+													"        if (err) {",
+													"            throw err",
+													"        }",
+													"",
+													"        // get requests list",
+													"        pm.sendRequest({",
+													"            url: baseUrl + '/api/session/'+sessionUuid+'/requests',",
+													"            method: 'GET',",
+													"        }, (err, res) => {",
+													"            if (err) {",
+													"                throw err",
+													"            }",
+													"",
+													"            pm.expect(res.code).to.equal(200)",
+													"            let data = res.json()",
+													"            pm.expect(data.length).to.eql(1)",
+													"",
+													"            // take first recorded request uuid",
+													"            pm.variables.set('request_uuid', data[0].uuid)",
+													"        })",
+													"    })",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Status code is 200', () => {",
+													"    pm.response.to.have.status(200)",
+													"})",
+													"",
+													"pm.test('JSON object has correct structure', () => {",
+													"    var data = pm.response.json()",
+													"",
+													"    pm.expect(data).to.have.all.keys('success')",
+													"",
+													"    pm.expect(data.success).to.be.true",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
 									"request": {
 										"method": "DELETE",
 										"header": [],
 										"url": {
-											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests/{{$randomUUID}}",
+											"raw": "{{base_url}}/api/session/{{session_uuid}}/requests/{{request_uuid}}",
 											"host": [
 												"{{base_url}}"
 											],
 											"path": [
 												"api",
 												"session",
-												"{{$randomUUID}}",
+												"{{session_uuid}}",
 												"requests",
-												"{{$randomUUID}}"
+												"{{request_uuid}}"
 											]
 										}
 									},
 									"response": []
 								},
 								{
-									"name": "Get requests list for session with passed UUID (TODO)",
+									"name": "Get requests list for session with passed UUID",
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													"const baseUrl = pm.environment.get('base_url')",
+													"",
+													"// create session",
+													"pm.sendRequest({",
+													"    url: baseUrl + '/api/session',",
+													"    method: 'POST',",
+													"    body: {",
+													"        mode: 'raw',",
+													"        raw: '{}',",
+													"    },",
+													"}, (err, res) => {",
+													"    if (err) {",
+													"        throw err",
+													"    }",
+													"",
+													"    pm.expect(res.code).to.equal(200)",
+													"",
+													"    let sessionUuid = res.json().uuid;",
+													"    pm.variables.set('session_uuid', sessionUuid)",
+													"",
+													"    // make two simple requests to the webhook endpoint (for just created session)",
+													"    pm.sendRequest({",
+													"        url: baseUrl + '/' + sessionUuid,",
+													"        method: 'GET',",
+													"    })",
+													"",
+													"    pm.sendRequest({",
+													"        url: baseUrl + '/' + sessionUuid + '/two',",
+													"        method: 'GET',",
+													"    })",
+													"})"
+												],
+												"type": "text/javascript"
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Status code is 200', () => {",
+													"    pm.response.to.have.status(200)",
+													"})",
+													"",
+													"pm.test('JSON object has correct structure', () => {",
+													"    const data = pm.response.json()",
+													"    const sessionUuid = pm.variables.get('session_uuid')",
+													"",
+													"    data.each((v) => {",
+													"        pm.expect(v).to.have.all.keys('uuid', 'client_address', 'method', 'content', 'headers', 'url', 'created_at_unix')",
+													"",
+													"        pm.expect(v.uuid).to.be.a('string')",
+													"        pm.expect(v.client_address).to.be.a('string')",
+													"        pm.expect(v.method).to.be.eql('GET')",
+													"        pm.expect(v.content).to.be.eql('')",
+													"        pm.expect(v.url).to.be.contains('/' + sessionUuid)",
+													"        pm.expect(v.created_at_unix).to.be.a('number')",
+													"    })",
+													"",
+													"    pm.expect(data.length).to.be.eql(2)",
+													"})",
+													""
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
 									"request": {
 										"method": "GET",
 										"header": [],
 										"url": {
-											"raw": "{{base_url}}/api/session/{{$randomUUID}}/requests",
+											"raw": "{{base_url}}/api/session/{{session_uuid}}/requests",
 											"host": [
 												"{{base_url}}"
 											],
 											"path": [
 												"api",
 												"session",
-												"{{$randomUUID}}",
+												"{{session_uuid}}",
 												"requests"
 											]
 										}
@@ -319,16 +572,63 @@
 									},
 									"response": []
 								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
 							]
 						},
 						{
-							"name": "Create new session (TODO)",
+							"name": "Create new session",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', () => {",
+											"    pm.response.to.have.status(200)",
+											"})",
+											"",
+											"pm.test('JSON object has correct structure', () => {",
+											"    var data = pm.response.json()",
+											"",
+											"    pm.expect(data).to.have.all.keys('uuid', 'response')",
+											"",
+											"    pm.expect(data.uuid).to.be.a('string')",
+											"",
+											"    pm.expect(data.response.content).to.be.a('string')",
+											"    pm.expect(data.response.code).to.be.eql(201)",
+											"    pm.expect(data.response.content_type).to.be.eql('application/json2')",
+											"    pm.expect(data.response.delay_sec).to.be.eql(0)",
+											"    pm.expect(data.response.created_at_unix).to.be.a('number')",
+											"})"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
 							"request": {
 								"method": "POST",
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"status_code\": 200,\n    \"content_type\": \"application/json\",\n    \"response_delay\": 0,\n    \"response_body\": \"\"\n}",
+									"raw": "{\n    \"status_code\": 201,\n    \"content_type\": \"application/json2\",\n    \"response_delay\": 0,\n    \"response_body\": \"foo content\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -349,7 +649,104 @@
 							"response": []
 						},
 						{
-							"name": "Delete session with passed UUID(TODO)",
+							"name": "Delete session with passed UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"pm.sendRequest({",
+											"    url: pm.environment.get('base_url') + '/api/session',",
+											"    method: 'POST',",
+											"    body: {",
+											"        mode: 'raw',",
+											"        raw: '{}',",
+											"    },",
+											"}, (err, res) => {",
+											"    if (err) {",
+											"        throw err",
+											"    }",
+											"",
+											"    pm.expect(res.code).to.equal(200)",
+											"",
+											"    // Variables help: <https://learning.postman.com/docs/sending-requests/variables/>",
+											"    pm.variables.set('new_session_uuid', res.json().uuid)",
+											"})"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', () => {",
+											"    pm.response.to.have.status(200)",
+											"})",
+											"",
+											"pm.test('JSON object has correct structure', () => {",
+											"    var data = pm.response.json()",
+											"",
+											"    pm.expect(data).to.have.all.keys('success')",
+											"",
+											"    pm.expect(data.success).to.be.true",
+											"})"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/session/{{new_session_uuid}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"session",
+										"{{new_session_uuid}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete session with wrong UUID",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404', () => {",
+											"    pm.response.to.have.status(404)",
+											"})",
+											"",
+											"pm.test('JSON object has correct structure', () => {",
+											"    var data = pm.response.json()",
+											"",
+											"    pm.expect(data).to.have.all.keys('success', 'code', 'message')",
+											"",
+											"    pm.expect(data.success).to.be.false",
+											"    pm.expect(data.code).to.be.eql(404)",
+											"    pm.expect(data.message).to.contains('not found')",
+											"})"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
 							"request": {
 								"method": "DELETE",
 								"header": [],
@@ -380,10 +777,6 @@
 									"    pm.response.to.have.status(200)\r",
 									"});\r",
 									"\r",
-									"pm.test('Content-Type header is application/json', () => {\r",
-									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('application/json')\r",
-									"});\r",
-									"\r",
 									"pm.test('JSON object has correct structure', () => {\r",
 									"    var data = pm.response.json()\r",
 									"\r",
@@ -398,7 +791,7 @@
 									"    pm.expect(data.limits).to.have.all.keys('max_requests', 'session_lifetime_sec')\r",
 									"    pm.expect(data.limits.max_requests).to.be.a('number')\r",
 									"    pm.expect(data.limits.session_lifetime_sec).to.be.a('number')\r",
-									"});\r",
+									"})\r",
 									""
 								],
 								"type": "text/javascript"
@@ -420,6 +813,34 @@
 						}
 					},
 					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Content-Type header is application/json', () => {",
+							"    pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('application/json')",
+							"})",
+							"",
+							"pm.test('Caching control headers is valid', () => {",
+							"    pm.expect(pm.response.headers.get('Cache-Control')).to.be.eql('no-cache, no-store, must-revalidate')",
+							"    pm.expect(pm.response.headers.get('Expires')).to.be.eql('0')",
+							"    pm.expect(pm.response.headers.get('Pragma')).to.be.eql('no-cache')",
+							"})"
+						]
+					}
 				}
 			]
 		},
