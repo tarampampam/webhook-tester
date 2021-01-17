@@ -68,3 +68,5 @@ COPY --chown=appuser ./public /app/public
 WORKDIR /app
 
 ENTRYPOINT ["/app/webhook-tester"]
+
+CMD ["serve"]
