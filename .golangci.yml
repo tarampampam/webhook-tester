@@ -1,3 +1,5 @@
+# TODO use this config: <https://github.com/tarampampam/mikrotik-hosts-parser/blob/master/.golangci.yml>
+
 # Documentation: <https://github.com/golangci/golangci-lint#config-file>
 
 run:
