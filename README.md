@@ -46,7 +46,7 @@ services:
     image: tarampampam/webhook-tester:latest
     command: serve --port 8080 --redis-host redis
     ports:
-      - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
+      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
 
   redis:
     image: redis:6.0.5-alpine

@@ -3,6 +3,7 @@ version: '3.4'
 volumes:
   tmp-data:
   redis-data:
+  golint-cache:
 
 x-app: &app-service
   image: golang:1.15-buster # Image page: <https://hub.docker.com/_/golang>
@@ -23,11 +24,10 @@ services:
   web:
     <<: *app-service
     ports:
-      - '8082:8080/tcp' # Open <http://127.0.0.1:8082>
+      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
     command: go run . serve --port 8080 --redis-host redis --max-requests 12 --ignore-header-prefix foo
     depends_on:
       - redis
-      - redis-commander
 
   redis:
     image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
@@ -35,12 +35,13 @@ services:
       - redis-data:/data:cached
     ports:
       - 6379
-      #- '6379:6379/tcp'
 
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    restart: always
+  golint:
+    image: golangci/golangci-lint:v1.33-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
     environment:
-      - REDIS_HOSTS=docker:redis:6379:1
-    ports:
-      - '8081:8081/tcp' # Open <http://127.0.0.1:8081>
+      GOLANGCI_LINT_CACHE: /tmp/golint # <https://github.com/golangci/golangci-lint/blob/v1.33.0/internal/cache/default.go#L68>
+    volumes:
+      - .:/src:ro
+      - golint-cache:/tmp/golint:rw
+    working_dir: /src
+    command: /bin/true
