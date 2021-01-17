@@ -1,6 +1,6 @@
-module webhook-tester
+module github.com/tarampampam/webhook-tester
 
-go 1.14
+go 1.15
 
 require (
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
