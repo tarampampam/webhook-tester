@@ -74,6 +74,5 @@ ENTRYPOINT ["/bin/webhook-tester"]
 # TODO append "--log-json" flag
 CMD [ \
     "serve", \
-    "--port", "8080", \
     "--public", "/opt/webhook-tester/public" \
 ]
