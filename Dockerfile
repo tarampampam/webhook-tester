@@ -19,11 +19,11 @@ WORKDIR /src
 COPY . /src
 
 # arguments to pass on each go tool link invocation
-ENV LDFLAGS="-s -w -X webhook-tester/version.version=$APP_VERSION"
+ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
 
 RUN set -x \
     && go version \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester . \
+    && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/ \
     && /tmp/webhook-tester version \
     && /tmp/webhook-tester -h
 
@@ -41,7 +41,7 @@ RUN set -x \
     && cp -R /etc/ssl/certs ./etc/ssl/certs \
     && cp /etc/mime.types ./etc/mime.types \
     && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
-    && cp -R /src/public ./opt/webhook-tester/public \
+    && cp -R /src/web ./opt/webhook-tester/web \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && mv /tmp/webhook-tester ./bin/webhook-tester
@@ -80,5 +80,5 @@ ENTRYPOINT ["/bin/webhook-tester"]
 # TODO append "--log-json" flag
 CMD [ \
     "serve", \
-    "--public", "/opt/webhook-tester/public" \
+    "--public", "/opt/webhook-tester/web" \
 ]
