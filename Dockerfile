@@ -28,17 +28,23 @@ RUN set -x \
     && /tmp/webhook-tester -h
 
 # prepare rootfs for runtime
+RUN mkdir -p /tmp/rootfs
+
+WORKDIR /tmp/rootfs
+
 RUN set -x \
-    && mkdir -p /tmp/rootfs/etc/ssl /tmp/rootfs/etc/apache2 \
-    && mkdir -p /tmp/rootfs/bin \
-    && mkdir -p /tmp/rootfs/opt/webhook-tester \
-    && cp -R /etc/ssl/certs /tmp/rootfs/etc/ssl/certs \
-    && cp /etc/mime.types /tmp/rootfs/etc/mime.types \
-    && cp /etc/apache2/mime.types /tmp/rootfs/etc/apache2/mime.types \
-    && cp -R /src/public /tmp/rootfs/opt/webhook-tester/public \
-    && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > /tmp/rootfs/etc/passwd \
-    && echo 'appuser:x:10001:' > /tmp/rootfs/etc/group \
-    && mv /tmp/webhook-tester /tmp/rootfs/bin/webhook-tester
+    && mkdir -p \
+        ./etc/ssl \
+        ./etc/apache2 \
+        ./bin \
+        ./opt/webhook-tester \
+    && cp -R /etc/ssl/certs ./etc/ssl/certs \
+    && cp /etc/mime.types ./etc/mime.types \
+    && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
+    && cp -R /src/public ./opt/webhook-tester/public \
+    && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
+    && echo 'appuser:x:10001:' > ./etc/group \
+    && mv /tmp/webhook-tester ./bin/webhook-tester
 
 # use empty filesystem
 FROM scratch
