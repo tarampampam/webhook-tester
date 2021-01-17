@@ -9,7 +9,7 @@ RUN set -x \
     && mkdir /src \
     # SSL ca certificates (ca-certificates is required to call HTTPS endpoints)
     # packages mailcap and apache2 is needed for /etc/mime.types and /etc/apache2/mime.types files respectively
-    && apk add --no-cache mailcap apache2 ca-certificates upx \
+    && apk add --no-cache mailcap apache2 ca-certificates \
     && update-ca-certificates
 
 WORKDIR /src
@@ -25,10 +25,8 @@ RUN set -x \
 COPY . /src
 
 RUN set -x \
-    && upx -V \
     && go version \
     && GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X webhook-tester/version.version=${APP_VERSION}" -o /tmp/webhook-tester . \
-    && upx -7 /tmp/webhook-tester \
     && /tmp/webhook-tester version \
     && /tmp/webhook-tester -h
 
