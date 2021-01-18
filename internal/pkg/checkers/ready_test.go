@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestReadyChecker_CheckWithoutRedisClient(t *testing.T) {
-	assert.NoError(t, NewReadyChecker(context.Background(), nil).Check())
-}
-
 func TestReadyChecker_CheckSuccessWithRedisClient(t *testing.T) {
 	// start mini-redis
 	mini, err := miniredis.Run()
@@ -39,4 +35,8 @@ func TestReadyChecker_CheckFailedWithRedisClient(t *testing.T) {
 	mini.SetError("foo err")
 	assert.Error(t, NewReadyChecker(context.Background(), rdb).Check())
 	mini.SetError("")
+}
+
+func TestReadyChecker_CheckFailedWithoutRedisClient(t *testing.T) {
+	assert.EqualError(t, NewReadyChecker(context.Background(), nil).Check(), "nil redis instance")
 }

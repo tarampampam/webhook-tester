@@ -6,10 +6,10 @@ require (
 	github.com/alicebob/miniredis v2.5.0+incompatible
 	github.com/alicebob/miniredis/v2 v2.14.1
 	github.com/fatih/color v1.10.0
+	github.com/felixge/httpsnoop v1.0.1
 	github.com/go-redis/redis/v8 v8.4.8
 	github.com/gomodule/redigo v1.8.2 // indirect
 	github.com/google/uuid v1.1.5
-	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/json-iterator/go v1.1.10
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d

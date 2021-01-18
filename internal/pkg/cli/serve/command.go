@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -52,12 +51,6 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 
 const serverShutdownTimeout = 5 * time.Second
 
-const (
-	// HTTP read/write timeouts
-	httpReadTimeout  = time.Second * 5
-	httpWriteTimeout = time.Second * 35
-)
-
 // run current command.
 func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:funlen,gocyclo
 	var (
@@ -102,7 +95,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		SessionTTL:           sessionTTL,
 		PusherKey:            f.pusher.key,         // FIXME depends on broadcast driver
 		PusherCluster:        f.pusher.cluster,     // FIXME depends on broadcast driver
-		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME depends on broadcast driver
+		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME
 	}
 
 	var broadcaster broadcast.Broadcaster
@@ -119,16 +112,12 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 	}
 
 	// create HTTP server
-	server := appHttp.NewServer(&appHttp.ServerSettings{
-		Address:                   f.listen.ip + ":" + strconv.Itoa(int(f.listen.port)),
-		WriteTimeout:              httpWriteTimeout,
-		ReadTimeout:               httpReadTimeout,
-		PublicAssetsDirectoryPath: f.publicDir,
-		KeepAliveEnabled:          false,
-	}, appSettings, storage, broadcaster)
+	server := appHttp.NewServer(ctx, log, f.publicDir, appSettings, storage, broadcaster, rdb)
 
 	// register server routes, middlewares, etc.
-	server.RegisterHandlers()
+	if err := server.Register(); err != nil {
+		return err
+	}
 
 	startingErrCh := make(chan error, 1) // channel for server starting error
 
@@ -153,7 +142,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 			log.Warn("Path to the directory with public assets was not provided")
 		}
 
-		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.Start(f.listen.ip, f.listen.port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}(startingErrCh)

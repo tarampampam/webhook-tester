@@ -2,6 +2,7 @@ package checkers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -23,6 +24,8 @@ func (c *ReadyChecker) Check() error {
 		if err := c.rdb.Ping(c.ctx).Err(); err != nil {
 			return err
 		}
+	} else {
+		return errors.New("nil redis instance")
 	}
 
 	return nil

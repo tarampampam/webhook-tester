@@ -14,8 +14,8 @@ x-app: &app-service
   volumes:
     - /etc/passwd:/etc/passwd:ro
     - /etc/group:/etc/group:ro
-    - .:/src:cached
-    - tmp-data:/tmp:cached
+    - .:/src:rw
+    - tmp-data:/tmp:rw
 
 services:
   app:
@@ -32,7 +32,7 @@ services:
   redis:
     image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
-      - redis-data:/data:cached
+      - redis-data:/data:rw
     ports:
       - 6379
 
