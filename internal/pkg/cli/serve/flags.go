@@ -80,7 +80,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) {
 		"ignore-header-prefix",
 		"",
 		[]string{},
-		"ignore incoming webhook header prefix, case insensitive (can be multiple; example: 'X-Forwarded-')",
+		"ignore incoming webhook header prefix, case insensitive (example: 'X-Forwarded-')",
 	)
 	flagSet.StringVarP(
 		&f.redisDSN,
