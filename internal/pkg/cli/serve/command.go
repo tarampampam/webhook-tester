@@ -81,6 +81,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 	if optErr != nil {
 		return optErr
 	}
+
 	rdb := redis.NewClient(opt).WithContext(ctx)
 
 	defer func() { _ = rdb.Close() }()
@@ -105,6 +106,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 	}
 
 	var broadcaster broadcast.Broadcaster
+
 	switch f.broadcastDriver {
 	case brDriverNone:
 		broadcaster = &null.Broadcaster{} // FIXME rewrite null broadcaster to "none broadcaster"

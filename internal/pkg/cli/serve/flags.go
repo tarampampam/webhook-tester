@@ -36,7 +36,7 @@ type flags struct {
 	pusher struct{ appID, key, secret, cluster string }
 }
 
-func (f *flags) init(flagSet *pflag.FlagSet) {
+func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 	exe, _ := os.Executable()
 	exe = path.Dir(exe)
 
@@ -89,7 +89,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) {
 		"redis://127.0.0.1:6379/0",
 		fmt.Sprintf("redis server DSN (format: \"redis://<user>:<password>@<host>:<port>/<db_number>\") [$%s]", env.RedisDSN), //nolint:lll
 	)
-	flagSet.StringVarP( // TODO new (remove this comment)
+	flagSet.StringVarP(
 		&f.broadcastDriver,
 		"broadcast-driver",
 		"",
