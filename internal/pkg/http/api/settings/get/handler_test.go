@@ -29,7 +29,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.JSONEq(t, `{
-					"version": "undefined@undefined",
+					"version": "0.0.0@undefined",
 					"pusher": {"key":"bar", "cluster":"foo"},
 					"limits": {"max_requests":123, "session_lifetime_sec":321}
 				}`, rr.Body.String())

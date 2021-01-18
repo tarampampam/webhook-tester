@@ -19,19 +19,13 @@ type Storage struct {
 	uuidGenerator func() string
 }
 
-func NewStorage(addr, password string, dbNum, maxConn int, sessionTTL time.Duration, maxRequests uint16) *Storage {
+func NewStorage(ctx context.Context, client *redis.Client, sessionTTL time.Duration, maxRequests uint16) *Storage {
 	return &Storage{
-		Context:     context.TODO(),
+		Context:     ctx, // FIXME why public?
 		ttl:         sessionTTL,
 		maxRequests: maxRequests,
-		redis: redis.NewClient(&redis.Options{
-			Addr:     addr,
-			Username: "",
-			Password: password,
-			DB:       dbNum,
-			PoolSize: maxConn,
-		}),
-		json: jsoniter.ConfigFastest,
+		redis:       client,
+		json:        jsoniter.ConfigFastest,
 		uuidGenerator: func() string {
 			return uuid.New().String()
 		},
