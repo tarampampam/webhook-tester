@@ -222,7 +222,7 @@ func (f *flags) validate() error {
 			return errors.New("pusher cluster does not set")
 		}
 	default:
-		return fmt.Errorf("unsupported caching engine: %s", f.broadcastDriver)
+		return fmt.Errorf("unsupported broadcast driver: %s", f.broadcastDriver)
 	}
 
 	return nil
