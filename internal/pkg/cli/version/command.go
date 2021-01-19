@@ -1,17 +1,24 @@
+// Package version contains CLI `version` command implementation.
 package version
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 
-	ver "github.com/tarampampam/webhook-tester/internal/pkg/version"
+	"github.com/spf13/cobra"
 )
 
-// Command is a `version` command.
-type Command struct{}
+// NewCommand creates `version` command.
+func NewCommand(ver string) *cobra.Command {
+	return &cobra.Command{
+		Use:     "version",
+		Aliases: []string{"v", "ver"},
+		Short:   "Display application version",
+		RunE: func(*cobra.Command, []string) (err error) {
+			_, err = fmt.Fprintf(os.Stdout, "app version:\t%s (%s)\n", ver, runtime.Version())
 
-// Execute current command.
-func (*Command) Execute(_ []string) (err error) {
-	_, err = fmt.Printf("Version: %s\n", ver.Version())
-
-	return
+			return
+		},
+	}
 }

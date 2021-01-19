@@ -62,7 +62,7 @@ linters:
     - unused # Checks Go code for unused constants, variables, functions and types
     - varcheck # Finds unused global variables and constants
     - whitespace # Tool for detection of leading and trailing whitespace
-    - godox # Tool for detection of FIXME, TODO and other comment keywords
+    #- godox # Tool for detection of FIXME, TODO and other comment keywords # TODO uncomment
     - gochecknoglobals # Checks that no globals are present in Go code
     - gocognit # Computes and checks the cognitive complexity of functions
     - prealloc # Finds slice declarations that could potentially be preallocated

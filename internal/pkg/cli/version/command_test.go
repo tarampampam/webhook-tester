@@ -1,50 +1,29 @@
 package version
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCommand_Execute(t *testing.T) {
-	t.Parallel()
+func TestProperties(t *testing.T) {
+	cmd := NewCommand("")
 
-	tests := []struct {
-		name             string
-		giveArgs         []string
-		wantOutput       []string
-		wantErr          bool
-		wantErrorMessage string
-	}{
-		{
-			name:             "By default",
-			giveArgs:         []string{},
-			wantOutput:       []string{"Version:", "undefined@undefined", "\n"},
-			wantErr:          false,
-			wantErrorMessage: "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var err error
-			var cmd = Command{}
+	assert.Equal(t, "version", cmd.Use)
+	assert.ElementsMatch(t, []string{"v", "ver"}, cmd.Aliases)
+	assert.NotNil(t, cmd.RunE)
+}
 
-			assert.NoError(t, cmd.Execute(tt.giveArgs))
+func TestCommandRun(t *testing.T) {
+	cmd := NewCommand("1.2.3@foobar")
+	cmd.SetArgs([]string{})
 
-			output := capturer.CaptureStdout(func() {
-				err = cmd.Execute(tt.giveArgs)
-			})
+	output := capturer.CaptureStdout(func() {
+		assert.NoError(t, cmd.Execute())
+	})
 
-			if tt.wantOutput != nil {
-				for _, line := range tt.wantOutput {
-					assert.Contains(t, output, line)
-				}
-			}
-
-			if tt.wantErr && err.Error() != tt.wantErrorMessage {
-				t.Errorf("Expected error message [%s] was not found in %v", tt.wantErrorMessage, err)
-			}
-		})
-	}
+	assert.Contains(t, output, "1.2.3@foobar")
+	assert.Contains(t, output, runtime.Version())
 }

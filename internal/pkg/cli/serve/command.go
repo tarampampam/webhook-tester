@@ -1,161 +1,174 @@
+// Package serve contains CLI `serve` command implementation.
 package serve
 
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
 	"time"
 
+	"github.com/go-redis/redis/v8"
+	"github.com/spf13/cobra"
+	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast/null"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast/pusher"
-	apphttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
+	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage/redis"
+	redisStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/redis"
+	"go.uber.org/zap"
 )
 
-const (
-	// gracefully shutdown timeout.
-	shutdownTimeout = time.Second * 5
+// broadcast driver names
+const brDriverNone, brDriverPusher = "none", "pusher"
 
-	// HTTP read/write timeouts
-	httpReadTimeout  = time.Second * 5
-	httpWriteTimeout = time.Second * 35
-)
+// NewCommand creates `serve` command.
+func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
+	var f flags
 
-type (
-	address   string
-	port      uint16
-	publicDir string
-)
+	cmd := &cobra.Command{
+		Use:     "serve",
+		Aliases: []string{"s", "server"},
+		Short:   "Start HTTP server",
+		Long:    "Environment variables have higher priority then flags",
+		PreRunE: func(*cobra.Command, []string) error {
+			if err := f.overrideUsingEnv(); err != nil {
+				return err
+			}
 
-// Command is a `serve` command.
-type Command struct {
-	Address            address   `required:"true" long:"listen" env:"LISTEN_ADDR" default:"0.0.0.0" description:"IP address to listen on"`                 //nolint:lll
-	Port               port      `required:"true" long:"port" env:"LISTEN_PORT" default:"8080" description:"TCP port number"`                              //nolint:lll
-	PublicDir          publicDir `required:"true" long:"public" env:"PUBLIC_DIR" default:"./web" description:"Directory with public assets"`               //nolint:lll
-	MaxRequests        uint16    `required:"true" long:"max-requests" default:"128" env:"MAX_REQUESTS" description:"Maximum stored requests per session"`  //nolint:lll
-	SessionTTLSec      uint32    `required:"true" long:"session-ttl" default:"604800" env:"SESSION_TTL" description:"Session lifetime (in seconds)"`       //nolint:lll
-	IgnoreHeaderPrefix []string  `long:"ignore-header-prefix" description:"Ignore incoming webhook header prefix, case insensitive (like 'X-Forwarded-')"` //nolint:lll
-	RedisHost          string    `required:"true" long:"redis-host" env:"REDIS_HOST" description:"Redis server hostname or IP address"`                    //nolint:lll
-	RedisPort          port      `required:"true" long:"redis-port" default:"6379" env:"REDIS_PORT" description:"Redis server TCP port number"`            //nolint:lll
-	RedisPass          string    `long:"redis-password" default:"" env:"REDIS_PASSWORD" description:"Redis server password (optional)"`                    //nolint:lll
-	RedisDBNum         uint16    `required:"true" long:"redis-db-num" default:"1" env:"REDIS_DB_NUM" description:"Redis database number"`                  //nolint:lll
-	RedisMaxConn       uint16    `required:"true" long:"redis-max-conn" default:"10" env:"REDIS_MAX_CONN" description:"Maximum redis connections"`         //nolint:lll
-	PusherAppID        string    `long:"pusher-app-id" env:"PUSHER_APP_ID" description:"Pusher application ID"`
-	PusherKey          string    `long:"pusher-key" env:"PUSHER_KEY" description:"Pusher key"`
-	PusherSecret       string    `long:"pusher-secret" env:"PUSHER_SECRET" description:"Pusher secret"`
-	PusherCluster      string    `long:"pusher-cluster" default:"eu" env:"PUSHER_CLUSTER" description:"Pusher cluster"`
-}
-
-// Convert struct into string representation.
-func (a address) String() string   { return string(a) }
-func (p port) String() string      { return strconv.FormatUint(uint64(p), 10) }
-func (d publicDir) String() string { return string(d) }
-
-// Validate address for listening on.
-func (address) IsValidValue(ip string) error {
-	if net.ParseIP(ip) == nil {
-		return errors.New("wrong address for listening value (invalid IP address)")
+			return f.validate()
+		},
+		RunE: func(*cobra.Command, []string) error {
+			return run(ctx, log, &f)
+		},
 	}
 
-	return nil
+	f.init(cmd.Flags())
+
+	return cmd
 }
 
-// Validate public directory path.
-func (publicDir) IsValidValue(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return err
-	}
+const serverShutdownTimeout = 5 * time.Second
 
-	return nil
-}
-
-// Execute current command.
-func (cmd *Command) Execute(_ []string) error {
+// run current command.
+func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:funlen,gocyclo
 	var (
-		appSettings       = cmd.getAppSettings()
-		ctx, cancel       = context.WithTimeout(context.Background(), shutdownTimeout)
-		dataStorage       = cmd.getStorage(ctx, appSettings)
-		broadcaster, bErr = cmd.getBroadcaster()
+		ctx, cancel = context.WithCancel(parentCtx) // serve context creation
+		oss         = breaker.NewOSSignals(ctx)     // OS signals listener
 	)
 
-	if bErr != nil {
-		_, _ = fmt.Fprintln(os.Stderr, bErr.Error())
-	}
-
-	server := apphttp.NewServer(&apphttp.ServerSettings{
-		Address:                   cmd.Address.String() + ":" + cmd.Port.String(),
-		WriteTimeout:              httpWriteTimeout,
-		ReadTimeout:               httpReadTimeout,
-		PublicAssetsDirectoryPath: cmd.PublicDir.String(),
-		KeepAliveEnabled:          false,
-	}, appSettings, dataStorage, broadcaster)
-
-	server.RegisterHandlers()
-
-	// make a channel for system signals
-	signals := make(chan os.Signal, 1)
-
-	// "Subscribe" for system signals
-	signal.Notify(signals, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	// start server in a goroutine
-	go func() {
-		if startErr := server.Start(); startErr != http.ErrServerClosed {
-			panic("Server starting error")
-		}
-	}()
-
-	// listen for a signal
-	<-signals
-
-	defer func() {
-		if err := dataStorage.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "storage closing error: %s\n", err)
-		}
+	// subscribe for system signals
+	oss.Subscribe(func(sig os.Signal) {
+		log.Warn("Stopping by OS signal..", zap.String("signal", sig.String()))
 
 		cancel()
+	})
+
+	defer func() {
+		cancel()   // call the cancellation function after all
+		oss.Stop() // stop system signals listening
 	}()
 
-	if err := server.Stop(ctx); err != nil {
+	opt, optErr := redis.ParseURL(f.redisDSN)
+	if optErr != nil {
+		return optErr
+	}
+
+	rdb := redis.NewClient(opt).WithContext(ctx)
+
+	defer func() { _ = rdb.Close() }()
+
+	if pingErr := rdb.Ping(ctx).Err(); pingErr != nil {
+		return pingErr
+	}
+
+	sessionTTL, parsingErr := time.ParseDuration(f.sessionTTL)
+	if parsingErr != nil {
+		return parsingErr
+	}
+
+	storage := redisStorage.NewStorage(ctx, rdb, sessionTTL, f.maxRequests)
+
+	appSettings := &settings.AppSettings{
+		MaxRequests:          f.maxRequests,
+		SessionTTL:           sessionTTL,
+		PusherKey:            f.pusher.key,         // FIXME depends on broadcast driver
+		PusherCluster:        f.pusher.cluster,     // FIXME depends on broadcast driver
+		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME
+	}
+
+	var broadcaster broadcast.Broadcaster
+
+	switch f.broadcastDriver {
+	case brDriverNone:
+		broadcaster = &null.Broadcaster{} // FIXME rewrite null broadcaster to "none broadcaster"
+
+	case brDriverPusher:
+		broadcaster = pusher.NewBroadcaster(f.pusher.appID, f.pusher.key, f.pusher.secret, f.pusher.cluster)
+
+	default:
+		return errors.New("unsupported broadcasting driver")
+	}
+
+	// create HTTP server
+	server := appHttp.NewServer(ctx, log, f.publicDir, appSettings, storage, broadcaster, rdb)
+
+	// register server routes, middlewares, etc.
+	if err := server.Register(); err != nil {
 		return err
 	}
 
+	startingErrCh := make(chan error, 1) // channel for server starting error
+
+	// start HTTP server in separate goroutine
+	go func(errCh chan<- error) {
+		defer close(errCh)
+
+		fields := []zap.Field{
+			zap.String("addr", f.listen.ip),
+			zap.Uint16("port", f.listen.port),
+			zap.String("public", f.publicDir),
+			zap.Uint16("max requests", f.maxRequests),
+			zap.String("session ttl", f.sessionTTL),
+			zap.Strings("ignore prefixes", f.ignoreHeaderPrefix),
+			zap.String("redis dsn", f.redisDSN),
+			zap.String("broadcast driver", f.broadcastDriver),
+		}
+
+		log.Info("Server starting", fields...)
+
+		if f.publicDir == "" {
+			log.Warn("Path to the directory with public assets was not provided")
+		}
+
+		if err := server.Start(f.listen.ip, f.listen.port); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}(startingErrCh)
+
+	// and wait for..
+	select {
+	case err := <-startingErrCh: // ..server starting error
+		return err
+
+	case <-ctx.Done(): // ..or context cancellation
+		log.Debug("Server stopping")
+
+		// create context for server graceful shutdown
+		ctxShutdown, ctxCancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
+		defer ctxCancelShutdown()
+
+		// stop the server using created context above
+		if err := server.Stop(ctxShutdown); err != nil {
+			return err
+		}
+
+		// and close redis connection
+		if err := rdb.Close(); err != nil {
+			return err
+		}
+	}
+
 	return nil
-}
-
-func (cmd *Command) getAppSettings() *settings.AppSettings {
-	return &settings.AppSettings{
-		MaxRequests:          cmd.MaxRequests,
-		SessionTTL:           time.Second * time.Duration(cmd.SessionTTLSec),
-		PusherKey:            cmd.PusherKey,
-		PusherCluster:        cmd.PusherCluster,
-		IgnoreHeaderPrefixes: cmd.IgnoreHeaderPrefix,
-	}
-}
-
-func (cmd *Command) getStorage(_ context.Context, appSettings *settings.AppSettings) storage.Storage {
-	return redis.NewStorage(
-		cmd.RedisHost+":"+cmd.RedisPort.String(),
-		cmd.RedisPass,
-		int(cmd.RedisDBNum),
-		int(cmd.RedisMaxConn),
-		appSettings.SessionTTL,
-		appSettings.MaxRequests,
-	)
-}
-
-func (cmd *Command) getBroadcaster() (broadcast.Broadcaster, error) {
-	if cmd.PusherAppID != "" && cmd.PusherKey != "" && cmd.PusherSecret != "" && cmd.PusherCluster != "" {
-		return pusher.NewBroadcaster(cmd.PusherAppID, cmd.PusherKey, cmd.PusherSecret, cmd.PusherCluster), nil
-	}
-
-	return nil, errors.New("pusher.com cannot be registered (wrong configuration)")
 }

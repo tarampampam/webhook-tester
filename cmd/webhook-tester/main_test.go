@@ -9,17 +9,33 @@ import (
 )
 
 func Test_Main(t *testing.T) {
-	origFlags := make([]string, 0)
-	origFlags = append(origFlags, os.Args...)
+	os.Args = []string{"", "--help"}
+	exitFn = func(code int) { assert.Equal(t, 0, code) }
 
-	defer func() { os.Args = origFlags }()
+	output := capturer.CaptureStdout(main)
 
-	os.Args = []string{"", "-h"}
+	assert.Contains(t, output, "Usage:")
+	assert.Contains(t, output, "Available Commands:")
+	assert.Contains(t, output, "Flags:")
+}
 
-	output := capturer.CaptureStdout(func() {
-		main()
-	})
+func Test_MainWithoutCommands(t *testing.T) {
+	os.Args = []string{""}
+	exitFn = func(code int) { assert.Equal(t, 0, code) }
 
-	assert.Contains(t, output, "Help Options")
-	assert.Contains(t, output, "Available commands")
+	output := capturer.CaptureStdout(main)
+
+	assert.Contains(t, output, "Usage:")
+	assert.Contains(t, output, "Available Commands:")
+	assert.Contains(t, output, "Flags:")
+}
+
+func Test_MainUnknownSubcommand(t *testing.T) {
+	os.Args = []string{"", "foobar"}
+	exitFn = func(code int) { assert.Equal(t, 1, code) }
+
+	output := capturer.CaptureStderr(main)
+
+	assert.Contains(t, output, "unknown command")
+	assert.Contains(t, output, "foobar")
 }

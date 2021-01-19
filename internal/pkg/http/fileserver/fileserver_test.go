@@ -2,229 +2,280 @@ package fileserver
 
 import (
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFileServer_ServeHTTP(t *testing.T) {
-	t.Parallel()
+func init() { //nolint:gochecknoinits
+	rand.Seed(time.Now().UnixNano())
+}
 
-	// Create directory in temporary
-	createTempDir := func() string {
-		t.Helper()
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") //nolint:gochecknoglobals
 
-		if dir, err := ioutil.TempDir("", "test-"); err != nil {
-			panic(err)
-		} else {
-			return dir
-		}
+func RandStringRunes(t *testing.T, n int) string {
+	t.Helper()
+
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))] //nolint:gosec
 	}
 
-	tests := []struct {
-		name                string
-		giveDirs            []string
-		giveFiles           map[string][]byte
-		giveNotFoundHandler FileNotFoundHandler
-		giveIndexFile       string
-		giveError404file    string
-		giveRequestURI      string
-		giveRequestMethod   string
-		giveRequestHeaders  map[string]string
-		wantResponseCode    int
-		wantResponseBody    []byte
-		wantContentType     string
-		wantRedirectTo      string
+	return string(b)
+}
+
+func TestNewFileServer_WrongDirectoryError(t *testing.T) {
+	fs, err := NewFileServer(Settings{
+		FilesRoot: RandStringRunes(t, 32),
+	})
+
+	assert.Nil(t, fs)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not exists")
+
+	tmpDir, _ := ioutil.TempDir("", "test-")
+	defer func(d string) { assert.NoError(t, os.RemoveAll(d)) }(tmpDir)
+	file, _ := os.Create(filepath.Join(tmpDir, "foo"))
+	file.Close()
+
+	fs, err = NewFileServer(Settings{
+		FilesRoot: file.Name(),
+	})
+
+	assert.Nil(t, fs)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not directory")
+}
+
+func TestFileServer_ServeHTTP(t *testing.T) {
+	var cases = []struct {
+		name                   string
+		giveDirs               []string
+		giveFiles              map[string][]byte
+		giveSettings           Settings
+		giveRequestMethod      string
+		giveRequestURI         string
+		giveRequestHeaders     map[string]string
+		beforeServing          func(fs *FileServer)
+		wantResponseHTTPCode   int
+		wantResponseContent    string
+		wantResponseSubstrings []string
+		resultCheckingFn       func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
-			name: "Static TEXT file serving from local FS",
+			name:                   "serving request without URI",
+			giveRequestURI:         "",
+			wantResponseHTTPCode:   http.StatusNotFound,
+			wantResponseSubstrings: []string{"Not Found"},
+		},
+		{
+			name:           "static file serving",
+			giveRequestURI: "/test",
 			giveFiles: map[string][]byte{
-				"test1.txt": []byte("test content"),
+				"test": []byte("test content"),
 			},
-			giveRequestURI:    "/test1.txt",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusOK,
-			wantResponseBody:  []byte("test content"),
-			wantContentType:   "text/plain; charset=utf-8",
+			wantResponseHTTPCode: http.StatusOK,
+			wantResponseContent:  "test content",
 		},
 		{
-			name: "Static HTML file serving from local FS",
+			name:           "static HTML file serving",
+			giveRequestURI: "/test.html",
 			giveFiles: map[string][]byte{
-				"test1.html": []byte("<html>test content</html>"),
+				"test.html": []byte("<p>test html content</p>"),
 			},
-			giveRequestURI:    "/test1.html",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusOK,
-			wantResponseBody:  []byte("<html>test content</html>"),
-			wantContentType:   "text/html; charset=utf-8",
+			wantResponseHTTPCode: http.StatusOK,
+			wantResponseContent:  "<p>test html content</p>",
+			resultCheckingFn: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				assert.Equal(t, rr.Header().Get("Content-Type"), "text/html; charset=utf-8")
+			},
 		},
 		{
-			name:              "Redirect from .../index.html to .../",
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "/indx.html",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusMovedPermanently,
-			wantRedirectTo:    "/",
+			name:                 "directory above (./../) requested",
+			giveRequestURI:       "/../../../../etc/passwd",
+			wantResponseHTTPCode: http.StatusNotFound,
 		},
 		{
-			name:              "Redirect from .../index.html to .../ insime some directory",
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "/some/indx.html",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusMovedPermanently,
-			wantRedirectTo:    "/some/",
+			name: "disabled redirection from",
+			giveSettings: Settings{
+				IndexFileName: "idx.html",
+			},
+			giveRequestURI:       "/foo/idx.html",
+			wantResponseHTTPCode: http.StatusNotFound,
 		},
 		{
-			name: "Request root",
+			name: "redirect from ./{indexFileName} to ./",
+			giveSettings: Settings{
+				IndexFileName:           "idx.html",
+				RedirectIndexFileToRoot: true,
+			},
+			giveRequestURI:       "/idx.html",
+			wantResponseHTTPCode: http.StatusMovedPermanently,
+			resultCheckingFn: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				assert.Equal(t, "/", rr.Header().Get("Location"))
+			},
+		},
+		{
+			name: "redirect from ./foo/{indexFileName} to ./foo/",
+			giveSettings: Settings{
+				IndexFileName:           "idx.html",
+				RedirectIndexFileToRoot: true,
+			},
+			giveRequestURI:       "/foo/idx.html",
+			wantResponseHTTPCode: http.StatusMovedPermanently,
+			resultCheckingFn: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				assert.Equal(t, "/foo/", rr.Header().Get("Location"))
+			},
+		},
+		{
+			name: "index file in root directory serving",
+			giveSettings: Settings{
+				IndexFileName: "idx.html",
+			},
+			giveRequestURI: "/",
 			giveFiles: map[string][]byte{
-				"indx.html": []byte("test content"),
+				"idx.html": []byte("index content"),
 			},
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "",
-			giveRequestMethod: "GET",
-			wantResponseBody:  []byte("test content"),
-			wantResponseCode:  http.StatusOK,
-			wantContentType:   "text/html; charset=utf-8",
+			wantResponseHTTPCode: http.StatusOK,
+			wantResponseContent:  "index content",
 		},
 		{
-			name:     "Index file from some directory",
+			name: "index file in sub-directory serving",
+			giveSettings: Settings{
+				IndexFileName: "idx.html",
+			},
+			giveRequestURI: "/foo/",
+			giveDirs:       []string{"foo"},
+			giveFiles: map[string][]byte{
+				"idx.html":                       []byte("index in root"),
+				filepath.Join("foo", "idx.html"): []byte("index in foo"),
+			},
+			wantResponseHTTPCode: http.StatusOK,
+			wantResponseContent:  "index in foo",
+		},
+		{
+			name: "404 on directory request",
+			giveSettings: Settings{
+				IndexFileName: "indx.html",
+			},
 			giveDirs: []string{"foo"},
 			giveFiles: map[string][]byte{
 				"indx.html":                       []byte("index in root"),
 				filepath.Join("foo", "indx.html"): []byte("index in foo"),
 			},
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "/foo/",
-			giveRequestMethod: "GET",
-			wantResponseBody:  []byte("index in foo"),
-			wantResponseCode:  http.StatusOK,
-			wantContentType:   "text/html; charset=utf-8",
+			giveRequestURI:       "/foo",
+			wantResponseHTTPCode: http.StatusNotFound,
 		},
 		{
-			name:     "404 on directory request",
-			giveDirs: []string{"foo"},
-			giveFiles: map[string][]byte{
-				"indx.html":                       []byte("index in root"),
-				filepath.Join("foo", "indx.html"): []byte("index in foo"),
+			name: "custom error handler",
+			beforeServing: func(fs *FileServer) {
+				fs.ErrorHandlers = []ErrorHandlerFunc{
+					func(w http.ResponseWriter, r *http.Request, fs *FileServer, errorCode int) bool {
+						w.WriteHeader(444)
+						_, _ = w.Write([]byte("foo bar"))
+						w.Header().Set("Content-Type", "blah blah")
+
+						return true
+					},
+				}
 			},
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "/foo",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusNotFound,
-		},
-		{
-			name:              "NotFoundHandler handling",
-			giveIndexFile:     "indx.html",
-			giveRequestURI:    "/foo",
-			giveRequestMethod: "GET",
-			giveNotFoundHandler: func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(444)
-				_, _ = w.Write([]byte("foo bar"))
-				w.Header().Set("Content-Type", "blah blah")
+			giveRequestURI:       "/foo",
+			wantResponseHTTPCode: 444,
+			wantResponseContent:  "foo bar",
+			resultCheckingFn: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				assert.Equal(t, "blah blah", rr.Header().Get("Content-Type"))
 			},
-			wantResponseCode: 444,
-			wantResponseBody: []byte("foo bar"),
-			wantContentType:  "blah blah",
 		},
 		{
-			name: "Error 404 file serving from local FS",
-			giveFiles: map[string][]byte{
-				"404.html": []byte("error 404 file"),
+			name: "custom error handler fallback",
+			beforeServing: func(fs *FileServer) {
+				fs.ErrorHandlers = []ErrorHandlerFunc{
+					func(w http.ResponseWriter, r *http.Request, fs *FileServer, errorCode int) bool {
+						return false
+					},
+				}
 			},
-			giveRequestURI:    "/foo",
-			giveError404file:  "404.html",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusNotFound,
-			wantResponseBody:  []byte("error 404 file"),
-			wantContentType:   "text/html; charset=utf-8",
+			giveRequestURI:         "/foo",
+			wantResponseHTTPCode:   http.StatusNotFound,
+			wantResponseSubstrings: []string{"<html>", "Error 404", "Not Found", "</html>"},
 		},
 		{
-			name:               "Error 404 in json format",
-			giveRequestURI:     "/foo",
-			giveRequestMethod:  "GET",
-			giveRequestHeaders: map[string]string{"accept": "application/json"},
-			wantResponseCode:   http.StatusNotFound,
-			wantResponseBody:   []byte(`{"success":false,"code":404,"message":"Not found"}` + "\n"),
-			wantContentType:    "application/json; charset=utf-8",
-		},
-		{
-			name:              "Error 404 fallback",
-			giveRequestURI:    "/foo",
-			giveError404file:  "404.html",
-			giveRequestMethod: "GET",
-			wantResponseCode:  http.StatusNotFound,
-			wantResponseBody:  []byte("<html><body><h1>ERROR 404</h1><h2>Requested file was not found</h2></body></html>"),
-			wantContentType:   "text/html; charset=utf-8",
+			name:                 "error in json format when json requested",
+			giveRequestURI:       "/foo",
+			giveRequestHeaders:   map[string]string{"accept": "application/json"},
+			wantResponseHTTPCode: http.StatusNotFound,
+			resultCheckingFn: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				assert.JSONEq(t, `{"code":404,"message":"Not Found"}`, rr.Body.String())
+			},
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			var root http.Dir
+			tmpDir, tmpDirErr := ioutil.TempDir("", "test-")
+			assert.NoError(t, tmpDirErr)
+
+			defer func(d string) { assert.NoError(t, os.RemoveAll(d)) }(tmpDir)
 
 			if len(tt.giveDirs) > 0 || len(tt.giveFiles) > 0 {
-				tmpDir := createTempDir()
-				root = http.Dir(tmpDir)
-
-				defer func(d string) { assert.NoError(t, os.RemoveAll(d)) }(tmpDir)
-
-				// Create directories
 				for _, d := range tt.giveDirs {
 					assert.NoError(t, os.Mkdir(filepath.Join(tmpDir, d), 0777))
 				}
 
-				// Create files
 				for name, content := range tt.giveFiles {
-					if f, err := os.Create(filepath.Join(tmpDir, name)); err != nil {
-						panic(err)
-					} else {
-						if _, err := f.Write(content); err != nil {
-							panic(err)
-						}
-						if err := f.Close(); err != nil {
-							panic(err)
-						}
-					}
+					file, createErr := os.Create(filepath.Join(tmpDir, name))
+					assert.NoError(t, createErr)
+					_, fileWritingErr := file.Write(content)
+					assert.NoError(t, fileWritingErr)
+					assert.NoError(t, file.Close())
 				}
-			} else {
-				root = ""
 			}
 
-			fileServer := NewFileServer(Settings{
-				Root:            root,
-				NotFoundHandler: tt.giveNotFoundHandler,
-				IndexFile:       tt.giveIndexFile,
-				Error404file:    tt.giveError404file,
-			})
+			if tt.giveSettings.FilesRoot == "" {
+				tt.giveSettings.FilesRoot = tmpDir
+			}
+
+			fs, fsErr := NewFileServer(tt.giveSettings)
+
+			assert.NoError(t, fsErr)
 
 			var (
 				req, _ = http.NewRequest(tt.giveRequestMethod, tt.giveRequestURI, nil)
 				rr     = httptest.NewRecorder()
 			)
 
-			for key, value := range tt.giveRequestHeaders {
-				req.Header.Set(key, value)
+			if tt.giveRequestHeaders != nil {
+				for key, value := range tt.giveRequestHeaders {
+					req.Header.Set(key, value)
+				}
 			}
 
-			fileServer.ServeHTTP(rr, req)
-
-			assert.Equal(t, rr.Code, tt.wantResponseCode)
-
-			if len(tt.wantResponseBody) > 0 && !reflect.DeepEqual(rr.Body.Bytes(), tt.wantResponseBody) {
-				t.Errorf("Wrong HTTP response. Want [%s], got [%s]", tt.wantResponseBody, rr.Body.String())
+			if tt.beforeServing != nil {
+				tt.beforeServing(fs)
 			}
 
-			if ct := rr.Header().Get("Content-Type"); tt.wantContentType != "" && ct != tt.wantContentType {
-				t.Errorf("Wrong response content type header. Want %s, got %s", tt.wantContentType, ct)
+			fs.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.wantResponseHTTPCode, rr.Code)
+
+			if tt.wantResponseContent != "" {
+				assert.Equal(t, tt.wantResponseContent, rr.Body.String())
 			}
 
-			if rt := rr.Header().Get("Location"); tt.wantRedirectTo != "" && tt.wantRedirectTo != rt {
-				t.Errorf("Wrong redirect to location. Want %s, got %s", tt.wantRedirectTo, rt)
+			if len(tt.wantResponseSubstrings) > 0 {
+				for _, expected := range tt.wantResponseSubstrings {
+					assert.Contains(t, rr.Body.String(), expected)
+				}
+			}
+
+			if tt.resultCheckingFn != nil {
+				tt.resultCheckingFn(t, rr)
 			}
 		})
 	}

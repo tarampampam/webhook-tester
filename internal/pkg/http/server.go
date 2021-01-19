@@ -2,83 +2,124 @@ package http
 
 import (
 	"context"
-	"log"
+	"mime"
 	"net/http"
-	"os"
+	"strconv"
 	"time"
 
-	"github.com/gorilla/handlers"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/panic"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"go.uber.org/zap"
 )
 
 type (
-	ServerSettings struct {
-		Address                   string // TCP address to listen on
-		WriteTimeout              time.Duration
-		ReadTimeout               time.Duration
-		PublicAssetsDirectoryPath string
-		KeepAliveEnabled          bool
-	}
-
 	Server struct {
-		settings    *ServerSettings
+		ctx         context.Context
+		log         *zap.Logger
+		publicDir   string
 		appSettings *settings.AppSettings
-		Server      *http.Server
-		Router      *mux.Router
+		server      *http.Server
+		router      *mux.Router
 		storage     storage.Storage
-		broadcaster broadcast.Broadcaster // optional, can be nil
-		stdLog      *log.Logger
-		errLog      *log.Logger
+		broadcaster broadcast.Broadcaster
+		rdb         *redis.Client
 	}
+)
+
+const (
+	defaultReadTimeout  = time.Second * 5
+	defaultWriteTimeout = time.Second * 15
 )
 
 // NewServer creates new server instance.
 func NewServer(
-	srvSettings *ServerSettings,
+	ctx context.Context,
+	log *zap.Logger,
+	publicDir string,
 	appSettings *settings.AppSettings,
 	storage storage.Storage,
 	br broadcast.Broadcaster,
+	rdb *redis.Client,
 ) *Server {
 	var (
-		router     = *mux.NewRouter()
-		stdLog     = log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)
-		errLog     = log.New(os.Stderr, "[error] ", log.LstdFlags)
+		router     = mux.NewRouter()
 		httpServer = &http.Server{
-			Addr:         srvSettings.Address,
-			Handler:      handlers.CombinedLoggingHandler(os.Stdout, &router),
-			ErrorLog:     errLog,
-			WriteTimeout: srvSettings.WriteTimeout,
-			ReadTimeout:  srvSettings.ReadTimeout,
+			Handler:      router,
+			ErrorLog:     zap.NewStdLog(log),
+			ReadTimeout:  defaultReadTimeout,
+			WriteTimeout: defaultWriteTimeout,
 		}
 	)
 
-	httpServer.SetKeepAlivesEnabled(srvSettings.KeepAliveEnabled)
-
 	return &Server{
-		settings:    srvSettings,
+		ctx:         ctx,
+		log:         log,
+		publicDir:   publicDir,
 		appSettings: appSettings,
-		Server:      httpServer,
-		Router:      &router,
+		server:      httpServer,
+		router:      router,
 		storage:     storage,
 		broadcaster: br,
-		stdLog:      stdLog,
-		errLog:      errLog,
+		rdb:         rdb,
 	}
 }
 
-// Start Server.
-func (s *Server) Start() error {
-	s.stdLog.Println("Starting Server on " + s.Server.Addr)
+// Start server.
+func (s *Server) Start(ip string, port uint16) error {
+	s.server.Addr = ip + ":" + strconv.Itoa(int(port))
 
-	return s.Server.ListenAndServe()
+	return s.server.ListenAndServe()
 }
 
-// Stop Server.
-func (s *Server) Stop(ctx context.Context) error {
-	s.stdLog.Println("Stopping Server")
+// Register server routes, middlewares, etc.
+func (s *Server) Register() error {
+	s.registerGlobalMiddlewares()
 
-	return s.Server.Shutdown(ctx)
+	if err := s.registerHandlers(); err != nil {
+		return err
+	}
+
+	if err := s.registerCustomMimeTypes(); err != nil {
+		return err
+	}
+
+	return nil
 }
+
+func (s *Server) registerGlobalMiddlewares() {
+	s.router.Use(
+		logreq.New(s.log),
+		panic.New(s.log),
+	)
+}
+
+// registerHandlers register server http handlers.
+func (s *Server) registerHandlers() error {
+	if err := s.registerWebHookHandlers(); err != nil {
+		return err
+	}
+
+	s.registerAPIHandlers()
+	s.registerServiceHandlers()
+
+	if s.publicDir != "" {
+		if err := s.registerFileServerHandler(s.publicDir); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// registerCustomMimeTypes registers custom mime types.
+func (*Server) registerCustomMimeTypes() error {
+	return mime.AddExtensionType(".vue", "text/html; charset=utf-8")
+}
+
+// Stop server.
+func (s *Server) Stop(ctx context.Context) error { return s.server.Shutdown(ctx) }

@@ -68,17 +68,16 @@ COPY --from=builder /tmp/rootfs /
 USER appuser:appuser
 
 # Docs: <https://docs.docker.com/engine/reference/builder/#healthcheck>
-# TODO add healthcheck
-#HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
-#    "/bin/webhook-tester", "healthcheck", \
-#    "--log-json", \
-#    "--port", "8080" \
-#]
+HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
+    "/bin/webhook-tester", "healthcheck", \
+    "--log-json", \
+    "--port", "8080" \
+]
 
 ENTRYPOINT ["/bin/webhook-tester"]
 
-# TODO append "--log-json" flag
 CMD [ \
     "serve", \
+    "--log-json", \
     "--public", "/opt/webhook-tester/web" \
 ]

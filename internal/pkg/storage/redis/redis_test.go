@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -307,7 +308,9 @@ func newFakeRedisStorage(t *testing.T, maxRequests uint16) (*Storage, *miniredis
 
 	miniRedis.Select(0)
 
-	s := NewStorage("", "", 0, 1, time.Second*10, maxRequests)
+	client := redis.NewClient(&redis.Options{Addr: miniRedis.Addr()})
+
+	s := NewStorage(context.TODO(), client, time.Second*10, maxRequests)
 	s.redis = redis.NewClient(&redis.Options{
 		Addr: miniRedis.Addr(),
 	})

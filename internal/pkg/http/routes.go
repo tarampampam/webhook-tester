@@ -3,6 +3,9 @@ package http
 import (
 	"net/http"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
+
 	sessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/create"
 	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/delete"
 	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/all"
@@ -11,38 +14,51 @@ import (
 	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
 	settingsGet "github.com/tarampampam/webhook-tester/internal/pkg/http/api/settings/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/probes"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-// RegisterHandlers register server http handlers.
-func (s *Server) RegisterHandlers() {
-	s.registerServiceHandlers()
-	s.registerAPIHandlers()
-	s.registerWebHookHandlers()
-	s.registerFileServerHandler()
+func (s *Server) registerWebHookHandlers() error {
+	allowedMethods := []string{
+		http.MethodGet,
+		http.MethodHead,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodPatch,
+		http.MethodDelete,
+		http.MethodOptions,
+		http.MethodTrace,
+	}
+
+	webhookRouter := s.router.
+		PathPrefix("").
+		Subrouter()
+
+	webhookRouter.Use(AllowCORSMiddleware)
+
+	handler := webhook.NewHandler(s.appSettings, s.storage, s.broadcaster) // TODO return error if wrong config passed
+
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
+		Methods(allowedMethods...).
+		Name("webhook")
+
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", handler).
+		Methods(allowedMethods...).
+		Name("webhook_with_status_code")
+
+	webhookRouter.
+		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", handler).
+		Methods(allowedMethods...).
+		Name("webhook_any")
+
+	return nil
 }
 
-// Register "service" handlers.
-func (s *Server) registerServiceHandlers() {
-	// liveness probe
-	s.Router.
-		Handle("/live", probes.NewLivenessHandler()).
-		Methods(http.MethodGet).
-		Name("liveness_probe")
-
-	// readiness probe
-	s.Router.
-		Handle("/ready", probes.NewReadinessHandler(s.storage)).
-		Methods(http.MethodGet).
-		Name("readiness_probe")
-}
-
-// Register API handlers.
 func (s *Server) registerAPIHandlers() {
-	apiRouter := s.Router.
+	apiRouter := s.router.
 		PathPrefix("/api").
 		Subrouter()
 
@@ -97,51 +113,34 @@ func (s *Server) registerAPIHandlers() {
 		Name("api_delete_all_session_requests")
 }
 
-// Register incoming webhook handlers.
-func (s *Server) registerWebHookHandlers() {
-	allowedMethods := []string{
-		http.MethodGet,
-		http.MethodHead,
-		http.MethodPost,
-		http.MethodPut,
-		http.MethodPatch,
-		http.MethodDelete,
-		http.MethodOptions,
-		http.MethodTrace,
-	}
+func (s *Server) registerServiceHandlers() {
+	s.router.
+		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(s.ctx, s.rdb))).
+		Methods(http.MethodGet, http.MethodHead).
+		Name("ready")
 
-	webhookRouter := s.Router.
-		PathPrefix("").
-		Subrouter()
-
-	webhookRouter.Use(AllowCORSMiddleware)
-
-	handler := webhook.NewHandler(s.appSettings, s.storage, s.broadcaster)
-
-	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
-		Methods(allowedMethods...).
-		Name("webhook")
-
-	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{statusCode:[1-5][0-9][0-9]}", handler).
-		Methods(allowedMethods...).
-		Name("webhook_with_status_code")
-
-	webhookRouter.
-		Handle("/{sessionUUID:"+uuidPattern+"}/{any:.*}", handler).
-		Methods(allowedMethods...).
-		Name("webhook_any")
+	s.router.
+		HandleFunc("/live", healthz.NewHandler(checkers.NewLiveChecker())).
+		Methods(http.MethodGet, http.MethodHead).
+		Name("live")
 }
 
-// Register file server handler.
-func (s *Server) registerFileServerHandler() {
-	s.Router.
+func (s *Server) registerFileServerHandler(publicDir string) error {
+	fs, err := fileserver.NewFileServer(fileserver.Settings{
+		FilesRoot:               publicDir,
+		IndexFileName:           "index.html",
+		ErrorFileName:           "__error__.html",
+		RedirectIndexFileToRoot: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.router.
 		PathPrefix("/").
-		Handler(fileserver.NewFileServer(fileserver.Settings{
-			Root:         http.Dir(s.settings.PublicAssetsDirectoryPath),
-			IndexFile:    "index.html",
-			Error404file: "404.html",
-		})).
+		Methods(http.MethodGet, http.MethodHead).
+		Handler(fs).
 		Name("static")
+
+	return nil
 }
