@@ -21,10 +21,14 @@ const maxBodyLength = 8192
 type Handler struct {
 	appSettings *settings.AppSettings
 	storage     storage.Storage
-	broadcaster broadcast.Broadcaster
+	broadcaster broadcaster
 }
 
-func NewHandler(set *settings.AppSettings, storage storage.Storage, br broadcast.Broadcaster) http.Handler {
+type broadcaster interface {
+	Publish(channel string, event broadcast.Event) error
+}
+
+func NewHandler(set *settings.AppSettings, storage storage.Storage, br broadcaster) http.Handler {
 	return &Handler{
 		appSettings: set,
 		storage:     storage,
@@ -98,7 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 
 	if h.broadcaster != nil {
 		go func(sessionUUID, requestUUID string) {
-			_ = h.broadcaster.Publish(sessionUUID, broadcast.RequestRegistered, requestUUID)
+			_ = h.broadcaster.Publish(sessionUUID, broadcast.NewRequestRegisteredEvent(requestUUID))
 		}(sessionUUID, requestData.UUID)
 	}
 
