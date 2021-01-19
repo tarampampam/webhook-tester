@@ -14,11 +14,15 @@ import (
 
 type Handler struct {
 	storage     storage.Storage
-	broadcaster broadcast.Broadcaster
+	broadcaster broadcaster
 	json        jsoniter.API
 }
 
-func NewHandler(storage storage.Storage, broadcaster broadcast.Broadcaster) http.Handler {
+type broadcaster interface {
+	Publish(channel string, event broadcast.Event) error
+}
+
+func NewHandler(storage storage.Storage, broadcaster broadcaster) http.Handler {
 	return &Handler{
 		storage:     storage,
 		broadcaster: broadcaster,
@@ -46,7 +50,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if h.broadcaster != nil {
 		go func(sessionUUID string) {
-			_ = h.broadcaster.Publish(sessionUUID, broadcast.RequestsDeleted, "*")
+			_ = h.broadcaster.Publish(sessionUUID, broadcast.NewAllRequestsDeletedEvent())
 		}(sessionUUID)
 	}
 

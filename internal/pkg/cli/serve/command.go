@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast/null"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast/pusher"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	redisStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/redis"
@@ -98,14 +96,16 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME
 	}
 
-	var broadcaster broadcast.Broadcaster
+	var broadcaster interface {
+		Publish(channel string, event broadcast.Event) error
+	}
 
 	switch f.broadcastDriver {
 	case brDriverNone:
-		broadcaster = &null.Broadcaster{} // FIXME rewrite null broadcaster to "none broadcaster"
+		broadcaster = &broadcast.None{}
 
 	case brDriverPusher:
-		broadcaster = pusher.NewBroadcaster(f.pusher.appID, f.pusher.key, f.pusher.secret, f.pusher.cluster)
+		broadcaster = broadcast.NewPusher(f.pusher.appID, f.pusher.key, f.pusher.secret, f.pusher.cluster)
 
 	default:
 		return errors.New("unsupported broadcasting driver")

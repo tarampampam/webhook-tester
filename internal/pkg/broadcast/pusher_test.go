@@ -1,4 +1,4 @@
-package pusher
+package broadcast
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ type roundTripFunc func(req *http.Request) *http.Response
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req), nil }
 
 func TestBroadcaster_Publish(t *testing.T) {
-	var catch bool = false
+	var catch = false
 
 	client := &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) *http.Response {
@@ -24,7 +24,7 @@ func TestBroadcaster_Publish(t *testing.T) {
 			assert.Nil(t, err)
 
 			assert.Contains(t, "https://api-yeah.pusher.com/", req.RequestURI)
-			assert.JSONEq(t, `{"name":"eventName","channels":["channel"],"data":"data"}`, string(body))
+			assert.JSONEq(t, `{"name":"request-registered","channels":["channel"],"data":"bar"}`, string(body))
 
 			return &http.Response{
 				StatusCode: 200,
@@ -33,21 +33,8 @@ func TestBroadcaster_Publish(t *testing.T) {
 		}),
 	}
 
-	broadcaster := NewBroadcaster("foo", "bar", "baz", "yeah")
-	broadcaster.pusher.HTTPClient = client
+	broadcaster := NewPusher("foo", "bar", "baz", "yeah", WithPusherHTTPClient(client))
 
-	assert.Nil(t, broadcaster.Publish("channel", "eventName", "data"))
+	assert.Nil(t, broadcaster.Publish("channel", NewRequestRegisteredEvent("bar")))
 	assert.True(t, catch)
-}
-
-func TestNewBroadcaster(t *testing.T) {
-	t.Parallel()
-
-	broadcaster := NewBroadcaster("foo", "bar", "baz", "yeah")
-
-	assert.Equal(t, "foo", broadcaster.pusher.AppID)
-	assert.Equal(t, "bar", broadcaster.pusher.Key)
-	assert.Equal(t, "baz", broadcaster.pusher.Secret)
-	assert.Equal(t, "yeah", broadcaster.pusher.Cluster)
-	assert.True(t, broadcaster.pusher.Secure)
 }

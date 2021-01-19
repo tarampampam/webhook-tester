@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
-	nullBroadcast "github.com/tarampampam/webhook-tester/internal/pkg/broadcast/null"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
@@ -26,12 +25,12 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		giveBody    io.Reader
 		giveReqVars map[string]string
 		setUp       func(s *nullStorage.Storage)
-		checkResult func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster)
+		checkResult func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None)
 	}{
 		{
 			name:        "without registered session UUID",
 			giveReqVars: nil,
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster) {
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
 				assert.Equal(t, http.StatusInternalServerError, rr.Code)
 				assert.JSONEq(t,
 					`{"code":500,"success":false,"message":"cannot extract session UUID"}`, rr.Body.String(),
@@ -44,7 +43,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			setUp: func(s *nullStorage.Storage) {
 				s.Error = errors.New("foo")
 			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster) {
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
 				assert.Equal(t, http.StatusInternalServerError, rr.Code)
 				assert.JSONEq(t,
 					`{"code":500,"success":false,"message":"cannot read session data from storage: foo"}`, rr.Body.String(),
@@ -58,7 +57,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				s.Error = nil
 				s.Boolean = false
 			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster) {
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
 				assert.Equal(t, http.StatusNotFound, rr.Code)
 				assert.JSONEq(t,
 					`{"code":404,"success":false,"message":"session with UUID aa-bb-cc-dd was not found"}`, rr.Body.String(),
@@ -81,16 +80,17 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				}
 				s.RequestData = &storage.RequestData{UUID: "11-22-33-44"}
 			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster) {
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
 				time.Sleep(time.Millisecond) // goroutine must be done
 
 				assert.Equal(t, 202, rr.Code)
 				assert.Equal(t, "foo", rr.Body.String())
 				assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
 
-				assert.Equal(t, "aa-bb-cc-dd", b.GetLastPublishedChannel())
-				assert.Equal(t, broadcast.RequestRegistered, b.GetLastPublishedEventName())
-				assert.Equal(t, "11-22-33-44", b.GetLastPublishedData())
+				ch, e := b.LastPublishedEvent()
+
+				assert.Equal(t, "aa-bb-cc-dd", ch)
+				assert.Equal(t, broadcast.NewRequestRegisteredEvent("11-22-33-44"), e)
 			},
 		},
 		{
@@ -109,15 +109,16 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				}
 				s.RequestData = &storage.RequestData{UUID: "11-22-33-44"}
 			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *nullBroadcast.Broadcaster) {
+			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
 				time.Sleep(time.Millisecond) // goroutine must be done
 
 				assert.Equal(t, 202, rr.Code)
 				assert.Equal(t, "foo", rr.Body.String())
 
-				assert.Equal(t, "aa-bb-cc-dd", b.GetLastPublishedChannel())
-				assert.Equal(t, broadcast.RequestRegistered, b.GetLastPublishedEventName())
-				assert.Equal(t, "11-22-33-44", b.GetLastPublishedData())
+				ch, e := b.LastPublishedEvent()
+
+				assert.Equal(t, "aa-bb-cc-dd", ch)
+				assert.Equal(t, broadcast.NewRequestRegisteredEvent("11-22-33-44"), e)
 			},
 		},
 	}
@@ -128,7 +129,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", tt.giveBody)
 				rr      = httptest.NewRecorder()
 				s       = &nullStorage.Storage{}
-				br      = &nullBroadcast.Broadcaster{}
+				br      = &broadcast.None{}
 				handler = NewHandler(&settings.AppSettings{}, s, br)
 			)
 

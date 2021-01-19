@@ -26,10 +26,14 @@ type (
 		server      *http.Server
 		router      *mux.Router
 		storage     storage.Storage
-		broadcaster broadcast.Broadcaster
+		broadcaster broadcaster
 		rdb         *redis.Client
 	}
 )
+
+type broadcaster interface {
+	Publish(channel string, event broadcast.Event) error
+}
 
 const (
 	defaultReadTimeout  = time.Second * 5
@@ -43,7 +47,7 @@ func NewServer(
 	publicDir string,
 	appSettings *settings.AppSettings,
 	storage storage.Storage,
-	br broadcast.Broadcaster,
+	br broadcaster,
 	rdb *redis.Client,
 ) *Server {
 	var (
