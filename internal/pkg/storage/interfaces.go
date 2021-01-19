@@ -1,13 +1,6 @@
 package storage
 
-import "io"
-
 type Storage interface {
-	io.Closer
-
-	// Test sends request to the storage for connection checking.
-	Test() error
-
 	// GetSession returns session data.
 	// If session was not found - `nil, nil` will be returned.
 	GetSession(sessionUUID string) (*SessionData, error)

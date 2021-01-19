@@ -46,25 +46,13 @@ func (r *requestData) toSharedStruct(requestUUID string) *storage.RequestData {
 	}
 }
 
-type storageKey struct {
-	sessionUUID string
-}
-
-func newStorageKey(sessionUUID string) storageKey {
-	return storageKey{sessionUUID: sessionUUID}
-}
+type storageKey string
 
 // session data [session-UUID]:[session-data]
-func (s storageKey) session() string {
-	return "webhook-tester:session:" + s.sessionUUID
-}
+func (s storageKey) session() string { return "webhook-tester:session:" + string(s) }
 
 // requests list [timestamp]:[request-UUID]
-func (s storageKey) requests() string {
-	return s.session() + ":requests"
-}
+func (s storageKey) requests() string { return s.session() + ":requests" }
 
 // request data [request-UUID]:[request-data]
-func (s storageKey) request(requestUUID string) string {
-	return s.session() + ":requests:" + requestUUID
-}
+func (s storageKey) request(id string) string { return s.session() + ":requests:" + id }

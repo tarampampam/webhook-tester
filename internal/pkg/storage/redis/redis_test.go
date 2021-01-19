@@ -11,28 +11,12 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-func TestStorage_Test(t *testing.T) {
-	t.Parallel()
-
-	s, miniRedis := newFakeRedisStorage(t, 1)
-
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
-
-	assert.Nil(t, s.Test())
-}
-
 func TestStorage_SessionCreateReadDelete(t *testing.T) {
 	t.Parallel()
 
 	s, miniRedis := newFakeRedisStorage(t, 1)
 
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
+	defer miniRedis.Close()
 
 	wh := &storage.WebHookResponse{
 		Content:     "foo bar",
@@ -74,10 +58,7 @@ func TestStorage_RequestCreateReadDelete(t *testing.T) {
 
 	s, miniRedis := newFakeRedisStorage(t, 10)
 
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
+	defer miniRedis.Close()
 
 	session, sessionCreationErr := s.CreateSession(&storage.WebHookResponse{})
 	assert.Nil(t, sessionCreationErr)
@@ -124,10 +105,7 @@ func TestStorage_RequestCreationLimit(t *testing.T) {
 
 	s, miniRedis := newFakeRedisStorage(t, 2)
 
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
+	defer miniRedis.Close()
 
 	session, _ := s.CreateSession(&storage.WebHookResponse{})
 
@@ -158,10 +136,7 @@ func TestStorage_GetAllRequests(t *testing.T) {
 
 	s, miniRedis := newFakeRedisStorage(t, 10)
 
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
+	defer miniRedis.Close()
 
 	session, sessionCreationErr := s.CreateSession(&storage.WebHookResponse{})
 	assert.Nil(t, sessionCreationErr)
@@ -189,10 +164,7 @@ func TestStorage_DeleteRequests(t *testing.T) {
 
 	s, miniRedis := newFakeRedisStorage(t, 10)
 
-	defer func() {
-		assert.Nil(t, s.Close())
-		miniRedis.Close()
-	}()
+	defer miniRedis.Close()
 
 	session, sessionCreationErr := s.CreateSession(&storage.WebHookResponse{})
 	assert.Nil(t, sessionCreationErr)
@@ -215,7 +187,6 @@ func TestStorage_DeleteRequests(t *testing.T) {
 	assert.Nil(t, requests2)
 }
 
-/*
 func TestStorage_GetSession(t *testing.T) {
 	var (
 		correctSessionJSON string = `{
@@ -225,7 +196,7 @@ func TestStorage_GetSession(t *testing.T) {
 			"resp_delay_sec":12,
 			"created_at_unix":1596032211
 		}`
-	    wrongJSON string = `{"foo"`
+		wrongJSON string = `{"foo"`
 	)
 
 	var cases = []struct {
@@ -275,11 +246,8 @@ func TestStorage_GetSession(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			s, miniRedis := setup(t)
-			defer func() {
-				assert.Nil(t, s.Close())
-				miniRedis.Close()
-			}()
+			s, miniRedis := newFakeRedisStorage(t, 128)
+			defer miniRedis.Close()
 
 			if tt.giveSessionJSON != nil {
 				assert.Nil(t, miniRedis.Set(tt.giveSessionKey, *tt.giveSessionJSON))
@@ -299,7 +267,6 @@ func TestStorage_GetSession(t *testing.T) {
 		})
 	}
 }
-*/
 
 func newFakeRedisStorage(t *testing.T, maxRequests uint16) (*Storage, *miniredis.Miniredis) {
 	miniRedis, err := miniredis.Run()
@@ -311,7 +278,7 @@ func newFakeRedisStorage(t *testing.T, maxRequests uint16) (*Storage, *miniredis
 	client := redis.NewClient(&redis.Options{Addr: miniRedis.Addr()})
 
 	s := NewStorage(context.TODO(), client, time.Second*10, maxRequests)
-	s.redis = redis.NewClient(&redis.Options{
+	s.rdb = redis.NewClient(&redis.Options{
 		Addr: miniRedis.Addr(),
 	})
 
