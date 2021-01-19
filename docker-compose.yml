@@ -14,8 +14,8 @@ x-app: &app-service
   volumes:
     - /etc/passwd:/etc/passwd:ro
     - /etc/group:/etc/group:ro
-    - .:/src:cached
-    - tmp-data:/tmp:cached
+    - .:/src:rw
+    - tmp-data:/tmp:rw
 
 services:
   app:
@@ -25,14 +25,14 @@ services:
     <<: *app-service
     ports:
       - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
-    command: go run . serve --port 8080 --redis-host redis --max-requests 12 --ignore-header-prefix foo
+    command: go run ./cmd/webhook-tester serve --port 8080 --public ./web --redis-dsn redis://redis:6379/0 --max-requests 12 --ignore-header-prefix foo
     depends_on:
       - redis
 
   redis:
     image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
-      - redis-data:/data:cached
+      - redis-data:/data:rw
     ports:
       - 6379
 

@@ -1,9 +1,12 @@
+// Package version is used as a place, where application version defined.
 package version
 
-// version value will be set during compilation
-var version string = "undefined@undefined"
+import "strings"
 
-// Version returns version value.
+// version value will be set during compilation.
+var version = "v0.0.0@undefined"
+
+// Version returns version value (without `v` prefix).
 func Version() string {
-	return version
+	return strings.TrimLeft(version, "vV ")
 }

@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>404 - Page not found</title>
+    <title>{{ code }} - {{ message }}</title>
 
     <style>
         body {
@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<div id="error_text">404: page not found</div>
+<div id="error_text">{{ code }}: {{ message }}</div>
 
 <script>
     'use strict';
@@ -42,25 +42,25 @@
     const $errorText = document.getElementById('error_text');
     const text = $errorText.innerText;
 
-    let progress404 = 0;
+    let progress = 0;
 
     const scrambleInterval = window.setInterval(() => {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-=+<>,./?[{()}]!@#$%^&*~`\|'.split('');
-        let string404 = text;
+        let message = text;
 
         for (let i = 0; i < text.length; i++) {
-            if (i >= progress404) {
-                string404 = setCharAt(string404, i, characters[Math.round(Math.random() * (characters.length - 1))]);
+            if (i >= progress) {
+                message = setCharAt(message, i, characters[Math.round(Math.random() * (characters.length - 1))]);
             }
         }
 
-        $errorText.innerText = string404;
+        $errorText.innerText = message;
     }, 800 / 60);
 
     window.setTimeout(() => {
         let revealInterval = window.setInterval(() => {
-            if (progress404 < text.length) {
-                progress404++;
+            if (progress < text.length) {
+                progress++;
             } else {
                 clearInterval(revealInterval);
                 clearInterval(scrambleInterval);
