@@ -20,8 +20,6 @@ func TestStorage_All(t *testing.T) {
 		Boolean:     true,
 	}
 
-	assert.Equal(t, s.Error, s.Close())
-
 	delSess, delSessErr := s.DeleteSession("")
 	assert.Equal(t, s.Boolean, delSess)
 	assert.Same(t, s.Error, delSessErr)
