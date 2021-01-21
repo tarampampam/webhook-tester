@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
@@ -22,7 +23,7 @@ func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
 	assert.NoError(t, gotSessionErr)
 	assert.Equal(t, sessionUUID, gotSession.UUID())
 	assert.Equal(t, time.Now().Unix(), gotSession.CreatedAt().Unix())
-	assert.Equal(t, (time.Second*123).Nanoseconds(), gotSession.Delay().Nanoseconds())
+	assert.Equal(t, (time.Second * 123).Nanoseconds(), gotSession.Delay().Nanoseconds())
 	assert.Equal(t, "text/javascript", gotSession.ContentType())
 	assert.Equal(t, "foo bar", gotSession.Content())
 	assert.Equal(t, uint16(201), gotSession.Code())
@@ -42,7 +43,7 @@ func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
 }
 
 func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond * 100)
+	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -87,7 +88,7 @@ func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
 }
 
 func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 2, time.Nanosecond * 100)
+	s := NewInMemoryStorage(time.Minute, 2, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -113,7 +114,7 @@ func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
 }
 
 func TestInMemoryStorage_GetAllRequests(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond * 100)
+	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -138,7 +139,7 @@ func TestInMemoryStorage_GetAllRequests(t *testing.T) {
 }
 
 func TestInMemoryStorage_DeleteRequests(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond * 100)
+	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -163,7 +164,7 @@ func TestInMemoryStorage_DeleteRequests(t *testing.T) {
 }
 
 func TestInMemoryStorage_GetSessionExpired(t *testing.T) {
-	s := NewInMemoryStorage(time.Millisecond * 10, 10, time.Minute)
+	s := NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
 	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)

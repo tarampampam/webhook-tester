@@ -267,9 +267,7 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 				allReq = append(allReq, rq{k, s.stor[sessionUUID].requests[k].createdAt.UnixNano()})
 			}
 
-			sort.Slice(allReq, func(i, j int) bool {
-				return allReq[i].ts > allReq[j].ts
-			})
+			sort.Slice(allReq, func(i, j int) bool { return allReq[i].ts > allReq[j].ts })
 
 			for i, plan := 0, allReq[int(s.maxRequests):]; i < len(plan); i++ {
 				delete(s.stor[sessionUUID].requests, plan[i].id)

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -10,7 +11,7 @@ import (
 )
 
 type redisSession struct {
-	Uuid            string `json:"-"`
+	Uuid            string `json:"-"` //nolint:golint,stylecheck
 	RespContent     string `json:"resp_content"`
 	RespCode        uint16 `json:"resp_code"`
 	RespContentType string `json:"resp_content_type"`
@@ -26,7 +27,7 @@ func (s *redisSession) Delay() time.Duration { return time.Duration(s.RespDelay)
 func (s *redisSession) CreatedAt() time.Time { return time.Unix(s.TS, 0) }         // CreatedAt creation time.
 
 type redisRequest struct {
-	Uuid          string            `json:"-"`
+	Uuid          string            `json:"-"` //nolint:golint,stylecheck
 	ReqClientAddr string            `json:"client_addr"`
 	ReqMethod     string            `json:"method"`
 	ReqContent    string            `json:"content"`
@@ -313,6 +314,10 @@ func (s *RedisStorage) GetAllRequests(sessionUUID string) ([]Request, error) {
 			}
 		}
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].(*redisRequest).TS < result[j].(*redisRequest).TS
+	})
 
 	return result, nil
 }

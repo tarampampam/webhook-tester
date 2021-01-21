@@ -29,7 +29,7 @@ func TestRedisStorage_SessionCreateReadDelete(t *testing.T) {
 	assert.NoError(t, gotSessionErr)
 	assert.Equal(t, sessionUUID, gotSession.UUID())
 	assert.Equal(t, time.Now().Unix(), gotSession.CreatedAt().Unix())
-	assert.Equal(t, (time.Second*123).Nanoseconds(), gotSession.Delay().Nanoseconds())
+	assert.Equal(t, (time.Second * 123).Nanoseconds(), gotSession.Delay().Nanoseconds())
 	assert.Equal(t, "text/javascript", gotSession.ContentType())
 	assert.Equal(t, "foo bar", gotSession.Content())
 	assert.Equal(t, uint16(201), gotSession.Code())

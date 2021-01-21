@@ -90,7 +90,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		string(body),
 		r.RequestURI,
 		h.headerToStringsMap(r.Header),
-)
+	)
 
 	if creationErr != nil {
 		errors.NewServerError(
@@ -154,11 +154,10 @@ main:
 	return result
 }
 
+var trustHeaders = [...]string{"X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP"} //nolint:gochecknoglobals
+
 func (h *Handler) getRealClientAddress(r *http.Request) string {
-	var (
-		trustHeaders = [...]string{"X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP"}
-		ip           string
-	)
+	var ip string
 
 	for _, name := range trustHeaders {
 		if value := r.Header.Get(name); value != "" {

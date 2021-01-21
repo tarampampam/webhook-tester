@@ -20,22 +20,22 @@ func TestHandler_ServeHTTPSessionCreation(t *testing.T) {
 	defer s.Close()
 
 	var (
-		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte(`{
+		req, _ = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte(`{
 			"content_type":null,
 			"status_code":null,
 			"response_delay":null,
 			"response_body":null
 		}`)))
-		rr      = httptest.NewRecorder()
-		h = NewHandler(s)
+		rr = httptest.NewRecorder()
+		h  = NewHandler(s)
 	)
 
 	h.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	resp := struct{
-		UUID             string           `json:"uuid"`
+	resp := struct {
+		UUID             string `json:"uuid"`
 		ResponseSettings struct {
 			Content       string `json:"content"`
 			Code          uint16 `json:"code"`
@@ -71,16 +71,16 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			wantResponseJSON: `{"code":400,"success":false,"message":"empty request body"}`,
 		},
 		{
-			name:             "wrong json",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong json",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{json`))
 			},
 			wantStatusCode:   http.StatusBadRequest,
 			wantResponseJSON: `{"code":400,"success":false,"message":"cannot parse passed json"}`,
 		},
 		{
-			name:             "wrong value in correct json struct (unmarshal error)",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong value in correct json struct (unmarshal error)",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
 					"content_type":null,
 					"status_code":null,
@@ -92,8 +92,8 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			wantResponseJSON: `{"code":400,"success":false,"message":"cannot parse passed json"}`,
 		},
 		{
-			name:             "wrong value in json (response_delay)",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong value in json (response_delay)",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
 					"content_type":null,
 					"status_code":null,
@@ -105,8 +105,8 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: delay is too much"}`,
 		},
 		{
-			name:             "wrong value in json (status_code)",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong value in json (status_code)",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
 					"content_type":null,
 					"status_code":1,
@@ -118,8 +118,8 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: wrong status code value"}`,
 		},
 		{
-			name:             "wrong value in json (content_type)",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong value in json (content_type)",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
 					"content_type":"` + strings.Repeat("x", 512) + `",
 					"status_code":null,
@@ -131,8 +131,8 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: content-type value is too long"}`,
 		},
 		{
-			name:             "wrong value in json (response_body)",
-			giveRequestBody:  func() io.Reader {
+			name: "wrong value in json (response_body)",
+			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
 					"content_type":null,
 					"status_code":null,

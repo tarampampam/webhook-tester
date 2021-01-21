@@ -31,7 +31,7 @@ func (r *request) validate() error {
 
 func (r *request) statusCode() uint16 {
 	if r.StatusCode == nil {
-		return 200 // default value
+		return 200 //nolint:gomnd // default value
 	}
 
 	return *r.StatusCode
