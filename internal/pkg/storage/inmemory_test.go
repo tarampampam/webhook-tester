@@ -161,3 +161,22 @@ func TestInMemoryStorage_DeleteRequests(t *testing.T) {
 	requests2, _ := s.GetAllRequests(sessionUUID)
 	assert.Nil(t, requests2)
 }
+
+func TestInMemoryStorage_GetSessionExpired(t *testing.T) {
+	s := NewInMemoryStorage(time.Millisecond * 10, 10, time.Minute)
+	defer s.Close()
+
+	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sessionUUID)
+
+	session, err := s.GetSession(sessionUUID)
+	assert.NoError(t, err)
+	assert.NotNil(t, session)
+
+	<-time.After(time.Millisecond * 11)
+
+	session, err = s.GetSession(sessionUUID)
+	assert.NoError(t, err)
+	assert.Nil(t, session) // important
+}

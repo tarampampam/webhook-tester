@@ -14,7 +14,6 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
 )
 
 func TestHandler_ServeHTTP(t *testing.T) {

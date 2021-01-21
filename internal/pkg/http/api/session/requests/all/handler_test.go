@@ -9,10 +9,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
 )
 
-func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
+func TestHandler_ServeHTTP(t *testing.T) {
 	t.Parallel()
 
 	var cases = []struct {

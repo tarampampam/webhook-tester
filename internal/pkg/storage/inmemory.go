@@ -46,10 +46,7 @@ func (r *inmemoryRequest) Headers() map[string]string { return r.headers }    //
 func (r *inmemoryRequest) URI() string                { return r.uri }        // URI Uniform Resource Identifier.
 func (r *inmemoryRequest) CreatedAt() time.Time       { return r.createdAt }  // CreatedAt creation time.
 
-var (
-	ErrClosed           = errors.New("closed")
-	ErrSessionNotExists = errors.New("session does not exists")
-)
+var ErrClosed = errors.New("closed")
 
 type InMemoryStorage struct {
 	sessionTTL  time.Duration
@@ -152,7 +149,7 @@ func (s *InMemoryStorage) GetSession(uuid string) (Session, error) {
 			delete(s.stor, uuid)
 			s.storMu.Unlock()
 
-			return nil, nil
+			return nil, nil // session has been expired (not found)
 		}
 
 		return session, nil
@@ -188,81 +185,62 @@ func (s *InMemoryStorage) CreateSession(content string, code uint16, contentType
 
 // DeleteSession deletes session with passed UUID.
 func (s *InMemoryStorage) DeleteSession(uuid string) (bool, error) {
-	if s.isClosed() {
-		return false, ErrClosed
+	session, err := s.GetSession(uuid)
+	if err != nil {
+		return false, err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
-
-	if _, ok := s.stor[uuid]; ok {
-		// session has been expired?
-		if time.Now().UnixNano() > s.stor[uuid].expiresAtNano {
-			delete(s.stor, uuid)
-
-			return false, nil
-		}
-
+	if session != nil {
+		s.storMu.Lock()
 		delete(s.stor, uuid)
+		s.storMu.Unlock()
 
-		return true, nil
+		return true, nil // found and deleted
 	}
 
-	return false, nil
+	return false, nil // session was not found
 }
 
 // DeleteRequests deletes stored requests for session with passed UUID.
 func (s *InMemoryStorage) DeleteRequests(uuid string) (bool, error) {
-	if s.isClosed() {
-		return false, ErrClosed
+	session, err := s.GetSession(uuid)
+	if err != nil {
+		return false, err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
-
-	if _, ok := s.stor[uuid]; ok {
-		// session has been expired?
-		if time.Now().UnixNano() > s.stor[uuid].expiresAtNano {
-			delete(s.stor, uuid)
-
-			return false, nil
-		}
+	if session != nil {
+		s.storMu.Lock()
+		defer s.storMu.Unlock()
 
 		if len(s.stor[uuid].requests) == 0 {
-			return false, nil
+			return false, nil // nothing to delete
 		}
 
 		for id := range s.stor[uuid].requests {
 			delete(s.stor[uuid].requests, id)
 		}
 
-		return true, nil
+		return true, nil // requests deleted
 	}
 
-	return false, nil
+	return false, nil // session was not found
 }
 
 // CreateRequest creates new request in storage using passed data.
 func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:lll
-	if s.isClosed() {
-		return "", ErrClosed
+	session, err := s.GetSession(sessionUUID)
+	if err != nil {
+		return "", err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
+	if session != nil {
+		s.storMu.Lock()
+		defer s.storMu.Unlock()
 
-	if _, ok := s.stor[sessionUUID]; ok {
 		now := time.Now()
-
-		// session has been expired?
-		if now.UnixNano() > s.stor[sessionUUID].expiresAtNano {
-			delete(s.stor, sessionUUID)
-
-			return "", ErrSessionNotExists
-		}
-
 		id := s.newUUID()
 
+		// append new request
 		s.stor[sessionUUID].requests[id] = &inmemoryRequest{
 			uuid:       id,
 			clientAddr: clientAddr,
@@ -273,9 +251,10 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 			createdAt:  now,
 		}
 
-		s.stor[sessionUUID].expiresAtNano = now.UnixNano() + s.sessionTTL.Nanoseconds() // update TTL
+		// update session TTL
+		s.stor[sessionUUID].expiresAtNano = now.UnixNano() + s.sessionTTL.Nanoseconds()
 
-		// limit stored requests count // TODO limit requests stack length
+		// limit stored requests count
 		if rl := len(s.stor[sessionUUID].requests); rl > int(s.maxRequests) {
 			type rq struct {
 				id string
@@ -297,56 +276,40 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 			}
 		}
 
-		return id, nil
+		return id, nil // request added
 	}
 
-	return "", ErrSessionNotExists
+	return "", nil // session was not found
 }
 
 // GetRequest returns request data.
 func (s *InMemoryStorage) GetRequest(sessionUUID, requestUUID string) (Request, error) {
-	if s.isClosed() {
-		return nil, ErrClosed
+	session, err := s.GetSession(sessionUUID)
+	if err != nil {
+		return nil, err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
-
-	if _, sessionOk := s.stor[sessionUUID]; sessionOk {
-		// session has been expired?
-		if time.Now().UnixNano() > s.stor[sessionUUID].expiresAtNano {
-			delete(s.stor, sessionUUID)
-
-			return nil, ErrSessionNotExists
-		}
-
+	if session != nil {
 		if _, reqOk := s.stor[sessionUUID].requests[requestUUID]; reqOk {
 			return s.stor[sessionUUID].requests[requestUUID], nil
 		}
+
+		return nil, nil // request was not found
 	}
 
-	return nil, nil // not found
+	return nil, nil // session was not found
 }
 
 // GetAllRequests returns all request as a slice of structures.
 func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) {
-	if s.isClosed() {
-		return nil, ErrClosed
+	session, err := s.GetSession(sessionUUID)
+	if err != nil {
+		return nil, err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
-
-	if _, sessionOk := s.stor[sessionUUID]; sessionOk {
-		// session has been expired?
-		if time.Now().UnixNano() > s.stor[sessionUUID].expiresAtNano {
-			delete(s.stor, sessionUUID)
-
-			return nil, ErrSessionNotExists
-		}
-
+	if session != nil {
 		if len(s.stor[sessionUUID].requests) == 0 {
-			return nil, nil
+			return nil, nil // no requests
 		}
 
 		result := make([]Request, 0, len(s.stor[sessionUUID].requests))
@@ -361,32 +324,25 @@ func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) 
 		return result, nil
 	}
 
-	return nil, nil
+	return nil, nil // session was not found
 }
 
 // DeleteRequest deletes stored request with passed session and request UUIDs.
 func (s *InMemoryStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
-	if s.isClosed() {
-		return false, ErrClosed
+	session, err := s.GetSession(sessionUUID)
+	if err != nil {
+		return false, err
 	}
 
-	s.storMu.Lock()
-	defer s.storMu.Unlock()
-
-	if _, sessionOk := s.stor[sessionUUID]; sessionOk {
-		// session has been expired?
-		if time.Now().UnixNano() > s.stor[sessionUUID].expiresAtNano {
-			delete(s.stor, sessionUUID)
-
-			return false, ErrSessionNotExists
-		}
-
-		if _, reqOk := s.stor[sessionUUID].requests[requestUUID]; reqOk {
+	if session != nil {
+		if _, ok := s.stor[sessionUUID].requests[requestUUID]; ok {
 			delete(s.stor[sessionUUID].requests, requestUUID)
 
-			return true, nil
+			return true, nil // deleted
 		}
+
+		return false, nil // request was not found
 	}
 
-	return false, nil
+	return false, nil // session was not found
 }
