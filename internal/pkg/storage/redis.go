@@ -165,19 +165,18 @@ func (s *RedisStorage) DeleteRequests(sessionUUID string) (bool, error) {
 // CreateRequest creates new request in storage using passed data.
 func (s *RedisStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:funlen,lll
 	var (
-		now   = time.Now()
-		rData = redisRequest{
-			ReqClientAddr: clientAddr,
-			ReqMethod:     method,
-			ReqContent:    content,
-			ReqHeaders:    headers,
-			ReqURI:        uri,
-			TS:            now.Unix(),
-		}
+		now = time.Now()
 		key = redisKey(sessionUUID)
 	)
 
-	asJSON, jsonErr := s.json.Marshal(rData)
+	asJSON, jsonErr := s.json.Marshal(redisRequest{
+		ReqClientAddr: clientAddr,
+		ReqMethod:     method,
+		ReqContent:    content,
+		ReqHeaders:    headers,
+		ReqURI:        uri,
+		TS:            now.Unix(),
+	})
 	if jsonErr != nil {
 		return "", jsonErr
 	}

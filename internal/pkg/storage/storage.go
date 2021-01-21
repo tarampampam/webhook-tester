@@ -18,7 +18,8 @@ type Storage interface {
 	// DeleteRequests deletes stored requests for session with passed UUID.
 	DeleteRequests(uuid string) (bool, error)
 
-	// CreateRequest creates new request in storage using passed data.
+	// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
+	// sored requests for the session.
 	// Session with passed UUID must exists.
 	// Request UUID without error will be returned on success.
 	CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error)
