@@ -4,7 +4,7 @@ import "sync"
 
 // None broadcaster is useful for preventing event publishing "outside" of the application. It can be used as a plug for
 // the "real" code or for the unit tests.
-type None struct {
+type None struct { // TODO add events listener instead LastPublishedEvent()
 	mu          sync.Mutex
 	err         error
 	lastChannel string

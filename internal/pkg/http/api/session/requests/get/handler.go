@@ -27,7 +27,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID := mux.Vars(r)["sessionUUID"]
 	requestUUID := mux.Vars(r)["requestUUID"]
 
-	data, gettingErr := h.storage.GetRequest(sessionUUID, requestUUID)
+	req, gettingErr := h.storage.GetRequest(sessionUUID, requestUUID)
 
 	if gettingErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -38,7 +38,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if data == nil {
+	if req == nil {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(errors.NewServerError(
 			uint16(http.StatusNotFound),
@@ -50,11 +50,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	_ = h.json.NewEncoder(w).Encode(api.StoredRequest{
 		UUID:          requestUUID,
-		ClientAddr:    data.Request.ClientAddr,
-		Method:        data.Request.Method,
-		Content:       data.Request.Content,
-		Headers:       api.MapToHeaders(data.Request.Headers).Sorted(),
-		URI:           data.Request.URI,
-		CreatedAtUnix: data.CreatedAtUnix,
+		ClientAddr:    req.ClientAddr(),
+		Method:        req.Method(),
+		Content:       req.Content(),
+		Headers:       api.MapToHeaders(req.Headers()).Sorted(),
+		URI:           req.URI(),
+		CreatedAtUnix: req.CreatedAt().Unix(),
 	})
 }

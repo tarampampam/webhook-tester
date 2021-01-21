@@ -14,7 +14,7 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
-	redisStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/redis"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
 
@@ -86,7 +86,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		return parsingErr
 	}
 
-	storage := redisStorage.NewStorage(ctx, rdb, sessionTTL, f.maxRequests)
+	stor := storage.NewRedisStorage(ctx, rdb, sessionTTL, f.maxRequests)
 
 	appSettings := &settings.AppSettings{
 		MaxRequests:          f.maxRequests,
@@ -112,7 +112,7 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 	}
 
 	// create HTTP server
-	server := appHttp.NewServer(ctx, log, f.publicDir, appSettings, storage, broadcaster, rdb)
+	server := appHttp.NewServer(ctx, log, f.publicDir, appSettings, stor, broadcaster, rdb)
 
 	// register server routes, middlewares, etc.
 	if err := server.Register(); err != nil {

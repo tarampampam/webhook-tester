@@ -3,6 +3,7 @@ package create
 import (
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
@@ -33,28 +34,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request = request{}
+	var req = request{}
 
-	if err := h.json.Unmarshal(body, &request); err != nil {
+	if err := h.json.Unmarshal(body, &req); err != nil {
 		errors.NewServerError(uint16(http.StatusBadRequest), "cannot parse passed json").RespondWithJSON(w)
 		return
 	}
 
-	if err := request.validate(); err != nil {
+	if err := req.validate(); err != nil {
 		errors.NewServerError(uint16(http.StatusBadRequest), "invalid value passed: "+err.Error()).RespondWithJSON(w)
 		return
 	}
 
-	request.setDefaults()
-
-	var webHookResp = &storage.WebHookResponse{
-		Content:     *request.ResponseContent,
-		Code:        *request.StatusCode,
-		ContentType: *request.ContentType,
-		DelaySec:    *request.ResponseDelaySec,
-	}
-
-	sessionData, sessionErr := h.storage.CreateSession(webHookResp)
+	sessionUUID, sessionErr := h.storage.CreateSession(
+		req.responseContent(),
+		req.statusCode(),
+		req.contentType(),
+		time.Second*time.Duration(req.responseDelaySec()),
+	)
 	if sessionErr != nil {
 		errors.NewServerError(uint16(http.StatusInternalServerError), sessionErr.Error()).RespondWithJSON(w)
 		return
@@ -63,13 +60,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	_ = h.json.NewEncoder(w).Encode(response{
-		UUID: sessionData.UUID,
+		UUID: sessionUUID,
 		ResponseSettings: responseSettings{
-			Content:       sessionData.WebHookResponse.Content,
-			Code:          sessionData.WebHookResponse.Code,
-			ContentType:   sessionData.WebHookResponse.ContentType,
-			DelaySec:      sessionData.WebHookResponse.DelaySec,
-			CreatedAtUnix: sessionData.CreatedAtUnix,
+			Content:       req.responseContent(),
+			Code:          req.statusCode(),
+			ContentType:   req.contentType(),
+			DelaySec:      req.responseDelaySec(),
+			CreatedAtUnix: time.Now().Unix(),
 		},
 	})
 }

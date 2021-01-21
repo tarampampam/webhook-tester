@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
 )
 
 func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
@@ -20,7 +19,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 	var cases = []struct {
 		name        string
 		giveBody    io.Reader
-		setUp       func(s *nullStorage.Storage)
+		setUp       func(s *storage.InMemoryStorage)
 		checkResult func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
@@ -135,7 +134,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 				"response_delay":null,
 				"response_body":null
 			}`)),
-			setUp: func(s *nullStorage.Storage) {
+			setUp: func(s *storage.InMemoryStorage) {
 				s.Error = errors.New("foo")
 			},
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -154,7 +153,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 				"response_delay":null,
 				"response_body":null
 			}`)),
-			setUp: func(s *nullStorage.Storage) {
+			setUp: func(s *storage.InMemoryStorage) {
 				s.SessionData = &storage.SessionData{
 					UUID: "aa-bb-cc-dd",
 					WebHookResponse: storage.WebHookResponse{
@@ -188,7 +187,7 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", tt.giveBody)
 				rr      = httptest.NewRecorder()
-				s       = &nullStorage.Storage{}
+				s       = &storage.InMemoryStorage{}
 				handler = NewHandler(s)
 			)
 
