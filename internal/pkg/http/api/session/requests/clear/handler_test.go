@@ -1,11 +1,16 @@
 package clear
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 
@@ -38,8 +43,12 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Second, 10, time.Minute)
-			defer s.Close()
+			mini, err := miniredis.Run()
+			assert.NoError(t, err)
+
+			defer mini.Close()
+
+			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", nil)
@@ -61,8 +70,12 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
-	defer s.Close()
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)
@@ -70,6 +83,20 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		br      = broadcast.None{}
 		handler = NewHandler(s, &br)
 	)
+
+	var (
+		brChannel string
+		brEvent   broadcast.Event
+		brCount   int
+		brMutex   sync.Mutex
+	)
+
+	br.OnPublish(func(ch string, e broadcast.Event) {
+		brMutex.Lock()
+		brChannel, brEvent = ch, e
+		brCount++
+		brMutex.Unlock()
+	})
 
 	// create session
 	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
@@ -91,10 +118,11 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 
-	ch, e := br.LastPublishedEvent()
-
-	assert.Equal(t, sessionUUID, ch)
-	assert.Equal(t, "requests-deleted", e.Name())
+	brMutex.Lock()
+	assert.Equal(t, 1, brCount)
+	assert.Equal(t, sessionUUID, brChannel)
+	assert.Equal(t, "requests-deleted", brEvent.Name())
+	brMutex.Unlock()
 
 	requests, err = s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)

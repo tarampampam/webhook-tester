@@ -1,45 +1,71 @@
 package broadcast
 
 import (
-	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNone_Publish(t *testing.T) {
-	none := None{}
+	var none None
 
-	// basic event publishing
-	ch, last := none.LastPublishedEvent()
-	assert.Nil(t, last)
-	assert.Empty(t, ch)
+	var (
+		counter1, counter2 int
+		ourEvent           = NewRequestRegisteredEvent("bar")
+	)
 
-	e := NewRequestRegisteredEvent("bar")
-	assert.NoError(t, none.Publish("foo", e))
+	none.OnPublish(func(ch string, e Event) {
+		counter1++
 
-	// get last recorded event
-	ch, last = none.LastPublishedEvent()
-	assert.Equal(t, "foo", ch)
-	assert.Same(t, e, last)
+		assert.Equal(t, "foo", ch)
+		assert.Same(t, e, ourEvent)
+	})
 
-	// set some error
-	none.SetError(errors.New("foo error"))
-	assert.EqualError(t, none.Publish("aaa", e), "foo error")
+	none.OnPublish(func(ch string, e Event) {
+		counter2++
 
-	// event must be recorded anyway
-	ch, last = none.LastPublishedEvent()
-	assert.Equal(t, "aaa", ch)
-	assert.Same(t, e, last)
+		assert.Equal(t, "foo", ch)
+		assert.Same(t, e, ourEvent)
+	})
 
-	// unset the error
-	none.SetError(nil)
+	assert.NoError(t, none.Publish("foo", ourEvent))
+	assert.Equal(t, 1, counter1)
+	assert.Equal(t, 1, counter2)
+	assert.NoError(t, none.Publish("foo", ourEvent))
+	assert.Equal(t, 2, counter1)
+	assert.Equal(t, 2, counter2)
+}
 
-	// and then all works fine again
-	assert.NoError(t, none.Publish("foo", e))
+func TestNone_Concurrent(t *testing.T) {
+	var none None
 
-	// and event recorded successful
-	ch, last = none.LastPublishedEvent()
-	assert.Equal(t, "foo", ch)
-	assert.Same(t, e, last)
+	var wg sync.WaitGroup
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() {
+			none.OnPublish(func(ch string, e Event) {
+				timer := time.NewTimer(time.Microsecond)
+				<-timer.C
+				timer.Stop()
+			})
+
+			wg.Done()
+		}()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() {
+			assert.NoError(t, none.Publish("foo", NewRequestRegisteredEvent("bar")))
+
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
 }

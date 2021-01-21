@@ -6,49 +6,8 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
 )
-
-type redisSession struct {
-	Uuid            string `json:"-"` //nolint:golint,stylecheck
-	RespContent     string `json:"resp_content"`
-	RespCode        uint16 `json:"resp_code"`
-	RespContentType string `json:"resp_content_type"`
-	RespDelay       int64  `json:"resp_delay_nano"` // FIXME was `resp_delay_sec`, backwards incompatible
-	TS              int64  `json:"created_at_unix"`
-}
-
-func (s *redisSession) UUID() string         { return s.Uuid }                     // UUID unique session ID.
-func (s *redisSession) Content() string      { return s.RespContent }              // Content session server content.
-func (s *redisSession) Code() uint16         { return s.RespCode }                 // Code default server response code.
-func (s *redisSession) ContentType() string  { return s.RespContentType }          // ContentType response content type.
-func (s *redisSession) Delay() time.Duration { return time.Duration(s.RespDelay) } // Delay before response sending.
-func (s *redisSession) CreatedAt() time.Time { return time.Unix(s.TS, 0) }         // CreatedAt creation time.
-
-type redisRequest struct {
-	Uuid          string            `json:"-"` //nolint:golint,stylecheck
-	ReqClientAddr string            `json:"client_addr"`
-	ReqMethod     string            `json:"method"`
-	ReqContent    string            `json:"content"`
-	ReqHeaders    map[string]string `json:"headers"`
-	ReqURI        string            `json:"uri"`
-	TS            int64             `json:"created_at_unix"`
-}
-
-func (r *redisRequest) UUID() string               { return r.Uuid }             // UUID returns unique request ID.
-func (r *redisRequest) ClientAddr() string         { return r.ReqClientAddr }    // ClientAddr client hostname or IP.
-func (r *redisRequest) Method() string             { return r.ReqMethod }        // Method HTTP method name.
-func (r *redisRequest) Content() string            { return r.ReqContent }       // Content request body (payload).
-func (r *redisRequest) Headers() map[string]string { return r.ReqHeaders }       // Headers HTTP request headers.
-func (r *redisRequest) URI() string                { return r.ReqURI }           // URI Uniform Resource Identifier.
-func (r *redisRequest) CreatedAt() time.Time       { return time.Unix(r.TS, 0) } // CreatedAt creation time.
-
-type redisKey string
-
-func (s redisKey) session() string          { return "webhook-tester:session:" + string(s) } // session data.
-func (s redisKey) requests() string         { return s.session() + ":requests" }             // requests list.
-func (s redisKey) request(id string) string { return s.session() + ":requests:" + id }       // request data.
 
 // RedisStorage is redis storage implementation.
 type RedisStorage struct {
@@ -69,8 +28,6 @@ func NewRedisStorage(ctx context.Context, rdb *redis.Client, sessionTTL time.Dur
 		json:        jsoniter.ConfigFastest,
 	}
 }
-
-func (s *RedisStorage) newUUID() string { return uuid.New().String() }
 
 // GetSession returns session data.
 func (s *RedisStorage) GetSession(uuid string) (Session, error) {
@@ -110,7 +67,7 @@ func (s *RedisStorage) CreateSession(content string, code uint16, contentType st
 		return "", jsonErr
 	}
 
-	id := s.newUUID()
+	id := NewUUID()
 
 	if err := s.rdb.Set(s.ctx, redisKey(id).session(), asJSON, s.ttl).Err(); err != nil {
 		return "", err
@@ -163,7 +120,8 @@ func (s *RedisStorage) DeleteRequests(sessionUUID string) (bool, error) {
 	return s.deleteKeys(keys...)
 }
 
-// CreateRequest creates new request in storage using passed data.
+// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
+// stored requests for the session.
 func (s *RedisStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:funlen,lll
 	var (
 		now = time.Now()
@@ -182,7 +140,7 @@ func (s *RedisStorage) CreateRequest(sessionUUID, clientAddr, method, content, u
 		return "", jsonErr
 	}
 
-	id := s.newUUID()
+	id := NewUUID()
 
 	// save request data
 	if _, err := s.rdb.Pipelined(s.ctx, func(pipe redis.Pipeliner) error {
@@ -332,3 +290,43 @@ func (s *RedisStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, err
 
 	return s.deleteKeys(key.request(requestUUID))
 }
+
+type redisKey string
+
+func (s redisKey) session() string          { return "webhook-tester:session:" + string(s) } // session data.
+func (s redisKey) requests() string         { return s.session() + ":requests" }             // requests list.
+func (s redisKey) request(id string) string { return s.session() + ":requests:" + id }       // request data.
+
+type redisSession struct {
+	Uuid            string `json:"-"` //nolint:golint,stylecheck
+	RespContent     string `json:"resp_content"`
+	RespCode        uint16 `json:"resp_code"`
+	RespContentType string `json:"resp_content_type"`
+	RespDelay       int64  `json:"resp_delay_nano"` // FIXME was `resp_delay_sec`, backwards incompatible
+	TS              int64  `json:"created_at_unix"`
+}
+
+func (s *redisSession) UUID() string         { return s.Uuid }                     // UUID unique session ID.
+func (s *redisSession) Content() string      { return s.RespContent }              // Content session server content.
+func (s *redisSession) Code() uint16         { return s.RespCode }                 // Code default server response code.
+func (s *redisSession) ContentType() string  { return s.RespContentType }          // ContentType response content type.
+func (s *redisSession) Delay() time.Duration { return time.Duration(s.RespDelay) } // Delay before response sending.
+func (s *redisSession) CreatedAt() time.Time { return time.Unix(s.TS, 0) }         // CreatedAt creation time.
+
+type redisRequest struct {
+	Uuid          string            `json:"-"` //nolint:golint,stylecheck
+	ReqClientAddr string            `json:"client_addr"`
+	ReqMethod     string            `json:"method"`
+	ReqContent    string            `json:"content"`
+	ReqHeaders    map[string]string `json:"headers"`
+	ReqURI        string            `json:"uri"`
+	TS            int64             `json:"created_at_unix"`
+}
+
+func (r *redisRequest) UUID() string               { return r.Uuid }             // UUID returns unique request ID.
+func (r *redisRequest) ClientAddr() string         { return r.ReqClientAddr }    // ClientAddr client hostname or IP.
+func (r *redisRequest) Method() string             { return r.ReqMethod }        // Method HTTP method name.
+func (r *redisRequest) Content() string            { return r.ReqContent }       // Content request body (payload).
+func (r *redisRequest) Headers() map[string]string { return r.ReqHeaders }       // Headers HTTP request headers.
+func (r *redisRequest) URI() string                { return r.ReqURI }           // URI Uniform Resource Identifier.
+func (r *redisRequest) CreatedAt() time.Time       { return time.Unix(r.TS, 0) } // CreatedAt creation time.

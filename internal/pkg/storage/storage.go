@@ -1,6 +1,10 @@
 package storage
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Storage is a Session's and Request's storage.
 type Storage interface {
@@ -19,7 +23,7 @@ type Storage interface {
 	DeleteRequests(uuid string) (bool, error)
 
 	// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
-	// sored requests for the session.
+	// stored requests for the session.
 	// Session with passed UUID must exists.
 	// Request UUID without error will be returned on success.
 	CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error)
@@ -56,3 +60,6 @@ type Request interface {
 	URI() string                // URI returns Uniform Resource Identifier.
 	CreatedAt() time.Time       // CreatedAt returns creation time (accuracy to seconds).
 }
+
+// NewUUID generates new UUID v4.
+func NewUUID() string { return uuid.New().String() }

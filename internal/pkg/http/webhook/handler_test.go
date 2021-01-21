@@ -2,12 +2,17 @@ package webhook
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -41,8 +46,12 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
-			defer s.Close()
+			mini, err := miniredis.Run()
+			assert.NoError(t, err)
+
+			defer mini.Close()
+
+			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
@@ -64,8 +73,12 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
-	defer s.Close()
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
@@ -73,6 +86,20 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		br      = &broadcast.None{}
 		handler = NewHandler(&settings.AppSettings{}, s, br)
 	)
+
+	var (
+		brChannel string
+		brEvent   broadcast.Event
+		brCount   int
+		brMutex   sync.Mutex
+	)
+
+	br.OnPublish(func(ch string, e broadcast.Event) {
+		brMutex.Lock()
+		brChannel, brEvent = ch, e
+		brCount++
+		brMutex.Unlock()
+	})
 
 	req.Header.Set("x-bar", "baz")
 
@@ -90,10 +117,11 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	assert.Equal(t, "foo", rr.Body.String())
 	assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
 
-	ch, e := br.LastPublishedEvent()
-
-	assert.Equal(t, sessionUUID, ch)
-	assert.Equal(t, "request-registered", e.Name())
+	brMutex.Lock()
+	assert.Equal(t, 1, brCount)
+	assert.Equal(t, sessionUUID, brChannel)
+	assert.Equal(t, "request-registered", brEvent.Name())
+	brMutex.Unlock()
 
 	requests, err := s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)

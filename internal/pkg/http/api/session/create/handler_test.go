@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,14 +11,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
+	"github.com/go-redis/redis/v8"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 func TestHandler_ServeHTTPSessionCreation(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Second)
-	defer s.Close()
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
 
 	var (
 		req, _ = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte(`{
@@ -47,7 +55,7 @@ func TestHandler_ServeHTTPSessionCreation(t *testing.T) {
 
 	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
 
-	_, err := uuid.Parse(resp.UUID)
+	_, err = uuid.Parse(resp.UUID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", resp.ResponseSettings.Content)
@@ -147,8 +155,12 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 10, time.Second)
-			defer s.Close()
+			mini, err := miniredis.Run()
+			assert.NoError(t, err)
+
+			defer mini.Close()
+
+			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveRequestBody())

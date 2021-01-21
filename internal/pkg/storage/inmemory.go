@@ -54,20 +54,28 @@ type InMemoryStorage struct {
 
 	cleanupInterval time.Duration
 
-	storMu sync.RWMutex
-	stor   map[string]*inmemorySession // key is session UUID
+	storageMu sync.RWMutex
+	storage   map[string]*inmemorySession // key is session UUID
 
 	close    chan struct{}
 	closedMu sync.RWMutex
 	closed   bool
 }
 
-func NewInMemoryStorage(sessionTTL time.Duration, maxRequests uint16, cleanupInterval time.Duration) *InMemoryStorage {
+const defaultInMemoryCleanupInterval = time.Second * 3 // default cleanup interval
+
+func NewInMemoryStorage(sessionTTL time.Duration, maxRequests uint16, cleanup ...time.Duration) *InMemoryStorage {
+	ci := defaultInMemoryCleanupInterval
+
+	if len(cleanup) > 0 {
+		ci = cleanup[0]
+	}
+
 	s := &InMemoryStorage{
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
-		cleanupInterval: cleanupInterval,
-		stor:            make(map[string]*inmemorySession),
+		cleanupInterval: ci,
+		storage:         make(map[string]*inmemorySession),
 		close:           make(chan struct{}, 1),
 	}
 	go s.cleanup()
@@ -84,35 +92,36 @@ func (s *InMemoryStorage) cleanup() {
 	for {
 		select {
 		case <-s.close:
-			s.storMu.Lock()
-			for id := range s.stor {
-				delete(s.stor, id)
+			s.storageMu.Lock()
+			for id := range s.storage {
+				delete(s.storage, id)
 			}
-			s.storMu.Unlock()
+			s.storageMu.Unlock()
 
 			return
 
 		case <-timer.C:
-			s.storMu.Lock()
+			s.storageMu.Lock()
 			var now = time.Now().UnixNano()
 
-			for id, session := range s.stor {
+			for id, session := range s.storage {
 				if now > session.expiresAtNano {
-					delete(s.stor, id)
+					delete(s.storage, id)
 				}
 			}
-			s.storMu.Unlock()
+			s.storageMu.Unlock()
 
 			timer.Reset(s.cleanupInterval)
 		}
 	}
 }
 
-func (s *InMemoryStorage) isClosed() bool {
+func (s *InMemoryStorage) isClosed() (closed bool) {
 	s.closedMu.RLock()
-	defer s.closedMu.RUnlock()
+	closed = s.closed
+	s.closedMu.RUnlock()
 
-	return s.closed
+	return
 }
 
 // Close current storage with data invalidation.
@@ -138,16 +147,16 @@ func (s *InMemoryStorage) GetSession(uuid string) (Session, error) {
 		return nil, ErrClosed
 	}
 
-	s.storMu.RLock()
-	session, ok := s.stor[uuid]
-	s.storMu.RUnlock()
+	s.storageMu.RLock()
+	session, ok := s.storage[uuid]
+	s.storageMu.RUnlock()
 
 	if ok {
 		// session has been expired?
 		if time.Now().UnixNano() > session.expiresAtNano {
-			s.storMu.Lock()
-			delete(s.stor, uuid)
-			s.storMu.Unlock()
+			s.storageMu.Lock()
+			delete(s.storage, uuid)
+			s.storageMu.Unlock()
 
 			return nil, nil // session has been expired (not found)
 		}
@@ -167,8 +176,8 @@ func (s *InMemoryStorage) CreateSession(content string, code uint16, contentType
 	id := s.newUUID()
 	now := time.Now()
 
-	s.storMu.Lock()
-	s.stor[id] = &inmemorySession{
+	s.storageMu.Lock()
+	s.storage[id] = &inmemorySession{
 		uuid:          id,
 		content:       content,
 		code:          code,
@@ -178,7 +187,7 @@ func (s *InMemoryStorage) CreateSession(content string, code uint16, contentType
 		requests:      make(map[string]*inmemoryRequest, s.maxRequests),
 		expiresAtNano: now.UnixNano() + s.sessionTTL.Nanoseconds(),
 	}
-	s.storMu.Unlock()
+	s.storageMu.Unlock()
 
 	return id, nil
 }
@@ -191,9 +200,9 @@ func (s *InMemoryStorage) DeleteSession(uuid string) (bool, error) {
 	}
 
 	if session != nil {
-		s.storMu.Lock()
-		delete(s.stor, uuid)
-		s.storMu.Unlock()
+		s.storageMu.Lock()
+		delete(s.storage, uuid)
+		s.storageMu.Unlock()
 
 		return true, nil // found and deleted
 	}
@@ -209,15 +218,15 @@ func (s *InMemoryStorage) DeleteRequests(uuid string) (bool, error) {
 	}
 
 	if session != nil {
-		s.storMu.Lock()
-		defer s.storMu.Unlock()
+		s.storageMu.Lock()
+		defer s.storageMu.Unlock()
 
-		if len(s.stor[uuid].requests) == 0 {
+		if len(s.storage[uuid].requests) == 0 {
 			return false, nil // nothing to delete
 		}
 
-		for id := range s.stor[uuid].requests {
-			delete(s.stor[uuid].requests, id)
+		for id := range s.storage[uuid].requests {
+			delete(s.storage[uuid].requests, id)
 		}
 
 		return true, nil // requests deleted
@@ -226,7 +235,8 @@ func (s *InMemoryStorage) DeleteRequests(uuid string) (bool, error) {
 	return false, nil // session was not found
 }
 
-// CreateRequest creates new request in storage using passed data.
+// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
+// stored requests for the session.
 func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:lll
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
@@ -234,14 +244,14 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 	}
 
 	if session != nil {
-		s.storMu.Lock()
-		defer s.storMu.Unlock()
+		s.storageMu.Lock()
+		defer s.storageMu.Unlock()
 
 		now := time.Now()
 		id := s.newUUID()
 
 		// append new request
-		s.stor[sessionUUID].requests[id] = &inmemoryRequest{
+		s.storage[sessionUUID].requests[id] = &inmemoryRequest{
 			uuid:       id,
 			clientAddr: clientAddr,
 			method:     method,
@@ -252,10 +262,10 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 		}
 
 		// update session TTL
-		s.stor[sessionUUID].expiresAtNano = now.UnixNano() + s.sessionTTL.Nanoseconds()
+		s.storage[sessionUUID].expiresAtNano = now.UnixNano() + s.sessionTTL.Nanoseconds()
 
 		// limit stored requests count
-		if rl := len(s.stor[sessionUUID].requests); rl > int(s.maxRequests) {
+		if rl := len(s.storage[sessionUUID].requests); rl > int(s.maxRequests) {
 			type rq struct {
 				id string
 				ts int64
@@ -263,14 +273,14 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 
 			allReq := make([]rq, 0, rl)
 
-			for k := range s.stor[sessionUUID].requests {
-				allReq = append(allReq, rq{k, s.stor[sessionUUID].requests[k].createdAt.UnixNano()})
+			for k := range s.storage[sessionUUID].requests {
+				allReq = append(allReq, rq{k, s.storage[sessionUUID].requests[k].createdAt.UnixNano()})
 			}
 
 			sort.Slice(allReq, func(i, j int) bool { return allReq[i].ts > allReq[j].ts })
 
 			for i, plan := 0, allReq[int(s.maxRequests):]; i < len(plan); i++ {
-				delete(s.stor[sessionUUID].requests, plan[i].id)
+				delete(s.storage[sessionUUID].requests, plan[i].id)
 			}
 		}
 
@@ -288,8 +298,8 @@ func (s *InMemoryStorage) GetRequest(sessionUUID, requestUUID string) (Request, 
 	}
 
 	if session != nil {
-		if _, reqOk := s.stor[sessionUUID].requests[requestUUID]; reqOk {
-			return s.stor[sessionUUID].requests[requestUUID], nil
+		if _, reqOk := s.storage[sessionUUID].requests[requestUUID]; reqOk {
+			return s.storage[sessionUUID].requests[requestUUID], nil
 		}
 
 		return nil, nil // request was not found
@@ -306,13 +316,13 @@ func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) 
 	}
 
 	if session != nil {
-		if len(s.stor[sessionUUID].requests) == 0 {
+		if len(s.storage[sessionUUID].requests) == 0 {
 			return nil, nil // no requests
 		}
 
-		result := make([]Request, 0, len(s.stor[sessionUUID].requests))
-		for id := range s.stor[sessionUUID].requests {
-			result = append(result, s.stor[sessionUUID].requests[id])
+		result := make([]Request, 0, len(s.storage[sessionUUID].requests))
+		for id := range s.storage[sessionUUID].requests {
+			result = append(result, s.storage[sessionUUID].requests[id])
 		}
 
 		sort.Slice(result, func(i, j int) bool {
@@ -333,8 +343,8 @@ func (s *InMemoryStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, 
 	}
 
 	if session != nil {
-		if _, ok := s.stor[sessionUUID].requests[requestUUID]; ok {
-			delete(s.stor[sessionUUID].requests, requestUUID)
+		if _, ok := s.storage[sessionUUID].requests[requestUUID]; ok {
+			delete(s.storage[sessionUUID].requests, requestUUID)
 
 			return true, nil // deleted
 		}

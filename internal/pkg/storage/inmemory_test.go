@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -163,7 +164,7 @@ func TestInMemoryStorage_DeleteRequests(t *testing.T) {
 	assert.Nil(t, requests2)
 }
 
-func TestInMemoryStorage_GetSessionExpired(t *testing.T) {
+func TestInMemoryStorage_CreateRequestExpired(t *testing.T) {
 	s := NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
@@ -180,4 +181,120 @@ func TestInMemoryStorage_GetSessionExpired(t *testing.T) {
 	session, err = s.GetSession(sessionUUID)
 	assert.NoError(t, err)
 	assert.Nil(t, session) // important
+}
+
+func TestInMemoryStorage_GetRequestExpired(t *testing.T) {
+	s := NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
+	defer s.Close()
+
+	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sessionUUID)
+	requestUUID, err := s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "", "", nil)
+	assert.NoError(t, err)
+
+	request, err := s.GetRequest(sessionUUID, requestUUID)
+	assert.NoError(t, err)
+	assert.NotNil(t, request)
+
+	<-time.After(time.Millisecond * 11)
+
+	request, err = s.GetRequest(sessionUUID, requestUUID)
+	assert.NoError(t, err)
+	assert.Nil(t, request) // important
+}
+
+func TestInMemoryStorage_ClosedStateProducesError(t *testing.T) {
+	s := NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
+	assert.NoError(t, s.Close())
+
+	assert.ErrorIs(t, s.Close(), ErrClosed) // 2nd call produces error
+
+	_, err := s.GetSession("foo")
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.CreateSession("foo", 202, "foo/bar", time.Second)
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.DeleteSession("foo")
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.DeleteRequests("foo")
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.CreateRequest("foo", "1.1.1.1", "GET", "", "", nil)
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.GetRequest("foo", "bar")
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.GetAllRequests("foo")
+	assert.ErrorIs(t, err, ErrClosed)
+
+	_, err = s.DeleteRequest("foo", "bar")
+	assert.ErrorIs(t, err, ErrClosed)
+}
+
+func TestInMemoryStorage_Concurrent(t *testing.T) {
+	s := NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
+	defer s.Close()
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.GetSession("foo"); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.CreateSession("foo", 202, "foo/bar", time.Second); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.DeleteSession("foo"); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.DeleteRequests("foo"); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() {
+			id, err := s.CreateSession("foo", 202, "foo/bar", time.Second)
+			assert.NoError(t, err)
+
+			_, _ = s.CreateRequest(id, "1.1.1.1", "GET", "", "", nil)
+
+			wg.Done()
+		}()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.GetRequest("foo", "bar"); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.GetAllRequests("foo"); wg.Done() }()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+
+		go func() { _, _ = s.DeleteRequest("foo", "bar"); wg.Done() }()
+	}
+
+	wg.Wait()
 }

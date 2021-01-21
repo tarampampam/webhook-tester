@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
+	"github.com/go-redis/redis/v8"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
@@ -52,8 +55,12 @@ func TestServer_StartAndStop(t *testing.T) {
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
 
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Minute)
-	defer s.Close()
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
 
@@ -128,8 +135,12 @@ func TestServer_Register(t *testing.T) {
 		{name: "static", route: "/", methods: []string{http.MethodGet, http.MethodHead}},
 	}
 
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Minute)
-	defer s.Close()
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
 
