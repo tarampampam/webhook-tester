@@ -4,6 +4,7 @@ package serve
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -20,6 +21,9 @@ import (
 
 // broadcast driver names
 const brDriverNone, brDriverPusher = "none", "pusher"
+
+// storage driver names
+const storageMemory, storageRedis = "memory", "redis"
 
 // NewCommand creates `serve` command.
 func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
@@ -68,26 +72,13 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		oss.Stop() // stop system signals listening
 	}()
 
-	opt, optErr := redis.ParseURL(f.redisDSN)
-	if optErr != nil {
-		return optErr
-	}
-
-	rdb := redis.NewClient(opt).WithContext(ctx)
-
-	defer func() { _ = rdb.Close() }()
-
-	if pingErr := rdb.Ping(ctx).Err(); pingErr != nil {
-		return pingErr
-	}
-
+	// parse session TTL duration (string) into time.Duration
 	sessionTTL, parsingErr := time.ParseDuration(f.sessionTTL)
 	if parsingErr != nil {
 		return parsingErr
 	}
 
-	stor := storage.NewRedisStorage(ctx, rdb, sessionTTL, f.maxRequests)
-
+	// prepare application settings struct // TODO can we do not use this struct?
 	appSettings := &settings.AppSettings{
 		MaxRequests:          f.maxRequests,
 		SessionTTL:           sessionTTL,
@@ -96,19 +87,44 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME
 	}
 
-	var broadcaster interface {
-		Publish(channel string, event broadcast.Event) error
-	}
+	var (
+		broadcaster interface {
+			Publish(channel string, event broadcast.Event) error
+		}
 
+		stor storage.Storage
+		rdb  *redis.Client
+	)
+
+	// create required broadcaster implementation
 	switch f.broadcastDriver {
 	case brDriverNone:
 		broadcaster = &broadcast.None{}
 
 	case brDriverPusher:
 		broadcaster = broadcast.NewPusher(f.pusher.appID, f.pusher.key, f.pusher.secret, f.pusher.cluster)
+	}
 
-	default:
-		return errors.New("unsupported broadcasting driver")
+	// create required storage implementation
+	switch f.storageDriver {
+	case storageMemory:
+		inmemory := storage.NewInMemoryStorage(sessionTTL, f.maxRequests)
+
+		defer func() { _ = inmemory.Close() }()
+
+		stor = inmemory
+
+	case storageRedis:
+		opt, _ := redis.ParseURL(f.redisDSN)
+		rdb = redis.NewClient(opt).WithContext(ctx)
+
+		defer func() { _ = rdb.Close() }()
+
+		if pingErr := rdb.Ping(ctx).Err(); pingErr != nil {
+			return pingErr
+		}
+
+		stor = storage.NewRedisStorage(ctx, rdb, sessionTTL, f.maxRequests)
 	}
 
 	// create HTTP server
@@ -132,8 +148,12 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 			zap.Uint16("max requests", f.maxRequests),
 			zap.String("session ttl", f.sessionTTL),
 			zap.Strings("ignore prefixes", f.ignoreHeaderPrefix),
-			zap.String("redis dsn", f.redisDSN),
+			zap.String("storage driver", f.storageDriver),
 			zap.String("broadcast driver", f.broadcastDriver),
+		}
+
+		if f.storageDriver == storageRedis {
+			fields = append(fields, zap.String("redis dsn", f.redisDSN))
 		}
 
 		log.Info("Server starting", fields...)
@@ -164,9 +184,18 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 			return err
 		}
 
+		// close storage (if it is possible)
+		if c, ok := stor.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				return err
+			}
+		}
+
 		// and close redis connection
-		if err := rdb.Close(); err != nil {
-			return err
+		if rdb != nil {
+			if err := rdb.Close(); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -13,6 +13,8 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, "PUBLIC_DIR", string(PublicDir))
 	assert.Equal(t, "MAX_REQUESTS", string(MaxSessionRequests))
 	assert.Equal(t, "SESSION_TTL", string(SessionTTL))
+	assert.Equal(t, "STORAGE_DRIVER", string(StorageDriverName))
+	assert.Equal(t, "BROADCAST_DRIVER", string(BroadcastDriverName))
 	assert.Equal(t, "PUSHER_APP_ID", string(PusherAppID))
 	assert.Equal(t, "PUSHER_KEY", string(PusherKey))
 	assert.Equal(t, "PUSHER_SECRET", string(PusherSecret))
@@ -29,6 +31,8 @@ func TestEnvVariable_Lookup(t *testing.T) {
 		{giveEnv: PublicDir},
 		{giveEnv: MaxSessionRequests},
 		{giveEnv: SessionTTL},
+		{giveEnv: StorageDriverName},
+		{giveEnv: BroadcastDriverName},
 		{giveEnv: PusherAppID},
 		{giveEnv: PusherSecret},
 		{giveEnv: PusherCluster},

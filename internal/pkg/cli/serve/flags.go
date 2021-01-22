@@ -31,6 +31,7 @@ type flags struct {
 	//	unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>
 	redisDSN string
 
+	storageDriver   string
 	broadcastDriver string
 
 	pusher struct{ appID, key, secret, cluster string }
@@ -88,6 +89,13 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"",
 		"redis://127.0.0.1:6379/0",
 		fmt.Sprintf("redis server DSN (format: \"redis://<user>:<password>@<host>:<port>/<db_number>\") [$%s]", env.RedisDSN), //nolint:lll
+	)
+	flagSet.StringVarP(
+		&f.storageDriver,
+		"storage-driver",
+		"",
+		storageMemory,
+		fmt.Sprintf("storage driver (%s|%s) [$%s]", storageMemory, storageRedis, env.StorageDriverName),
 	)
 	flagSet.StringVarP(
 		&f.broadcastDriver,
@@ -159,6 +167,10 @@ func (f *flags) overrideUsingEnv() error {
 		f.redisDSN = envVar
 	}
 
+	if envVar, exists := env.StorageDriverName.Lookup(); exists {
+		f.storageDriver = envVar
+	}
+
 	if envVar, exists := env.BroadcastDriverName.Lookup(); exists {
 		f.broadcastDriver = envVar
 	}
@@ -197,8 +209,17 @@ func (f *flags) validate() error {
 		return fmt.Errorf("wrong session lifetime [%s] period", f.sessionTTL)
 	}
 
-	if _, err := redis.ParseURL(f.redisDSN); err != nil {
-		return fmt.Errorf("wrong redis DSN [%s]: %w", f.redisDSN, err)
+	switch f.storageDriver {
+	case storageMemory:
+		// do nothing
+
+	case storageRedis:
+		if _, err := redis.ParseURL(f.redisDSN); err != nil {
+			return fmt.Errorf("wrong redis DSN [%s]: %w", f.redisDSN, err)
+		}
+
+	default:
+		return fmt.Errorf("unsupported storage driver: %s", f.storageDriver)
 	}
 
 	switch f.broadcastDriver {
@@ -221,6 +242,7 @@ func (f *flags) validate() error {
 		if f.pusher.cluster == "" {
 			return errors.New("pusher cluster does not set")
 		}
+
 	default:
 		return fmt.Errorf("unsupported broadcast driver: %s", f.broadcastDriver)
 	}

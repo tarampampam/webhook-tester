@@ -21,6 +21,8 @@ const (
 	// SessionTTL is a session lifetime.
 	SessionTTL envVariable = "SESSION_TTL"
 
+	StorageDriverName envVariable = "STORAGE_DRIVER"
+
 	BroadcastDriverName envVariable = "BROADCAST_DRIVER"
 
 	// PusherAppID is a pusher application ID.

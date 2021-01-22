@@ -1,16 +1,12 @@
 package all
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/alicebob/miniredis"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -40,12 +36,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			mini, err := miniredis.Run()
-			assert.NoError(t, err)
-
-			defer mini.Close()
-
-			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
+			s := storage.NewInMemoryStorage(time.Minute, 1)
+			defer s.Close()
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
@@ -66,12 +58,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
-	mini, err := miniredis.Run()
-	assert.NoError(t, err)
-
-	defer mini.Close()
-
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
 
 	var (
 		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)
@@ -115,12 +103,8 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
-	mini, err := miniredis.Run()
-	assert.NoError(t, err)
-
-	defer mini.Close()
-
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 3)
+	s := storage.NewInMemoryStorage(time.Minute, 3)
+	defer s.Close()
 
 	var (
 		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)

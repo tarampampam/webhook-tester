@@ -1,14 +1,10 @@
 package delete
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/alicebob/miniredis"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -58,12 +54,8 @@ func TestHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			mini, err := miniredis.Run()
-			assert.NoError(t, err)
-
-			defer mini.Close()
-
-			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+			s := storage.NewInMemoryStorage(time.Minute, 10)
+			defer s.Close()
 
 			sessionUUID, err := s.CreateSession("", 201, "", 0)
 			assert.NoError(t, err)

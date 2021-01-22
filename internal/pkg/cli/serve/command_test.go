@@ -145,6 +145,23 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			wantErrorStrings: []string{"wrong public assets directory", "/tmp/nonexistent/bar/baz"},
 		},
 		{
+			name: "Storage Driver Flag Wrong Argument",
+			giveArgs: []string{
+				"--public", "",
+				"--storage-driver", "foobar",
+			},
+			wantErrorStrings: []string{"unsupported storage driver", "foobar"},
+		},
+		{
+			name:    "Storage Driver Flag Wrong Env Value",
+			giveEnv: map[string]string{"STORAGE_DRIVER": "barbaz"},
+			giveArgs: []string{
+				"--public", "",
+				"--storage-driver", "memory",
+			},
+			wantErrorStrings: []string{"unsupported storage driver", "barbaz"},
+		},
+		{
 			name: "Broadcast Driver Flag Wrong Argument",
 			giveArgs: []string{
 				"--public", "",
@@ -165,6 +182,7 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name: "Redis DSN Flag Wrong Argument",
 			giveArgs: []string{
 				"--public", "",
+				"--storage-driver", "redis",
 				"--redis-dsn", "foo://bar",
 			},
 			wantErrorStrings: []string{"wrong redis DSN", "foo://bar"},
@@ -174,6 +192,7 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			giveEnv: map[string]string{"REDIS_DSN": "bar://baz"},
 			giveArgs: []string{
 				"--public", "",
+				"--storage-driver", "redis",
 				"--redis-dsn", "foo://123.123.123.123:1234/0", // `--redis-dsn` flag must be ignored
 			},
 			wantErrorStrings: []string{"wrong redis DSN", "bar://baz"},
@@ -454,7 +473,7 @@ func TestSuccessfulCommandRunningUsingDefaultBroadcastDriver(t *testing.T) {
 	assert.Contains(t, output, "Server stopping")
 }
 
-func TestSuccessfulCommandRunningUsingPusherBroadcastDriver(t *testing.T) {
+func TestSuccessfulCommandRunningUsingRedisStorageAndPusherBroadcastDriver(t *testing.T) {
 	// get TCP port number for a test
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
@@ -468,12 +487,29 @@ func TestSuccessfulCommandRunningUsingPusherBroadcastDriver(t *testing.T) {
 	output := startAndStopServer(t, port, []string{
 		"--public", "",
 		"--port", strconv.Itoa(port),
+		"--storage-driver", "redis",
 		"--redis-dsn", fmt.Sprintf("redis://127.0.0.1:%s/0", mini.Port()),
 		"--broadcast-driver", "pusher",
 		"--pusher-app-id", "foo_app_id",
 		"--pusher-key", "foo_key",
 		"--pusher-secret", "foo_secret",
 		"--pusher-cluster", "foo_cluster",
+	})
+
+	assert.Contains(t, output, "Server starting")
+	assert.Contains(t, output, "Stopping by OS signal")
+	assert.Contains(t, output, "Server stopping")
+}
+
+func TestSuccessfulCommandRunningUsingMemoryStorageAndNoneBroadcastDriver(t *testing.T) {
+	// get TCP port number for a test
+	port, err := getRandomTCPPort(t)
+	assert.NoError(t, err)
+
+	output := startAndStopServer(t, port, []string{
+		"--public", "",
+		"--port", strconv.Itoa(port),
+		"--broadcast-driver", "none",
 	})
 
 	assert.Contains(t, output, "Server starting")

@@ -27,7 +27,7 @@ type (
 		router      *mux.Router
 		storage     storage.Storage
 		broadcaster broadcaster
-		rdb         *redis.Client
+		rdb         *redis.Client // optional, can be nil
 	}
 )
 

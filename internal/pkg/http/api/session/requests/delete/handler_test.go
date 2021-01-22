@@ -1,7 +1,6 @@
 package delete
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -9,14 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis"
-	"github.com/go-redis/redis/v8"
-
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
@@ -49,12 +44,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			mini, err := miniredis.Run()
-			assert.NoError(t, err)
-
-			defer mini.Close()
-
-			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+			s := storage.NewInMemoryStorage(time.Minute, 10)
+			defer s.Close()
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", nil)
@@ -76,12 +67,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	mini, err := miniredis.Run()
-	assert.NoError(t, err)
-
-	defer mini.Close()
-
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
 
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)

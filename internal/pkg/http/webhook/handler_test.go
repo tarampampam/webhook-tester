@@ -2,7 +2,6 @@ package webhook
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,9 +9,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/alicebob/miniredis"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -46,12 +42,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			mini, err := miniredis.Run()
-			assert.NoError(t, err)
-
-			defer mini.Close()
-
-			s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+			s := storage.NewInMemoryStorage(time.Minute, 10)
+			defer s.Close()
 
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
@@ -73,12 +65,8 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	mini, err := miniredis.Run()
-	assert.NoError(t, err)
-
-	defer mini.Close()
-
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
 
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))

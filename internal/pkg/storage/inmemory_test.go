@@ -236,7 +236,9 @@ func TestInMemoryStorage_ClosedStateProducesError(t *testing.T) {
 }
 
 func TestInMemoryStorage_Concurrent(t *testing.T) {
-	s := NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
+	var maxRequests = 10
+
+	s := NewInMemoryStorage(time.Second, uint16(maxRequests), time.Nanosecond*10)
 	defer s.Close()
 
 	var wg sync.WaitGroup
@@ -244,56 +246,47 @@ func TestInMemoryStorage_Concurrent(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 
-		go func() { _, _ = s.GetSession("foo"); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.CreateSession("foo", 202, "foo/bar", time.Second); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.DeleteSession("foo"); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.DeleteRequests("foo"); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
 		go func() {
-			id, err := s.CreateSession("foo", 202, "foo/bar", time.Second)
+			sUUID, err := s.CreateSession("foo", 202, "foo/bar", time.Second)
 			assert.NoError(t, err)
 
-			_, _ = s.CreateRequest(id, "1.1.1.1", "GET", "", "", nil)
+			_, err = s.GetSession(sUUID)
+			assert.NoError(t, err)
+
+			for j := 1; j < 50; j++ {
+				reqUUID, err2 := s.CreateRequest(sUUID, "1.1.1.1", "GET", "", "", nil)
+				assert.NotEmpty(t, reqUUID)
+				assert.NoError(t, err2)
+
+				req, err3 := s.GetRequest(sUUID, reqUUID)
+				assert.NotNil(t, req)
+				assert.NoError(t, err3)
+
+				all, err4 := s.GetAllRequests(sUUID)
+
+				if j >= maxRequests {
+					assert.Len(t, all, maxRequests)
+				} else {
+					assert.Len(t, all, j)
+				}
+
+				assert.NoError(t, err4)
+			}
+
+			allReq, err5 := s.GetAllRequests(sUUID)
+			assert.NoError(t, err5)
+
+			_, err7 := s.DeleteRequest(sUUID, allReq[0].UUID())
+			assert.NoError(t, err7)
+
+			_, err8 := s.DeleteRequests(sUUID)
+			assert.NoError(t, err8)
+
+			_, err6 := s.DeleteSession(sUUID)
+			assert.NoError(t, err6)
 
 			wg.Done()
 		}()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.GetRequest("foo", "bar"); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.GetAllRequests("foo"); wg.Done() }()
-	}
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-
-		go func() { _, _ = s.DeleteRequest("foo", "bar"); wg.Done() }()
 	}
 
 	wg.Wait()

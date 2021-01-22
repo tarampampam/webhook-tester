@@ -62,7 +62,7 @@ type InMemoryStorage struct {
 	closed   bool
 }
 
-const defaultInMemoryCleanupInterval = time.Second * 3 // default cleanup interval
+const defaultInMemoryCleanupInterval = time.Second // default cleanup interval
 
 func NewInMemoryStorage(sessionTTL time.Duration, maxRequests uint16, cleanup ...time.Duration) *InMemoryStorage {
 	ci := defaultInMemoryCleanupInterval
@@ -298,6 +298,9 @@ func (s *InMemoryStorage) GetRequest(sessionUUID, requestUUID string) (Request, 
 	}
 
 	if session != nil {
+		s.storageMu.RLock()
+		defer s.storageMu.RUnlock()
+
 		if _, reqOk := s.storage[sessionUUID].requests[requestUUID]; reqOk {
 			return s.storage[sessionUUID].requests[requestUUID], nil
 		}
@@ -316,6 +319,9 @@ func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) 
 	}
 
 	if session != nil {
+		s.storageMu.RLock()
+		defer s.storageMu.RUnlock()
+
 		if len(s.storage[sessionUUID].requests) == 0 {
 			return nil, nil // no requests
 		}
@@ -343,6 +349,9 @@ func (s *InMemoryStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, 
 	}
 
 	if session != nil {
+		s.storageMu.Lock()
+		defer s.storageMu.Unlock()
+
 		if _, ok := s.storage[sessionUUID].requests[requestUUID]; ok {
 			delete(s.storage[sessionUUID].requests, requestUUID)
 
