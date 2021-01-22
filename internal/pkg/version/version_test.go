@@ -1,9 +1,13 @@
-package version
+package version_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/version"
+)
 
 func TestVersion(t *testing.T) {
-	if value := Version(); value != "0.0.0@undefined" {
+	if value := version.Version(); value != "0.0.0@undefined" {
 		t.Errorf("Unexpected default version value: %s", value)
 	}
 }

@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"regexp"
@@ -8,11 +8,12 @@ import (
 
 	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/logger"
 )
 
 func TestNewNotVerboseDebugJSON(t *testing.T) {
 	output := capturer.CaptureStderr(func() {
-		log, err := New(false, false, false)
+		log, err := logger.New(false, false, false)
 		assert.NoError(t, err)
 
 		log.Info("inf msg")
@@ -28,7 +29,7 @@ func TestNewNotVerboseDebugJSON(t *testing.T) {
 
 func TestNewVerboseNotDebugJSON(t *testing.T) {
 	output := capturer.CaptureStderr(func() {
-		log, err := New(true, false, false)
+		log, err := logger.New(true, false, false)
 		assert.NoError(t, err)
 
 		log.Info("inf msg")
@@ -44,7 +45,7 @@ func TestNewVerboseNotDebugJSON(t *testing.T) {
 
 func TestNewVerboseDebugNotJSON(t *testing.T) {
 	output := capturer.CaptureStderr(func() {
-		log, err := New(true, true, false)
+		log, err := logger.New(true, true, false)
 		assert.NoError(t, err)
 
 		log.Info("inf msg")
@@ -60,7 +61,7 @@ func TestNewVerboseDebugNotJSON(t *testing.T) {
 
 func TestNewNotVerboseDebugButJSON(t *testing.T) {
 	output := capturer.CaptureStderr(func() {
-		log, err := New(false, false, true)
+		log, err := logger.New(false, false, true)
 		assert.NoError(t, err)
 
 		log.Info("inf msg")

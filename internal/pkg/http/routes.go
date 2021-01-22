@@ -5,12 +5,8 @@ import (
 	"net/http"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
-
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	sessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/create"
 	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/delete"
 	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/all"
@@ -19,7 +15,9 @@ import (
 	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
 	settingsGet "github.com/tarampampam/webhook-tester/internal/pkg/http/api/settings/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"

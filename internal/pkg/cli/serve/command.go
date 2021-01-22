@@ -8,11 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/cobra"
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"go.uber.org/zap"
 )

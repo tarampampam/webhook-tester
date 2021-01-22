@@ -1,4 +1,4 @@
-package serve
+package serve_test
 
 import (
 	"context"
@@ -16,11 +16,12 @@ import (
 	"github.com/kami-zh/go-capturer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/cli/serve"
 	"go.uber.org/zap"
 )
 
 func TestProperties(t *testing.T) {
-	cmd := NewCommand(context.Background(), zap.NewNop())
+	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 
 	assert.Equal(t, "serve", cmd.Use)
 	assert.ElementsMatch(t, []string{"s", "server"}, cmd.Aliases)
@@ -28,7 +29,7 @@ func TestProperties(t *testing.T) {
 }
 
 func TestFlags(t *testing.T) {
-	cmd := NewCommand(context.Background(), zap.NewNop())
+	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 	exe, _ := os.Executable()
 	exe = path.Dir(exe)
 
@@ -69,7 +70,7 @@ func TestFlags(t *testing.T) {
 }
 
 func TestSuccessfulFlagsPreparing(t *testing.T) {
-	cmd := NewCommand(context.Background(), zap.NewNop())
+	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 	cmd.SetArgs([]string{"--public", ""})
 
 	var executed bool
@@ -334,7 +335,7 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := NewCommand(context.Background(), zap.NewNop())
+			cmd := serve.NewCommand(context.Background(), zap.NewNop())
 			cmd.SetArgs(tt.giveArgs)
 
 			var executed bool
@@ -410,7 +411,7 @@ func startAndStopServer(t *testing.T, port int, args []string) string {
 		output = capturer.CaptureStderr(func() {
 			// create command with valid flags to run
 			log, _ := zap.NewDevelopment()
-			cmd := NewCommand(context.Background(), log)
+			cmd := serve.NewCommand(context.Background(), log)
 			cmd.SilenceUsage = true
 			cmd.SetArgs(args)
 
@@ -534,7 +535,7 @@ func TestRunningUsingBusyPortFailing(t *testing.T) {
 	defer func() { assert.NoError(t, l.Close()) }()
 
 	// create command with valid flags to run
-	cmd := NewCommand(context.Background(), zap.NewNop())
+	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 	cmd.SilenceUsage = true
 	cmd.SetArgs([]string{
 		"--public", "",
