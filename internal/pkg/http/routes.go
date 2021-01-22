@@ -2,6 +2,9 @@ package http
 
 import (
 	"context"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
 	"net/http"
 
 	"github.com/go-redis/redis/v8"
@@ -22,7 +25,7 @@ import (
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-func (s *Server) registerWebHookHandlers(cfg config.Config, storage storage.Storage, br broadcaster) error {
+func (s *Server) registerWebHookHandlers(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) error {
 	allowedMethods := []string{
 		http.MethodGet,
 		http.MethodHead,
@@ -38,9 +41,9 @@ func (s *Server) registerWebHookHandlers(cfg config.Config, storage storage.Stor
 		PathPrefix("").
 		Subrouter()
 
-	webhookRouter.Use(AllowCORSMiddleware)
+	webhookRouter.Use(cors.New())
 
-	handler := webhook.NewHandler(cfg, storage, br) // TODO return error if wrong config passed
+	handler := webhook.NewHandler(ctx, cfg, storage, br) // TODO return error if wrong config passed
 
 	webhookRouter.
 		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
@@ -65,7 +68,7 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 		PathPrefix("/api").
 		Subrouter()
 
-	apiRouter.Use(DisableCachingMiddleware, JSONResponseMiddleware)
+	apiRouter.Use(nocache.New(), json.New())
 
 	// get application settings
 	apiRouter.

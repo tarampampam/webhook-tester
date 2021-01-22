@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -16,127 +17,128 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-const maxBodyLength = 8192
-
-type Handler struct {
-	cfg         config.Config
-	storage     storage.Storage
-	broadcaster broadcaster
-}
-
 type broadcaster interface {
 	Publish(channel string, event broadcast.Event) error
 }
 
-func NewHandler(cfg config.Config, storage storage.Storage, br broadcaster) http.Handler {
+const maxBodyLength = 64 * 1024 // 64 KiB // TODO make configurable?
+
+type Handler struct {
+	ctx     context.Context
+	cfg     config.Config // TODO maybe not all config is required?
+	storage storage.Storage
+	br      broadcaster
+}
+
+func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) http.Handler {
 	return &Handler{
-		cfg:         cfg,
-		storage:     storage,
-		broadcaster: br,
+		ctx:     ctx,
+		cfg:     cfg,
+		storage: storage,
+		br:      br,
 	}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:funlen
-	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
-	if !sessionFound {
-		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
-		return
-	}
-
-	sessionData, sessionErr := h.storage.GetSession(sessionUUID)
-
-	if sessionErr != nil {
-		errors.NewServerError(
-			uint16(http.StatusInternalServerError), "cannot read session data from storage: "+sessionErr.Error(),
-		).RespondWithJSON(w)
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	sUUID, ok := mux.Vars(r)["sessionUUID"] // extract session UUID from the request variables
+	if !ok {
+		h.respondWithError(w, http.StatusInternalServerError, "cannot extract session UUID")
 
 		return
 	}
 
-	if sessionData == nil {
-		errors.NewServerError(
-			uint16(http.StatusNotFound), fmt.Sprintf("session with UUID %s was not found", sessionUUID),
-		).RespondWithJSON(w)
+	session, err := h.storage.GetSession(sUUID) // read current session info
+	if err != nil {
+		h.respondWithError(w, http.StatusInternalServerError, "session reading failed: "+err.Error())
 
 		return
 	}
 
-	var body []byte
+	if session == nil { // session is exists?
+		h.respondWithError(w, http.StatusNotFound, "session with UUID "+sUUID+" was not found")
+
+		return
+	}
+
+	var body = make([]byte, 0) // for request body
 
 	if r.Body != nil {
-		b, readErr := ioutil.ReadAll(r.Body)
-		if readErr != nil {
-			errors.NewServerError(uint16(http.StatusInternalServerError), readErr.Error()).RespondWithJSON(w)
+		if body, err = ioutil.ReadAll(r.Body); err != nil {
+			h.respondWithError(w, http.StatusInternalServerError, err.Error())
+
 			return
 		}
-
-		body = b
-	} else {
-		body = []byte{}
 	}
 
-	if l := len(body); l > maxBodyLength {
-		errors.NewServerError(
-			uint16(http.StatusBadRequest),
-			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", l, maxBodyLength),
-		).RespondWithJSON(w)
+	if bl := len(body); bl > maxBodyLength { // check passed body size
+		h.respondWithError(w,
+			http.StatusInternalServerError,
+			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", bl, maxBodyLength),
+		)
 
 		return
 	}
 
-	requestUUID, creationErr := h.storage.CreateRequest(sessionUUID,
+	var rUUID string
+
+	// store request in a storage
+	if rUUID, err = h.storage.CreateRequest(
+		sUUID,
 		h.getRealClientAddress(r),
 		r.Method,
 		string(body),
 		r.RequestURI,
 		h.headerToStringsMap(r.Header),
-	)
-
-	if creationErr != nil {
-		errors.NewServerError(
-			uint16(http.StatusInternalServerError), "cannot put session data into storage: "+creationErr.Error(),
-		).RespondWithJSON(w)
+	); err != nil {
+		h.respondWithError(w, http.StatusInternalServerError, "request saving in storage failed: "+err.Error())
 
 		return
 	}
 
-	if h.broadcaster != nil {
-		go func(sessionUUID, requestUUID string) {
-			_ = h.broadcaster.Publish(sessionUUID, broadcast.NewRequestRegisteredEvent(requestUUID))
-		}(sessionUUID, requestUUID)
-	}
+	// broadcast an event "new request was registered successful"
+	go func() { _ = h.br.Publish(sUUID, broadcast.NewRequestRegisteredEvent(rUUID)) }()
 
-	if delay := sessionData.Delay(); delay > 0 {
+	if delay := session.Delay(); delay > 0 {
 		timer := time.NewTimer(delay)
-		<-timer.C
-		timer.Stop()
+		defer timer.Stop()
+
+		select {
+		case <-h.ctx.Done():
+			h.respondWithError(w, http.StatusInternalServerError, "canceled")
+
+			return
+
+		case <-timer.C:
+		}
 	}
 
-	w.Header().Set("Content-Type", sessionData.ContentType())
-	w.WriteHeader(h.getRequiredHTTPCode(r, sessionData))
+	w.Header().Set("Content-Type", session.ContentType())
+	w.WriteHeader(h.getRequiredHTTPCode(r, session))
 
-	_, _ = w.Write([]byte(sessionData.Content()))
+	_, _ = w.Write([]byte(session.Content()))
 }
 
-func (h *Handler) getRequiredHTTPCode(r *http.Request, sessionData storage.Session) (result int) {
+func (h *Handler) respondWithError(w http.ResponseWriter, code int, msg string) {
+	errors.NewServerError(code, msg).RespondWithJSON(w)
+}
+
+func (h *Handler) getRequiredHTTPCode(r *http.Request, session storage.Session) int {
 	// try to extract required status code from the request
-	if statusCode, codeFound := mux.Vars(r)["statusCode"]; codeFound {
+	if statusCode, ok := mux.Vars(r)["statusCode"]; ok {
 		if code, err := strconv.Atoi(statusCode); err == nil {
-			if sessionData.Code() >= 100 && sessionData.Code() <= 599 {
-				result = code
+			if session.Code() >= 100 && session.Code() <= 599 {
+				return code
 			}
 		}
-	} else {
-		result = int(sessionData.Code())
 	}
 
-	return
+	return int(session.Code())
 }
 
 func (h *Handler) headerToStringsMap(header http.Header) map[string]string {
 	result := make(map[string]string)
 
-	shouldBeIgnored := make([]string, len(h.cfg.IgnoreHeaderPrefixes))
+	shouldBeIgnored := make([]string, len(h.cfg.IgnoreHeaderPrefixes)) // TODO optimize, burn on construct
 	for i, value := range h.cfg.IgnoreHeaderPrefixes {
 		shouldBeIgnored[i] = strings.ToUpper(strings.TrimSpace(value))
 	}

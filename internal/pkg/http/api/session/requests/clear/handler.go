@@ -33,16 +33,16 @@ func NewHandler(storage storage.Storage, broadcaster broadcaster) http.Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
 	if !sessionFound {
-		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		errors.NewServerError(http.StatusInternalServerError, "cannot extract session UUID").RespondWithJSON(w)
 		return
 	}
 
 	if deleted, err := h.storage.DeleteRequests(sessionUUID); err != nil {
-		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
+		errors.NewServerError(http.StatusInternalServerError, err.Error()).RespondWithJSON(w)
 		return
 	} else if !deleted {
 		errors.NewServerError(
-			uint16(http.StatusNotFound), fmt.Sprintf("requests for session with UUID %s was not found", sessionUUID),
+			http.StatusNotFound, fmt.Sprintf("requests for session with UUID %s was not found", sessionUUID),
 		).RespondWithJSON(w)
 
 		return

@@ -26,21 +26,21 @@ func NewHandler(storage storage.Storage) http.Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
 	if !sessionFound {
-		errors.NewServerError(uint16(http.StatusInternalServerError), "cannot extract session UUID").RespondWithJSON(w)
+		errors.NewServerError(http.StatusInternalServerError, "cannot extract session UUID").RespondWithJSON(w)
 		return
 	}
 
 	if session, err := h.storage.GetSession(sessionUUID); session == nil {
 		if err != nil {
 			errors.NewServerError(
-				uint16(http.StatusInternalServerError), "cannot get session data: "+err.Error(),
+				http.StatusInternalServerError, "cannot get session data: "+err.Error(),
 			).RespondWithJSON(w)
 
 			return
 		}
 
 		errors.NewServerError(
-			uint16(http.StatusNotFound), fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+			http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID),
 		).RespondWithJSON(w)
 
 		return
@@ -49,7 +49,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	allReq, err := h.storage.GetAllRequests(sessionUUID)
 	if err != nil {
 		errors.NewServerError(
-			uint16(http.StatusInternalServerError), "cannot get requests data: "+err.Error(),
+			http.StatusInternalServerError, "cannot get requests data: "+err.Error(),
 		).RespondWithJSON(w)
 
 		return

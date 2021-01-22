@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
 				rr      = httptest.NewRecorder()
 				br      = &broadcast.None{}
-				handler = NewHandler(config.Config{}, s, br)
+				handler = NewHandler(context.Background(), config.Config{}, s, br)
 			)
 
 			if tt.giveReqVars != nil {
@@ -72,7 +73,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
 		rr      = httptest.NewRecorder()
 		br      = &broadcast.None{}
-		handler = NewHandler(config.Config{}, s, br)
+		handler = NewHandler(context.Background(), config.Config{}, s, br)
 	)
 
 	var (

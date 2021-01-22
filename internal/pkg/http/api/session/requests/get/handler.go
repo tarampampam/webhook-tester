@@ -32,7 +32,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if gettingErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(errors.NewServerError(
-			uint16(http.StatusInternalServerError), "cannot read request data: "+gettingErr.Error(),
+			http.StatusInternalServerError, "cannot read request data: "+gettingErr.Error(),
 		).ToJSON())
 
 		return
@@ -41,7 +41,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if req == nil {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write(errors.NewServerError(
-			uint16(http.StatusNotFound),
+			http.StatusNotFound,
 			fmt.Sprintf("request with UUID %s was not found", requestUUID),
 		).ToJSON())
 

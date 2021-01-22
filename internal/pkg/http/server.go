@@ -53,7 +53,7 @@ func NewServer(log *zap.Logger) *Server {
 		log:           log,
 		server:        httpServer,
 		router:        router,
-		afterShutdown: make([]func(), 0),
+		afterShutdown: make([]func(), 0, 1),
 	}
 }
 
@@ -123,7 +123,7 @@ func (s *Server) registerHandlers(
 	publicDir string,
 	rdb *redis.Client,
 ) error {
-	if err := s.registerWebHookHandlers(cfg, storage, br); err != nil {
+	if err := s.registerWebHookHandlers(ctx, cfg, storage, br); err != nil {
 		return err
 	}
 

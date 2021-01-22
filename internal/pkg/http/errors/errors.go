@@ -6,37 +6,33 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-type ServerError struct {
+type serverError struct {
 	Success bool   `json:"success"`
-	Code    uint16 `json:"code"`
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-func NewServerError(code uint16, message string) *ServerError {
-	return &ServerError{
-		Success: false,
-		Code:    code,
-		Message: message,
-	}
+func NewServerError(code int, message string) *serverError {
+	return &serverError{Success: false, Code: code, Message: message}
 }
 
 // Get error message.
-func (e *ServerError) Error() string {
-	return e.Message
-}
+func (e *serverError) Error() string { return e.Message }
 
-func (e *ServerError) ToJSON() []byte {
-	if marshaled, err := jsoniter.ConfigFastest.Marshal(e); err == nil {
-		return marshaled
+func (e *serverError) ToJSON() []byte {
+	if j, err := jsoniter.ConfigFastest.Marshal(e); err == nil {
+		return j
 	}
 
-	return []byte(`{"error cannot be converted into JSON representation"}`)
+	return []byte(`{"error cannot be converted into JSON representation"}`) // fallback
 }
 
-func (e *ServerError) RespondWithJSON(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
+func (e *serverError) RespondWithJSON(w http.ResponseWriter) {
+	if k, v := "Content-Type", "application/json"; w.Header().Get(k) != v {
+		w.Header().Set(k, v)
+	}
 
-	w.WriteHeader(int(e.Code))
+	w.WriteHeader(e.Code)
 
 	_, _ = w.Write(e.ToJSON())
 }

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Graceful shutdown support for `serve` sub-command
 - HTTP requests & HTTP panics logging middlewares
 - Logging using `uber-go/zap` package
+- Webhook delay uses `time.After()` instead `time.Sleep()` with context canceling support
 
 ### Changed
 
