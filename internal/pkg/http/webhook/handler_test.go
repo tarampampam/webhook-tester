@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
-	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -49,7 +49,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
 				rr      = httptest.NewRecorder()
 				br      = &broadcast.None{}
-				handler = NewHandler(&settings.AppSettings{}, s, br)
+				handler = NewHandler(config.Config{}, s, br)
 			)
 
 			if tt.giveReqVars != nil {
@@ -72,7 +72,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
 		rr      = httptest.NewRecorder()
 		br      = &broadcast.None{}
-		handler = NewHandler(&settings.AppSettings{}, s, br)
+		handler = NewHandler(config.Config{}, s, br)
 	)
 
 	var (

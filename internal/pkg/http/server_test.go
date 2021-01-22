@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
-	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
@@ -55,7 +54,7 @@ func TestServer_StartAndStop(t *testing.T) {
 	s := storage.NewInMemoryStorage(time.Minute, 10)
 	defer s.Close()
 
-	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
+	srv := NewServer(zap.NewNop())
 
 	assert.False(t, checkTCPPortIsBusy(t, port))
 
@@ -131,7 +130,7 @@ func TestServer_Register(t *testing.T) {
 	s := storage.NewInMemoryStorage(time.Minute, 10)
 	defer s.Close()
 
-	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
+	srv := NewServer(zap.NewNop())
 
 	router := srv.router // dirty hack, yes, i know
 
@@ -145,7 +144,10 @@ func TestServer_Register(t *testing.T) {
 	}
 
 	// call register fn
-	assert.NoError(t, srv.Register())
+	assert.NoError(t, srv.Register(context.Background(), config.Config{
+		StorageDriver:   config.StorageDriverMemory,
+		BroadcastDriver: config.BroadcastDriverNone,
+	}, ".", nil))
 
 	// state *after* registration
 	types, _ = mime.ExtensionsByType("text/html; charset=utf-8") // reload
@@ -160,10 +162,13 @@ func TestServer_Register(t *testing.T) {
 }
 
 func TestServer_RegisterWithoutResourcesDir(t *testing.T) {
-	srv := NewServer(context.Background(), zap.NewNop(), "", nil, nil, nil, nil) // empty resources dir
-	router := srv.router                                                         // dirty hack, yes, i know
+	srv := NewServer(zap.NewNop())
+	router := srv.router // dirty hack, yes, i know
 
 	assert.Nil(t, router.Get("static"))
-	assert.NoError(t, srv.Register())
+	assert.NoError(t, srv.Register(context.Background(), config.Config{
+		StorageDriver:   config.StorageDriverMemory,
+		BroadcastDriver: config.BroadcastDriverNone,
+	}, "", nil)) // empty resources dir
 	assert.Nil(t, router.Get("static"))
 }

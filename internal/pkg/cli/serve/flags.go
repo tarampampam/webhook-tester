@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/pflag"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/env"
 )
 
@@ -94,15 +95,15 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		&f.storageDriver,
 		"storage-driver",
 		"",
-		storageMemory,
-		fmt.Sprintf("storage driver (%s|%s) [$%s]", storageMemory, storageRedis, env.StorageDriverName),
+		config.StorageDriverMemory.String(),
+		fmt.Sprintf("storage driver (%s|%s) [$%s]", config.StorageDriverMemory, config.StorageDriverRedis, env.StorageDriverName), //nolint:lll
 	)
 	flagSet.StringVarP(
 		&f.broadcastDriver,
 		"broadcast-driver",
 		"",
-		brDriverNone,
-		fmt.Sprintf("broadcast driver (%s|%s) [$%s]", brDriverNone, brDriverPusher, env.BroadcastDriverName),
+		config.BroadcastDriverNone.String(),
+		fmt.Sprintf("broadcast driver (%s|%s) [$%s]", config.BroadcastDriverNone, config.BroadcastDriverPusher, env.BroadcastDriverName), //nolint:lll
 	)
 	flagSet.StringVarP(
 		&f.pusher.appID,
@@ -210,10 +211,10 @@ func (f *flags) validate() error {
 	}
 
 	switch f.storageDriver {
-	case storageMemory:
+	case config.StorageDriverMemory.String():
 		// do nothing
 
-	case storageRedis:
+	case config.StorageDriverRedis.String():
 		if _, err := redis.ParseURL(f.redisDSN); err != nil {
 			return fmt.Errorf("wrong redis DSN [%s]: %w", f.redisDSN, err)
 		}
@@ -223,10 +224,10 @@ func (f *flags) validate() error {
 	}
 
 	switch f.broadcastDriver {
-	case brDriverNone:
+	case config.BroadcastDriverNone.String():
 		// do nothing
 
-	case brDriverPusher:
+	case config.BroadcastDriverPusher.String():
 		if f.pusher.appID == "" {
 			return errors.New("pusher application ID does not set")
 		}
@@ -248,4 +249,38 @@ func (f *flags) validate() error {
 	}
 
 	return nil
+}
+
+func (f *flags) toConfig() config.Config {
+	cfg := config.Config{
+		MaxRequests:          f.maxRequests,
+		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix,
+	}
+
+	if ttl, err := time.ParseDuration(f.sessionTTL); err == nil { // error ignored
+		cfg.SessionTTL = ttl
+	}
+
+	switch f.storageDriver {
+	case config.StorageDriverMemory.String():
+		cfg.StorageDriver = config.StorageDriverMemory
+
+	case config.StorageDriverRedis.String():
+		cfg.StorageDriver = config.StorageDriverRedis
+	}
+
+	switch f.broadcastDriver {
+	case config.BroadcastDriverNone.String():
+		cfg.BroadcastDriver = config.BroadcastDriverNone
+
+	case config.BroadcastDriverPusher.String():
+		cfg.BroadcastDriver = config.BroadcastDriverPusher
+	}
+
+	cfg.Pusher.AppID = f.pusher.appID
+	cfg.Pusher.Cluster = f.pusher.cluster
+	cfg.Pusher.Key = f.pusher.key
+	cfg.Pusher.Secret = f.pusher.secret
+
+	return cfg
 }

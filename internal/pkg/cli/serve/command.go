@@ -4,26 +4,18 @@ package serve
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/cobra"
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
-	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
-
-// broadcast driver names
-const brDriverNone, brDriverPusher = "none", "pusher"
-
-// storage driver names
-const storageMemory, storageRedis = "memory", "redis"
 
 // NewCommand creates `serve` command.
 func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
@@ -42,7 +34,7 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 			return f.validate()
 		},
 		RunE: func(*cobra.Command, []string) error {
-			return run(ctx, log, &f)
+			return run(ctx, log, f.toConfig(), f.listen.ip, f.listen.port, f.publicDir, f.redisDSN)
 		},
 	}
 
@@ -54,7 +46,15 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 const serverShutdownTimeout = 5 * time.Second
 
 // run current command.
-func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:funlen,gocyclo
+func run( //nolint:funlen
+	parentCtx context.Context,
+	log *zap.Logger,
+	cfg config.Config,
+	ip string,
+	port uint16,
+	publicDir string,
+	redisDSN string,
+) error {
 	var (
 		ctx, cancel = context.WithCancel(parentCtx) // serve context creation
 		oss         = breaker.NewOSSignals(ctx)     // OS signals listener
@@ -72,50 +72,15 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		oss.Stop() // stop system signals listening
 	}()
 
-	// parse session TTL duration (string) into time.Duration
-	sessionTTL, parsingErr := time.ParseDuration(f.sessionTTL)
-	if parsingErr != nil {
-		return parsingErr
-	}
+	var rdb *redis.Client // vam be nil, this is ok
 
-	// prepare application settings struct // TODO can we do not use this struct?
-	appSettings := &settings.AppSettings{
-		MaxRequests:          f.maxRequests,
-		SessionTTL:           sessionTTL,
-		PusherKey:            f.pusher.key,         // FIXME depends on broadcast driver
-		PusherCluster:        f.pusher.cluster,     // FIXME depends on broadcast driver
-		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix, // FIXME
-	}
-
-	var (
-		broadcaster interface {
-			Publish(channel string, event broadcast.Event) error
+	// establish connection with redis server, if this action is required (based on storage driver)
+	if cfg.StorageDriver == config.StorageDriverRedis {
+		opt, optErr := redis.ParseURL(redisDSN)
+		if optErr != nil {
+			return optErr
 		}
 
-		stor storage.Storage
-		rdb  *redis.Client
-	)
-
-	// create required broadcaster implementation
-	switch f.broadcastDriver {
-	case brDriverNone:
-		broadcaster = &broadcast.None{}
-
-	case brDriverPusher:
-		broadcaster = broadcast.NewPusher(f.pusher.appID, f.pusher.key, f.pusher.secret, f.pusher.cluster)
-	}
-
-	// create required storage implementation
-	switch f.storageDriver {
-	case storageMemory:
-		inmemory := storage.NewInMemoryStorage(sessionTTL, f.maxRequests)
-
-		defer func() { _ = inmemory.Close() }()
-
-		stor = inmemory
-
-	case storageRedis:
-		opt, _ := redis.ParseURL(f.redisDSN)
 		rdb = redis.NewClient(opt).WithContext(ctx)
 
 		defer func() { _ = rdb.Close() }()
@@ -123,15 +88,13 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		if pingErr := rdb.Ping(ctx).Err(); pingErr != nil {
 			return pingErr
 		}
-
-		stor = storage.NewRedisStorage(ctx, rdb, sessionTTL, f.maxRequests)
 	}
 
 	// create HTTP server
-	server := appHttp.NewServer(ctx, log, f.publicDir, appSettings, stor, broadcaster, rdb)
+	server := appHttp.NewServer(log)
 
 	// register server routes, middlewares, etc.
-	if err := server.Register(); err != nil {
+	if err := server.Register(ctx, cfg, publicDir, rdb); err != nil {
 		return err
 	}
 
@@ -142,27 +105,27 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		defer close(errCh)
 
 		fields := []zap.Field{
-			zap.String("addr", f.listen.ip),
-			zap.Uint16("port", f.listen.port),
-			zap.String("public", f.publicDir),
-			zap.Uint16("max requests", f.maxRequests),
-			zap.String("session ttl", f.sessionTTL),
-			zap.Strings("ignore prefixes", f.ignoreHeaderPrefix),
-			zap.String("storage driver", f.storageDriver),
-			zap.String("broadcast driver", f.broadcastDriver),
+			zap.String("addr", ip),
+			zap.Uint16("port", port),
+			zap.String("public", publicDir),
+			zap.Uint16("max requests", cfg.MaxRequests),
+			zap.Duration("session ttl", cfg.SessionTTL),
+			zap.Strings("ignore prefixes", cfg.IgnoreHeaderPrefixes),
+			zap.String("storage driver", cfg.StorageDriver.String()),
+			zap.String("broadcast driver", cfg.BroadcastDriver.String()),
 		}
 
-		if f.storageDriver == storageRedis {
-			fields = append(fields, zap.String("redis dsn", f.redisDSN))
+		if cfg.StorageDriver == config.StorageDriverRedis {
+			fields = append(fields, zap.String("redis dsn", redisDSN))
 		}
 
 		log.Info("Server starting", fields...)
 
-		if f.publicDir == "" {
+		if publicDir == "" {
 			log.Warn("Path to the directory with public assets was not provided")
 		}
 
-		if err := server.Start(f.listen.ip, f.listen.port); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.Start(ip, port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}(startingErrCh)
@@ -182,13 +145,6 @@ func run(parentCtx context.Context, log *zap.Logger, f *flags) error { //nolint:
 		// stop the server using created context above
 		if err := server.Stop(ctxShutdown); err != nil {
 			return err
-		}
-
-		// close storage (if it is possible)
-		if c, ok := stor.(io.Closer); ok {
-			if err := c.Close(); err != nil {
-				return err
-			}
 		}
 
 		// and close redis connection

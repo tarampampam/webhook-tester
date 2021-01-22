@@ -11,15 +11,15 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
-	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 const maxBodyLength = 8192
 
 type Handler struct {
-	appSettings *settings.AppSettings
+	cfg         config.Config
 	storage     storage.Storage
 	broadcaster broadcaster
 }
@@ -28,9 +28,9 @@ type broadcaster interface {
 	Publish(channel string, event broadcast.Event) error
 }
 
-func NewHandler(set *settings.AppSettings, storage storage.Storage, br broadcaster) http.Handler {
+func NewHandler(cfg config.Config, storage storage.Storage, br broadcaster) http.Handler {
 	return &Handler{
-		appSettings: set,
+		cfg:         cfg,
 		storage:     storage,
 		broadcaster: br,
 	}
@@ -136,8 +136,8 @@ func (h *Handler) getRequiredHTTPCode(r *http.Request, sessionData storage.Sessi
 func (h *Handler) headerToStringsMap(header http.Header) map[string]string {
 	result := make(map[string]string)
 
-	shouldBeIgnored := make([]string, len(h.appSettings.IgnoreHeaderPrefixes))
-	for i, value := range h.appSettings.IgnoreHeaderPrefixes {
+	shouldBeIgnored := make([]string, len(h.cfg.IgnoreHeaderPrefixes))
+	for i, value := range h.cfg.IgnoreHeaderPrefixes {
 		shouldBeIgnored[i] = strings.ToUpper(strings.TrimSpace(value))
 	}
 

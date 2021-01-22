@@ -1,7 +1,12 @@
 package http
 
 import (
+	"context"
 	"net/http"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
@@ -19,7 +24,7 @@ import (
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-func (s *Server) registerWebHookHandlers() error {
+func (s *Server) registerWebHookHandlers(cfg config.Config, storage storage.Storage, br broadcaster) error {
 	allowedMethods := []string{
 		http.MethodGet,
 		http.MethodHead,
@@ -37,7 +42,7 @@ func (s *Server) registerWebHookHandlers() error {
 
 	webhookRouter.Use(AllowCORSMiddleware)
 
-	handler := webhook.NewHandler(s.appSettings, s.storage, s.broadcaster) // TODO return error if wrong config passed
+	handler := webhook.NewHandler(cfg, storage, br) // TODO return error if wrong config passed
 
 	webhookRouter.
 		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
@@ -57,7 +62,7 @@ func (s *Server) registerWebHookHandlers() error {
 	return nil
 }
 
-func (s *Server) registerAPIHandlers() {
+func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage, br broadcaster) {
 	apiRouter := s.router.
 		PathPrefix("/api").
 		Subrouter()
@@ -66,25 +71,25 @@ func (s *Server) registerAPIHandlers() {
 
 	// get application settings
 	apiRouter.
-		Handle("/settings", settingsGet.NewHandler(s.appSettings)).
+		Handle("/settings", settingsGet.NewHandler(cfg)). // FIXME settings passed using pointer, it is really needed?
 		Methods(http.MethodGet).
 		Name("api_settings_get")
 
 	// create new session
 	apiRouter.
-		Handle("/session", sessionCreate.NewHandler(s.storage)).
+		Handle("/session", sessionCreate.NewHandler(storage)).
 		Methods(http.MethodPost).
 		Name("api_session_create")
 
 	// delete session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(s.storage)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(storage)).
 		Methods(http.MethodDelete).
 		Name("api_session_delete")
 
 	// get requests list for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(s.storage)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(storage)).
 		Methods(http.MethodGet).
 		Name("api_session_requests_all_get")
 
@@ -92,7 +97,7 @@ func (s *Server) registerAPIHandlers() {
 	apiRouter.
 		Handle(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			getRequest.NewHandler(s.storage),
+			getRequest.NewHandler(storage),
 		).
 		Methods(http.MethodGet).
 		Name("api_session_request_get")
@@ -101,21 +106,21 @@ func (s *Server) registerAPIHandlers() {
 	apiRouter.
 		Handle(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			deleteRequest.NewHandler(s.storage, s.broadcaster),
+			deleteRequest.NewHandler(storage, br),
 		).
 		Methods(http.MethodDelete).
 		Name("api_delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage, s.broadcaster)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, br)).
 		Methods(http.MethodDelete).
 		Name("api_delete_all_session_requests")
 }
 
-func (s *Server) registerServiceHandlers() {
+func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client) {
 	s.router.
-		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(s.ctx, s.rdb))).
+		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(ctx, rdb))).
 		Methods(http.MethodGet, http.MethodHead).
 		Name("ready")
 
