@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
 
@@ -52,7 +52,10 @@ func TestServer_StartAndStop(t *testing.T) {
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
 
-	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, &nullStorage.Storage{}, &broadcast.None{}, nil) //nolint:lll
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
 
 	assert.False(t, checkTCPPortIsBusy(t, port))
 
@@ -125,7 +128,10 @@ func TestServer_Register(t *testing.T) {
 		{name: "static", route: "/", methods: []string{http.MethodGet, http.MethodHead}},
 	}
 
-	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, &nullStorage.Storage{}, &broadcast.None{}, nil) //nolint:lll
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	srv := NewServer(context.Background(), zap.NewNop(), ".", &settings.AppSettings{}, s, &broadcast.None{}, nil)
 
 	router := srv.router // dirty hack, yes, i know
 

@@ -29,24 +29,34 @@ func (r *request) validate() error {
 	return nil
 }
 
-func (r *request) setDefaults() {
+func (r *request) statusCode() uint16 {
 	if r.StatusCode == nil {
-		var defaultStatusCode uint16 = 200
-		r.StatusCode = &defaultStatusCode
+		return 200 //nolint:gomnd // default value
 	}
 
+	return *r.StatusCode
+}
+
+func (r *request) contentType() string {
 	if r.ContentType == nil {
-		var defaultContentType string = "text/plain"
-		r.ContentType = &defaultContentType
+		return "text/plain" // default value
 	}
 
+	return *r.ContentType
+}
+
+func (r *request) responseDelaySec() uint8 {
 	if r.ResponseDelaySec == nil {
-		var defaultDelaySec uint8 = 0
-		r.ResponseDelaySec = &defaultDelaySec
+		return 0 // default value
 	}
 
+	return *r.ResponseDelaySec
+}
+
+func (r *request) responseContent() string {
 	if r.ResponseContent == nil {
-		var defaultContent string = ""
-		r.ResponseContent = &defaultContent
+		return "" // default value
 	}
+
+	return *r.ResponseContent
 }

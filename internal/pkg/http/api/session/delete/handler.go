@@ -42,7 +42,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// and recorded session requests
-	if _, err := h.storage.DeleteRequests(sessionUUID); err != nil {
+	if _, err := h.storage.DeleteRequests(sessionUUID); err != nil { // TODO delete requests first and ignore error?
 		errors.NewServerError(uint16(http.StatusInternalServerError), err.Error()).RespondWithJSON(w)
 		return
 	}

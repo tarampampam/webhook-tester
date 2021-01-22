@@ -130,14 +130,19 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: End-to-End tests
+    name: End-to-End tests (${{ matrix.storage-driver }} storage)
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
     needs: [build]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
 
       - name: Start redis server
+        if: matrix.storage-driver == 'redis'
         run: docker run --rm -d -p "6379:6379/tcp" redis:6.0.9-alpine
 
       - name: Download compiled binary file
@@ -151,7 +156,7 @@ jobs:
         run: mv ./webhook-tester ./../app && chmod +x ./../app
 
       - name: Start HTTP server
-        run: ./app serve --port 8081 --public ./web --redis-dsn "redis://127.0.0.1:6379/0" &
+        run: ./app serve --port 8081 --public ./web --storage-driver "${{ matrix.storage-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
 
       - name: Run Newman
         uses: ./.github/actions/newman
@@ -198,8 +203,12 @@ jobs:
           path: ./docker-image.tar
 
   docker-image-e2e:
-    name: Docker image End-to-End tests
+    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage)
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
     needs: [docker-image]
     steps:
       - name: Check out code
@@ -209,6 +218,7 @@ jobs:
         run: docker network create "app-network"
 
       - name: Start redis server
+        if: matrix.storage-driver == 'redis'
         run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:6.0.9-alpine
 
       - name: Download builded docker image
@@ -226,6 +236,7 @@ jobs:
           docker run --rm -d \
             --network "app-network" \
             -p "8081:8081/tcp" \
+            -e "STORAGE_DRIVER=${{ matrix.storage-driver }}" \
             -e "REDIS_DSN=redis://redis:6379/0" \
             -e "LISTEN_PORT=8081" \
               webhook-tester:local

@@ -1,28 +1,24 @@
 package delete
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
-	t.Parallel()
-
+func TestHandler_ServeHTTP(t *testing.T) {
 	var cases = []struct {
 		name        string
-		giveReqVars map[string]string
-		setUp       func(s *nullStorage.Storage)
+		giveReqVars func(sessionUUID string) map[string]string
 		checkResult func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
-			name:        "without registered session UUID",
-			giveReqVars: nil,
+			name: "without registered session UUID",
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, rr.Code)
 				assert.JSONEq(t,
@@ -31,24 +27,9 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:        "emulate storage error",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = errors.New("foo")
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, rr.Code)
-				assert.JSONEq(t,
-					`{"code":500,"success":false,"message":"foo"}`, rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "emulate 'session was not found'",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = nil
-				s.Boolean = false
+			name: "session was not found",
+			giveReqVars: func(_ string) map[string]string {
+				return map[string]string{"sessionUUID": "aa-bb-cc-dd"}
 			},
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusNotFound, rr.Code)
@@ -58,11 +39,9 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:        "success",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = nil
-				s.Boolean = true
+			name: "success",
+			giveReqVars: func(sessionUUID string) map[string]string {
+				return map[string]string{"sessionUUID": sessionUUID}
 			},
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, rr.Code)
@@ -75,19 +54,20 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			s := storage.NewInMemoryStorage(time.Minute, 10)
+			defer s.Close()
+
+			sessionUUID, err := s.CreateSession("", 201, "", 0)
+			assert.NoError(t, err)
+
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
 				rr      = httptest.NewRecorder()
-				s       = &nullStorage.Storage{}
 				handler = NewHandler(s)
 			)
 
 			if tt.giveReqVars != nil {
-				req = mux.SetURLVars(req, tt.giveReqVars)
-			}
-
-			if tt.setUp != nil {
-				tt.setUp(s)
+				req = mux.SetURLVars(req, tt.giveReqVars(sessionUUID))
 			}
 
 			handler.ServeHTTP(rr, req)

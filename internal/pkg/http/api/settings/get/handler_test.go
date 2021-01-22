@@ -10,7 +10,7 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 )
 
-func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
+func TestHandler_ServeHTTP(t *testing.T) {
 	t.Parallel()
 
 	var cases = []struct {
