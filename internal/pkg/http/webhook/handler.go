@@ -39,7 +39,7 @@ func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage,
 	}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:funlen
 	sUUID, ok := mux.Vars(r)["sessionUUID"] // extract session UUID from the request variables
 	if !ok {
 		h.respondWithError(w, http.StatusInternalServerError, "cannot extract session UUID")

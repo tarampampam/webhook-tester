@@ -12,7 +12,7 @@ type serverError struct {
 	Message string `json:"message"`
 }
 
-func NewServerError(code int, message string) *serverError {
+func NewServerError(code int, message string) *serverError { //nolint:golint
 	return &serverError{Success: false, Code: code, Message: message}
 }
 

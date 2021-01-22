@@ -2,10 +2,11 @@ package http
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
-	"net/http"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
@@ -25,7 +26,12 @@ import (
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-func (s *Server) registerWebHookHandlers(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) error {
+func (s *Server) registerWebHookHandlers(
+	ctx context.Context,
+	cfg config.Config,
+	storage storage.Storage,
+	br broadcaster,
+) error {
 	allowedMethods := []string{
 		http.MethodGet,
 		http.MethodHead,

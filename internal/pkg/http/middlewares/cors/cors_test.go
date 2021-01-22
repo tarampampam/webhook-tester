@@ -1,10 +1,11 @@
 package cors_test
 
 import (
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 
 	"github.com/stretchr/testify/assert"
 )
