@@ -1,183 +1,47 @@
 package all
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
 )
 
-func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
-	t.Parallel()
-
+func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	var cases = []struct {
-		name        string
-		giveReqVars map[string]string
-		setUp       func(s *nullStorage.Storage)
-		checkResult func(t *testing.T, rr *httptest.ResponseRecorder)
+		name           string
+		giveReqVars    map[string]string
+		wantStatusCode int
+		wantJSON       string
 	}{
 		{
-			name:        "without registered session UUID",
-			giveReqVars: nil,
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, rr.Code)
-				assert.JSONEq(t,
-					`{"code":500,"success":false,"message":"cannot extract session UUID"}`, rr.Body.String(),
-				)
-			},
+			name:           "without registered session UUID",
+			giveReqVars:    nil,
+			wantStatusCode: http.StatusInternalServerError,
+			wantJSON:       `{"code":500,"success":false,"message":"cannot extract session UUID"}`,
 		},
 		{
-			name:        "emulate storage error",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = errors.New("foo")
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, rr.Code)
-				assert.JSONEq(t,
-					`{"code":500,"success":false,"message":"cannot get session data: foo"}`, rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "emulate 'session was not found'",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = nil
-				s.Boolean = false
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusNotFound, rr.Code)
-				assert.JSONEq(t,
-					`{"code":404,"success":false,"message":"session with UUID aa-bb-cc-dd was not found"}`, rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "success with one item (headers must be sorted)",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = nil
-				s.Boolean = true
-				s.SessionData = &storage.SessionData{
-					UUID: "aa-bb-cc-dd",
-				}
-				s.Requests = &[]storage.RequestData{
-					{
-						UUID: "11-22-33-44",
-						Request: storage.Request{
-							ClientAddr: "1.2.2.1",
-							Method:     "PUT",
-							Content:    "foobar",
-							Headers:    map[string]string{"bbb": "foo", "aaa": "bar"},
-							URI:        "http://example.com/foo",
-						},
-						CreatedAtUnix: 1,
-					},
-				}
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, rr.Code)
-				assert.JSONEq(t, `[{
-					"client_address":"1.2.2.1",
-					"content":"foobar",
-					"created_at_unix":1,
-					"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
-					"method":"PUT",
-					"url":"http://example.com/foo",
-					"uuid":"11-22-33-44"
-				}]`, rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "success with many items (must be sorted)",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage) {
-				s.Error = nil
-				s.Boolean = true
-				s.SessionData = &storage.SessionData{
-					UUID: "aa-bb-cc-dd",
-				}
-				s.Requests = &[]storage.RequestData{
-					{
-						UUID:          "111",
-						Request:       storage.Request{},
-						CreatedAtUnix: 3,
-					},
-					{
-						UUID:          "222",
-						Request:       storage.Request{},
-						CreatedAtUnix: 1,
-					},
-					{
-						UUID:          "333",
-						Request:       storage.Request{},
-						CreatedAtUnix: 10,
-					},
-					{
-						UUID:          "444",
-						Request:       storage.Request{},
-						CreatedAtUnix: 2,
-					},
-				}
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, rr.Code)
-				assert.JSONEq(t, `[
-					{
-						"client_address":"",
-						"content":"",
-						"created_at_unix":10,
-						"headers":[],
-						"method":"",
-						"url":"",
-						"uuid":"333"
-					},
-					{
-						"client_address":"",
-						"content":"",
-						"created_at_unix":3,
-						"headers":[],
-						"method":"",
-						"url":"",
-						"uuid":"111"
-					},
-					{
-						"client_address":"",
-						"content":"",
-						"created_at_unix":2,
-						"headers":[],
-						"method":"",
-						"url":"",
-						"uuid":"444"
-					},
-					{
-						"client_address":"",
-						"content":"",
-						"created_at_unix":1,
-						"headers":[],
-						"method":"",
-						"url":"",
-						"uuid":"222"
-					}
-				]`, rr.Body.String(),
-				)
-			},
+			name:           "session was not found",
+			giveReqVars:    map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			wantStatusCode: http.StatusNotFound,
+			wantJSON:       `{"code":404,"success":false,"message":"session with UUID aa-bb-cc-dd was not found"}`,
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			s := storage.NewInMemoryStorage(time.Minute, 1)
+			defer s.Close()
+
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
 				rr      = httptest.NewRecorder()
-				s       = &nullStorage.Storage{}
 				handler = NewHandler(s)
 			)
 
@@ -185,13 +49,146 @@ func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
 				req = mux.SetURLVars(req, tt.giveReqVars)
 			}
 
-			if tt.setUp != nil {
-				tt.setUp(s)
-			}
-
 			handler.ServeHTTP(rr, req)
 
-			tt.checkResult(t, rr)
+			assert.Equal(t, tt.wantStatusCode, rr.Code)
+			assert.JSONEq(t, tt.wantJSON, rr.Body.String())
 		})
 	}
+}
+
+func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = NewHandler(s)
+	)
+
+	// create session
+	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	assert.NoError(t, err)
+
+	// create ONE request for the session
+	requestUUID, err := s.CreateRequest(
+		sessionUUID,
+		"1.2.2.1",
+		"PUT",
+		"foobar",
+		"http://example.com/foo",
+		map[string]string{"aaa": "bar", "bbb": "foo"},
+	)
+	assert.NoError(t, err)
+
+	request, _ := s.GetRequest(sessionUUID, requestUUID)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+
+	handler.ServeHTTP(rr, req)
+
+	runtime.Gosched()
+	<-time.After(time.Millisecond) // FIXME goroutine must be done
+
+	assert.JSONEq(t, `[{
+		"client_address":"1.2.2.1",
+		"content":"foobar",
+		"created_at_unix":`+strconv.FormatInt(request.CreatedAt().Unix(), 10)+`,
+		"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
+		"method":"PUT",
+		"url":"http://example.com/foo",
+		"uuid":"`+request.UUID()+`"
+	}]`, rr.Body.String())
+}
+
+func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
+	s := storage.NewInMemoryStorage(time.Minute, 3)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = NewHandler(s)
+	)
+
+	// create session
+	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	assert.NoError(t, err)
+
+	// create THREE requests for the session
+	_, _ = s.CreateRequest( // must be ignored, storage limit = 3
+		sessionUUID,
+		"1.1.1.1",
+		"PUT",
+		"foobar",
+		"http://example.com/foo1",
+		nil,
+	)
+	request1UUID, _ := s.CreateRequest(
+		sessionUUID,
+		"1.1.1.1",
+		"PUT",
+		"foobar",
+		"http://example.com/foo1",
+		map[string]string{"aaa": "bar", "bbb": "foo"},
+	)
+
+	<-time.After(time.Millisecond * 5)
+
+	request2UUID, _ := s.CreateRequest(
+		sessionUUID,
+		"2.2.2.2",
+		"PUT",
+		"foobar",
+		"http://example.com/foo2",
+		nil,
+	)
+
+	<-time.After(time.Millisecond * 5)
+
+	request3UUID, _ := s.CreateRequest(
+		sessionUUID,
+		"3.3.3.3",
+		"PUT",
+		"foobar",
+		"http://example.com/foo3",
+		map[string]string{"aaa": "bar"},
+	)
+	request1, _ := s.GetRequest(sessionUUID, request1UUID)
+	request2, _ := s.GetRequest(sessionUUID, request2UUID)
+	request3, _ := s.GetRequest(sessionUUID, request3UUID)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+
+	handler.ServeHTTP(rr, req)
+
+	runtime.Gosched()
+	<-time.After(time.Millisecond) // FIXME goroutine must be done
+
+	assert.JSONEq(t, `[{
+		"client_address":"1.1.1.1",
+		"content":"foobar",
+		"created_at_unix":`+strconv.FormatInt(request1.CreatedAt().Unix(), 10)+`,
+		"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
+		"method":"PUT",
+		"url":"http://example.com/foo1",
+		"uuid":"`+request1.UUID()+`"
+	},{
+		"client_address":"2.2.2.2",
+		"content":"foobar",
+		"created_at_unix":`+strconv.FormatInt(request2.CreatedAt().Unix(), 10)+`,
+		"headers":[],
+		"method":"PUT",
+		"url":"http://example.com/foo2",
+		"uuid":"`+request2.UUID()+`"
+	},{
+		"client_address":"3.3.3.3",
+		"content":"foobar",
+		"created_at_unix":`+strconv.FormatInt(request3.CreatedAt().Unix(), 10)+`,
+		"headers":[{"name": "aaa", "value": "bar"}],
+		"method":"PUT",
+		"url":"http://example.com/foo3",
+		"uuid":"`+request3.UUID()+`"
+	}]`, rr.Body.String())
 }

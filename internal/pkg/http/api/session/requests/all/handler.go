@@ -46,7 +46,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := h.storage.GetAllRequests(sessionUUID)
+	allReq, err := h.storage.GetAllRequests(sessionUUID)
 	if err != nil {
 		errors.NewServerError(
 			uint16(http.StatusInternalServerError), "cannot get requests data: "+err.Error(),
@@ -60,20 +60,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result  = make(api.StoredRequests, 0)
 	)
 
-	if data == nil {
+	if allReq == nil {
 		_ = encoder.Encode(result) // not 404 - just empty result
 		return
 	}
 
-	for _, resp := range *data {
+	for _, req := range allReq {
 		result = append(result, api.StoredRequest{
-			UUID:          resp.UUID,
-			ClientAddr:    resp.Request.ClientAddr,
-			Method:        resp.Request.Method,
-			Content:       resp.Request.Content,
-			Headers:       api.MapToHeaders(resp.Request.Headers).Sorted(),
-			URI:           resp.Request.URI,
-			CreatedAtUnix: resp.CreatedAtUnix,
+			UUID:          req.UUID(),
+			ClientAddr:    req.ClientAddr(),
+			Method:        req.Method(),
+			Content:       req.Content(),
+			Headers:       api.MapToHeaders(req.Headers()).Sorted(),
+			URI:           req.URI(),
+			CreatedAtUnix: req.CreatedAt().Unix(),
 		})
 	}
 

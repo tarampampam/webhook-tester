@@ -84,13 +84,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		return
 	}
 
-	requestData, creationErr := h.storage.CreateRequest(sessionUUID, &storage.Request{
-		ClientAddr: h.getRealClientAddress(r),
-		Method:     r.Method,
-		Content:    string(body),
-		Headers:    h.headerToStringsMap(r.Header),
-		URI:        r.RequestURI,
-	})
+	requestUUID, creationErr := h.storage.CreateRequest(sessionUUID,
+		h.getRealClientAddress(r),
+		r.Method,
+		string(body),
+		r.RequestURI,
+		h.headerToStringsMap(r.Header),
+	)
 
 	if creationErr != nil {
 		errors.NewServerError(
@@ -103,29 +103,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 	if h.broadcaster != nil {
 		go func(sessionUUID, requestUUID string) {
 			_ = h.broadcaster.Publish(sessionUUID, broadcast.NewRequestRegisteredEvent(requestUUID))
-		}(sessionUUID, requestData.UUID)
+		}(sessionUUID, requestUUID)
 	}
 
-	if delay := sessionData.WebHookResponse.DelaySec; delay > 0 {
-		time.Sleep(time.Second * time.Duration(delay))
+	if delay := sessionData.Delay(); delay > 0 {
+		timer := time.NewTimer(delay)
+		<-timer.C
+		timer.Stop()
 	}
 
-	w.Header().Set("Content-Type", sessionData.WebHookResponse.ContentType)
+	w.Header().Set("Content-Type", sessionData.ContentType())
 	w.WriteHeader(h.getRequiredHTTPCode(r, sessionData))
 
-	_, _ = w.Write([]byte(sessionData.WebHookResponse.Content))
+	_, _ = w.Write([]byte(sessionData.Content()))
 }
 
-func (h *Handler) getRequiredHTTPCode(r *http.Request, sessionData *storage.SessionData) (result int) {
+func (h *Handler) getRequiredHTTPCode(r *http.Request, sessionData storage.Session) (result int) {
 	// try to extract required status code from the request
 	if statusCode, codeFound := mux.Vars(r)["statusCode"]; codeFound {
 		if code, err := strconv.Atoi(statusCode); err == nil {
-			if sessionData.WebHookResponse.Code >= 100 && sessionData.WebHookResponse.Code <= 599 {
+			if sessionData.Code() >= 100 && sessionData.Code() <= 599 {
 				result = code
 			}
 		}
 	} else {
-		result = int(sessionData.WebHookResponse.Code)
+		result = int(sessionData.Code())
 	}
 
 	return
@@ -152,11 +154,10 @@ main:
 	return result
 }
 
+var trustHeaders = [...]string{"X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP"} //nolint:gochecknoglobals
+
 func (h *Handler) getRealClientAddress(r *http.Request) string {
-	var (
-		trustHeaders = [...]string{"X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP"}
-		ip           string
-	)
+	var ip string
 
 	for _, name := range trustHeaders {
 		if value := r.Header.Get(name); value != "" {

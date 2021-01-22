@@ -1,107 +1,118 @@
 package clear
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
-	nullStorage "github.com/tarampampam/webhook-tester/internal/pkg/storage/null"
 )
 
-func TestJSONRPCHandler_ServeHTTP(t *testing.T) {
-	t.Parallel()
-
+func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	var cases = []struct {
-		name        string
-		giveReqVars map[string]string
-		setUp       func(s *nullStorage.Storage, b *broadcast.None)
-		checkResult func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None)
+		name           string
+		giveReqVars    map[string]string
+		wantStatusCode int
+		wantJSON       string
 	}{
 		{
-			name:        "without registered session UUID",
-			giveReqVars: nil,
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, _ *broadcast.None) {
-				assert.Equal(t, http.StatusInternalServerError, rr.Code)
-				assert.JSONEq(t,
-					`{"code":500,"success":false,"message":"cannot extract session UUID"}`, rr.Body.String(),
-				)
-			},
+			name:           "without request params",
+			giveReqVars:    nil,
+			wantStatusCode: http.StatusInternalServerError,
+			wantJSON:       `{"code":500,"success":false,"message":"cannot extract session UUID"}`,
 		},
 		{
-			name:        "emulate storage error",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage, b *broadcast.None) {
-				s.Error = errors.New("foo")
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, _ *broadcast.None) {
-				assert.Equal(t, http.StatusInternalServerError, rr.Code)
-				assert.JSONEq(t,
-					`{"code":500,"success":false,"message":"foo"}`, rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "emulate 'not found'",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage, b *broadcast.None) {
-				s.Error = nil
-				s.Boolean = false
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, _ *broadcast.None) {
-				assert.Equal(t, http.StatusNotFound, rr.Code)
-				assert.JSONEq(t,
-					`{"code":404,"success":false,"message":"requests for session with UUID aa-bb-cc-dd was not found"}`,
-					rr.Body.String(),
-				)
-			},
-		},
-		{
-			name:        "success",
-			giveReqVars: map[string]string{"sessionUUID": "aa-bb-cc-dd"},
-			setUp: func(s *nullStorage.Storage, b *broadcast.None) {
-				s.Error = nil
-				s.Boolean = true
-			},
-			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder, b *broadcast.None) {
-				time.Sleep(time.Millisecond) // goroutine must be done
-
-				assert.Equal(t, http.StatusOK, rr.Code)
-				assert.JSONEq(t, `{"success":true}`, rr.Body.String())
-
-				ch, e := b.LastPublishedEvent()
-
-				assert.Equal(t, "aa-bb-cc-dd", ch)
-				assert.Equal(t, broadcast.NewAllRequestsDeletedEvent(), e)
-			},
+			name:           "session not found",
+			giveReqVars:    map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			wantStatusCode: http.StatusNotFound,
+			wantJSON:       `{"code":404,"success":false,"message":"requests for session with UUID aa-bb-cc-dd was not found"}`,
 		},
 	}
 
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			s := storage.NewInMemoryStorage(time.Minute, 10)
+			defer s.Close()
+
 			var (
-				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
+				req, _  = http.NewRequest(http.MethodPost, "http://test", nil)
 				rr      = httptest.NewRecorder()
-				s       = &nullStorage.Storage{}
-				b       = broadcast.None{}
-				handler = NewHandler(s, &b)
+				br      = broadcast.None{}
+				handler = NewHandler(s, &br)
 			)
 
 			if tt.giveReqVars != nil {
 				req = mux.SetURLVars(req, tt.giveReqVars)
 			}
 
-			if tt.setUp != nil {
-				tt.setUp(s, &b)
-			}
-
 			handler.ServeHTTP(rr, req)
 
-			tt.checkResult(t, rr, &b)
+			assert.Equal(t, tt.wantStatusCode, rr.Code)
+			assert.JSONEq(t, tt.wantJSON, rr.Body.String())
 		})
 	}
+}
+
+func TestHandler_ServeHTTPSuccess(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		br      = broadcast.None{}
+		handler = NewHandler(s, &br)
+	)
+
+	var (
+		brChannel string
+		brEvent   broadcast.Event
+		brCount   int
+		brMutex   sync.Mutex
+	)
+
+	br.OnPublish(func(ch string, e broadcast.Event) {
+		brMutex.Lock()
+		brChannel, brEvent = ch, e
+		brCount++
+		brMutex.Unlock()
+	})
+
+	// create session
+	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	assert.NoError(t, err)
+
+	// create request for the session
+	_, err = s.CreateRequest(sessionUUID, "", "", "", "", nil)
+	assert.NoError(t, err)
+	requests, err := s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+	assert.Len(t, requests, 1) // is not empty
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+
+	handler.ServeHTTP(rr, req)
+
+	runtime.Gosched()
+	<-time.After(time.Millisecond) // FIXME goroutine must be done
+
+	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
+
+	brMutex.Lock()
+	assert.Equal(t, 1, brCount)
+	assert.Equal(t, sessionUUID, brChannel)
+	assert.Equal(t, "requests-deleted", brEvent.Name())
+	brMutex.Unlock()
+
+	requests, err = s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+	assert.Len(t, requests, 0) // but now is empty!
 }

@@ -36,7 +36,3 @@ func TestReadyChecker_CheckFailedWithRedisClient(t *testing.T) {
 	assert.Error(t, NewReadyChecker(context.Background(), rdb).Check())
 	mini.SetError("")
 }
-
-func TestReadyChecker_CheckFailedWithoutRedisClient(t *testing.T) {
-	assert.EqualError(t, NewReadyChecker(context.Background(), nil).Check(), "nil redis instance")
-}
