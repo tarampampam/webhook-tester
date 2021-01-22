@@ -12,13 +12,12 @@ type None struct {
 // Publish an event into passed channel.
 func (n *None) Publish(channel string, event Event) error {
 	n.mu.Lock()
-	defer n.mu.Unlock()
-
 	if len(n.l) > 0 {
 		for i := 0; i < len(n.l); i++ {
 			n.l[i](channel, event)
 		}
 	}
+	n.mu.Unlock()
 
 	return nil
 }
@@ -26,11 +25,10 @@ func (n *None) Publish(channel string, event Event) error {
 // OnPublish allows to attack your handler on Publish function calling.
 func (n *None) OnPublish(f func(ch string, e Event)) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
-
 	if n.l == nil {
 		n.l = make([]func(string, Event), 0, 1) // "lazy" init
 	}
 
 	n.l = append(n.l, f)
+	n.mu.Unlock()
 }
