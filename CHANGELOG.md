@@ -9,9 +9,11 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Added
 
 - E2E test using postman
+- In-memory storage implementation
 - `serve` sub-command flags:
-  - `--redis-dsn` redis server DSN (format: `redis://<user>:<password>@<host>:<port>/<db_number>`)
+  - `--redis-dsn` redis server DSN (format: `redis://<user>:<password>@<host>:<port>/<db_number>`), required when storage driver `redis` is used
   - `--broadcast-driver` broadcast driver
+  - `--storage-driver` storage driver (`redis` and `memory` is supported)
 - Sub-command `healthcheck` (hidden in CLI help) that makes a simple HTTP request (with user-agent `HealthChecker/internal`) to the `http://127.0.0.1:8080/live` endpoint. Port number can be changed using `--port`, `-p` flag or `LISTEN_PORT` environment variable
 - Healthcheck in dockerfile
 - Global (available for all sub-commands) flags:
