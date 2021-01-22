@@ -67,7 +67,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		return
 	}
 
-	var body = make([]byte, 0) // for request body
+	var body []byte // for request body
 
 	if r.Body != nil {
 		if body, err = ioutil.ReadAll(r.Body); err != nil {
@@ -75,6 +75,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 
 			return
 		}
+	} else {
+		body = make([]byte, 0)
 	}
 
 	if bl := len(body); bl > maxBodyLength { // check passed body size
