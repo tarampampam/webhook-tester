@@ -4,10 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
@@ -20,6 +16,9 @@ import (
 	settingsGet "github.com/tarampampam/webhook-tester/internal/pkg/http/api/settings/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )

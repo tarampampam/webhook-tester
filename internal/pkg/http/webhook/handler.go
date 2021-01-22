@@ -18,24 +18,31 @@ import (
 )
 
 type broadcaster interface {
-	Publish(channel string, event broadcast.Event) error
+	Publish(ch string, e broadcast.Event) error
 }
 
 const maxBodyLength = 64 * 1024 // 64 KiB // TODO make configurable?
 
 type Handler struct {
 	ctx     context.Context
-	cfg     config.Config // TODO maybe not all config is required?
 	storage storage.Storage
 	br      broadcaster
+
+	ignoreHeaderPrefixes []string
 }
 
 func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) http.Handler {
+	ignoreHeaders := make([]string, len(cfg.IgnoreHeaderPrefixes))
+	for i := 0; i < len(cfg.IgnoreHeaderPrefixes); i++ {
+		ignoreHeaders[i] = strings.ToUpper(strings.TrimSpace(cfg.IgnoreHeaderPrefixes[i]))
+	}
+
 	return &Handler{
 		ctx:     ctx,
-		cfg:     cfg,
 		storage: storage,
 		br:      br,
+
+		ignoreHeaderPrefixes: ignoreHeaders,
 	}
 }
 
@@ -125,10 +132,8 @@ func (h *Handler) respondWithError(w http.ResponseWriter, code int, msg string) 
 func (h *Handler) getRequiredHTTPCode(r *http.Request, session storage.Session) int {
 	// try to extract required status code from the request
 	if statusCode, ok := mux.Vars(r)["statusCode"]; ok {
-		if code, err := strconv.Atoi(statusCode); err == nil {
-			if session.Code() >= 100 && session.Code() <= 599 {
-				return code
-			}
+		if code, err := strconv.Atoi(statusCode); err == nil && code >= 100 && code <= 599 {
+			return code
 		}
 	}
 
@@ -136,20 +141,16 @@ func (h *Handler) getRequiredHTTPCode(r *http.Request, session storage.Session) 
 }
 
 func (h *Handler) headerToStringsMap(header http.Header) map[string]string {
-	result := make(map[string]string)
+	result := make(map[string]string, len(header))
 
-	shouldBeIgnored := make([]string, len(h.cfg.IgnoreHeaderPrefixes)) // TODO optimize, burn on construct
-	for i, value := range h.cfg.IgnoreHeaderPrefixes {
-		shouldBeIgnored[i] = strings.ToUpper(strings.TrimSpace(value))
-	}
-
-main:
+loop:
 	for name, values := range header {
-		for _, ignore := range shouldBeIgnored {
-			if strings.HasPrefix(strings.ToUpper(name), ignore) {
-				continue main
+		for i := 0; i < len(h.ignoreHeaderPrefixes); i++ {
+			if strings.HasPrefix(strings.ToUpper(name), h.ignoreHeaderPrefixes[i]) {
+				continue loop
 			}
 		}
+
 		result[name] = strings.Join(values, "; ")
 	}
 

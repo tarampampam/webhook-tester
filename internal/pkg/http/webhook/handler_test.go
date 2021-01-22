@@ -1,4 +1,4 @@
-package webhook
+package webhook_test
 
 import (
 	"bytes"
@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +25,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	var cases = []struct {
 		name           string
 		giveBody       io.Reader
-		giveReqVars    map[string]string
+		giveReqVars    func(s storage.Storage) map[string]string
 		wantStatusCode int
 		wantJSON       string
 	}{
@@ -33,10 +36,24 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			wantJSON:       `{"code":500,"success":false,"message":"cannot extract session UUID"}`,
 		},
 		{
-			name:           "session was not found",
-			giveReqVars:    map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			name: "session was not found",
+			giveReqVars: func(s storage.Storage) map[string]string {
+				return map[string]string{"sessionUUID": "aa-bb-cc-dd"}
+			},
 			wantStatusCode: http.StatusNotFound,
 			wantJSON:       `{"code":404,"success":false,"message":"session with UUID aa-bb-cc-dd was not found"}`,
+		},
+		{
+			name: "too large body request",
+			giveReqVars: func(s storage.Storage) map[string]string {
+				sUUID, err := s.CreateSession("", 202, "", 0)
+				assert.NoError(t, err)
+
+				return map[string]string{"sessionUUID": sUUID}
+			},
+			giveBody:       bytes.NewBuffer([]byte(strings.Repeat("x", 65537))),
+			wantStatusCode: http.StatusInternalServerError,
+			wantJSON:       `{"code":500,"success":false,"message":"request body is too large (current: 65537, maximal: 65536)"}`, //nolint:lll
 		},
 	}
 
@@ -50,11 +67,11 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
 				rr      = httptest.NewRecorder()
 				br      = &broadcast.None{}
-				handler = NewHandler(context.Background(), config.Config{}, s, br)
+				handler = webhook.NewHandler(context.Background(), config.Config{}, s, br)
 			)
 
 			if tt.giveReqVars != nil {
-				req = mux.SetURLVars(req, tt.giveReqVars)
+				req = mux.SetURLVars(req, tt.giveReqVars(s))
 			}
 
 			handler.ServeHTTP(rr, req)
@@ -73,7 +90,9 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
 		rr      = httptest.NewRecorder()
 		br      = &broadcast.None{}
-		handler = NewHandler(context.Background(), config.Config{}, s, br)
+		handler = webhook.NewHandler(context.Background(), config.Config{
+			IgnoreHeaderPrefixes: []string{"x-bAr-", "Baz"},
+		}, s, br)
 	)
 
 	var (
@@ -90,7 +109,12 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		brMutex.Unlock()
 	})
 
-	req.Header.Set("x-bar", "baz")
+	req.Header.Set("x-bar-foo", "baz") // must be ignored
+	req.Header.Set("bAZ", "foo")       // must be ignored
+	req.Header.Set("foo", "blah")
+	req.Header.Set("X-Forwarded-For", "4.4.4.4")
+	req.Header.Set("X-Real-IP", "3.3.3.3")
+	req.Header.Set("cf-connecting-ip", "2.2.2.2, 2.1.1.2")
 
 	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
 	assert.NoError(t, err)
@@ -117,5 +141,136 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 
 	assert.Equal(t, http.MethodPost, requests[0].Method())
 	assert.Equal(t, "foo=bar", requests[0].Content())
-	assert.Equal(t, map[string]string{"X-Bar": "baz"}, requests[0].Headers())
+	assert.Equal(t, map[string]string{
+		"Foo":              "blah",
+		"X-Forwarded-For":  "4.4.4.4",
+		"X-Real-Ip":        "3.3.3.3",
+		"Cf-Connecting-Ip": "2.2.2.2, 2.1.1.2",
+	}, requests[0].Headers())
+	assert.Equal(t, "2.2.2.2", requests[0].ClientAddr())
+}
+
+func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+	)
+
+	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	assert.NoError(t, err)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "222"})
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, 222, rr.Code)
+	assert.Equal(t, "foo", rr.Body.String())
+	assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
+
+	requests, err := s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.MethodPut, requests[0].Method())
+	assert.Equal(t, "", requests[0].Content())
+	assert.Empty(t, requests[0].Headers())
+}
+
+func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+	)
+
+	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", 0)
+	assert.NoError(t, err)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "999"}) // wrong code
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, 203, rr.Code)
+	assert.Equal(t, "foo", rr.Body.String())
+	assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
+
+	requests, err := s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.MethodPut, requests[0].Method())
+	assert.Equal(t, "", requests[0].Content())
+	assert.Empty(t, requests[0].Headers())
+}
+
+func TestHandler_ServeHTTPDelay(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+	)
+
+	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Millisecond*100)
+	assert.NoError(t, err)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+
+	start := time.Now().UnixNano()
+
+	handler.ServeHTTP(rr, req)
+
+	end := time.Now().UnixNano()
+
+	assert.InDelta(t, time.Millisecond*100, time.Duration(end-start), float64(time.Millisecond*5))
+
+	assert.Equal(t, 203, rr.Code)
+	assert.Equal(t, "foo", rr.Body.String())
+	assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
+
+	requests, err := s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.MethodPut, requests[0].Method())
+	assert.Equal(t, "", requests[0].Content())
+	assert.Empty(t, requests[0].Headers())
+}
+
+func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var (
+		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
+		rr      = httptest.NewRecorder()
+		handler = webhook.NewHandler(ctx, config.Config{}, s, &broadcast.None{})
+	)
+
+	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Hour)
+	assert.NoError(t, err)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+
+	cancel()
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.JSONEq(t, `{"code":500,"success":false,"message":"canceled"}`, rr.Body.String())
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	requests, err := s.GetAllRequests(sessionUUID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.MethodPut, requests[0].Method())
+	assert.Equal(t, "", requests[0].Content())
+	assert.Empty(t, requests[0].Headers())
 }
