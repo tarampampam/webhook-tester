@@ -26,6 +26,7 @@ type flags struct {
 	maxRequests        uint16
 	sessionTTL         string // duration
 	ignoreHeaderPrefix []string
+	maxRequestBodySize uint32 // maximal webhook request body size (in bytes)
 
 	// redisDSN allows to setup redis server using single string. Examples:
 	//	redis://<user>:<password>@<host>:<port>/<db_number>
@@ -83,6 +84,13 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"",
 		[]string{},
 		"ignore incoming webhook header prefix, case insensitive (example: 'X-Forwarded-')",
+	)
+	flagSet.Uint32VarP(
+		&f.maxRequestBodySize,
+		"max-request-body-size",
+		"",
+		64*1024, //nolint:gomnd // 64 KiB
+		"maximal webhook request body size (in bytes)",
 	)
 	flagSet.StringVarP(
 		&f.redisDSN,
@@ -255,6 +263,7 @@ func (f *flags) toConfig() config.Config {
 	cfg := config.Config{
 		MaxRequests:          f.maxRequests,
 		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix,
+		MaxRequestBodySize:   f.maxRequestBodySize,
 	}
 
 	if ttl, err := time.ParseDuration(f.sessionTTL); err == nil { // error ignored

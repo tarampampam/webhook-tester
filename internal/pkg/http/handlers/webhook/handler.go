@@ -21,26 +21,26 @@ type broadcaster interface {
 	Publish(ch string, e broadcast.Event) error
 }
 
-const maxBodyLength = 64 * 1024 // 64 KiB // TODO make configurable?
-
 type Handler struct {
-	ctx     context.Context
-	storage storage.Storage
-	br      broadcaster
+	ctx         context.Context
+	storage     storage.Storage
+	br          broadcaster
+	maxBodySize uint32
 
 	ignoreHeaderPrefixes []string
 }
 
-func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) http.Handler {
+func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) *Handler {
 	ignoreHeaders := make([]string, len(cfg.IgnoreHeaderPrefixes))
 	for i := 0; i < len(cfg.IgnoreHeaderPrefixes); i++ {
 		ignoreHeaders[i] = strings.ToUpper(strings.TrimSpace(cfg.IgnoreHeaderPrefixes[i]))
 	}
 
 	return &Handler{
-		ctx:     ctx,
-		storage: storage,
-		br:      br,
+		ctx:         ctx,
+		storage:     storage,
+		br:          br,
+		maxBodySize: cfg.MaxRequestBodySize,
 
 		ignoreHeaderPrefixes: ignoreHeaders,
 	}
@@ -79,10 +79,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		body = make([]byte, 0)
 	}
 
-	if bl := len(body); bl > maxBodyLength { // check passed body size
+	if h.maxBodySize > 0 && uint32(len(body)) > h.maxBodySize { // check passed body size
 		h.respondWithError(w,
 			http.StatusInternalServerError,
-			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", bl, maxBodyLength),
+			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", len(body), h.maxBodySize),
 		)
 
 		return
@@ -147,9 +147,13 @@ func (h *Handler) headerToStringsMap(header http.Header) map[string]string {
 
 loop:
 	for name, values := range header {
-		for i := 0; i < len(h.ignoreHeaderPrefixes); i++ {
-			if strings.HasPrefix(strings.ToUpper(name), h.ignoreHeaderPrefixes[i]) {
-				continue loop
+		if len(h.ignoreHeaderPrefixes) > 0 {
+			upperName := strings.ToUpper(name)
+
+			for i := 0; i < len(h.ignoreHeaderPrefixes); i++ {
+				if strings.HasPrefix(upperName, h.ignoreHeaderPrefixes[i]) {
+					continue loop
+				}
 			}
 		}
 

@@ -92,6 +92,7 @@ func TestServer_Register(t *testing.T) {
 		methods []string
 	}{
 		{name: "api_settings_get", route: "/api/settings", methods: []string{http.MethodGet}},
+		{name: "api_get_version", route: "/api/version", methods: []string{http.MethodGet}},
 		{name: "api_session_create", route: "/api/session", methods: []string{http.MethodPost}},
 		{name: "api_session_delete", route: "/api/session/{sessionUUID:" + uuid + "}", methods: []string{http.MethodDelete}},                                             //nolint:lll
 		{name: "api_session_requests_all_get", route: "/api/session/{sessionUUID:" + uuid + "}/requests", methods: []string{http.MethodGet}},                             //nolint:lll

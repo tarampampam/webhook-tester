@@ -81,7 +81,7 @@
             <button class="btn btn-success my-2 my-sm-0 border-0"
                     v-bind:data-clipboard-text="currentWebHookUrl"
                     @mouseDown.middle="openInNewTab">
-                <i class="fas fa-copy mr-1"></i> Copy URL
+                <i class="fas fa-copy mr-1"></i> Copy Webhook URL
             </button>
             <button class="btn btn-info my-2 ml-2 my-sm-0 border-0" data-toggle="modal" data-target="#new-url-modal">
                 <i class="fas fa-plus mr-1"></i> New URL

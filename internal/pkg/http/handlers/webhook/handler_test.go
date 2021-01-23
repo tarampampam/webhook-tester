@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/webhook"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +20,37 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
+
+func BenchmarkHandler_ServeHTTP(b *testing.B) {
+	b.ReportAllocs()
+
+	s := storage.NewInMemoryStorage(time.Minute, 10)
+	defer s.Close()
+
+	var (
+		req, _ = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
+		rr     = httptest.NewRecorder()
+		h      = webhook.NewHandler(context.Background(), config.Config{
+			IgnoreHeaderPrefixes: []string{"bar", "baz"},
+		}, s, &broadcast.None{})
+	)
+
+	sessionUUID, _ := s.CreateSession("foo", 202, "foo/bar", 0)
+
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "222"})
+
+	req.Header.Set("foo", "blah")
+	req.Header.Set("X-Forwarded-For", "4.4.4.4")
+	req.Header.Set("X-Forwarded-For1", "4.4.4.4")
+	req.Header.Set("X-Forwarded-For2", "4.4.4.4")
+	req.Header.Set("X-Forwarded-For3", "4.4.4.4")
+	req.Header.Set("X-Forwarded-For4", "4.4.4.4")
+	req.Header.Set("X-Forwarded-For5", "4.4.4.4")
+
+	for n := 0; n < b.N; n++ {
+		h.ServeHTTP(rr, req)
+	}
+}
 
 func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	var cases = []struct {
@@ -51,9 +82,9 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 
 				return map[string]string{"sessionUUID": sUUID}
 			},
-			giveBody:       bytes.NewBuffer([]byte(strings.Repeat("x", 65537))),
+			giveBody:       bytes.NewBuffer([]byte(strings.Repeat("x", 65))),
 			wantStatusCode: http.StatusInternalServerError,
-			wantJSON:       `{"code":500,"success":false,"message":"request body is too large (current: 65537, maximal: 65536)"}`, //nolint:lll
+			wantJSON:       `{"code":500,"success":false,"message":"request body is too large (current: 65, maximal: 64)"}`, //nolint:lll
 		},
 	}
 
@@ -67,7 +98,9 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
 				rr      = httptest.NewRecorder()
 				br      = &broadcast.None{}
-				handler = webhook.NewHandler(context.Background(), config.Config{}, s, br)
+				handler = webhook.NewHandler(context.Background(), config.Config{
+					MaxRequestBodySize: 64,
+				}, s, br)
 			)
 
 			if tt.giveReqVars != nil {

@@ -1,4 +1,4 @@
-package get
+package settings_test
 
 import (
 	"net/http"
@@ -8,7 +8,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
 )
+
+func BenchmarkNewGetSettingsHandler(b *testing.B) {
+	b.ReportAllocs()
+
+	var (
+		req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)
+		rr     = httptest.NewRecorder()
+		cfg    = config.Config{}
+	)
+
+	h := settings.NewGetSettingsHandler(cfg)
+
+	for n := 0; n < b.N; n++ {
+		h.ServeHTTP(rr, req)
+	}
+}
 
 func TestHandler_ServeHTTP(t *testing.T) {
 	t.Parallel()
@@ -25,13 +42,15 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				cfg.Pusher.Key = "bar"
 				cfg.MaxRequests = 123
 				cfg.SessionTTL = time.Second * 321
+				cfg.MaxRequestBodySize = 222
+				cfg.BroadcastDriver = config.BroadcastDriverPusher
 			},
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.JSONEq(t, `{
-					"version": "0.0.0@undefined",
+					"broadcast_driver": "pusher",
 					"pusher": {"key":"bar", "cluster":"foo"},
-					"limits": {"max_requests":123, "session_lifetime_sec":321}
+					"limits": {"max_requests":123, "session_lifetime_sec":321, "max_webhook_body_size": 222}
 				}`, rr.Body.String())
 			},
 		},
@@ -49,7 +68,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 				tt.setUp(&cfg)
 			}
 
-			handler := NewHandler(cfg)
+			handler := settings.NewGetSettingsHandler(cfg)
 
 			handler.ServeHTTP(rr, req)
 

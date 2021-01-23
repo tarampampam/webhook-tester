@@ -13,14 +13,16 @@ import (
 	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/clear"
 	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/delete"
 	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
-	settingsGet "github.com/tarampampam/webhook-tester/internal/pkg/http/api/settings/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
+	apiSettings "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
+	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/webhook"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/pkg/version"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -77,9 +79,14 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 
 	// get application settings
 	apiRouter.
-		Handle("/settings", settingsGet.NewHandler(cfg)). // FIXME settings passed using pointer, it is really needed?
+		HandleFunc("/settings", apiSettings.NewGetSettingsHandler(cfg)).
 		Methods(http.MethodGet).
 		Name("api_settings_get")
+
+	apiRouter.
+		HandleFunc("/version", apiVersion.NewHandler(version.Version())).
+		Methods(http.MethodGet).
+		Name("api_get_version")
 
 	// create new session
 	apiRouter.

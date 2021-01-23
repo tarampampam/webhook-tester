@@ -24,6 +24,7 @@ type Config struct {
 	MaxRequests          uint16
 	SessionTTL           time.Duration
 	IgnoreHeaderPrefixes []string
+	MaxRequestBodySize   uint32 // maximal webhook request body size (in bytes)
 
 	StorageDriver   storageDriver
 	BroadcastDriver broadcastDriver

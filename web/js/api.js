@@ -18,6 +18,18 @@ define(['axios'], (axios) => {
     /**
      * @returns {Promise<APISettings>}
      */
+    const getAppVersion = () => {
+        return new Promise((resolve, reject) => {
+            axios
+                .get(`${getApiUri()}/version`)
+                .then((response) => resolve(response.data))
+                .catch((err) => reject(err));
+        });
+    };
+
+    /**
+     * @returns {Promise<APISettings>}
+     */
     const getAppSettings = () => {
         return new Promise((resolve, reject) => {
             axios
@@ -114,6 +126,7 @@ define(['axios'], (axios) => {
     };
 
     return {
+        getAppVersion,
         getAppSettings,
         startNewSession,
         deleteSession,
