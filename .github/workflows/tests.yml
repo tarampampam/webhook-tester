@@ -53,7 +53,7 @@ jobs:
           fetch-depth: 2 # Fixes codecov error 'Issue detecting commit SHA'
 
       - name: Go modules Cache # Docs: <https://git.io/JfAKn#go---modules>
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -100,7 +100,7 @@ jobs:
         run: echo "::set-output name=value::`echo ${GITHUB_REF##*/} | sed -e 's/^[vV ]*//'`@`echo ${GITHUB_SHA} | cut -c1-8`"
 
       - name: Go modules Cache # Docs: <https://git.io/JfAKn#go---modules>
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
