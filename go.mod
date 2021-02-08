@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/alicebob/miniredis v2.5.0+incompatible
-	github.com/alicebob/miniredis/v2 v2.14.1
+	github.com/alicebob/miniredis/v2 v2.14.2
 	github.com/fatih/color v1.10.0
 	github.com/felixge/httpsnoop v1.0.1
 	github.com/go-redis/redis/v8 v8.4.11
@@ -17,6 +17,5 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	github.com/yuin/gopher-lua v0.0.0-20200603152657-dc2b0ca8b37e // indirect
 	go.uber.org/zap v1.16.0
 )
