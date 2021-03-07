@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check for GitLeaks
-        uses: zricethezav/gitleaks-action@v1.3.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
+        uses: zricethezav/gitleaks-action@v1.4.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
 
   go-test:
     name: Unit tests
@@ -45,7 +45,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.16.0
 
       - name: Check out code
         uses: actions/checkout@v2
@@ -90,7 +90,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.16.0
 
       - name: Check out code
         uses: actions/checkout@v2
