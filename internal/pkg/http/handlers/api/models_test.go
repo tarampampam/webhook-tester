@@ -1,8 +1,9 @@
 package api_test
 
 import (
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 	"testing"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 
 	"github.com/stretchr/testify/assert"
 )

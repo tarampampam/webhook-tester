@@ -2,8 +2,9 @@ package all
 
 import (
 	"fmt"
-	api2 "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 	"net/http"
+
+	api2 "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 
 	"github.com/gorilla/mux"
 	jsoniter "github.com/json-iterator/go"
