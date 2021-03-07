@@ -1,4 +1,4 @@
-package create
+package create_test
 
 import (
 	"bytes"
@@ -12,52 +12,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/create"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-func TestHandler_ServeHTTPSessionCreation(t *testing.T) {
+func TestHandlerErrors(t *testing.T) {
 	s := storage.NewInMemoryStorage(time.Minute, 1)
 	defer s.Close()
 
-	var (
-		req, _ = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte(`{
-			"content_type":null,
-			"status_code":null,
-			"response_delay":null,
-			"response_body":null
-		}`)))
-		rr = httptest.NewRecorder()
-		h  = NewHandler(s)
-	)
+	h := create.NewHandler(s)
 
-	h.ServeHTTP(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	resp := struct {
-		UUID             string `json:"uuid"`
-		ResponseSettings struct {
-			Content       string `json:"content"`
-			Code          uint16 `json:"code"`
-			ContentType   string `json:"content_type"`
-			DelaySec      uint8  `json:"delay_sec"`
-			CreatedAtUnix int64  `json:"created_at_unix"`
-		} `json:"response"`
-	}{}
-
-	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
-
-	_, err := uuid.Parse(resp.UUID)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "", resp.ResponseSettings.Content)
-	assert.Equal(t, uint16(200), resp.ResponseSettings.Code)
-	assert.Equal(t, "text/plain", resp.ResponseSettings.ContentType)
-	assert.Equal(t, uint8(0), resp.ResponseSettings.DelaySec)
-	assert.Equal(t, time.Now().Unix(), resp.ResponseSettings.CreatedAtUnix)
-}
-
-func TestHandler_ServeHTTPErrors(t *testing.T) {
 	var cases = []struct {
 		name             string
 		giveRequestBody  func() io.Reader
@@ -102,7 +66,7 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 				}`))
 			},
 			wantStatusCode:   http.StatusBadRequest,
-			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: delay is too much"}`,
+			wantResponseJSON: `{"code":400,"success":false,"message":"wrong request: delay is too much"}`,
 		},
 		{
 			name: "wrong value in json (status_code)",
@@ -115,20 +79,20 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 				}`))
 			},
 			wantStatusCode:   http.StatusBadRequest,
-			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: wrong status code value"}`,
+			wantResponseJSON: `{"code":400,"success":false,"message":"wrong request: wrong status code"}`,
 		},
 		{
 			name: "wrong value in json (content_type)",
 			giveRequestBody: func() io.Reader {
 				return bytes.NewBuffer([]byte(`{
-					"content_type":"` + strings.Repeat("x", 512) + `",
+					"content_type":"` + strings.Repeat("x", 32+1) + `",
 					"status_code":null,
 					"response_delay":null,
 					"response_body":""
 				}`))
 			},
 			wantStatusCode:   http.StatusBadRequest,
-			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: content-type value is too long"}`,
+			wantResponseJSON: `{"code":400,"success":false,"message":"wrong request: content-type value is too large"}`,
 		},
 		{
 			name: "wrong value in json (response_body)",
@@ -141,25 +105,63 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 				}`))
 			},
 			wantStatusCode:   http.StatusBadRequest,
-			wantResponseJSON: `{"code":400,"success":false,"message":"invalid value passed: response content is too long"}`,
+			wantResponseJSON: `{"code":400,"success":false,"message":"wrong request: response content is too large"}`,
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 10)
-			defer s.Close()
-
 			var (
-				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveRequestBody())
-				rr      = httptest.NewRecorder()
-				handler = NewHandler(s)
+				req, _ = http.NewRequest(http.MethodPost, "http://test", tt.giveRequestBody())
+				rr     = httptest.NewRecorder()
 			)
 
-			handler.ServeHTTP(rr, req)
+			h.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.wantStatusCode, rr.Code)
 			assert.JSONEq(t, tt.wantResponseJSON, rr.Body.String())
 		})
 	}
+}
+
+func TestHandlerSessionCreation(t *testing.T) {
+	s := storage.NewInMemoryStorage(time.Minute, 1)
+	defer s.Close()
+
+	var (
+		req, _ = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte(`{
+			"content_type":null,
+			"status_code":null,
+			"response_delay":null,
+			"response_body":null
+		}`)))
+		rr = httptest.NewRecorder()
+		h  = create.NewHandler(s)
+	)
+
+	h.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	resp := struct {
+		UUID             string `json:"uuid"`
+		ResponseSettings struct {
+			Content       string `json:"content"`
+			Code          uint16 `json:"code"`
+			ContentType   string `json:"content_type"`
+			DelaySec      uint8  `json:"delay_sec"`
+			CreatedAtUnix int64  `json:"created_at_unix"`
+		} `json:"response"`
+	}{}
+
+	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+
+	_, err := uuid.Parse(resp.UUID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", resp.ResponseSettings.Content)
+	assert.Equal(t, uint16(200), resp.ResponseSettings.Code)
+	assert.Equal(t, "text/plain", resp.ResponseSettings.ContentType)
+	assert.Equal(t, uint8(0), resp.ResponseSettings.DelaySec)
+	assert.Equal(t, time.Now().Unix(), resp.ResponseSettings.CreatedAtUnix)
 }

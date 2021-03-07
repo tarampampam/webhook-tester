@@ -42,7 +42,7 @@ func TestFlags(t *testing.T) {
 		{giveName: "port", wantShorthand: "p", wantDefault: "8080"},
 		{giveName: "public", wantShorthand: "", wantDefault: filepath.Join(exe, "web")},
 		{giveName: "max-requests", wantShorthand: "", wantDefault: "128"},
-		{giveName: "session-ttl", wantShorthand: "", wantDefault: "168h"},
+		{giveName: "session-ttl", wantShorthand: "", wantDefault: "168h0m0s"},
 		{giveName: "ignore-header-prefix", wantShorthand: "", wantDefault: "[]"},
 		{giveName: "redis-dsn", wantShorthand: "", wantDefault: "redis://127.0.0.1:6379/0"},
 		{giveName: "broadcast-driver", wantShorthand: "", wantDefault: "none"},
@@ -221,7 +221,7 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 				"--public", "",
 				"--session-ttl", "1d", // wrong
 			},
-			wantErrorStrings: []string{"wrong session lifetime", "1d"},
+			wantErrorStrings: []string{"invalid argument", "1d"},
 		},
 		{
 			name:    "Session TTL Flag Wrong Env Value",

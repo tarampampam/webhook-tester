@@ -7,13 +7,13 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	sessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/create"
 	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/delete"
 	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/all"
 	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/clear"
 	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/delete"
 	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
+	apiSessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/create"
 	apiSettings "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
 	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
@@ -90,7 +90,7 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 
 	// create new session
 	apiRouter.
-		Handle("/session", sessionCreate.NewHandler(storage)).
+		HandleFunc("/session", apiSessionCreate.NewHandler(storage)).
 		Methods(http.MethodPost).
 		Name("api_session_create")
 

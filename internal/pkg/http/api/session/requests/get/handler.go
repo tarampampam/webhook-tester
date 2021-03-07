@@ -2,12 +2,12 @@ package get
 
 import (
 	"fmt"
+	api2 "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -30,20 +30,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	req, gettingErr := h.storage.GetRequest(sessionUUID, requestUUID)
 
 	if gettingErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(errors.NewServerError(
+		api2.Respond(w, api2.NewServerError(
 			http.StatusInternalServerError, "cannot read request data: "+gettingErr.Error(),
-		).ToJSON())
+		))
 
 		return
 	}
 
 	if req == nil {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(errors.NewServerError(
-			http.StatusNotFound,
-			fmt.Sprintf("request with UUID %s was not found", requestUUID),
-		).ToJSON())
+		api2.Respond(w, api2.NewServerError(
+			http.StatusNotFound, fmt.Sprintf("request with UUID %s was not found", requestUUID),
+		))
 
 		return
 	}

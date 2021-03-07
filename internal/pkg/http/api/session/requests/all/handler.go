@@ -2,12 +2,12 @@ package all
 
 import (
 	"fmt"
+	api2 "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -26,31 +26,32 @@ func NewHandler(storage storage.Storage) http.Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
 	if !sessionFound {
-		errors.NewServerError(http.StatusInternalServerError, "cannot extract session UUID").RespondWithJSON(w)
+		api2.Respond(w, api2.NewServerError(http.StatusInternalServerError, "cannot extract session UUID"))
+
 		return
 	}
 
 	if session, err := h.storage.GetSession(sessionUUID); session == nil {
 		if err != nil {
-			errors.NewServerError(
+			api2.Respond(w, api2.NewServerError(
 				http.StatusInternalServerError, "cannot get session data: "+err.Error(),
-			).RespondWithJSON(w)
+			))
 
 			return
 		}
 
-		errors.NewServerError(
+		api2.Respond(w, api2.NewServerError(
 			http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID),
-		).RespondWithJSON(w)
+		))
 
 		return
 	}
 
 	allReq, err := h.storage.GetAllRequests(sessionUUID)
 	if err != nil {
-		errors.NewServerError(
+		api2.Respond(w, api2.NewServerError(
 			http.StatusInternalServerError, "cannot get requests data: "+err.Error(),
-		).RespondWithJSON(w)
+		))
 
 		return
 	}

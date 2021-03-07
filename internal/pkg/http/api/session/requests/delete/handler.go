@@ -2,13 +2,13 @@ package delete
 
 import (
 	"fmt"
+	api2 "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -33,23 +33,26 @@ func NewHandler(storage storage.Storage, broadcaster broadcaster) http.Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
 	if !sessionFound {
-		errors.NewServerError(http.StatusInternalServerError, "cannot extract session UUID").RespondWithJSON(w)
+		api2.Respond(w, api2.NewServerError(http.StatusInternalServerError, "cannot extract session UUID"))
+
 		return
 	}
 
 	requestUUID, requestFound := mux.Vars(r)["requestUUID"]
 	if !requestFound {
-		errors.NewServerError(http.StatusInternalServerError, "cannot extract request UUID").RespondWithJSON(w)
+		api2.Respond(w, api2.NewServerError(http.StatusInternalServerError, "cannot extract request UUID"))
+
 		return
 	}
 
 	if deleted, err := h.storage.DeleteRequest(sessionUUID, requestUUID); err != nil {
-		errors.NewServerError(http.StatusInternalServerError, err.Error()).RespondWithJSON(w)
+		api2.Respond(w, api2.NewServerError(http.StatusInternalServerError, err.Error()))
+
 		return
 	} else if !deleted {
-		errors.NewServerError(
+		api2.Respond(w, api2.NewServerError(
 			http.StatusNotFound, fmt.Sprintf("request with UUID %s was not found", requestUUID),
-		).RespondWithJSON(w)
+		))
 
 		return
 	}

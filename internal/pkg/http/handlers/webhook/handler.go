@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/errors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -49,20 +48,20 @@ func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage,
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:funlen
 	sUUID, ok := mux.Vars(r)["sessionUUID"] // extract session UUID from the request variables
 	if !ok {
-		h.respondWithError(w, http.StatusInternalServerError, "cannot extract session UUID")
+		h.error(w, http.StatusInternalServerError, "cannot extract session UUID")
 
 		return
 	}
 
 	session, err := h.storage.GetSession(sUUID) // read current session info
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "session reading failed: "+err.Error())
+		h.error(w, http.StatusInternalServerError, "session reading failed: "+err.Error())
 
 		return
 	}
 
 	if session == nil { // session is exists?
-		h.respondWithError(w, http.StatusNotFound, "session with UUID "+sUUID+" was not found")
+		h.error(w, http.StatusNotFound, "session with UUID "+sUUID+" was not found")
 
 		return
 	}
@@ -71,7 +70,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 
 	if r.Body != nil {
 		if body, err = ioutil.ReadAll(r.Body); err != nil {
-			h.respondWithError(w, http.StatusInternalServerError, err.Error())
+			h.error(w, http.StatusInternalServerError, err.Error())
 
 			return
 		}
@@ -80,7 +79,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 	}
 
 	if h.maxBodySize > 0 && uint32(len(body)) > h.maxBodySize { // check passed body size
-		h.respondWithError(w,
+		h.error(w,
 			http.StatusInternalServerError,
 			fmt.Sprintf("request body is too large (current: %d, maximal: %d)", len(body), h.maxBodySize),
 		)
@@ -99,7 +98,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		r.RequestURI,
 		h.headerToStringsMap(r.Header),
 	); err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "request saving in storage failed: "+err.Error())
+		h.error(w, http.StatusInternalServerError, "request saving in storage failed: "+err.Error())
 
 		return
 	}
@@ -109,15 +108,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 
 	if delay := session.Delay(); delay > 0 {
 		timer := time.NewTimer(delay)
-		defer timer.Stop()
 
 		select {
 		case <-h.ctx.Done():
-			h.respondWithError(w, http.StatusInternalServerError, "canceled")
+			timer.Stop()
+			h.error(w, http.StatusInternalServerError, "canceled")
 
 			return
 
 		case <-timer.C:
+			timer.Stop()
 		}
 	}
 
@@ -127,8 +127,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 	_, _ = w.Write([]byte(session.Content()))
 }
 
-func (h *Handler) respondWithError(w http.ResponseWriter, code int, msg string) {
-	errors.NewServerError(code, msg).RespondWithJSON(w)
+func (h *Handler) error(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	w.WriteHeader(code)
+
+	statusText := http.StatusText(code)
+	_, _ = w.Write([]byte(`<!doctype html>
+<!--
+  WebHook error: ` + msg + `
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>` + statusText + `</title>
+    <style>
+        html,body {width:100%; height:100%; margin:0; padding:0; background-color: #2b2b2b; color: #efeffa}
+        body {display:flex; justify-content:center; align-items:center; font-family:sans-serif}
+        .container {text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebHook: ` + statusText + `</h1>
+        <h3>` + msg + `</h3>
+    </div>
+</body>
+</html>`),
+	)
 }
 
 func (h *Handler) getRequiredHTTPCode(r *http.Request, session storage.Session) int {

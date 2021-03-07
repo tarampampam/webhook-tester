@@ -24,7 +24,7 @@ type flags struct {
 
 	publicDir          string // can be empty
 	maxRequests        uint16
-	sessionTTL         string // duration
+	sessionTTL         time.Duration
 	ignoreHeaderPrefix []string
 	maxRequestBodySize uint32 // maximal webhook request body size (in bytes)
 
@@ -71,11 +71,11 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		128,
 		fmt.Sprintf("maximum stored requests per session (max 65535) [$%s]", env.MaxSessionRequests),
 	)
-	flagSet.StringVarP(
+	flagSet.DurationVarP(
 		&f.sessionTTL,
 		"session-ttl",
 		"",
-		"168h",
+		time.Hour*168,
 		fmt.Sprintf("session lifetime (examples: 48h, 1h30m) [$%s]", env.SessionTTL),
 	)
 	flagSet.StringSliceVarP(
@@ -169,7 +169,11 @@ func (f *flags) overrideUsingEnv() error {
 	}
 
 	if envVar, exists := env.SessionTTL.Lookup(); exists {
-		f.sessionTTL = envVar
+		if d, err := time.ParseDuration(envVar); err == nil {
+			f.sessionTTL = d
+		} else {
+			return fmt.Errorf("wrong session lifetime [%s] period", envVar)
+		}
 	}
 
 	if envVar, exists := env.RedisDSN.Lookup(); exists {
@@ -212,10 +216,6 @@ func (f *flags) validate() error {
 		if info, err := os.Stat(f.publicDir); err != nil || !info.Mode().IsDir() {
 			return fmt.Errorf("wrong public assets directory [%s] path", f.publicDir)
 		}
-	}
-
-	if _, err := time.ParseDuration(f.sessionTTL); err != nil {
-		return fmt.Errorf("wrong session lifetime [%s] period", f.sessionTTL)
 	}
 
 	switch f.storageDriver {
@@ -264,10 +264,7 @@ func (f *flags) toConfig() config.Config {
 		MaxRequests:          f.maxRequests,
 		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix,
 		MaxRequestBodySize:   f.maxRequestBodySize,
-	}
-
-	if ttl, err := time.ParseDuration(f.sessionTTL); err == nil { // error ignored
-		cfg.SessionTTL = ttl
+		SessionTTL:           f.sessionTTL,
 	}
 
 	switch f.storageDriver {

@@ -44,7 +44,7 @@ func (h RequestHeaders) Sorted() RequestHeaders {
 }
 
 func MapToHeaders(in map[string]string) *RequestHeaders {
-	result := make(RequestHeaders, 0)
+	result := make(RequestHeaders, 0, len(in))
 
 	for name, value := range in {
 		result = append(result, RequestHeader{Name: name, Value: value})

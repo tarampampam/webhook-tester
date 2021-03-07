@@ -1,9 +1,9 @@
 package settings
 
 import (
-	"encoding/json"
 	"net/http"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 )
 
@@ -33,7 +33,7 @@ func NewGetSettingsHandler(cfg config.Config) http.HandlerFunc {
 			resp.Limits.MaxWebhookRequestBodySize = cfg.MaxRequestBodySize
 			resp.Limits.SessionLifetimeSec = uint32(cfg.SessionTTL.Seconds())
 
-			c, _ = json.Marshal(resp)
+			c, _ = jsoniter.ConfigFastest.Marshal(resp)
 		}
 
 		w.WriteHeader(http.StatusOK)

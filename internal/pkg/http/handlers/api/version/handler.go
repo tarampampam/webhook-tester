@@ -2,8 +2,9 @@
 package version
 
 import (
-	"encoding/json"
 	"net/http"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 // NewHandler creates version handler.
@@ -12,7 +13,7 @@ func NewHandler(ver string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, _ *http.Request) {
 		if cache == nil {
-			cache, _ = json.Marshal(struct {
+			cache, _ = jsoniter.ConfigFastest.Marshal(struct {
 				Version string `json:"version"`
 			}{
 				Version: ver,
