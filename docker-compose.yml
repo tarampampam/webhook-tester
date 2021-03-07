@@ -5,21 +5,18 @@ volumes:
   redis-data:
   golint-cache:
 
-x-app: &app-service
-  image: golang:1.15-buster # Image page: <https://hub.docker.com/_/golang>
-  working_dir: /src
-  environment:
-    HOME: /tmp
-    GOPATH: /tmp
-  volumes:
-    - /etc/passwd:/etc/passwd:ro
-    - /etc/group:/etc/group:ro
-    - .:/src:rw
-    - tmp-data:/tmp:rw
-
 services:
-  app:
-    <<: *app-service
+  app: &app-service
+    image: golang:1.16.0-buster # Image page: <https://hub.docker.com/_/golang>
+    working_dir: /src
+    environment:
+      HOME: /tmp
+      GOPATH: /tmp
+    volumes:
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/group:/etc/group:ro
+      - .:/src:rw
+      - tmp-data:/tmp:rw
 
   web:
     <<: *app-service
