@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16.0
+          go-version: 1.16.2
 
       - name: Check out code
         uses: actions/checkout@v2
@@ -67,9 +67,11 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1 # Action page: <https://github.com/docker/setup-qemu-action>
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1 # Action page: <https://github.com/docker/setup-buildx-action>
-        id: buildx
 
       - name: Docker login in default registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_LOGIN }}" --password-stdin
@@ -84,11 +86,12 @@ jobs:
       - name: Build image
         run: |
           docker buildx build \
-            --platform ${{ steps.buildx.outputs.platforms }} \
+            --platform "linux/amd64,linux/386,linux/arm64,linux/arm/v6,linux/arm/v7" \
             --tag "tarampampam/webhook-tester:${{ steps.values.outputs.version }}" \
             --tag "tarampampam/webhook-tester:latest" \
             --tag "ghcr.io/tarampampam/webhook-tester:${{ steps.values.outputs.version }}" \
             --tag "ghcr.io/tarampampam/webhook-tester:latest" \
             --build-arg "APP_VERSION=${{ steps.values.outputs.version }}" \
+            --file ./Dockerfile \
             --push \
             .
