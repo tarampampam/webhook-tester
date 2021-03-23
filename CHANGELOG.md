@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Graceful shutdown support for `serve` sub-command
 - HTTP requests & HTTP panics logging middlewares
 - Logging using `uber-go/zap` package
+- Support for `linux/arm64`, `linux/arm/v6` and `linux/arm/v7` platforms for docker image
 
 ### Changed
 
@@ -32,7 +33,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Default value for `--public` flag (`serve` sub-command) now `%binary_file_dir%/web` instead `%current_working_directory%/web`
 - Flag `--session-ttl` (`serve` sub-command) now accepts duration (example: `1h30m`) instead seconds count
 - Flag `--public` now accepts empty value (in this case file server will be disabled)
-- Go updated from `1.15` up to `1.16.0`
+- Go updated from `1.15` up to `1.16.2`
 
 ### Removed
 
