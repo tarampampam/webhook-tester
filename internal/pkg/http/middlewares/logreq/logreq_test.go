@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
+
 	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
 	"go.uber.org/zap"
 )
 
@@ -35,11 +36,11 @@ func TestMiddleware(t *testing.T) {
 			},
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
 				assert.Equal(t, http.MethodGet, in["method"])
-				assert.NotZero(t, in["duration_micro"])
+				assert.NotZero(t, in["duration"])
 				assert.Equal(t, "info", in["level"])
 				assert.Contains(t, in["msg"], "processed")
-				assert.Equal(t, "4.3.2.1", in["remote_addr"])
-				assert.Equal(t, float64(http.StatusUnsupportedMediaType), in["status_code"])
+				assert.Equal(t, "4.3.2.1", in["remote addr"])
+				assert.Equal(t, float64(http.StatusUnsupportedMediaType), in["status code"])
 				assert.Equal(t, "http://unit/test/?foo=bar&baz", in["url"])
 				assert.Equal(t, "Foo Useragent", in["useragent"])
 			},
@@ -59,7 +60,7 @@ func TestMiddleware(t *testing.T) {
 				return
 			},
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
-				assert.Equal(t, "10.1.1.1", in["remote_addr"])
+				assert.Equal(t, "10.1.1.1", in["remote addr"])
 			},
 		},
 		{
@@ -76,7 +77,7 @@ func TestMiddleware(t *testing.T) {
 				return
 			},
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
-				assert.Equal(t, "10.0.1.1", in["remote_addr"])
+				assert.Equal(t, "10.0.1.1", in["remote addr"])
 			},
 		},
 		{
@@ -92,7 +93,7 @@ func TestMiddleware(t *testing.T) {
 				return
 			},
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
-				assert.Equal(t, "10.0.0.1", in["remote_addr"])
+				assert.Equal(t, "10.0.0.1", in["remote addr"])
 			},
 		},
 	}

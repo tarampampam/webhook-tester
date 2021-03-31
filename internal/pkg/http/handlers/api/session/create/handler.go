@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/responder"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api"
 
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
@@ -13,27 +15,27 @@ import (
 func NewHandler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Body == nil {
-			api.Respond(w, api.NewServerError(http.StatusBadRequest, "empty request body"))
+			responder.JSON(w, api.NewServerError(http.StatusBadRequest, "empty request body"))
 
 			return
 		}
 
 		body, readingErr := ioutil.ReadAll(r.Body)
 		if readingErr != nil {
-			api.Respond(w, api.NewServerError(http.StatusInternalServerError, readingErr.Error()))
+			responder.JSON(w, api.NewServerError(http.StatusInternalServerError, readingErr.Error()))
 
 			return
 		}
 
 		payload, parsingErr := ParseInput(body)
 		if parsingErr != nil {
-			api.Respond(w, api.NewServerError(http.StatusBadRequest, parsingErr.Error()))
+			responder.JSON(w, api.NewServerError(http.StatusBadRequest, parsingErr.Error()))
 
 			return
 		}
 
 		if err := payload.Validate(); err != nil {
-			api.Respond(w, api.NewServerError(http.StatusBadRequest, "wrong request: "+err.Error()))
+			responder.JSON(w, api.NewServerError(http.StatusBadRequest, "wrong request: "+err.Error()))
 
 			return
 		}
@@ -45,12 +47,12 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 			payload.Delay,
 		)
 		if savingErr != nil {
-			api.Respond(w, api.NewServerError(http.StatusInternalServerError, savingErr.Error()))
+			responder.JSON(w, api.NewServerError(http.StatusInternalServerError, savingErr.Error()))
 
 			return
 		}
 
-		api.Respond(w, output{
+		responder.JSON(w, output{
 			SessionUUID: uuid,
 			Content:     payload.ResponseContent,
 			StatusCode:  payload.StatusCode,

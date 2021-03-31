@@ -132,7 +132,6 @@ func (h *Handler) error(w http.ResponseWriter, code int, msg string) {
 
 	w.WriteHeader(code)
 
-	statusText := http.StatusText(code)
 	_, _ = w.Write([]byte(`<!doctype html>
 <!--
   WebHook error: ` + msg + `
@@ -142,7 +141,7 @@ func (h *Handler) error(w http.ResponseWriter, code int, msg string) {
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>` + statusText + `</title>
+    <title>` + http.StatusText(code) + `</title>
     <style>
         html,body {width:100%; height:100%; margin:0; padding:0; background-color: #2b2b2b; color: #efeffa}
         body {display:flex; justify-content:center; align-items:center; font-family:sans-serif}
@@ -151,7 +150,7 @@ func (h *Handler) error(w http.ResponseWriter, code int, msg string) {
 </head>
 <body>
     <div class="container">
-        <h1>WebHook: ` + statusText + `</h1>
+        <h1>WebHook: ` + http.StatusText(code) + `</h1>
         <h3>` + msg + `</h3>
     </div>
 </body>

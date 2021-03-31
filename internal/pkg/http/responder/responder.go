@@ -1,4 +1,5 @@
-package api
+// Package responder contains different HTTP responders ("sugared" functions for easy working with API responses).
+package responder
 
 import (
 	"encoding/json"
@@ -13,9 +14,10 @@ type jsoner interface {
 	ToJSON() ([]byte, error)
 }
 
-func Respond(w http.ResponseWriter, model jsoner) {
+// JSON writes passed model as a json-formatted string into writer.
+func JSON(w http.ResponseWriter, model jsoner) {
 	if name := "Content-Type"; w.Header().Get(name) == "" {
-		w.Header().Set(name, "application/json")
+		w.Header().Set(name, "application/json; charset=utf-8")
 	}
 
 	content, err := model.ToJSON()
@@ -25,7 +27,7 @@ func Respond(w http.ResponseWriter, model jsoner) {
 			Message string `json:"message"`
 		}{false, err.Error()})
 
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(fallback)
 
@@ -42,5 +44,7 @@ func Respond(w http.ResponseWriter, model jsoner) {
 
 	w.WriteHeader(code)
 
-	_, _ = w.Write(content)
+	if _, err = w.Write(content); err != nil {
+		panic(err) // occurred something very bad
+	}
 }

@@ -18,12 +18,12 @@ func New(log *zap.Logger) mux.MiddlewareFunc {
 			metrics := httpsnoop.CaptureMetrics(next, w, r)
 
 			log.Info("HTTP request processed",
-				zap.String("remote_addr", getRealClientAddress(r)),
+				zap.String("remote addr", getRealClientAddress(r)),
 				zap.String("useragent", r.UserAgent()),
 				zap.String("method", r.Method),
 				zap.String("url", r.URL.String()),
-				zap.Int("status_code", metrics.Code),
-				zap.Int64("duration_micro", metrics.Duration.Microseconds()),
+				zap.Int("status code", metrics.Code),
+				zap.Duration("duration", metrics.Duration),
 			)
 		})
 	}

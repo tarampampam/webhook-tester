@@ -1,10 +1,12 @@
-package delete
+package delete_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/delete"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +65,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
 				rr      = httptest.NewRecorder()
-				handler = NewHandler(s)
+				handler = delete.NewHandler(s)
 			)
 
 			if tt.giveReqVars != nil {

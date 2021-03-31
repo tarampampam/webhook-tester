@@ -58,13 +58,13 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 		giveBody       io.Reader
 		giveReqVars    func(s storage.Storage) map[string]string
 		wantStatusCode int
-		wantJSON       string
+		wantSubstring  []string
 	}{
 		{
 			name:           "without registered session UUID",
 			giveReqVars:    nil,
 			wantStatusCode: http.StatusInternalServerError,
-			wantJSON:       `{"code":500,"success":false,"message":"cannot extract session UUID"}`,
+			wantSubstring:  []string{"cannot extract session UUID"},
 		},
 		{
 			name: "session was not found",
@@ -72,7 +72,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				return map[string]string{"sessionUUID": "aa-bb-cc-dd"}
 			},
 			wantStatusCode: http.StatusNotFound,
-			wantJSON:       `{"code":404,"success":false,"message":"session with UUID aa-bb-cc-dd was not found"}`,
+			wantSubstring:  []string{"session with UUID aa-bb-cc-dd was not found"},
 		},
 		{
 			name: "too large body request",
@@ -84,7 +84,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			},
 			giveBody:       bytes.NewBuffer([]byte(strings.Repeat("x", 65))),
 			wantStatusCode: http.StatusInternalServerError,
-			wantJSON:       `{"code":500,"success":false,"message":"request body is too large (current: 65, maximal: 64)"}`, //nolint:lll
+			wantSubstring:  []string{"request body is too large (current: 65, maximal: 64)"},
 		},
 	}
 
@@ -110,7 +110,10 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.wantStatusCode, rr.Code)
-			assert.JSONEq(t, tt.wantJSON, rr.Body.String())
+
+			for i := 0; i < len(tt.wantSubstring); i++ {
+				assert.Contains(t, rr.Body.String(), tt.wantSubstring[i])
+			}
 		})
 	}
 }
@@ -297,8 +300,8 @@ func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.JSONEq(t, `{"code":500,"success":false,"message":"canceled"}`, rr.Body.String())
-	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.Contains(t, rr.Body.String(), "canceled")
+	assert.Contains(t, rr.Header().Get("Content-Type"), "text/html")
 
 	requests, err := s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)

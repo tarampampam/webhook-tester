@@ -7,13 +7,13 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/delete"
-	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/all"
-	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/clear"
-	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/delete"
-	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
 	apiSessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/create"
+	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/delete"
+	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/all"
+	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/clear"
+	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/delete"
+	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/get"
 	apiSettings "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
 	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
@@ -96,19 +96,19 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 
 	// delete session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(storage)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(storage)).
 		Methods(http.MethodDelete).
 		Name("api_session_delete")
 
 	// get requests list for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(storage)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(storage)).
 		Methods(http.MethodGet).
 		Name("api_session_requests_all_get")
 
 	// get request details by UUID for session with passed UUID
 	apiRouter.
-		Handle(
+		HandleFunc(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
 			getRequest.NewHandler(storage),
 		).
@@ -117,7 +117,7 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 
 	// delete request by UUID for session with passed UUID
 	apiRouter.
-		Handle(
+		HandleFunc(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
 			deleteRequest.NewHandler(storage, br),
 		).
@@ -126,7 +126,7 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, br)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, br)).
 		Methods(http.MethodDelete).
 		Name("api_delete_all_session_requests")
 }

@@ -1,4 +1,4 @@
-package clear
+package delete_test
 
 import (
 	"net/http"
@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/delete"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -28,10 +29,16 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			wantJSON:       `{"code":500,"success":false,"message":"cannot extract session UUID"}`,
 		},
 		{
-			name:           "session not found",
+			name:           "without request uuid",
 			giveReqVars:    map[string]string{"sessionUUID": "aa-bb-cc-dd"},
+			wantStatusCode: http.StatusInternalServerError,
+			wantJSON:       `{"code":500,"success":false,"message":"cannot extract request UUID"}`,
+		},
+		{
+			name:           "request not found",
+			giveReqVars:    map[string]string{"sessionUUID": "aa-bb-cc-dd", "requestUUID": "11-22-33-44"},
 			wantStatusCode: http.StatusNotFound,
-			wantJSON:       `{"code":404,"success":false,"message":"requests for session with UUID aa-bb-cc-dd was not found"}`,
+			wantJSON:       `{"code":404,"success":false,"message":"request with UUID 11-22-33-44 was not found"}`,
 		},
 	}
 
@@ -45,7 +52,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				req, _  = http.NewRequest(http.MethodPost, "http://test", nil)
 				rr      = httptest.NewRecorder()
 				br      = broadcast.None{}
-				handler = NewHandler(s, &br)
+				handler = delete.NewHandler(s, &br)
 			)
 
 			if tt.giveReqVars != nil {
@@ -68,7 +75,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
 		br      = broadcast.None{}
-		handler = NewHandler(s, &br)
+		handler = delete.NewHandler(s, &br)
 	)
 
 	var (
@@ -89,14 +96,14 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
-	// create request for the session
-	_, err = s.CreateRequest(sessionUUID, "", "", "", "", nil)
-	assert.NoError(t, err)
+	// create 2 requests for the session
+	_, _ = s.CreateRequest(sessionUUID, "", "", "", "", nil)
+	requestUUID, _ := s.CreateRequest(sessionUUID, "", "", "", "", nil)
 	requests, err := s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)
-	assert.Len(t, requests, 1) // is not empty
+	assert.Len(t, requests, 2) // is not empty
 
-	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
+	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "requestUUID": requestUUID})
 
 	handler.ServeHTTP(rr, req)
 
@@ -108,10 +115,10 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	brMutex.Lock()
 	assert.Equal(t, 1, brCount)
 	assert.Equal(t, sessionUUID, brChannel)
-	assert.Equal(t, "requests-deleted", brEvent.Name())
+	assert.Equal(t, "request-deleted", brEvent.Name())
 	brMutex.Unlock()
 
 	requests, err = s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)
-	assert.Len(t, requests, 0) // but now is empty!
+	assert.Len(t, requests, 1) // but still contains 1 request!
 }

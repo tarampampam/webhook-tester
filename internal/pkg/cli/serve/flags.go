@@ -143,7 +143,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 	)
 }
 
-func (f *flags) overrideUsingEnv() error {
+func (f *flags) overrideUsingEnv() error { //nolint:funlen
 	if envVar, exists := env.ListenAddr.Lookup(); exists {
 		f.listen.ip = envVar
 	}

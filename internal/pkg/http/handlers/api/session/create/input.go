@@ -27,7 +27,7 @@ func ParseInput(body []byte) (*input, error) {
 		return nil, errors.New("cannot parse passed json")
 	}
 
-	// init struct with defaults
+	// init with defaults
 	var p = input{
 		StatusCode:      http.StatusOK,
 		ContentType:     "text/plain",

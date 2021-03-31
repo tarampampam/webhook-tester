@@ -11,22 +11,6 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
 )
 
-func BenchmarkNewGetSettingsHandler(b *testing.B) {
-	b.ReportAllocs()
-
-	var (
-		req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)
-		rr     = httptest.NewRecorder()
-		cfg    = config.Config{}
-	)
-
-	h := settings.NewGetSettingsHandler(cfg)
-
-	for n := 0; n < b.N; n++ {
-		h.ServeHTTP(rr, req)
-	}
-}
-
 func TestHandler_ServeHTTP(t *testing.T) {
 	t.Parallel()
 
@@ -74,5 +58,21 @@ func TestHandler_ServeHTTP(t *testing.T) {
 
 			tt.checkResult(t, rr)
 		})
+	}
+}
+
+func BenchmarkNewGetSettingsHandler(b *testing.B) {
+	b.ReportAllocs()
+
+	var (
+		req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)
+		rr     = httptest.NewRecorder()
+		cfg    = config.Config{}
+	)
+
+	h := settings.NewGetSettingsHandler(cfg)
+
+	for n := 0; n < b.N; n++ {
+		h.ServeHTTP(rr, req)
 	}
 }

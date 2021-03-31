@@ -45,7 +45,7 @@ func NewServer(log *zap.Logger) *Server {
 			Handler:      router,
 			ErrorLog:     zap.NewStdLog(log),
 			ReadTimeout:  defaultReadTimeout,
-			WriteTimeout: defaultWriteTimeout,
+			WriteTimeout: defaultWriteTimeout, // TODO check with large webhook response delay
 		}
 	)
 

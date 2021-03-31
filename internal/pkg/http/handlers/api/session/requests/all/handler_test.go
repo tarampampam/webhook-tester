@@ -1,4 +1,4 @@
-package all
+package all_test
 
 import (
 	"net/http"
@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/all"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	}
 
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage.NewInMemoryStorage(time.Minute, 1)
 			defer s.Close()
@@ -42,7 +45,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
 				rr      = httptest.NewRecorder()
-				handler = NewHandler(s)
+				handler = all.NewHandler(s)
 			)
 
 			if tt.giveReqVars != nil {
@@ -64,7 +67,7 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = NewHandler(s)
+		handler = all.NewHandler(s)
 	)
 
 	// create session
@@ -109,7 +112,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 	var (
 		req, _  = http.NewRequest(http.MethodGet, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = NewHandler(s)
+		handler = all.NewHandler(s)
 	)
 
 	// create session
@@ -131,7 +134,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		"PUT",
 		"foobar",
 		"http://example.com/foo1",
-		map[string]string{"aaa": "bar", "bbb": "foo"},
+		map[string]string{"bbb": "foo", "aaa": "bar"},
 	)
 
 	<-time.After(time.Millisecond * 5)
