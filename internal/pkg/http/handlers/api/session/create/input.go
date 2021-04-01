@@ -15,7 +15,7 @@ type input struct {
 	ResponseContent string
 }
 
-func ParseInput(body []byte) (*input, error) {
+func parseInput(body []byte) (*input, error) {
 	var bodyPayload struct {
 		StatusCode       *uint16 `json:"status_code"`    // optional
 		ContentType      *string `json:"content_type"`   // optional
@@ -39,12 +39,15 @@ func ParseInput(body []byte) (*input, error) {
 	if v := bodyPayload.StatusCode; v != nil {
 		p.StatusCode = *v
 	}
+
 	if v := bodyPayload.ContentType; v != nil {
 		p.ContentType = *v
 	}
+
 	if v := bodyPayload.ResponseDelaySec; v != nil {
 		p.Delay = time.Duration(*v) * time.Second
 	}
+
 	if v := bodyPayload.ResponseContent; v != nil {
 		p.ResponseContent = *v
 	}

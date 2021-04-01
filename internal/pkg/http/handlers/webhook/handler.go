@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
 
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
@@ -92,7 +93,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 	// store request in a storage
 	if rUUID, err = h.storage.CreateRequest(
 		sUUID,
-		h.getRealClientAddress(r),
+		realip.FromHTTPRequest(r),
 		r.Method,
 		string(body),
 		r.RequestURI,
@@ -188,31 +189,4 @@ loop:
 	}
 
 	return result
-}
-
-var trustHeaders = [...]string{"X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP"} //nolint:gochecknoglobals
-
-func (h *Handler) getRealClientAddress(r *http.Request) string {
-	var ip string
-
-	for _, name := range trustHeaders {
-		if value := r.Header.Get(name); value != "" {
-			// `X-Forwarded-For` can be `10.0.0.1, 10.0.0.2, 10.0.0.3`
-			if strings.Contains(value, ",") {
-				parts := strings.Split(value, ",")
-
-				if len(parts) >= 1 {
-					ip = strings.TrimSpace(parts[0])
-				}
-			} else {
-				ip = strings.TrimSpace(value)
-			}
-		}
-	}
-
-	if net.ParseIP(ip) != nil {
-		return ip
-	}
-
-	return strings.Split(r.RemoteAddr, ":")[0]
 }

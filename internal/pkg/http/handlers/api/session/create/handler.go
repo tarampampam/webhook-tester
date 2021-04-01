@@ -27,7 +27,7 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 
-		payload, parsingErr := ParseInput(body)
+		payload, parsingErr := parseInput(body)
 		if parsingErr != nil {
 			responder.JSON(w, api.NewServerError(http.StatusBadRequest, parsingErr.Error()))
 

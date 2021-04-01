@@ -26,7 +26,9 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 
 			return
 		} else if !result {
-			responder.JSON(w, api.NewServerError(http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID)))
+			responder.JSON(w, api.NewServerError(
+				http.StatusNotFound, fmt.Sprintf("session with UUID %s was not found", sessionUUID),
+			))
 
 			return
 		}

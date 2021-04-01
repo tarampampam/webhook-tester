@@ -28,7 +28,6 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 		}
 
 		request, gettingErr := storage.GetRequest(sessionUUID, requestUUID)
-
 		if gettingErr != nil {
 			responder.JSON(w, api.NewServerError(
 				http.StatusInternalServerError, "cannot read request data: "+gettingErr.Error(),

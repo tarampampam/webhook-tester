@@ -22,8 +22,6 @@ func (e ServerError) StatusCode() int { return e.Code }
 func (e ServerError) ToJSON() ([]byte, error) { return jsoniter.ConfigFastest.Marshal(e) }
 
 type (
-	SessionRequests []SessionRequest
-
 	SessionRequest struct {
 		UUID          string                 `json:"uuid"`
 		ClientAddr    string                 `json:"client_address"`
@@ -40,5 +38,8 @@ type (
 	}
 )
 
+func (sr SessionRequest) ToJSON() ([]byte, error) { return jsoniter.ConfigFastest.Marshal(sr) }
+
+type SessionRequests []SessionRequest
+
 func (sr SessionRequests) ToJSON() ([]byte, error) { return jsoniter.ConfigFastest.Marshal(sr) }
-func (sr SessionRequest) ToJSON() ([]byte, error)  { return jsoniter.ConfigFastest.Marshal(sr) }

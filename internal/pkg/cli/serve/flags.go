@@ -75,7 +75,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		&f.sessionTTL,
 		"session-ttl",
 		"",
-		time.Hour*168,
+		time.Hour*168, //nolint:gomnd
 		fmt.Sprintf("session lifetime (examples: 48h, 1h30m) [$%s]", env.SessionTTL),
 	)
 	flagSet.StringSliceVarP(
