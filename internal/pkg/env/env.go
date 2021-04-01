@@ -6,39 +6,18 @@ import "os"
 type envVariable string
 
 const (
-	// ListenAddr is IP address for listening.
-	ListenAddr envVariable = "LISTEN_ADDR"
-
-	// ListenPort is port number for listening.
-	ListenPort envVariable = "LISTEN_PORT"
-
-	// PublicDir is a directory with public resources.
-	PublicDir envVariable = "PUBLIC_DIR"
-
-	// MaxSessionRequests is a maximum stored requests per session.
-	MaxSessionRequests envVariable = "MAX_REQUESTS"
-
-	// SessionTTL is a session lifetime.
-	SessionTTL envVariable = "SESSION_TTL"
-
-	StorageDriverName envVariable = "STORAGE_DRIVER"
-
-	BroadcastDriverName envVariable = "BROADCAST_DRIVER"
-
-	// PusherAppID is a pusher application ID.
-	PusherAppID envVariable = "PUSHER_APP_ID"
-
-	// PusherKey is a pusher key.
-	PusherKey envVariable = "PUSHER_KEY"
-
-	// PusherSecret is a pusher secret.
-	PusherSecret envVariable = "PUSHER_SECRET"
-
-	// PusherCluster is a pusher cluster.
-	PusherCluster envVariable = "PUSHER_CLUSTER"
-
-	// RedisDSN is URL-like redis connection string <https://redis.uptrace.dev/#connecting-to-redis-server>.
-	RedisDSN envVariable = "REDIS_DSN"
+	ListenAddr          envVariable = "LISTEN_ADDR"      // IP address for listening
+	ListenPort          envVariable = "LISTEN_PORT"      // port number for listening
+	PublicDir           envVariable = "PUBLIC_DIR"       // directory with public resources
+	MaxSessionRequests  envVariable = "MAX_REQUESTS"     // maximum stored requests per session
+	SessionTTL          envVariable = "SESSION_TTL"      // session lifetime
+	StorageDriverName   envVariable = "STORAGE_DRIVER"   // storage driver name
+	BroadcastDriverName envVariable = "BROADCAST_DRIVER" // broadcast driver name
+	PusherAppID         envVariable = "PUSHER_APP_ID"    // pusher application ID
+	PusherKey           envVariable = "PUSHER_KEY"       // pusher key
+	PusherSecret        envVariable = "PUSHER_SECRET"    // pusher secret
+	PusherCluster       envVariable = "PUSHER_CLUSTER"   // pusher cluster
+	RedisDSN            envVariable = "REDIS_DSN"        // URL-like redis connection string <https://bit.ly/3maKq4l>
 )
 
 // String returns environment variable name in the string representation.

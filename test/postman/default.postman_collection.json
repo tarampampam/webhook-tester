@@ -886,17 +886,6 @@
 					"item": [
 						{
 							"name": "Webhook",
-							"event": [
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
 							"request": {
 								"method": "GET",
 								"header": [],
@@ -1855,18 +1844,14 @@
 									"    pm.response.to.have.status(404)",
 									"})",
 									"",
-									"pm.test('Content-Type header is application/json', () => {",
-									"  pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('application/json')",
+									"pm.test('Content-Type header is text/html', () => {",
+									"    pm.expect(pm.response.headers.get('Content-Type')).to.contains('text/html')",
 									"})",
 									"",
-									"pm.test('JSON object has correct structure', () => {",
-									"    var data = pm.response.json()",
+									"pm.test('response is correct', () => {",
+									"    const $ = cheerio.load(pm.response.text());",
 									"",
-									"    pm.expect(data).to.have.all.keys('success', 'code', 'message')",
-									"",
-									"    pm.expect(data.success).to.be.false",
-									"    pm.expect(data.code).to.be.eql(404)",
-									"    pm.expect(data.message).to.contains('not found')",
+									"    pm.expect($('title').html()).to.contains('Not Found')",
 									"});",
 									""
 								],
@@ -1958,6 +1943,7 @@
 	],
 	"variable": [
 		{
+			"id": "84cda07f-2942-48f1-b122-ec1d7964e0ec",
 			"key": "webhooksSessionUUID",
 			"value": ""
 		}

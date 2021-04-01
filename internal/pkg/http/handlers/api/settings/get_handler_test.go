@@ -12,8 +12,6 @@ import (
 )
 
 func TestHandler_ServeHTTP(t *testing.T) {
-	t.Parallel()
-
 	var cases = []struct {
 		name        string
 		setUp       func(cfg *config.Config)
@@ -41,6 +39,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 	}
 
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			var (
 				req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"time"
 
@@ -34,7 +35,7 @@ func (s *RedisStorage) GetSession(uuid string) (Session, error) {
 	value, err := s.rdb.Get(s.ctx, redisKey(uuid).session()).Bytes()
 
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // not found
 		}
 
@@ -209,7 +210,7 @@ func (s *RedisStorage) GetRequest(sessionUUID, requestUUID string) (Request, err
 	value, err := s.rdb.Get(s.ctx, redisKey(sessionUUID).request(requestUUID)).Bytes()
 
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil // not found
 		}
 
