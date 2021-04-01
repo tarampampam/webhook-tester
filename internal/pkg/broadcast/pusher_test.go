@@ -1,4 +1,4 @@
-package broadcast
+package broadcast_test
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 )
 
 type roundTripFunc func(req *http.Request) *http.Response
@@ -33,8 +34,8 @@ func TestBroadcaster_Publish(t *testing.T) {
 		}),
 	}
 
-	broadcaster := NewPusher("foo", "bar", "baz", "yeah", WithPusherHTTPClient(client))
+	broadcaster := broadcast.NewPusher("foo", "bar", "baz", "yeah", broadcast.WithPusherHTTPClient(client))
 
-	assert.Nil(t, broadcaster.Publish("channel", NewRequestRegisteredEvent("bar")))
+	assert.Nil(t, broadcaster.Publish("channel", broadcast.NewRequestRegisteredEvent("bar")))
 	assert.True(t, catch)
 }

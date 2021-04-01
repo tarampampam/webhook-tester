@@ -3,12 +3,10 @@ module github.com/tarampampam/webhook-tester
 go 1.15
 
 require (
-	github.com/alicebob/miniredis v2.5.0+incompatible
 	github.com/alicebob/miniredis/v2 v2.14.3
 	github.com/fatih/color v1.10.0
 	github.com/felixge/httpsnoop v1.0.1
 	github.com/go-redis/redis/v8 v8.8.0
-	github.com/gomodule/redigo v1.8.2 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/json-iterator/go v1.1.10

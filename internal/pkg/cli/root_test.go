@@ -1,14 +1,15 @@
-package cli
+package cli_test
 
 import (
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/cli"
 )
 
 func TestSubcommands(t *testing.T) {
-	cmd := NewCommand("unit test")
+	cmd := cli.NewCommand("unit test")
 
 	cases := []struct {
 		giveName string
@@ -34,7 +35,7 @@ func TestSubcommands(t *testing.T) {
 }
 
 func TestFlags(t *testing.T) {
-	cmd := NewCommand("unit test")
+	cmd := cli.NewCommand("unit test")
 
 	cases := []struct {
 		giveName      string
@@ -64,7 +65,7 @@ func TestFlags(t *testing.T) {
 }
 
 func TestExecuting(t *testing.T) {
-	cmd := NewCommand("unit test")
+	cmd := cli.NewCommand("unit test")
 	cmd.SetArgs([]string{})
 
 	var executed bool

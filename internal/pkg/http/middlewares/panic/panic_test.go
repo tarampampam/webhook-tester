@@ -1,4 +1,4 @@
-package panic
+package panic_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/assert"
+	panicMiddlewares "github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/panic"
 	"go.uber.org/zap"
 )
 
@@ -74,7 +75,7 @@ func TestMiddleware(t *testing.T) {
 				log, err := zap.NewProduction()
 				assert.NoError(t, err)
 
-				New(log).Middleware(tt.giveHandler).ServeHTTP(rr, tt.giveRequest())
+				panicMiddlewares.New(log).Middleware(tt.giveHandler).ServeHTTP(rr, tt.giveRequest())
 			})
 
 			var asJSON map[string]interface{}

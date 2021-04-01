@@ -1,4 +1,4 @@
-package checkers
+package checkers_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 )
 
 type httpClientFunc func(*http.Request) (*http.Response, error)
@@ -26,7 +27,7 @@ func TestHealthChecker_CheckSuccess(t *testing.T) {
 		}, nil
 	}
 
-	checker := NewHealthChecker(context.Background(), httpMock)
+	checker := checkers.NewHealthChecker(context.Background(), httpMock)
 
 	assert.NoError(t, checker.Check(123))
 }
@@ -39,7 +40,7 @@ func TestHealthChecker_CheckFail(t *testing.T) {
 		}, nil
 	}
 
-	checker := NewHealthChecker(context.Background(), httpMock)
+	checker := checkers.NewHealthChecker(context.Background(), httpMock)
 
 	err := checker.Check(123)
 	assert.Error(t, err)

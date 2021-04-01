@@ -1,0 +1,19 @@
+# Docs: <https://docs.codecov.io/docs/commit-status>
+
+coverage:
+  status:
+    project:
+      default:
+        # Choose a minimum coverage ratio that the commit must meet to be considered a success.
+        #
+        # `auto` will use the coverage from the base commit (pull request base or parent commit) coverage to compare
+        # against.
+        target: auto
+
+        # Allow the coverage to drop by X%, and posting a success status.
+        threshold: 5%
+
+    patch:
+      default:
+        target: auto
+        threshold: 5%

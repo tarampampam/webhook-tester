@@ -1,4 +1,4 @@
-package breaker
+package breaker_test
 
 import (
 	"context"
@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 )
 
 func TestNewOSSignals(t *testing.T) {
-	oss := NewOSSignals(context.Background())
+	oss := breaker.NewOSSignals(context.Background())
 
 	gotSignal := make(chan os.Signal, 1)
 
@@ -34,7 +35,7 @@ func TestNewOSSignals(t *testing.T) {
 func TestNewOSSignalCtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	oss := NewOSSignals(ctx)
+	oss := breaker.NewOSSignals(ctx)
 
 	gotSignal := make(chan os.Signal, 1)
 

@@ -1,13 +1,14 @@
-package storage
+package storage_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 func TestRedisStorage_SessionCreateReadDelete(t *testing.T) {
@@ -16,7 +17,7 @@ func TestRedisStorage_SessionCreateReadDelete(t *testing.T) {
 
 	defer mini.Close()
 
-	s := NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
 
 	sessionUUID, creationErr := s.CreateSession("foo bar", 201, "text/javascript", time.Second*123)
 	assert.NoError(t, creationErr)
@@ -54,7 +55,7 @@ func TestRedisStorage_RequestCreateReadDelete(t *testing.T) {
 
 	defer mini.Close()
 
-	s := NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.Nil(t, sessionCreationErr)
@@ -103,7 +104,7 @@ func TestRedisStorage_RequestCreationLimit(t *testing.T) {
 
 	defer mini.Close()
 
-	s := NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 2)
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 2)
 
 	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
 
@@ -133,7 +134,7 @@ func TestRedisStorage_GetAllRequests(t *testing.T) {
 
 	defer mini.Close()
 
-	s := NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)
@@ -162,7 +163,7 @@ func TestRedisStorage_DeleteRequests(t *testing.T) {
 
 	defer mini.Close()
 
-	s := NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)

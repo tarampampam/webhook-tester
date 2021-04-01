@@ -1,4 +1,4 @@
-package storage
+package storage_test
 
 import (
 	"sync"
@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
 func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 1, time.Second)
+	s := storage.NewInMemoryStorage(time.Minute, 1, time.Second)
 	defer s.Close()
 
 	sessionUUID, creationErr := s.CreateSession("foo bar", 201, "text/javascript", time.Second*123)
@@ -44,7 +45,7 @@ func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
 }
 
 func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -89,7 +90,7 @@ func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
 }
 
 func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 2, time.Nanosecond*100)
+	s := storage.NewInMemoryStorage(time.Minute, 2, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -115,7 +116,7 @@ func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
 }
 
 func TestInMemoryStorage_GetAllRequests(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -140,7 +141,7 @@ func TestInMemoryStorage_GetAllRequests(t *testing.T) {
 }
 
 func TestInMemoryStorage_DeleteRequests(t *testing.T) {
-	s := NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -165,7 +166,7 @@ func TestInMemoryStorage_DeleteRequests(t *testing.T) {
 }
 
 func TestInMemoryStorage_CreateRequestExpired(t *testing.T) {
-	s := NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
+	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
 	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -184,7 +185,7 @@ func TestInMemoryStorage_CreateRequestExpired(t *testing.T) {
 }
 
 func TestInMemoryStorage_GetRequestExpired(t *testing.T) {
-	s := NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
+	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
 	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -205,40 +206,40 @@ func TestInMemoryStorage_GetRequestExpired(t *testing.T) {
 }
 
 func TestInMemoryStorage_ClosedStateProducesError(t *testing.T) {
-	s := NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
+	s := storage.NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
 	assert.NoError(t, s.Close())
 
-	assert.ErrorIs(t, s.Close(), ErrClosed) // 2nd call produces error
+	assert.ErrorIs(t, s.Close(), storage.ErrClosed) // 2nd call produces error
 
 	_, err := s.GetSession("foo")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.CreateSession("foo", 202, "foo/bar", time.Second)
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.DeleteSession("foo")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.DeleteRequests("foo")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.CreateRequest("foo", "1.1.1.1", "GET", "", "", nil)
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.GetRequest("foo", "bar")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.GetAllRequests("foo")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.DeleteRequest("foo", "bar")
-	assert.ErrorIs(t, err, ErrClosed)
+	assert.ErrorIs(t, err, storage.ErrClosed)
 }
 
 func TestInMemoryStorage_Concurrent(t *testing.T) {
 	var maxRequests = 10
 
-	s := NewInMemoryStorage(time.Second, uint16(maxRequests), time.Nanosecond*10)
+	s := storage.NewInMemoryStorage(time.Second, uint16(maxRequests), time.Nanosecond*10)
 	defer s.Close()
 
 	var wg sync.WaitGroup

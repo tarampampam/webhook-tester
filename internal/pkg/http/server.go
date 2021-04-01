@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"mime"
 	"net/http"
 	"strconv"
@@ -10,30 +11,26 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/panic"
-	"github.com/tarampampam/webhook-tester/internal/pkg/settings"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
-)
-
-type (
-	Server struct {
-		ctx         context.Context
-		log         *zap.Logger
-		publicDir   string
-		appSettings *settings.AppSettings
-		server      *http.Server
-		router      *mux.Router
-		storage     storage.Storage
-		broadcaster broadcaster
-		rdb         *redis.Client // optional, can be nil
-	}
 )
 
 type broadcaster interface {
 	Publish(channel string, event broadcast.Event) error
 }
+
+type (
+	Server struct {
+		log    *zap.Logger
+		server *http.Server
+		router *mux.Router
+
+		afterShutdown []func()
+	}
+)
 
 const (
 	defaultReadTimeout  = time.Second * 5
@@ -41,37 +38,26 @@ const (
 )
 
 // NewServer creates new server instance.
-func NewServer(
-	ctx context.Context,
-	log *zap.Logger,
-	publicDir string,
-	appSettings *settings.AppSettings,
-	storage storage.Storage,
-	br broadcaster,
-	rdb *redis.Client,
-) *Server {
+func NewServer(log *zap.Logger) *Server {
 	var (
 		router     = mux.NewRouter()
 		httpServer = &http.Server{
 			Handler:      router,
 			ErrorLog:     zap.NewStdLog(log),
 			ReadTimeout:  defaultReadTimeout,
-			WriteTimeout: defaultWriteTimeout,
+			WriteTimeout: defaultWriteTimeout, // TODO check with large webhook response delay
 		}
 	)
 
 	return &Server{
-		ctx:         ctx,
-		log:         log,
-		publicDir:   publicDir,
-		appSettings: appSettings,
-		server:      httpServer,
-		router:      router,
-		storage:     storage,
-		broadcaster: br,
-		rdb:         rdb,
+		log:           log,
+		server:        httpServer,
+		router:        router,
+		afterShutdown: make([]func(), 0, 1),
 	}
 }
+
+func (s *Server) addOnShutdown(f func()) { s.afterShutdown = append(s.afterShutdown, f) }
 
 // Start server.
 func (s *Server) Start(ip string, port uint16) error {
@@ -81,10 +67,36 @@ func (s *Server) Start(ip string, port uint16) error {
 }
 
 // Register server routes, middlewares, etc.
-func (s *Server) Register() error {
+func (s *Server) Register(ctx context.Context, cfg config.Config, publicDir string, rdb *redis.Client) error {
+	var br broadcaster
+
+	switch cfg.BroadcastDriver {
+	case config.BroadcastDriverPusher:
+		br = broadcast.NewPusher(cfg.Pusher.AppID, cfg.Pusher.Key, cfg.Pusher.Secret, cfg.Pusher.Cluster)
+	case config.BroadcastDriverNone:
+		br = &broadcast.None{}
+	default:
+		return errors.New("unsupported broadcast driver")
+	}
+
+	var stor storage.Storage
+
+	switch cfg.StorageDriver {
+	case config.StorageDriverRedis:
+		stor = storage.NewRedisStorage(ctx, rdb, cfg.SessionTTL, cfg.MaxRequests)
+	case config.StorageDriverMemory:
+		inmemory := storage.NewInMemoryStorage(cfg.SessionTTL, cfg.MaxRequests)
+
+		s.addOnShutdown(func() { _ = inmemory.Close() })
+
+		stor = inmemory
+	default:
+		return errors.New("unsupported storage driver")
+	}
+
 	s.registerGlobalMiddlewares()
 
-	if err := s.registerHandlers(); err != nil {
+	if err := s.registerHandlers(ctx, cfg, stor, br, publicDir, rdb); err != nil {
 		return err
 	}
 
@@ -103,16 +115,23 @@ func (s *Server) registerGlobalMiddlewares() {
 }
 
 // registerHandlers register server http handlers.
-func (s *Server) registerHandlers() error {
-	if err := s.registerWebHookHandlers(); err != nil {
+func (s *Server) registerHandlers(
+	ctx context.Context,
+	cfg config.Config,
+	storage storage.Storage,
+	br broadcaster,
+	publicDir string,
+	rdb *redis.Client,
+) error {
+	if err := s.registerWebHookHandlers(ctx, cfg, storage, br); err != nil {
 		return err
 	}
 
-	s.registerAPIHandlers()
-	s.registerServiceHandlers()
+	s.registerAPIHandlers(cfg, storage, br)
+	s.registerServiceHandlers(ctx, rdb)
 
-	if s.publicDir != "" {
-		if err := s.registerFileServerHandler(s.publicDir); err != nil {
+	if publicDir != "" {
+		if err := s.registerFileServerHandler(publicDir); err != nil {
 			return err
 		}
 	}
@@ -126,4 +145,12 @@ func (*Server) registerCustomMimeTypes() error {
 }
 
 // Stop server.
-func (s *Server) Stop(ctx context.Context) error { return s.server.Shutdown(ctx) }
+func (s *Server) Stop(ctx context.Context) error {
+	defer func() {
+		for i := 0; i < len(s.afterShutdown); i++ {
+			s.afterShutdown[i]()
+		}
+	}()
+
+	return s.server.Shutdown(ctx)
+}

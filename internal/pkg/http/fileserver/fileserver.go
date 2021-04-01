@@ -46,7 +46,7 @@ type Settings struct {
 }
 
 // NewFileServer creates new file server with default settings. Feel free to change default behavior.
-func NewFileServer(s Settings) (*FileServer, error) { //nolint:gocritic
+func NewFileServer(s Settings) (*FileServer, error) {
 	if info, err := os.Stat(s.FilesRoot); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf(`directory "%s" does not exists`, s.FilesRoot)
