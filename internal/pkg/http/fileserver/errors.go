@@ -58,7 +58,7 @@ func JSONErrorHandler() ErrorHandlerFunc {
 }
 
 // StaticHTMLPageErrorHandler allows to use user-defined local file with HTML for error page generating.
-func StaticHTMLPageErrorHandler() ErrorHandlerFunc { //nolint:gocognit
+func StaticHTMLPageErrorHandler() ErrorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, fs *FileServer, errorCode int) bool {
 		if len(fs.Settings.ErrorFileName) > 0 {
 			if f, err := os.Open(path.Join(fs.Settings.FilesRoot, fs.Settings.ErrorFileName)); err == nil {

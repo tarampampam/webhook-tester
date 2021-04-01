@@ -1,4 +1,4 @@
-package nocache
+package nocache_test
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
 )
 
 func TestMiddleware(t *testing.T) {
@@ -27,7 +28,7 @@ func TestMiddleware(t *testing.T) {
 		handled = true
 	})
 
-	New().Middleware(nextHandler).ServeHTTP(rr, req)
+	nocache.New().Middleware(nextHandler).ServeHTTP(rr, req)
 
 	assert.True(t, handled)
 }

@@ -39,6 +39,6 @@ func NewPusher(appID, key, secret, cluster string, options ...PusherOption) *Pus
 }
 
 // Publish an event into passed channel.
-func (p *Pusher) Publish(channel string, event Event) error {
+func (p *Pusher) Publish(channel string, event Event) error { // TODO pass context for this operation
 	return p.cl.Trigger(channel, event.Name(), event.Data())
 }

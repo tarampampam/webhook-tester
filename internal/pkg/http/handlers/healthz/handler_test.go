@@ -1,4 +1,4 @@
-package healthz
+package healthz_test
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
 )
 
 type fakeChecker struct{ err error }
@@ -19,7 +20,7 @@ func TestNewHandlerNoError(t *testing.T) {
 		rr     = httptest.NewRecorder()
 	)
 
-	NewHandler(&fakeChecker{err: nil})(rr, req)
+	healthz.NewHandler(&fakeChecker{err: nil})(rr, req)
 
 	assert.Equal(t, rr.Code, http.StatusOK)
 	assert.Empty(t, rr.Body.Bytes())
@@ -31,7 +32,7 @@ func TestNewHandlerError(t *testing.T) {
 		rr     = httptest.NewRecorder()
 	)
 
-	NewHandler(&fakeChecker{err: errors.New("foo")})(rr, req)
+	healthz.NewHandler(&fakeChecker{err: errors.New("foo")})(rr, req)
 
 	assert.Equal(t, rr.Code, http.StatusServiceUnavailable)
 	assert.Equal(t, "foo", rr.Body.String())

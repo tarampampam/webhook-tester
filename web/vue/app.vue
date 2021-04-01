@@ -161,9 +161,11 @@
         },
 
         created() {
+            this.$api.getAppVersion()
+                .then((ver) => this.appVersion = ver.version);
+
             this.$api.getAppSettings()
                 .then((settings) => {
-                    this.appVersion = settings.version;
                     this.maxRequests = settings.limits.max_requests;
                     this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
 

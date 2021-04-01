@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/pflag"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/env"
 )
 
@@ -23,8 +24,9 @@ type flags struct {
 
 	publicDir          string // can be empty
 	maxRequests        uint16
-	sessionTTL         string // duration
+	sessionTTL         time.Duration
 	ignoreHeaderPrefix []string
+	maxRequestBodySize uint32 // maximal webhook request body size (in bytes)
 
 	// redisDSN allows to setup redis server using single string. Examples:
 	//	redis://<user>:<password>@<host>:<port>/<db_number>
@@ -69,11 +71,11 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		128,
 		fmt.Sprintf("maximum stored requests per session (max 65535) [$%s]", env.MaxSessionRequests),
 	)
-	flagSet.StringVarP(
+	flagSet.DurationVarP(
 		&f.sessionTTL,
 		"session-ttl",
 		"",
-		"168h",
+		time.Hour*168, //nolint:gomnd
 		fmt.Sprintf("session lifetime (examples: 48h, 1h30m) [$%s]", env.SessionTTL),
 	)
 	flagSet.StringSliceVarP(
@@ -82,6 +84,13 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"",
 		[]string{},
 		"ignore incoming webhook header prefix, case insensitive (example: 'X-Forwarded-')",
+	)
+	flagSet.Uint32VarP(
+		&f.maxRequestBodySize,
+		"max-request-body-size",
+		"",
+		64*1024, //nolint:gomnd // 64 KiB
+		"maximal webhook request body size (in bytes)",
 	)
 	flagSet.StringVarP(
 		&f.redisDSN,
@@ -94,15 +103,15 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		&f.storageDriver,
 		"storage-driver",
 		"",
-		storageMemory,
-		fmt.Sprintf("storage driver (%s|%s) [$%s]", storageMemory, storageRedis, env.StorageDriverName),
+		config.StorageDriverMemory.String(),
+		fmt.Sprintf("storage driver (%s|%s) [$%s]", config.StorageDriverMemory, config.StorageDriverRedis, env.StorageDriverName), //nolint:lll
 	)
 	flagSet.StringVarP(
 		&f.broadcastDriver,
 		"broadcast-driver",
 		"",
-		brDriverNone,
-		fmt.Sprintf("broadcast driver (%s|%s) [$%s]", brDriverNone, brDriverPusher, env.BroadcastDriverName),
+		config.BroadcastDriverNone.String(),
+		fmt.Sprintf("broadcast driver (%s|%s) [$%s]", config.BroadcastDriverNone, config.BroadcastDriverPusher, env.BroadcastDriverName), //nolint:lll
 	)
 	flagSet.StringVarP(
 		&f.pusher.appID,
@@ -134,7 +143,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 	)
 }
 
-func (f *flags) overrideUsingEnv() error {
+func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 	if envVar, exists := env.ListenAddr.Lookup(); exists {
 		f.listen.ip = envVar
 	}
@@ -160,7 +169,11 @@ func (f *flags) overrideUsingEnv() error {
 	}
 
 	if envVar, exists := env.SessionTTL.Lookup(); exists {
-		f.sessionTTL = envVar
+		if d, err := time.ParseDuration(envVar); err == nil {
+			f.sessionTTL = d
+		} else {
+			return fmt.Errorf("wrong session lifetime [%s] period", envVar)
+		}
 	}
 
 	if envVar, exists := env.RedisDSN.Lookup(); exists {
@@ -205,15 +218,11 @@ func (f *flags) validate() error {
 		}
 	}
 
-	if _, err := time.ParseDuration(f.sessionTTL); err != nil {
-		return fmt.Errorf("wrong session lifetime [%s] period", f.sessionTTL)
-	}
-
 	switch f.storageDriver {
-	case storageMemory:
+	case config.StorageDriverMemory.String():
 		// do nothing
 
-	case storageRedis:
+	case config.StorageDriverRedis.String():
 		if _, err := redis.ParseURL(f.redisDSN); err != nil {
 			return fmt.Errorf("wrong redis DSN [%s]: %w", f.redisDSN, err)
 		}
@@ -223,10 +232,10 @@ func (f *flags) validate() error {
 	}
 
 	switch f.broadcastDriver {
-	case brDriverNone:
+	case config.BroadcastDriverNone.String():
 		// do nothing
 
-	case brDriverPusher:
+	case config.BroadcastDriverPusher.String():
 		if f.pusher.appID == "" {
 			return errors.New("pusher application ID does not set")
 		}
@@ -248,4 +257,36 @@ func (f *flags) validate() error {
 	}
 
 	return nil
+}
+
+func (f *flags) toConfig() config.Config {
+	cfg := config.Config{
+		MaxRequests:          f.maxRequests,
+		IgnoreHeaderPrefixes: f.ignoreHeaderPrefix,
+		MaxRequestBodySize:   f.maxRequestBodySize,
+		SessionTTL:           f.sessionTTL,
+	}
+
+	switch f.storageDriver {
+	case config.StorageDriverMemory.String():
+		cfg.StorageDriver = config.StorageDriverMemory
+
+	case config.StorageDriverRedis.String():
+		cfg.StorageDriver = config.StorageDriverRedis
+	}
+
+	switch f.broadcastDriver {
+	case config.BroadcastDriverNone.String():
+		cfg.BroadcastDriver = config.BroadcastDriverNone
+
+	case config.BroadcastDriverPusher.String():
+		cfg.BroadcastDriver = config.BroadcastDriverPusher
+	}
+
+	cfg.Pusher.AppID = f.pusher.appID
+	cfg.Pusher.Cluster = f.pusher.cluster
+	cfg.Pusher.Key = f.pusher.key
+	cfg.Pusher.Secret = f.pusher.secret
+
+	return cfg
 }

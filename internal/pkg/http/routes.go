@@ -1,25 +1,38 @@
 package http
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
-
-	sessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/create"
-	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/delete"
-	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/all"
-	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/clear"
-	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/delete"
-	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/api/session/requests/get"
-	settingsGet "github.com/tarampampam/webhook-tester/internal/pkg/http/api/settings/get"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/webhook"
+	apiSessionCreate "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/create"
+	sessionDelete "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/delete"
+	getAllRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/all"
+	clearRequests "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/clear"
+	deleteRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/delete"
+	getRequest "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/requests/get"
+	apiSettings "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
+	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/webhook"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
+	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/pkg/version"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-func (s *Server) registerWebHookHandlers() error {
+func (s *Server) registerWebHookHandlers(
+	ctx context.Context,
+	cfg config.Config,
+	storage storage.Storage,
+	br broadcaster,
+) error {
 	allowedMethods := []string{
 		http.MethodGet,
 		http.MethodHead,
@@ -35,9 +48,9 @@ func (s *Server) registerWebHookHandlers() error {
 		PathPrefix("").
 		Subrouter()
 
-	webhookRouter.Use(AllowCORSMiddleware)
+	webhookRouter.Use(cors.New())
 
-	handler := webhook.NewHandler(s.appSettings, s.storage, s.broadcaster) // TODO return error if wrong config passed
+	handler := webhook.NewHandler(ctx, cfg, storage, br) // TODO return error if wrong config passed
 
 	webhookRouter.
 		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
@@ -57,65 +70,70 @@ func (s *Server) registerWebHookHandlers() error {
 	return nil
 }
 
-func (s *Server) registerAPIHandlers() {
+func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage, br broadcaster) {
 	apiRouter := s.router.
 		PathPrefix("/api").
 		Subrouter()
 
-	apiRouter.Use(DisableCachingMiddleware, JSONResponseMiddleware)
+	apiRouter.Use(nocache.New(), json.New())
 
 	// get application settings
 	apiRouter.
-		Handle("/settings", settingsGet.NewHandler(s.appSettings)).
+		HandleFunc("/settings", apiSettings.NewGetSettingsHandler(cfg)).
 		Methods(http.MethodGet).
 		Name("api_settings_get")
 
+	apiRouter.
+		HandleFunc("/version", apiVersion.NewHandler(version.Version())).
+		Methods(http.MethodGet).
+		Name("api_get_version")
+
 	// create new session
 	apiRouter.
-		Handle("/session", sessionCreate.NewHandler(s.storage)).
+		HandleFunc("/session", apiSessionCreate.NewHandler(storage)).
 		Methods(http.MethodPost).
 		Name("api_session_create")
 
 	// delete session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(s.storage)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}", sessionDelete.NewHandler(storage)).
 		Methods(http.MethodDelete).
 		Name("api_session_delete")
 
 	// get requests list for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(s.storage)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", getAllRequests.NewHandler(storage)).
 		Methods(http.MethodGet).
 		Name("api_session_requests_all_get")
 
 	// get request details by UUID for session with passed UUID
 	apiRouter.
-		Handle(
+		HandleFunc(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			getRequest.NewHandler(s.storage),
+			getRequest.NewHandler(storage),
 		).
 		Methods(http.MethodGet).
 		Name("api_session_request_get")
 
 	// delete request by UUID for session with passed UUID
 	apiRouter.
-		Handle(
+		HandleFunc(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			deleteRequest.NewHandler(s.storage, s.broadcaster),
+			deleteRequest.NewHandler(storage, br),
 		).
 		Methods(http.MethodDelete).
 		Name("api_delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(s.storage, s.broadcaster)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, br)).
 		Methods(http.MethodDelete).
 		Name("api_delete_all_session_requests")
 }
 
-func (s *Server) registerServiceHandlers() {
+func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client) {
 	s.router.
-		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(s.ctx, s.rdb))).
+		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(ctx, rdb))).
 		Methods(http.MethodGet, http.MethodHead).
 		Name("ready")
 

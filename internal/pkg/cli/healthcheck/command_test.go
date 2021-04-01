@@ -1,4 +1,4 @@
-package healthcheck
+package healthcheck_test
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 	"github.com/kami-zh/go-capturer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/tarampampam/webhook-tester/internal/pkg/cli/healthcheck"
 )
 
 type fakeChecker struct{ err error }
@@ -15,7 +16,7 @@ type fakeChecker struct{ err error }
 func (c *fakeChecker) Check(port uint16) error { return c.err }
 
 func TestProperties(t *testing.T) {
-	cmd := NewCommand(&fakeChecker{err: nil})
+	cmd := healthcheck.NewCommand(&fakeChecker{err: nil})
 
 	assert.Equal(t, "healthcheck", cmd.Use)
 	assert.ElementsMatch(t, []string{"chk", "health", "check"}, cmd.Aliases)
@@ -23,7 +24,7 @@ func TestProperties(t *testing.T) {
 }
 
 func TestCommandRun(t *testing.T) {
-	cmd := NewCommand(&fakeChecker{err: nil})
+	cmd := healthcheck.NewCommand(&fakeChecker{err: nil})
 	cmd.SetArgs([]string{})
 
 	output := capturer.CaptureOutput(func() {
@@ -34,7 +35,7 @@ func TestCommandRun(t *testing.T) {
 }
 
 func TestCommandRunFailed(t *testing.T) {
-	cmd := NewCommand(&fakeChecker{err: errors.New("foo err")})
+	cmd := healthcheck.NewCommand(&fakeChecker{err: errors.New("foo err")})
 	cmd.SetArgs([]string{})
 
 	output := capturer.CaptureStderr(func() {
@@ -45,7 +46,7 @@ func TestCommandRunFailed(t *testing.T) {
 }
 
 func TestPortFlagWrongArgument(t *testing.T) {
-	cmd := NewCommand(&fakeChecker{err: nil})
+	cmd := healthcheck.NewCommand(&fakeChecker{err: nil})
 	cmd.SetArgs([]string{"-p", "65536"}) // 65535 is max
 
 	var executed bool
@@ -67,7 +68,7 @@ func TestPortFlagWrongArgument(t *testing.T) {
 }
 
 func TestPortFlagWrongEnvValue(t *testing.T) {
-	cmd := NewCommand(&fakeChecker{err: nil})
+	cmd := healthcheck.NewCommand(&fakeChecker{err: nil})
 	cmd.SetArgs([]string{"-p", "8090"}) // `-p` flag must be ignored
 
 	assert.NoError(t, os.Setenv("LISTEN_PORT", "65536")) // 65535 is max
