@@ -2,19 +2,16 @@ package session
 
 import (
 	"context"
-	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-
-	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-
-	"github.com/gorilla/websocket"
-	"go.uber.org/zap"
 )
 
 type Handler struct {
@@ -24,7 +21,6 @@ type Handler struct {
 	stor storage.Storage
 	pub  pubsub.Publisher
 	sub  pubsub.Subscriber
-	log  *zap.Logger
 
 	connCounter int32 // atomic usage only!
 	upgrader    websocket.Upgrader
@@ -37,7 +33,6 @@ func NewHandler(
 	stor storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
-	log *zap.Logger, // TODO remove logger from this handler?
 ) *Handler {
 	return &Handler{
 		ctx:  ctx,
@@ -45,7 +40,6 @@ func NewHandler(
 		stor: stor,
 		pub:  pub,
 		sub:  sub,
-		log:  log,
 
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  512, //nolint:gomnd
@@ -94,13 +88,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	atomic.AddInt32(&h.connCounter, 1) // increment active connections count
 
 	go h.serveWebsocketConnection(sessionUUID, conn)
-
-	h.log.Debug("websocket connection established",
-		zap.String("session UUID", sessionUUID),
-		zap.String("local addr", conn.LocalAddr().String()),
-		zap.String("remote addr", conn.RemoteAddr().String()),
-		zap.Int32("current connections count", atomic.LoadInt32(&h.connCounter)),
-	)
 }
 
 // newClientContext creates new context for the client (connection).
@@ -127,7 +114,8 @@ const (
 // serveWebsocketConnection serves websocket connection.
 func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.Conn) {
 	defer func() {
-		_ = conn.Close()                    // close connection
+		_ = conn.Close() // close connection
+
 		atomic.AddInt32(&h.connCounter, -1) // decrement active connections count
 	}()
 
@@ -136,8 +124,6 @@ func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.C
 
 	// subscribe to events
 	if err := h.sub.Subscribe(sessionUUID, eventsCh); err != nil {
-		h.log.Error("can't subscribe to events", zap.Error(err))
-
 		return
 	}
 
@@ -145,7 +131,7 @@ func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.C
 	defer func() {
 		_ = h.sub.Unsubscribe(sessionUUID, eventsCh)
 
-		t := time.NewTicker(time.Microsecond * 3)
+		t := time.NewTicker(time.Microsecond * 3) //nolint:gomnd
 		defer t.Stop()
 
 		for { // cleanup the channel with a little intervals (a "little bit" dirty hack)

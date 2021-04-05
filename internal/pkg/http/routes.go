@@ -26,7 +26,6 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"github.com/tarampampam/webhook-tester/internal/pkg/version"
-	"go.uber.org/zap"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -141,18 +140,19 @@ func (s *Server) registerWebsocketHandlers(
 	storage storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
-	log *zap.Logger,
 ) {
 	wsRouter := s.router.
 		PathPrefix("/ws").
 		Subrouter()
 
 	wsRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", websocketSession.NewHandler(ctx, cfg, storage, pub, sub, log)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", websocketSession.NewHandler(ctx, cfg, storage, pub, sub)).
 		Methods(http.MethodGet).
 		Name("ws_session")
 }
 
+// TODO add "/uptime" handler?
+// TODO add "/metrics" handler
 func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client) {
 	s.router.
 		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(ctx, rdb))).
@@ -163,9 +163,6 @@ func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client)
 		HandleFunc("/live", healthz.NewHandler(checkers.NewLiveChecker())).
 		Methods(http.MethodGet, http.MethodHead).
 		Name("live")
-
-	// TODO add "/uptime" handler
-	// TODO add "/metrics" handler
 }
 
 func (s *Server) registerFileServerHandler(publicDir string) error {

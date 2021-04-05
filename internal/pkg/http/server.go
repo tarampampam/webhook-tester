@@ -101,7 +101,7 @@ func (s *Server) registerHandlers(
 	}
 
 	s.registerAPIHandlers(cfg, stor, pub)
-	s.registerWebsocketHandlers(ctx, cfg, stor, pub, sub, s.log)
+	s.registerWebsocketHandlers(ctx, cfg, stor, pub, sub)
 	s.registerServiceHandlers(ctx, rdb)
 
 	if publicDir != "" {
