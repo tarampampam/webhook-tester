@@ -2,8 +2,8 @@ package session
 
 import (
 	"context"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
-	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +28,7 @@ type Handler struct {
 
 	connCounter int32 // atomic usage only!
 	upgrader    websocket.Upgrader
+	json        jsoniter.API
 }
 
 func NewHandler(
@@ -47,16 +48,16 @@ func NewHandler(
 		log:  log,
 
 		upgrader: websocket.Upgrader{
-			ReadBufferSize:  1024,                                       //nolint:gomnd
-			WriteBufferSize: 1024,                                       //nolint:gomnd
-			CheckOrigin:     func(r *http.Request) bool { return true }, // FIXME remove this, just for a tests
+			ReadBufferSize:  512, //nolint:gomnd
+			WriteBufferSize: 512, //nolint:gomnd
 		},
+		json: jsoniter.ConfigFastest,
 	}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:funlen,gocognit,gocyclo // TODO rewrite
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if limit := h.cfg.WebSockets.MaxClients; limit != 0 {
-		if atomic.LoadInt32(&h.connCounter) >= int32(limit) {
+		if atomic.LoadInt32(&h.connCounter) > int32(limit) {
 			http.Error(w, "too many active connections", http.StatusTooManyRequests)
 
 			return
@@ -92,102 +93,103 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 
 	atomic.AddInt32(&h.connCounter, 1) // increment active connections count
 
+	go h.serveWebsocketConnection(sessionUUID, conn)
+
 	h.log.Debug("websocket connection established",
 		zap.String("session UUID", sessionUUID),
 		zap.String("local addr", conn.LocalAddr().String()),
 		zap.String("remote addr", conn.RemoteAddr().String()),
 		zap.Int32("current connections count", atomic.LoadInt32(&h.connCounter)),
 	)
+}
 
-	go func() {
-		defer func() { atomic.AddInt32(&h.connCounter, -1) }() // decrement active connections count
+// newClientContext creates new context for the client (connection).
+func (h *Handler) newClientContext() (context.Context, context.CancelFunc) {
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
 
-		var (
-			ctx    context.Context
-			cancel context.CancelFunc
-		)
+	if lifetime := h.cfg.WebSockets.MaxLifetime; lifetime > time.Duration(0) {
+		ctx, cancel = context.WithTimeout(h.ctx, lifetime)
+	} else {
+		ctx, cancel = context.WithCancel(h.ctx)
+	}
 
-		if lifetime := h.cfg.WebSockets.MaxLifetime; lifetime > time.Duration(0) {
-			ctx, cancel = context.WithTimeout(h.ctx, lifetime)
-		} else {
-			ctx, cancel = context.WithCancel(h.ctx)
-		}
+	return ctx, cancel
+}
 
-		defer cancel()
+const (
+	pingInterval     = time.Second * 10 // pinging interval
+	eventsBufferSize = 64               // buffer size for events subscription
+)
 
-		pingTicker := time.NewTicker(time.Second * 10) //nolint:gomnd
-		defer pingTicker.Stop()
+// serveWebsocketConnection serves websocket connection.
+func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.Conn) {
+	defer func() {
+		_ = conn.Close()                    // close connection
+		atomic.AddInt32(&h.connCounter, -1) // decrement active connections count
+	}()
 
-		eventsCh := make(chan pubsub.Event, 32) //nolint:gomnd // TODO what is the better chan size?
+	// create channel for events (do NOT close him unless you are sure no one is writing into it)
+	var eventsCh = make(chan pubsub.Event, eventsBufferSize)
 
-		if err := h.sub.Subscribe(sessionUUID, eventsCh); err != nil {
-			h.log.Error("cannot subscribe to pub/sub", zap.Error(err))
+	// subscribe to events
+	if err := h.sub.Subscribe(sessionUUID, eventsCh); err != nil {
+		h.log.Error("can't subscribe to events", zap.Error(err))
 
-			return
-		}
+		return
+	}
 
-		defer func() { // gracefully unsubscribing from the events
-			_ = h.sub.Unsubscribe(sessionUUID, eventsCh)
+	// gracefully unsubscribing from events
+	defer func() {
+		_ = h.sub.Unsubscribe(sessionUUID, eventsCh)
 
-			for { // cleanup the channel before closing
-				select {
-				case <-eventsCh:
-					runtime.Gosched()
+		t := time.NewTicker(time.Microsecond * 3)
+		defer t.Stop()
 
-				default:
-					return
-				}
-			}
-		}()
-
-		defer func() {
-			if closingErr := conn.Close(); closingErr != nil {
-				h.log.Error("websocket closing failed",
-					zap.Error(closingErr),
-					zap.String("local addr", conn.LocalAddr().String()),
-					zap.String("remote addr", conn.RemoteAddr().String()),
-				)
-			}
-		}()
-
-		go func() { // TODO just for a test
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case <-time.After(time.Second):
-					if pubErr := h.pub.Publish(sessionUUID, pubsub.NewRequestRegisteredEvent("foo request UUID")); pubErr != nil {
-						h.log.Error("cannot publish event", zap.Error(pubErr))
-					}
-				}
-			}
-		}()
-
-	loop:
-		for {
+		for { // cleanup the channel with a little intervals (a "little bit" dirty hack)
 			select {
-			case <-h.ctx.Done():
-				break loop
+			case <-eventsCh:
+				<-t.C
 
-			case event, opened := <-eventsCh:
-				if !opened {
-					break loop
-				}
+			default:
+				// WARNING: channel closing may occurs the panic on the pub/sub implementation side (comment next line
+				// in this case)
+				close(eventsCh)
 
-				if err := conn.WriteMessage(websocket.TextMessage, event.Data()); err != nil {
-					h.log.Debug("cannot write into websocket", zap.Error(err))
-
-					break loop
-				}
-
-			case <-pingTicker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil { // client pinging failed
-					h.log.Debug("client pinging using websocket has been failed", zap.Error(err))
-
-					break loop
-				}
+				return
 			}
 		}
 	}()
+
+	ctx, cancel := h.newClientContext()
+	defer cancel()
+
+	pingTicker := time.NewTicker(pingInterval)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case event := <-eventsCh:
+			j, _ := h.json.Marshal(output{Name: event.Name(), Date: string(event.Data())})
+
+			if err := conn.WriteMessage(websocket.TextMessage, j); err != nil {
+				return // cannot write into websocket (client has left the channel)
+			}
+
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return // client pinging using websocket has been failed
+			}
+		}
+	}
+}
+
+type output struct {
+	Name string `json:"name"`
+	Date string `json:"data"`
 }
