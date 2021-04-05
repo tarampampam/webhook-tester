@@ -58,7 +58,7 @@ type redisEvent struct {
 // Publish an event into passed channel.
 func (ps *Redis) Publish(channelName string, event Event) error {
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {
@@ -79,7 +79,7 @@ func (ps *Redis) Publish(channelName string, event Event) error {
 // immediately.
 func (ps *Redis) Subscribe(channelName string, channel chan<- Event) error { //nolint:funlen
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {
@@ -164,7 +164,7 @@ func (ps *Redis) Subscribe(channelName string, channel chan<- Event) error { //n
 // This can call the panics if some Event's scheduled for publishing.
 func (ps *Redis) Unsubscribe(channelName string, channel chan Event) error {
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {

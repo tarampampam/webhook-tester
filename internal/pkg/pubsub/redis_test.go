@@ -23,7 +23,7 @@ func TestRedis_PublishErrors(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	assert.EqualError(t, ps.Publish("", pubsub.NewRequestRegisteredEvent("bar")), "empty channel name are not allowed")
+	assert.EqualError(t, ps.Publish("", pubsub.NewRequestRegisteredEvent("bar")), "empty channel name is not allowed")
 }
 
 func TestRedis_PublishAndReceive(t *testing.T) {
@@ -137,7 +137,7 @@ func TestRedis_Unsubscribe(t *testing.T) {
 			<-time.After(time.Millisecond * 5)
 
 			assert.NoError(t, ps.Subscribe("foo", ch2)) // will be not unsubscribed for a test
-			assert.EqualError(t, ps.Unsubscribe("", ch1), "empty channel name are not allowed")
+			assert.EqualError(t, ps.Unsubscribe("", ch1), "empty channel name is not allowed")
 
 			assert.NoError(t, ps.Unsubscribe("foo", ch1))
 			assert.EqualError(t, ps.Unsubscribe("baz", ch1), "subscription does not exists")
@@ -171,7 +171,7 @@ func TestRedis_Subscribe(t *testing.T) {
 
 	assert.NoError(t, ps.Subscribe("foo", ch))
 
-	assert.EqualError(t, ps.Subscribe("", ch), "empty channel name are not allowed")
+	assert.EqualError(t, ps.Subscribe("", ch), "empty channel name is not allowed")
 
 	assert.EqualError(t, ps.Subscribe("foo", ch), "already subscribed") // repeated
 }

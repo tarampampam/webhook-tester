@@ -37,7 +37,7 @@ func (ps *InMemory) createSubscriptionIfNeeded(channelName string) {
 // Publish an event into passed channel. Publishing is non-blocking operation.
 func (ps *InMemory) Publish(channelName string, event Event) error {
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {
@@ -70,7 +70,7 @@ func (ps *InMemory) Publish(channelName string, event Event) error {
 // Note: do not forget to call Unsubscribe when all is done.
 func (ps *InMemory) Subscribe(channelName string, channel chan<- Event) error {
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {
@@ -96,7 +96,7 @@ func (ps *InMemory) Subscribe(channelName string, channel chan<- Event) error {
 // This can call the panics if some Event's scheduled for publishing.
 func (ps *InMemory) Unsubscribe(channelName string, channel chan Event) error {
 	if channelName == "" {
-		return errors.New("empty channel name are not allowed")
+		return errors.New("empty channel name is not allowed")
 	}
 
 	if ps.isClosed() {

@@ -14,7 +14,7 @@ func TestInMemory_PublishErrors(t *testing.T) {
 	ps := pubsub.NewInMemory()
 	defer func() { _ = ps.Close() }()
 
-	assert.EqualError(t, ps.Publish("", pubsub.NewRequestRegisteredEvent("bar")), "empty channel name are not allowed")
+	assert.EqualError(t, ps.Publish("", pubsub.NewRequestRegisteredEvent("bar")), "empty channel name is not allowed")
 }
 
 func TestInMemory_PublishAndReceive(t *testing.T) {
@@ -97,7 +97,7 @@ func TestInMemory_Unsubscribe(t *testing.T) {
 	assert.NoError(t, ps.Subscribe("foo", ch1))
 	assert.NoError(t, ps.Subscribe("foo", ch2))
 
-	assert.EqualError(t, ps.Unsubscribe("", ch1), "empty channel name are not allowed")
+	assert.EqualError(t, ps.Unsubscribe("", ch1), "empty channel name is not allowed")
 
 	assert.NoError(t, ps.Unsubscribe("foo", ch2))
 	assert.EqualError(t, ps.Unsubscribe("foo", ch2), "channel was not subscribed") // repeated op
@@ -122,7 +122,7 @@ func TestInMemory_Subscribe(t *testing.T) {
 
 	defer func() { assert.NoError(t, ps.Unsubscribe("foo", ch)) }()
 
-	assert.EqualError(t, ps.Subscribe("", ch), "empty channel name are not allowed")
+	assert.EqualError(t, ps.Subscribe("", ch), "empty channel name is not allowed")
 
 	assert.EqualError(t, ps.Subscribe("foo", ch), "already subscribed") // repeated
 }

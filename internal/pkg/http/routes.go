@@ -163,6 +163,9 @@ func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client)
 		HandleFunc("/live", healthz.NewHandler(checkers.NewLiveChecker())).
 		Methods(http.MethodGet, http.MethodHead).
 		Name("live")
+
+	// TODO add "/uptime" handler
+	// TODO add "/metrics" handler
 }
 
 func (s *Server) registerFileServerHandler(publicDir string) error {

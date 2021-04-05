@@ -24,7 +24,7 @@ func NewGetSettingsHandler(cfg config.Config) http.HandlerFunc {
 type settingsOutput struct {
 	Limits struct {
 		MaxRequests               uint16 `json:"max_requests"`
-		MaxWebhookRequestBodySize uint32 `json:"max_webhook_body_size"` // TODO new property, update frontend
+		MaxWebhookRequestBodySize uint32 `json:"max_webhook_body_size"`
 		SessionLifetimeSec        uint32 `json:"session_lifetime_sec"`
 	} `json:"limits"`
 }
