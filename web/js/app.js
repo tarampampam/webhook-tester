@@ -4,14 +4,13 @@
 /** @typedef {Object} httpVueLoader */
 
 define(
-    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'pusher', 'highlightjs', 'vue-loader'],
-    (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session, pusher) => {
+    ['Vue', 'VueRouter', 'moment', 'axios', 'clipboard', 'izitoast', 'api', 'session', 'ws', 'highlightjs', 'vue-loader'],
+    (Vue, VueRouter, moment, axios, clipboard, izitoast, api, session, ws) => {
         let isProduction = true;
 
         if (window.location.hostname.startsWith('127.') || window.location.href.startsWith('file:')) {
             // @link <https://github.com/vuejs/vue-devtools/issues/190#issuecomment-264203810>
             Vue.config.devtools = true;
-            pusher.logToConsole = true;
             isProduction = false;
         }
 
@@ -54,10 +53,10 @@ define(
         Vue.prototype.$izitoast = Vue.$izitoast = izitoast;
         Vue.prototype.$clipboard = Vue.$clipboard = clip;
         Vue.prototype.$session = Vue.$session = session;
-        Vue.prototype.$pusher = Vue.$pusher = pusher;
         Vue.prototype.$moment = Vue.$moment = moment;
         Vue.prototype.$axios = Vue.$axios = axios;
         Vue.prototype.$api = Vue.$api = api;
+        Vue.prototype.$ws = Vue.$ws = ws;
 
         return new Vue({
             router,

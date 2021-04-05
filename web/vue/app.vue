@@ -148,15 +148,12 @@
                 appVersion: null,
                 sessionLifetimeSec: null,
                 maxRequests: 50,
+                maxBodySize: 0, // in bytes // TODO append this value into UI
 
                 sessionUUID: null,
                 requestUUID: null,
 
-                pusher: {
-                    client: null,
-                    channel: null,
-                    channelName: null,
-                },
+                ws: null,
             }
         },
 
@@ -168,17 +165,10 @@
                 .then((settings) => {
                     this.maxRequests = settings.limits.max_requests;
                     this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
-
-                    if (settings.pusher.key !== "") {
-                        this.pusher.client = new this.$pusher(settings.pusher.key, {
-                            cluster: settings.pusher.cluster,
-                            forceTLS: true,
-                            encrypted: true,
-                        });
-
-                        this.refreshPusherSubscription();
-                    }
+                    this.maxBodySize = settings.limits.max_webhook_body_size;
                 });
+
+            this.wsRefreshConnection();
 
             this.initSession();
             this.initRequest();
@@ -225,7 +215,7 @@
                     });
                 }
 
-                this.refreshPusherSubscription();
+                this.wsRefreshConnection();
             },
             requestUUID: function () {
                 if (this.$route.params.requestUUID !== this.requestUUID) {
@@ -252,30 +242,34 @@
         },
 
         methods: {
-            refreshPusherSubscription() {
+            wsRefreshConnection() {
                 const requestRegistered = 'request-registered',
                     requestDeleted = 'request-deleted',
                     requestsDeleted = 'requests-deleted';
 
                 // unsubscribe first
-                if (this.pusher.channel !== null && this.pusher.channelName !== null) {
-                    this.pusher.channel.unsubscribe(this.pusher.channelName);
-                    this.pusher.channel = null;
+                if (this.ws !== null) {
+                    this.ws.close(); // docs: <https://github.com/joewalnes/reconnecting-websocket#wsclosecode-reason>
+                    this.ws = null;
                 }
 
-                // unset subscribed channel name
-                this.pusher.channelName = null;
+                if (this.sessionUUID !== null) {
+                    this.ws = this.$ws.newRenewableSessionConnection(this.sessionUUID, (name, data) => {
+                        // route incoming events
+                        switch (name) {
+                            case requestRegistered:
+                                this.wsRegisteredRequestHandler(data);
+                                break;
 
-                // subscribe and bind handler
-                if (this.pusher.client !== null && this.sessionUUID !== null) {
-                    this.pusher.channelName = this.sessionUUID;
-                    this.pusher.channel = this.pusher.client.subscribe(this.pusher.channelName);
+                            case requestDeleted:
+                                this.deleteRequest(data);
+                                break;
 
-                    this.pusher.channel.bind(requestRegistered, this.pusherRegisteredRequestHandler);
-                    this.pusher.channel.bind(requestDeleted, (uuid) => {
-                        this.deleteRequest(uuid);
+                            case requestsDeleted:
+                                this.clearRequests();
+                                break;
+                        }
                     });
-                    this.pusher.channel.bind(requestsDeleted, this.clearRequests);
                 }
             },
 
@@ -511,7 +505,7 @@
             /**
              * @param {String} requestUUID
              */
-            pusherRegisteredRequestHandler(requestUUID) {
+            wsRegisteredRequestHandler(requestUUID) {
                 this.$izitoast.info({
                     title: 'New request',
                     message: 'New incoming webhook request',
