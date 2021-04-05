@@ -1,29 +1,29 @@
-package broadcast_test
+package pubsub_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 )
 
 func TestNewRequestRegisteredEvent(t *testing.T) {
-	e := broadcast.NewRequestRegisteredEvent("foo")
+	e := pubsub.NewRequestRegisteredEvent("foo")
 
-	assert.Equal(t, "foo", e.Data())
+	assert.Equal(t, []byte("foo"), e.Data())
 	assert.Equal(t, "request-registered", e.Name())
 }
 
 func TestNewRequestDeletedEvent(t *testing.T) {
-	e := broadcast.NewRequestDeletedEvent("foo")
+	e := pubsub.NewRequestDeletedEvent("foo")
 
-	assert.Equal(t, "foo", e.Data())
+	assert.Equal(t, []byte("foo"), e.Data())
 	assert.Equal(t, "request-deleted", e.Name())
 }
 
 func TestNewAllRequestsDeletedEvent(t *testing.T) {
-	e := broadcast.NewAllRequestsDeletedEvent()
+	e := pubsub.NewAllRequestsDeletedEvent()
 
-	assert.Equal(t, "*", e.Data())
+	assert.Equal(t, []byte("*"), e.Data())
 	assert.Equal(t, "requests-deleted", e.Name())
 }
