@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Flag `--session-ttl` (`serve` sub-command) now accepts duration (example: `1h30m`) instead seconds count
 - Flag `--public` now accepts empty value (in this case file server will be disabled)
 - Go updated from `1.15` up to `1.16.2`
+- All frontend libraries updated
 
 ### Removed
 
