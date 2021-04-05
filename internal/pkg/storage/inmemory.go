@@ -48,7 +48,7 @@ func (r *inmemoryRequest) CreatedAt() time.Time       { return r.createdAt }  //
 
 var ErrClosed = errors.New("closed")
 
-type InMemoryStorage struct {
+type InMemoryStorage struct { // TODO remove `Storage` postfix
 	sessionTTL  time.Duration
 	maxRequests uint16
 
