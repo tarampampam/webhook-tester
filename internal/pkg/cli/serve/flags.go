@@ -1,7 +1,6 @@
 package serve
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -33,10 +32,12 @@ type flags struct {
 	//	unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>
 	redisDSN string
 
-	storageDriver   string
-	broadcastDriver string
+	storageDriver, pubSubDriver string
 
-	pusher struct{ appID, key, secret, cluster string }
+	websocket struct {
+		maxClients  uint32
+		maxLifetime time.Duration
+	}
 }
 
 func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
@@ -62,7 +63,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"public",
 		"",
 		filepath.Join(exe, "web"),
-		fmt.Sprintf("path to the directory with public assets [$%s]", env.PublicDir),
+		fmt.Sprintf("path to the directory with public assets (empty value = disable) [$%s]", env.PublicDir),
 	)
 	flagSet.Uint16VarP(
 		&f.maxRequests,
@@ -90,7 +91,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"max-request-body-size",
 		"",
 		64*1024, //nolint:gomnd // 64 KiB
-		"maximal webhook request body size (in bytes)",
+		"maximal webhook request body size (in bytes; 0 = unlimited)",
 	)
 	flagSet.StringVarP(
 		&f.redisDSN,
@@ -107,39 +108,25 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		fmt.Sprintf("storage driver (%s|%s) [$%s]", config.StorageDriverMemory, config.StorageDriverRedis, env.StorageDriverName), //nolint:lll
 	)
 	flagSet.StringVarP(
-		&f.broadcastDriver,
-		"broadcast-driver",
+		&f.pubSubDriver,
+		"pubsub-driver",
 		"",
-		config.BroadcastDriverNone.String(),
-		fmt.Sprintf("broadcast driver (%s|%s) [$%s]", config.BroadcastDriverNone, config.BroadcastDriverPusher, env.BroadcastDriverName), //nolint:lll
+		config.PubSubDriverMemory.String(),
+		fmt.Sprintf("pub/sub driver (%s|%s) [$%s]", config.PubSubDriverMemory, config.PubSubDriverRedis, env.PubSubDriver), //nolint:lll
 	)
-	flagSet.StringVarP(
-		&f.pusher.appID,
-		"pusher-app-id",
+	flagSet.Uint32VarP(
+		&f.websocket.maxClients,
+		"ws-max-clients",
 		"",
-		"",
-		fmt.Sprintf("pusher application ID [$%s]", env.PusherAppID),
+		0,
+		fmt.Sprintf("maximal websocket clients (0 = unlimited) [$%s]", env.WebsocketMaxClients),
 	)
-	flagSet.StringVarP(
-		&f.pusher.key,
-		"pusher-key",
+	flagSet.DurationVarP(
+		&f.websocket.maxLifetime,
+		"ws-max-lifetime",
 		"",
-		"",
-		fmt.Sprintf("pusher key [$%s]", env.PusherKey),
-	)
-	flagSet.StringVarP(
-		&f.pusher.secret,
-		"pusher-secret",
-		"",
-		"",
-		fmt.Sprintf("pusher secret [$%s]", env.PusherSecret),
-	)
-	flagSet.StringVarP(
-		&f.pusher.cluster,
-		"pusher-cluster",
-		"",
-		"eu",
-		fmt.Sprintf("pusher cluster [$%s]", env.PusherCluster),
+		time.Duration(0),
+		fmt.Sprintf("maximal single websocket lifetime (examples: 3h, 1h30m; 0 = unlimited) [$%s]", env.WebsocketMaxLifetime),
 	)
 }
 
@@ -184,24 +171,24 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 		f.storageDriver = envVar
 	}
 
-	if envVar, exists := env.BroadcastDriverName.Lookup(); exists {
-		f.broadcastDriver = envVar
+	if envVar, exists := env.PubSubDriver.Lookup(); exists {
+		f.pubSubDriver = envVar
 	}
 
-	if envVar, exists := env.PusherAppID.Lookup(); exists {
-		f.pusher.appID = envVar
+	if envVar, exists := env.WebsocketMaxClients.Lookup(); exists {
+		if p, err := strconv.ParseUint(envVar, 10, 32); err == nil {
+			f.websocket.maxClients = uint32(p)
+		} else {
+			return fmt.Errorf("wrong maximal websocket clients count [%s] value", envVar)
+		}
 	}
 
-	if envVar, exists := env.PusherKey.Lookup(); exists {
-		f.pusher.key = envVar
-	}
-
-	if envVar, exists := env.PusherSecret.Lookup(); exists {
-		f.pusher.secret = envVar
-	}
-
-	if envVar, exists := env.PusherCluster.Lookup(); exists {
-		f.pusher.cluster = envVar
+	if envVar, exists := env.WebsocketMaxLifetime.Lookup(); exists {
+		if d, err := time.ParseDuration(envVar); err == nil {
+			f.websocket.maxLifetime = d
+		} else {
+			return fmt.Errorf("wrong maximal single websocket lifetime [%s] period", envVar)
+		}
 	}
 
 	return nil
@@ -231,29 +218,17 @@ func (f *flags) validate() error {
 		return fmt.Errorf("unsupported storage driver: %s", f.storageDriver)
 	}
 
-	switch f.broadcastDriver {
-	case config.BroadcastDriverNone.String():
+	switch f.pubSubDriver {
+	case config.PubSubDriverMemory.String():
 		// do nothing
 
-	case config.BroadcastDriverPusher.String():
-		if f.pusher.appID == "" {
-			return errors.New("pusher application ID does not set")
-		}
-
-		if f.pusher.key == "" {
-			return errors.New("pusher key does not set")
-		}
-
-		if f.pusher.secret == "" {
-			return errors.New("pusher secret does not set")
-		}
-
-		if f.pusher.cluster == "" {
-			return errors.New("pusher cluster does not set")
+	case config.PubSubDriverRedis.String():
+		if _, err := redis.ParseURL(f.redisDSN); err != nil {
+			return fmt.Errorf("wrong redis DSN [%s]: %w", f.redisDSN, err)
 		}
 
 	default:
-		return fmt.Errorf("unsupported broadcast driver: %s", f.broadcastDriver)
+		return fmt.Errorf("unsupported pub/sub driver: %s", f.pubSubDriver)
 	}
 
 	return nil
@@ -275,18 +250,16 @@ func (f *flags) toConfig() config.Config {
 		cfg.StorageDriver = config.StorageDriverRedis
 	}
 
-	switch f.broadcastDriver {
-	case config.BroadcastDriverNone.String():
-		cfg.BroadcastDriver = config.BroadcastDriverNone
+	switch f.pubSubDriver {
+	case config.PubSubDriverMemory.String():
+		cfg.PubSubDriver = config.PubSubDriverMemory
 
-	case config.BroadcastDriverPusher.String():
-		cfg.BroadcastDriver = config.BroadcastDriverPusher
+	case config.PubSubDriverRedis.String():
+		cfg.PubSubDriver = config.PubSubDriverRedis
 	}
 
-	cfg.Pusher.AppID = f.pusher.appID
-	cfg.Pusher.Cluster = f.pusher.cluster
-	cfg.Pusher.Key = f.pusher.key
-	cfg.Pusher.Secret = f.pusher.secret
+	cfg.WebSockets.MaxClients = f.websocket.maxClients
+	cfg.WebSockets.MaxLifetime = f.websocket.maxLifetime
 
 	return cfg
 }

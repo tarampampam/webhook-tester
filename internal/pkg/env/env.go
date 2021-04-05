@@ -6,18 +6,16 @@ import "os"
 type envVariable string
 
 const (
-	ListenAddr          envVariable = "LISTEN_ADDR"      // IP address for listening
-	ListenPort          envVariable = "LISTEN_PORT"      // port number for listening
-	PublicDir           envVariable = "PUBLIC_DIR"       // directory with public resources
-	MaxSessionRequests  envVariable = "MAX_REQUESTS"     // maximum stored requests per session
-	SessionTTL          envVariable = "SESSION_TTL"      // session lifetime
-	StorageDriverName   envVariable = "STORAGE_DRIVER"   // storage driver name
-	BroadcastDriverName envVariable = "BROADCAST_DRIVER" // broadcast driver name
-	PusherAppID         envVariable = "PUSHER_APP_ID"    // pusher application ID
-	PusherKey           envVariable = "PUSHER_KEY"       // pusher key
-	PusherSecret        envVariable = "PUSHER_SECRET"    // pusher secret
-	PusherCluster       envVariable = "PUSHER_CLUSTER"   // pusher cluster
-	RedisDSN            envVariable = "REDIS_DSN"        // URL-like redis connection string <https://bit.ly/3maKq4l>
+	ListenAddr           envVariable = "LISTEN_ADDR"     // IP address for listening
+	ListenPort           envVariable = "LISTEN_PORT"     // port number for listening
+	PublicDir            envVariable = "PUBLIC_DIR"      // directory with public resources
+	MaxSessionRequests   envVariable = "MAX_REQUESTS"    // maximum stored requests per session
+	SessionTTL           envVariable = "SESSION_TTL"     // session lifetime
+	StorageDriverName    envVariable = "STORAGE_DRIVER"  // storage driver name
+	PubSubDriver         envVariable = "PUBSUB_DRIVER"   // pub/sub driver name
+	WebsocketMaxClients  envVariable = "WS_MAX_CLIENTS"  // maximal websocket clients
+	WebsocketMaxLifetime envVariable = "WS_MAX_LIFETIME" // maximal single websocket lifetime
+	RedisDSN             envVariable = "REDIS_DSN"       // URL-like redis connection string <https://bit.ly/3maKq4l>
 )
 
 // String returns environment variable name in the string representation.
