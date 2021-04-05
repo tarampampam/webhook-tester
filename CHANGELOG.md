@@ -10,11 +10,15 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - E2E test using postman
 - In-memory storage implementation
+- In-memory pub/sub implementation
+- Websockets for browser notifications
 - `serve` sub-command flags:
   - `--redis-dsn` redis server DSN (format: `redis://<user>:<password>@<host>:<port>/<db_number>`), required when storage driver `redis` is used
-  - `--broadcast-driver` broadcast driver
+  - `--pubsub-driver` pub/sub driver (`redis` and `memory` is supported)
   - `--storage-driver` storage driver (`redis` and `memory` is supported)
   - `--max-request-body-size` maximal webhook request body size (in bytes)
+  - `--ws-max-clients` maximal websocket clients
+  - `--ws-max-lifetime` maximal single websocket lifetime
 - Sub-command `healthcheck` (hidden in CLI help) that makes a simple HTTP request (with user-agent `HealthChecker/internal`) to the `http://127.0.0.1:8080/live` endpoint. Port number can be changed using `--port`, `-p` flag or `LISTEN_PORT` environment variable
 - Healthcheck in dockerfile
 - Global (available for all sub-commands) flags:
@@ -24,7 +28,6 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Graceful shutdown support for `serve` sub-command
 - HTTP requests & HTTP panics logging middlewares
 - Logging using `uber-go/zap` package
-- Webhook delay uses `time.After()` instead `time.Sleep()` with context canceling support
 - HTTP route `/api/version`
 - Support for `linux/arm64`, `linux/arm/v6` and `linux/arm/v7` platforms for docker image
 
@@ -45,9 +48,11 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - `serve` sub-command flags:`--redis-host`, `--redis-port`, `--redis-db-num`
 - Environment variables support: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB_NUM`
 - Property `version` from `/api/settings` JSON-object response
+- Pusher support
 
 ### Fixed
 
+- Webhook delay uses `time.After()` instead `time.Sleep()` with context canceling support
 - Wrong `content` property value for session creation HTTP handler
 - Wrong `Content-Type` header value for webhook handler
 - Correct file mime-types for docker image

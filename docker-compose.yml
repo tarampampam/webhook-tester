@@ -22,7 +22,19 @@ services:
     <<: *app-service
     ports:
       - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
-    command: go run ./cmd/webhook-tester serve --port 8080 --public ./web --redis-dsn redis://redis:6379/0 --max-requests 12 --ignore-header-prefix foo
+    command:
+      - go
+      - run
+      - ./cmd/webhook-tester
+      - serve
+      - --verbose
+      - --port=8080
+      - --public=./web
+      - --storage-driver=redis
+      - --pubsub-driver=redis
+      - --redis-dsn=redis://redis:6379/0
+      - --max-requests=12
+      - --ignore-header-prefix=foo
     depends_on:
       - redis
 
