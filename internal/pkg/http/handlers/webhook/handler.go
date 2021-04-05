@@ -12,25 +12,21 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
 
 	"github.com/gorilla/mux"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
-
-type broadcaster interface {
-	Publish(ch string, e broadcast.Event) error
-}
 
 type Handler struct {
 	ctx         context.Context
 	storage     storage.Storage
-	br          broadcaster
+	pub         pubsub.Publisher
 	maxBodySize uint32
 
 	ignoreHeaderPrefixes []string
 }
 
-func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, br broadcaster) *Handler {
+func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, pub pubsub.Publisher) *Handler {
 	ignoreHeaders := make([]string, len(cfg.IgnoreHeaderPrefixes))
 	for i := 0; i < len(cfg.IgnoreHeaderPrefixes); i++ {
 		ignoreHeaders[i] = strings.ToUpper(strings.TrimSpace(cfg.IgnoreHeaderPrefixes[i]))
@@ -39,7 +35,7 @@ func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage,
 	return &Handler{
 		ctx:         ctx,
 		storage:     storage,
-		br:          br,
+		pub:         pub,
 		maxBodySize: cfg.MaxRequestBodySize,
 
 		ignoreHeaderPrefixes: ignoreHeaders,
@@ -104,8 +100,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		return
 	}
 
-	// broadcast an event "new request was registered successful"
-	go func() { _ = h.br.Publish(sUUID, broadcast.NewRequestRegisteredEvent(rUUID)) }()
+	// publish an event "new request was registered successful"
+	go func() { _ = h.pub.Publish(sUUID, pubsub.NewRequestRegisteredEvent(rUUID)) }()
 
 	if delay := session.Delay(); delay > 0 {
 		timer := time.NewTimer(delay)

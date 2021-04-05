@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
@@ -18,11 +20,13 @@ import (
 	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/webhook"
+	websocketSession "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/websocket/session"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"github.com/tarampampam/webhook-tester/internal/pkg/version"
+	"go.uber.org/zap"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -31,7 +35,7 @@ func (s *Server) registerWebHookHandlers(
 	ctx context.Context,
 	cfg config.Config,
 	storage storage.Storage,
-	br broadcaster,
+	pub pubsub.Publisher,
 ) error {
 	allowedMethods := []string{
 		http.MethodGet,
@@ -50,7 +54,7 @@ func (s *Server) registerWebHookHandlers(
 
 	webhookRouter.Use(cors.New())
 
-	handler := webhook.NewHandler(ctx, cfg, storage, br) // TODO return error if wrong config passed
+	handler := webhook.NewHandler(ctx, cfg, storage, pub) // TODO return error if wrong config passed
 
 	webhookRouter.
 		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
@@ -70,7 +74,7 @@ func (s *Server) registerWebHookHandlers(
 	return nil
 }
 
-func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage, br broadcaster) {
+func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage, pub pubsub.Publisher) {
 	apiRouter := s.router.
 		PathPrefix("/api").
 		Subrouter()
@@ -119,16 +123,34 @@ func (s *Server) registerAPIHandlers(cfg config.Config, storage storage.Storage,
 	apiRouter.
 		HandleFunc(
 			"/session/{sessionUUID:"+uuidPattern+"}/requests/{requestUUID:"+uuidPattern+"}",
-			deleteRequest.NewHandler(storage, br),
+			deleteRequest.NewHandler(storage, pub),
 		).
 		Methods(http.MethodDelete).
 		Name("api_delete_session_request")
 
 	// delete all requests for session with passed UUID
 	apiRouter.
-		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, br)).
+		HandleFunc("/session/{sessionUUID:"+uuidPattern+"}/requests", clearRequests.NewHandler(storage, pub)).
 		Methods(http.MethodDelete).
 		Name("api_delete_all_session_requests")
+}
+
+func (s *Server) registerWebsocketHandlers(
+	ctx context.Context,
+	cfg config.Config,
+	storage storage.Storage,
+	pub pubsub.Publisher,
+	sub pubsub.Subscriber,
+	log *zap.Logger,
+) {
+	wsRouter := s.router.
+		PathPrefix("/ws").
+		Subrouter()
+
+	wsRouter.
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", websocketSession.NewHandler(ctx, cfg, storage, pub, sub, log)).
+		Methods(http.MethodGet).
+		Name("ws_session")
 }
 
 func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client) {

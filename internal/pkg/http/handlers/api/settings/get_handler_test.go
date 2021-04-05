@@ -20,18 +20,13 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		{
 			name: "without registered session UUID",
 			setUp: func(cfg *config.Config) {
-				cfg.Pusher.Cluster = "foo"
-				cfg.Pusher.Key = "bar"
 				cfg.MaxRequests = 123
 				cfg.SessionTTL = time.Second * 321
 				cfg.MaxRequestBodySize = 222
-				cfg.BroadcastDriver = config.BroadcastDriverPusher
 			},
 			checkResult: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.JSONEq(t, `{
-					"broadcast_driver": "pusher",
-					"pusher": {"key":"bar", "cluster":"foo"},
 					"limits": {"max_requests":123, "session_lifetime_sec":321, "max_webhook_body_size": 222}
 				}`, rr.Body.String())
 			},

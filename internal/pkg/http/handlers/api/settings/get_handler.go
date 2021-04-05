@@ -10,12 +10,8 @@ import (
 )
 
 func NewGetSettingsHandler(cfg config.Config) http.HandlerFunc {
-	out := settingsOutput{
-		BroadcastDriver: cfg.BroadcastDriver.String(),
-	}
+	var out settingsOutput
 
-	out.Pusher.Key = cfg.Pusher.Key
-	out.Pusher.Cluster = cfg.Pusher.Cluster
 	out.Limits.MaxRequests = cfg.MaxRequests
 	out.Limits.MaxWebhookRequestBodySize = cfg.MaxRequestBodySize
 	out.Limits.SessionLifetimeSec = uint32(cfg.SessionTTL.Seconds())
@@ -26,11 +22,6 @@ func NewGetSettingsHandler(cfg config.Config) http.HandlerFunc {
 }
 
 type settingsOutput struct {
-	BroadcastDriver string `json:"broadcast_driver"` // TODO new property, update frontend
-	Pusher          struct {
-		Key     string `json:"key"`
-		Cluster string `json:"cluster"`
-	} `json:"pusher"`
 	Limits struct {
 		MaxRequests               uint16 `json:"max_requests"`
 		MaxWebhookRequestBodySize uint32 `json:"max_webhook_body_size"` // TODO new property, update frontend

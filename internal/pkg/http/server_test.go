@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
@@ -126,6 +128,7 @@ func TestServer_Register(t *testing.T) {
 		{name: "ready", route: "/ready", methods: []string{http.MethodGet, http.MethodHead}},
 		{name: "live", route: "/live", methods: []string{http.MethodGet, http.MethodHead}},
 		{name: "static", route: "/", methods: []string{http.MethodGet, http.MethodHead}},
+		{name: "ws_session", route: "/ws/session/{sessionUUID:" + uuid + "}", methods: []string{http.MethodGet}},
 	}
 
 	s := storage.NewInMemoryStorage(time.Minute, 10)
@@ -144,11 +147,14 @@ func TestServer_Register(t *testing.T) {
 		assert.Nil(t, router.Get(r.name))
 	}
 
+	stor := storage.NewInMemoryStorage(time.Second, 16)
+	defer func() { _ = stor.Close() }()
+
+	pubSub := pubsub.NewInMemory()
+	defer func() { _ = pubSub.Close() }()
+
 	// call register fn
-	assert.NoError(t, srv.Register(context.Background(), config.Config{
-		StorageDriver:   config.StorageDriverMemory,
-		BroadcastDriver: config.BroadcastDriverNone,
-	}, ".", nil))
+	assert.NoError(t, srv.Register(context.Background(), config.Config{}, ".", nil, stor, pubSub, pubSub))
 
 	// state *after* registration
 	types, _ = mime.ExtensionsByType("text/html; charset=utf-8") // reload
@@ -166,10 +172,16 @@ func TestServer_RegisterWithoutResourcesDir(t *testing.T) {
 	srv := NewServer(zap.NewNop())
 	router := srv.router // dirty hack, yes, i know
 
+	stor := storage.NewInMemoryStorage(time.Second, 16)
+	defer func() { _ = stor.Close() }()
+
+	pubSub := pubsub.NewInMemory()
+	defer func() { _ = pubSub.Close() }()
+
 	assert.Nil(t, router.Get("static"))
-	assert.NoError(t, srv.Register(context.Background(), config.Config{
-		StorageDriver:   config.StorageDriverMemory,
-		BroadcastDriver: config.BroadcastDriverNone,
-	}, "", nil)) // empty resources dir
+	assert.NoError(t, srv.Register(
+		context.Background(), config.Config{}, "", nil, stor, pubSub, pubSub,
+	)) // empty resources dir
+
 	assert.Nil(t, router.Get("static"))
 }

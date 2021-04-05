@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,8 +15,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -30,10 +29,13 @@ func BenchmarkHandler_ServeHTTP(b *testing.B) {
 	var (
 		req, _ = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr     = httptest.NewRecorder()
+		ps     = pubsub.NewInMemory()
 		h      = webhook.NewHandler(context.Background(), config.Config{
 			IgnoreHeaderPrefixes: []string{"bar", "baz"},
-		}, s, &broadcast.None{})
+		}, s, ps)
 	)
+
+	defer func() { _ = ps.Close() }()
 
 	sessionUUID, _ := s.CreateSession("foo", 202, "foo/bar", 0)
 
@@ -97,11 +99,13 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			var (
 				req, _  = http.NewRequest(http.MethodPost, "http://test", tt.giveBody)
 				rr      = httptest.NewRecorder()
-				br      = &broadcast.None{}
+				ps      = pubsub.NewInMemory()
 				handler = webhook.NewHandler(context.Background(), config.Config{
 					MaxRequestBodySize: 64,
-				}, s, br)
+				}, s, ps)
 			)
+
+			defer func() { _ = ps.Close() }()
 
 			if tt.giveReqVars != nil {
 				req = mux.SetURLVars(req, tt.giveReqVars(s))
@@ -125,25 +129,11 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
 		rr      = httptest.NewRecorder()
-		br      = &broadcast.None{}
+		ps      = pubsub.NewInMemory()
 		handler = webhook.NewHandler(context.Background(), config.Config{
 			IgnoreHeaderPrefixes: []string{"x-bAr-", "Baz"},
-		}, s, br)
+		}, s, ps)
 	)
-
-	var (
-		brChannel string
-		brEvent   broadcast.Event
-		brCount   int
-		brMutex   sync.Mutex
-	)
-
-	br.OnPublish(func(ch string, e broadcast.Event) {
-		brMutex.Lock()
-		brChannel, brEvent = ch, e
-		brCount++
-		brMutex.Unlock()
-	})
 
 	req.Header.Set("x-bar-foo", "baz") // must be ignored
 	req.Header.Set("bAZ", "foo")       // must be ignored
@@ -157,6 +147,10 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
 
+	// subscribe for events
+	eventsCh := make(chan pubsub.Event, 3)
+	assert.NoError(t, ps.Subscribe(sessionUUID, eventsCh))
+
 	handler.ServeHTTP(rr, req)
 
 	runtime.Gosched()
@@ -166,14 +160,12 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	assert.Equal(t, "foo", rr.Body.String())
 	assert.Equal(t, "foo/bar", rr.Header().Get("Content-Type"))
 
-	brMutex.Lock()
-	assert.Equal(t, 1, brCount)
-	assert.Equal(t, sessionUUID, brChannel)
-	assert.Equal(t, "request-registered", brEvent.Name())
-	brMutex.Unlock()
-
 	requests, err := s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)
+
+	e := <-eventsCh
+	assert.Equal(t, "request-registered", e.Name())
+	assert.Equal(t, requests[0].UUID(), string(e.Data()))
 
 	assert.Equal(t, http.MethodPost, requests[0].Method())
 	assert.Equal(t, "foo=bar", requests[0].Content())
@@ -193,8 +185,11 @@ func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+		ps      = pubsub.NewInMemory()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
 	)
+
+	defer func() { _ = ps.Close() }()
 
 	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
 	assert.NoError(t, err)
@@ -222,8 +217,11 @@ func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+		ps      = pubsub.NewInMemory()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
 	)
+
+	defer func() { _ = ps.Close() }()
 
 	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", 0)
 	assert.NoError(t, err)
@@ -251,8 +249,11 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, &broadcast.None{})
+		ps      = pubsub.NewInMemory()
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
 	)
+
+	defer func() { _ = ps.Close() }()
 
 	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Millisecond*100)
 	assert.NoError(t, err)
@@ -288,8 +289,11 @@ func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		handler = webhook.NewHandler(ctx, config.Config{}, s, &broadcast.None{})
+		ps      = pubsub.NewInMemory()
+		handler = webhook.NewHandler(ctx, config.Config{}, s, ps)
 	)
+
+	defer func() { _ = ps.Close() }()
 
 	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Hour)
 	assert.NoError(t, err)
