@@ -20,6 +20,12 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
+type fakeMetrics struct {
+	c int
+}
+
+func (f *fakeMetrics) IncrementProcessedWebHooks() { f.c++ }
+
 func BenchmarkHandler_ServeHTTP(b *testing.B) {
 	b.ReportAllocs()
 
@@ -32,7 +38,7 @@ func BenchmarkHandler_ServeHTTP(b *testing.B) {
 		ps     = pubsub.NewInMemory()
 		h      = webhook.NewHandler(context.Background(), config.Config{
 			IgnoreHeaderPrefixes: []string{"bar", "baz"},
-		}, s, ps)
+		}, s, ps, &fakeMetrics{})
 	)
 
 	defer func() { _ = ps.Close() }()
@@ -102,7 +108,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 				ps      = pubsub.NewInMemory()
 				handler = webhook.NewHandler(context.Background(), config.Config{
 					MaxRequestBodySize: 64,
-				}, s, ps)
+				}, s, ps, &fakeMetrics{})
 			)
 
 			defer func() { _ = ps.Close() }()
@@ -130,9 +136,10 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPost, "http://test", bytes.NewBuffer([]byte("foo=bar")))
 		rr      = httptest.NewRecorder()
 		ps      = pubsub.NewInMemory()
+		m       = fakeMetrics{}
 		handler = webhook.NewHandler(context.Background(), config.Config{
 			IgnoreHeaderPrefixes: []string{"x-bAr-", "Baz"},
-		}, s, ps)
+		}, s, ps, &m)
 	)
 
 	req.Header.Set("x-bar-foo", "baz") // must be ignored
@@ -154,7 +161,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	runtime.Gosched()
-	<-time.After(time.Millisecond) // FIXME goroutine must be done
+	<-time.After(time.Millisecond) // goroutine must be done
 
 	assert.Equal(t, 202, rr.Code)
 	assert.Equal(t, "foo", rr.Body.String())
@@ -166,6 +173,8 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	e := <-eventsCh
 	assert.Equal(t, "request-registered", e.Name())
 	assert.Equal(t, requests[0].UUID(), string(e.Data()))
+
+	assert.Equal(t, 1, m.c)
 
 	assert.Equal(t, http.MethodPost, requests[0].Method())
 	assert.Equal(t, "foo=bar", requests[0].Content())
@@ -186,7 +195,7 @@ func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
 		ps      = pubsub.NewInMemory()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps, &fakeMetrics{})
 	)
 
 	defer func() { _ = ps.Close() }()
@@ -218,7 +227,7 @@ func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
 		ps      = pubsub.NewInMemory()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps, &fakeMetrics{})
 	)
 
 	defer func() { _ = ps.Close() }()
@@ -250,7 +259,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
 		ps      = pubsub.NewInMemory()
-		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps)
+		handler = webhook.NewHandler(context.Background(), config.Config{}, s, ps, &fakeMetrics{})
 	)
 
 	defer func() { _ = ps.Close() }()
@@ -290,7 +299,7 @@ func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
 		req, _  = http.NewRequest(http.MethodPut, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
 		ps      = pubsub.NewInMemory()
-		handler = webhook.NewHandler(ctx, config.Config{}, s, ps)
+		handler = webhook.NewHandler(ctx, config.Config{}, s, ps, &fakeMetrics{})
 	)
 
 	defer func() { _ = ps.Close() }()

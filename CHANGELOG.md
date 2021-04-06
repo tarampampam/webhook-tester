@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - HTTP requests & HTTP panics logging middlewares
 - Logging using `uber-go/zap` package
 - HTTP route `/api/version`
+- HTTP route `/metrics` with metrics in [prometheus](https://github.com/prometheus) format
 - Support for `linux/arm64`, `linux/arm/v6` and `linux/arm/v7` platforms for docker image
 
 ### Changed

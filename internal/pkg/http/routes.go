@@ -4,9 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
@@ -19,11 +18,14 @@ import (
 	apiSettings "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/settings"
 	apiVersion "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/version"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/healthz"
+	metricsHandler "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/metrics"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/webhook"
 	websocketSession "github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/websocket/session"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/cors"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/json"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/nocache"
+	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"github.com/tarampampam/webhook-tester/internal/pkg/version"
 )
@@ -35,6 +37,7 @@ func (s *Server) registerWebHookHandlers(
 	cfg config.Config,
 	storage storage.Storage,
 	pub pubsub.Publisher,
+	registerer prometheus.Registerer,
 ) error {
 	allowedMethods := []string{
 		http.MethodGet,
@@ -53,7 +56,12 @@ func (s *Server) registerWebHookHandlers(
 
 	webhookRouter.Use(cors.New())
 
-	handler := webhook.NewHandler(ctx, cfg, storage, pub) // TODO return error if wrong config passed
+	webhooksMetrics := metrics.NewWebhooks()
+	if err := webhooksMetrics.Register(registerer); err != nil {
+		return err
+	}
+
+	handler := webhook.NewHandler(ctx, cfg, storage, pub, &webhooksMetrics)
 
 	webhookRouter.
 		Handle("/{sessionUUID:"+uuidPattern+"}", handler).
@@ -140,20 +148,33 @@ func (s *Server) registerWebsocketHandlers(
 	storage storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
-) {
+	registerer prometheus.Registerer,
+) error {
 	wsRouter := s.router.
 		PathPrefix("/ws").
 		Subrouter()
 
+	websocketMetrics := metrics.NewWebsockets()
+	if err := websocketMetrics.Register(registerer); err != nil {
+		return err
+	}
+
+	handler := websocketSession.NewHandler(ctx, cfg, storage, pub, sub, &websocketMetrics)
+
 	wsRouter.
-		Handle("/session/{sessionUUID:"+uuidPattern+"}", websocketSession.NewHandler(ctx, cfg, storage, pub, sub)).
+		Handle("/session/{sessionUUID:"+uuidPattern+"}", handler).
 		Methods(http.MethodGet).
 		Name("ws_session")
+
+	return nil
 }
 
-// TODO add "/uptime" handler?
-// TODO add "/metrics" handler
-func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client) {
+func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client, registry prometheus.Gatherer) {
+	s.router.
+		HandleFunc("/metrics", metricsHandler.NewHandler(registry)).
+		Methods(http.MethodGet).
+		Name("metrics")
+
 	s.router.
 		HandleFunc("/ready", healthz.NewHandler(checkers.NewReadyChecker(ctx, rdb))).
 		Methods(http.MethodGet, http.MethodHead).

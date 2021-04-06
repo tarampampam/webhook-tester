@@ -9,35 +9,46 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
-
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-type Handler struct {
-	ctx         context.Context
-	storage     storage.Storage
-	pub         pubsub.Publisher
-	maxBodySize uint32
+type metrics interface {
+	IncrementProcessedWebHooks()
+}
 
+type Handler struct {
+	ctx     context.Context
+	storage storage.Storage
+	pub     pubsub.Publisher
+	m       metrics
+
+	maxBodySize          uint32
 	ignoreHeaderPrefixes []string
 }
 
-func NewHandler(ctx context.Context, cfg config.Config, storage storage.Storage, pub pubsub.Publisher) *Handler {
+func NewHandler(
+	ctx context.Context,
+	cfg config.Config,
+	storage storage.Storage,
+	pub pubsub.Publisher,
+	m metrics,
+) *Handler {
 	ignoreHeaders := make([]string, len(cfg.IgnoreHeaderPrefixes))
 	for i := 0; i < len(cfg.IgnoreHeaderPrefixes); i++ {
 		ignoreHeaders[i] = strings.ToUpper(strings.TrimSpace(cfg.IgnoreHeaderPrefixes[i]))
 	}
 
 	return &Handler{
-		ctx:         ctx,
-		storage:     storage,
-		pub:         pub,
-		maxBodySize: cfg.MaxRequestBodySize,
+		ctx:     ctx,
+		storage: storage,
+		pub:     pub,
+		m:       m,
 
+		maxBodySize:          cfg.MaxRequestBodySize,
 		ignoreHeaderPrefixes: ignoreHeaders,
 	}
 }
@@ -100,8 +111,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		return
 	}
 
-	// publish an event "new request was registered successful"
-	go func() { _ = h.pub.Publish(sUUID, pubsub.NewRequestRegisteredEvent(rUUID)) }()
+	go func() {
+		h.m.IncrementProcessedWebHooks()
+
+		_ = h.pub.Publish(sUUID, pubsub.NewRequestRegisteredEvent(rUUID))
+	}()
 
 	if delay := session.Delay(); delay > 0 {
 		timer := time.NewTimer(delay)

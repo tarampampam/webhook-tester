@@ -13,6 +13,8 @@
 
 With this application you instantly get a unique, random URL that you can use to test and debug Webhooks and HTTP requests.
 
+> Original project idea: [fredsted/webhook.site](https://github.com/fredsted/webhook.site)
+
 <p align="center">
   <img src="https://hsto.org/webt/_r/ne/yt/_rneytazmfi6nqrka9r5nkdramc.png" alt="screenshot" width="925" />
 </p>
