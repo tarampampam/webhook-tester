@@ -179,7 +179,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Start redis server
-        if: matrix.storage-driver == 'redis'
+        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
         run: docker run --rm -d -p "6379:6379/tcp" redis:6.0.9-alpine
 
       - name: Download compiled binary file
@@ -256,7 +256,7 @@ jobs:
         run: docker network create "app-network"
 
       - name: Start redis server
-        if: matrix.storage-driver == 'redis'
+        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
         run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:6.0.9-alpine
 
       - name: Download builded docker image
