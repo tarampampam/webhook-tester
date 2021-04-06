@@ -35,7 +35,7 @@ fmt: ## Run source code formatter tools
 
 lint: ## Run app linters
 	if [ ! -d "./node_modules" ]; then docker-compose run $(DC_RUN_ARGS) --no-deps node yarn install; fi # install node deps
-	docker-compose run $(DC_RUN_ARGS) --no-deps node ./node_modules/.bin/eslint ./web --ext .js,.vue --verbose
+	docker-compose run $(DC_RUN_ARGS) --no-deps node ./node_modules/.bin/eslint --color --ext .js,.vue ./web
 	docker-compose run --rm --no-deps golint golangci-lint run
 
 gotest: ## Run app tests
