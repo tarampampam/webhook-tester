@@ -119,7 +119,7 @@ After that you can navigate your browser to `http://127.0.0.1:8080/` try to send
 Just execute in your terminal:
 
 ```shell
-$ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X
+$ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X serve
 ```
 
 > Important notice: do **not** use `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
@@ -135,7 +135,7 @@ volumes:
 services:
   app:
     image: tarampampam/webhook-tester:X.X.X
-    command: serve --port 8080 --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
+    command: serve --port 8080 --log-json --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
     ports:
       - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
 
