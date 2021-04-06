@@ -149,7 +149,7 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 
 	if envVar, exists := env.MaxSessionRequests.Lookup(); exists {
 		if p, err := strconv.ParseUint(envVar, 10, 16); err == nil {
-			f.listen.port = uint16(p)
+			f.maxRequests = uint16(p)
 		} else {
 			return fmt.Errorf("wrong maximum session requests [%s] value", envVar)
 		}
