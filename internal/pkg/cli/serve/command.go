@@ -8,14 +8,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/cobra"
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
 
@@ -106,7 +105,7 @@ func run( //nolint:funlen,gocyclo
 		stor = inmemory
 
 	default:
-		return errors.New("unsupported storage driver")
+		return errors.New("unsupported storage driver") // cannot be covered by tests
 	}
 
 	var (
@@ -129,7 +128,7 @@ func run( //nolint:funlen,gocyclo
 		pub, sub = memoryPubSub, memoryPubSub
 
 	default:
-		return errors.New("unsupported pub/sub driver")
+		return errors.New("unsupported pub/sub driver") // cannot be covered by tests
 	}
 
 	// create HTTP server

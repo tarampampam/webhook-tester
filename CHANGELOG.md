@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - E2E test using postman
 - In-memory storage implementation
-- In-memory pub/sub implementation
+- In-memory and Redis pub/sub implementation
 - Websockets for browser notifications
 - `serve` sub-command flags:
   - `--redis-dsn` redis server DSN (format: `redis://<user>:<password>@<host>:<port>/<db_number>`), required when storage driver `redis` is used
@@ -49,7 +49,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - `serve` sub-command flags:`--redis-host`, `--redis-port`, `--redis-db-num`
 - Environment variables support: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB_NUM`
 - Property `version` from `/api/settings` JSON-object response
-- Pusher support
+- Pusher support (replaces with pub/sub + websockets)
 
 ### Fixed
 

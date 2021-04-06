@@ -62,7 +62,7 @@ jobs:
           restore-keys: ${{ runner.os }}-yarn-
 
       - name: Install Node Modules
-        run: yarn install
+        run: yarn install --pure-lockfile --emoji
 
       - name: Run ESLint
         run: ./node_modules/.bin/eslint --output-file eslint_report.json --format json --ext .js,.vue ./web

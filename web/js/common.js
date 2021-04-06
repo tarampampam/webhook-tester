@@ -14,7 +14,7 @@ requirejs.config({
         // JS framework for UI
         // Docs: <https://vuejs.org/v2/api/>
         Vue: [
-            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue', // @todo: remove `.min` for production using (without `vue.js devtools`)
+            'https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min', // hint: remove `.min` for `vue.js devtools`
             'https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.min',
         ],
         // Router for VueJS
