@@ -22,9 +22,12 @@ tests:
   - 'test/**/*'
   - '.golangci.yml'
   - 'codecov.yml'
+  - '.codecov.yml'
+  - '.eslintrc.yml'
 
 frontend:
   - 'web/**/*'
+  - 'package.json'
 
 docker:
   - 'Dockerfile'

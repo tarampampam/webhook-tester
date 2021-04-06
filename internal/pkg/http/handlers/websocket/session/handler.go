@@ -14,6 +14,11 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
+type metrics interface {
+	IncrementActiveClients()
+	DecrementActiveClients()
+}
+
 type Handler struct {
 	ctx context.Context
 
@@ -21,6 +26,7 @@ type Handler struct {
 	stor storage.Storage
 	pub  pubsub.Publisher
 	sub  pubsub.Subscriber
+	m    metrics
 
 	connCounter int32 // atomic usage only!
 	upgrader    websocket.Upgrader
@@ -33,6 +39,7 @@ func NewHandler(
 	stor storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
+	m metrics,
 ) *Handler {
 	return &Handler{
 		ctx:  ctx,
@@ -40,6 +47,7 @@ func NewHandler(
 		stor: stor,
 		pub:  pub,
 		sub:  sub,
+		m:    m,
 
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  512, //nolint:gomnd
@@ -86,6 +94,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	atomic.AddInt32(&h.connCounter, 1) // increment active connections count
+	h.m.IncrementActiveClients()
 
 	go h.serveWebsocketConnection(sessionUUID, conn)
 }
@@ -112,11 +121,12 @@ const (
 )
 
 // serveWebsocketConnection serves websocket connection.
-func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.Conn) {
+func (h *Handler) serveWebsocketConnection(sessionUUID string, conn *websocket.Conn) { //nolint:funlen
 	defer func() {
 		_ = conn.Close() // close connection
 
 		atomic.AddInt32(&h.connCounter, -1) // decrement active connections count
+		h.m.DecrementActiveClients()
 	}()
 
 	// create channel for events (do NOT close him unless you are sure no one is writing into it)
