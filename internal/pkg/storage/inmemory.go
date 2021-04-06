@@ -48,7 +48,7 @@ func (r *inmemoryRequest) CreatedAt() time.Time       { return r.createdAt }  //
 
 var ErrClosed = errors.New("closed")
 
-type InMemoryStorage struct { // TODO remove `Storage` postfix
+type InMemory struct {
 	sessionTTL  time.Duration
 	maxRequests uint16
 
@@ -64,14 +64,15 @@ type InMemoryStorage struct { // TODO remove `Storage` postfix
 
 const defaultInMemoryCleanupInterval = time.Second // default cleanup interval
 
-func NewInMemoryStorage(sessionTTL time.Duration, maxRequests uint16, cleanup ...time.Duration) *InMemoryStorage {
+// NewInMemory creates inmemory storage.
+func NewInMemory(sessionTTL time.Duration, maxRequests uint16, cleanup ...time.Duration) *InMemory {
 	ci := defaultInMemoryCleanupInterval
 
 	if len(cleanup) > 0 {
 		ci = cleanup[0]
 	}
 
-	s := &InMemoryStorage{
+	s := &InMemory{
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
 		cleanupInterval: ci,
@@ -83,7 +84,7 @@ func NewInMemoryStorage(sessionTTL time.Duration, maxRequests uint16, cleanup ..
 	return s
 }
 
-func (s *InMemoryStorage) cleanup() {
+func (s *InMemory) cleanup() {
 	defer close(s.close)
 
 	timer := time.NewTimer(s.cleanupInterval)
@@ -116,7 +117,7 @@ func (s *InMemoryStorage) cleanup() {
 	}
 }
 
-func (s *InMemoryStorage) isClosed() (closed bool) {
+func (s *InMemory) isClosed() (closed bool) {
 	s.closedMu.RLock()
 	closed = s.closed
 	s.closedMu.RUnlock()
@@ -125,7 +126,7 @@ func (s *InMemoryStorage) isClosed() (closed bool) {
 }
 
 // Close current storage with data invalidation.
-func (s *InMemoryStorage) Close() error {
+func (s *InMemory) Close() error {
 	if s.isClosed() {
 		return ErrClosed
 	}
@@ -139,10 +140,10 @@ func (s *InMemoryStorage) Close() error {
 	return nil
 }
 
-func (s *InMemoryStorage) newUUID() string { return uuid.New().String() }
+func (s *InMemory) newUUID() string { return uuid.New().String() }
 
 // GetSession returns session data.
-func (s *InMemoryStorage) GetSession(uuid string) (Session, error) {
+func (s *InMemory) GetSession(uuid string) (Session, error) {
 	if s.isClosed() {
 		return nil, ErrClosed
 	}
@@ -168,7 +169,7 @@ func (s *InMemoryStorage) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *InMemoryStorage) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *InMemory) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
 	if s.isClosed() {
 		return "", ErrClosed
 	}
@@ -193,7 +194,7 @@ func (s *InMemoryStorage) CreateSession(content string, code uint16, contentType
 }
 
 // DeleteSession deletes session with passed UUID.
-func (s *InMemoryStorage) DeleteSession(uuid string) (bool, error) {
+func (s *InMemory) DeleteSession(uuid string) (bool, error) {
 	session, err := s.GetSession(uuid)
 	if err != nil {
 		return false, err
@@ -211,7 +212,7 @@ func (s *InMemoryStorage) DeleteSession(uuid string) (bool, error) {
 }
 
 // DeleteRequests deletes stored requests for session with passed UUID.
-func (s *InMemoryStorage) DeleteRequests(uuid string) (bool, error) {
+func (s *InMemory) DeleteRequests(uuid string) (bool, error) {
 	session, err := s.GetSession(uuid)
 	if err != nil {
 		return false, err
@@ -237,7 +238,7 @@ func (s *InMemoryStorage) DeleteRequests(uuid string) (bool, error) {
 
 // CreateRequest creates new request in storage using passed data and updates expiration time for session and all
 // stored requests for the session.
-func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:lll
+func (s *InMemory) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:lll
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
 		return "", err
@@ -291,7 +292,7 @@ func (s *InMemoryStorage) CreateRequest(sessionUUID, clientAddr, method, content
 }
 
 // GetRequest returns request data.
-func (s *InMemoryStorage) GetRequest(sessionUUID, requestUUID string) (Request, error) {
+func (s *InMemory) GetRequest(sessionUUID, requestUUID string) (Request, error) {
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
 		return nil, err
@@ -312,7 +313,7 @@ func (s *InMemoryStorage) GetRequest(sessionUUID, requestUUID string) (Request, 
 }
 
 // GetAllRequests returns all request as a slice of structures.
-func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) {
+func (s *InMemory) GetAllRequests(sessionUUID string) ([]Request, error) {
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
 		return nil, err
@@ -342,7 +343,7 @@ func (s *InMemoryStorage) GetAllRequests(sessionUUID string) ([]Request, error) 
 }
 
 // DeleteRequest deletes stored request with passed session and request UUIDs.
-func (s *InMemoryStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
+func (s *InMemory) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
 		return false, err

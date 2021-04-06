@@ -56,7 +56,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 10)
+			s := storage.NewInMemory(time.Minute, 10)
 			defer s.Close()
 
 			sessionUUID, err := s.CreateSession("", 201, "", 0)

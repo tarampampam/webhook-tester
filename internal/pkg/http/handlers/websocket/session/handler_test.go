@@ -49,7 +49,7 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 			var (
 				req, _  = http.NewRequest(http.MethodGet, "http://testing", http.NoBody)
 				rr      = httptest.NewRecorder()
-				stor    = storage.NewInMemoryStorage(time.Second*2, 32)
+				stor    = storage.NewInMemory(time.Second*2, 32)
 				ps      = pubsub.NewInMemory()
 				handler = session.NewHandler(context.Background(), config.Config{}, stor, ps, ps, &fakeMetrics{})
 			)

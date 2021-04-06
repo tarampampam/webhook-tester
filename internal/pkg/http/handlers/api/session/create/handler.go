@@ -12,6 +12,10 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
+// IMPORTANT! Must be less then
+// github.com/tarampampam/webhook-tester/internal/pkg/http.writeTimeout value!
+const maxResponseDelay = time.Second * 30
+
 func NewHandler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Body == nil {

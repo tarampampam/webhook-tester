@@ -17,7 +17,7 @@ import (
 )
 
 func TestHandlerErrors(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 1)
+	s := storage.NewInMemory(time.Minute, 1)
 	defer s.Close()
 
 	h := create.NewHandler(s)
@@ -125,7 +125,7 @@ func TestHandlerErrors(t *testing.T) {
 }
 
 func TestHandlerSessionCreation(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 1)
+	s := storage.NewInMemory(time.Minute, 1)
 	defer s.Close()
 
 	var (
