@@ -74,10 +74,8 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
     "--port", "8080" \
 ]
 
+ENV PUBLIC_DIR="/opt/webhook-tester/web"
+
 ENTRYPOINT ["/bin/webhook-tester"]
 
-CMD [ \
-    "serve", \
-    "--log-json", \
-    "--public", "/opt/webhook-tester/web" \
-]
+CMD ["serve", "--log-json"]
