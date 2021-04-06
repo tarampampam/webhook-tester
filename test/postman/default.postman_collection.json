@@ -225,6 +225,38 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Metrics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('response status success', () => pm.response.to.be.success)",
+									"",
+									"pm.test('response body is not empty', () => pm.expect(pm.response.text().length).not.eq(0))",
+									"",
+									"pm.test('response contains goroutines counter', () => pm.expect(pm.response.text()).to.contains('go_goroutines'))"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/metrics",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"metrics"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
