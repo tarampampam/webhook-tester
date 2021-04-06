@@ -53,7 +53,7 @@ func TestServer_StartAndStop(t *testing.T) {
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
 
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	srv := NewServer(zap.NewNop())
@@ -132,7 +132,7 @@ func TestServer_Register(t *testing.T) {
 		{name: "ws_session", route: "/ws/session/{sessionUUID:" + uuid + "}", methods: []string{http.MethodGet}},
 	}
 
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	srv := NewServer(zap.NewNop())
@@ -148,7 +148,7 @@ func TestServer_Register(t *testing.T) {
 		assert.Nil(t, router.Get(r.name))
 	}
 
-	stor := storage.NewInMemoryStorage(time.Second, 16)
+	stor := storage.NewInMemory(time.Second, 16)
 	defer func() { _ = stor.Close() }()
 
 	pubSub := pubsub.NewInMemory()
@@ -173,7 +173,7 @@ func TestServer_RegisterWithoutResourcesDir(t *testing.T) {
 	srv := NewServer(zap.NewNop())
 	router := srv.router // dirty hack, yes, i know
 
-	stor := storage.NewInMemoryStorage(time.Second, 16)
+	stor := storage.NewInMemory(time.Second, 16)
 	defer func() { _ = stor.Close() }()
 
 	pubSub := pubsub.NewInMemory()

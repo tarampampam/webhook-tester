@@ -13,6 +13,7 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
+	"github.com/tarampampam/webhook-tester/internal/pkg/logger"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
@@ -82,7 +83,8 @@ func run( //nolint:funlen,gocyclo
 			return optErr
 		}
 
-		rdb = redis.NewClient(opt).WithContext(ctx) // TODO set ZAP logger for redis client
+		rdb = redis.NewClient(opt).WithContext(ctx)
+		redis.SetLogger(logger.NewRedisBridge(log)) // set zap logger for the redis client (globally)
 
 		defer func() { _ = rdb.Close() }()
 
@@ -96,10 +98,10 @@ func run( //nolint:funlen,gocyclo
 	// create required storage driver
 	switch cfg.StorageDriver {
 	case config.StorageDriverRedis:
-		stor = storage.NewRedisStorage(ctx, rdb, cfg.SessionTTL, cfg.MaxRequests)
+		stor = storage.NewRedis(ctx, rdb, cfg.SessionTTL, cfg.MaxRequests)
 
 	case config.StorageDriverMemory:
-		inmemory := storage.NewInMemoryStorage(cfg.SessionTTL, cfg.MaxRequests)
+		inmemory := storage.NewInMemory(cfg.SessionTTL, cfg.MaxRequests)
 		defer func() { _ = inmemory.Close() }()
 
 		stor = inmemory

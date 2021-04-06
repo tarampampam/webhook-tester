@@ -9,8 +9,8 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 1, time.Second)
+func TestInMemoryWebSockets_SessionCreateReadDelete(t *testing.T) {
+	s := storage.NewInMemory(time.Minute, 1, time.Second)
 	defer s.Close()
 
 	sessionUUID, creationErr := s.CreateSession("foo bar", 201, "text/javascript", time.Second*123)
@@ -44,8 +44,8 @@ func TestInMemoryStorage_SessionCreateReadDelete(t *testing.T) {
 	assert.NoError(t, gotSessionAgainErr)
 }
 
-func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+func TestInMemoryWebSockets_RequestCreateReadDelete(t *testing.T) {
+	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -89,8 +89,8 @@ func TestInMemoryStorage_RequestCreateReadDelete(t *testing.T) {
 	assert.NoError(t, nowNoRequestErr)
 }
 
-func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 2, time.Nanosecond*100)
+func TestInMemoryWebSockets_RequestCreationLimit(t *testing.T) {
+	s := storage.NewInMemory(time.Minute, 2, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -115,8 +115,8 @@ func TestInMemoryStorage_RequestCreationLimit(t *testing.T) {
 	assert.Equal(t, "3.3.3.3", requests[1].ClientAddr())
 }
 
-func TestInMemoryStorage_GetAllRequests(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+func TestInMemoryWebSockets_GetAllRequests(t *testing.T) {
+	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -140,8 +140,8 @@ func TestInMemoryStorage_GetAllRequests(t *testing.T) {
 	assert.Equal(t, "1.2.3.4", requests[0].ClientAddr())
 }
 
-func TestInMemoryStorage_DeleteRequests(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10, time.Nanosecond*100)
+func TestInMemoryWebSockets_DeleteRequests(t *testing.T) {
+	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -165,8 +165,8 @@ func TestInMemoryStorage_DeleteRequests(t *testing.T) {
 	assert.Nil(t, requests2)
 }
 
-func TestInMemoryStorage_CreateRequestExpired(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
+func TestInMemoryWebSockets_CreateRequestExpired(t *testing.T) {
+	s := storage.NewInMemory(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
 	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -184,8 +184,8 @@ func TestInMemoryStorage_CreateRequestExpired(t *testing.T) {
 	assert.Nil(t, session) // important
 }
 
-func TestInMemoryStorage_GetRequestExpired(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Millisecond*10, 10, time.Minute)
+func TestInMemoryWebSockets_GetRequestExpired(t *testing.T) {
+	s := storage.NewInMemory(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
 	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
@@ -205,8 +205,8 @@ func TestInMemoryStorage_GetRequestExpired(t *testing.T) {
 	assert.Nil(t, request) // important
 }
 
-func TestInMemoryStorage_ClosedStateProducesError(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Nanosecond*10, 10, time.Nanosecond*20)
+func TestInMemoryWebSockets_ClosedStateProducesError(t *testing.T) {
+	s := storage.NewInMemory(time.Nanosecond*10, 10, time.Nanosecond*20)
 	assert.NoError(t, s.Close())
 
 	assert.ErrorIs(t, s.Close(), storage.ErrClosed) // 2nd call produces error
@@ -236,10 +236,10 @@ func TestInMemoryStorage_ClosedStateProducesError(t *testing.T) {
 	assert.ErrorIs(t, err, storage.ErrClosed)
 }
 
-func TestInMemoryStorage_Concurrent(t *testing.T) {
+func TestInMemoryWebSockets_Concurrent(t *testing.T) {
 	var maxRequests = 10
 
-	s := storage.NewInMemoryStorage(time.Second, uint16(maxRequests), time.Nanosecond*10)
+	s := storage.NewInMemory(time.Second, uint16(maxRequests), time.Nanosecond*10)
 	defer s.Close()
 
 	var wg sync.WaitGroup

@@ -43,7 +43,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 1)
+			s := storage.NewInMemory(time.Minute, 1)
 			defer s.Close()
 
 			var (
@@ -65,7 +65,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_RequestReading(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (

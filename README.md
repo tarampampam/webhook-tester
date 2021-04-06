@@ -11,35 +11,119 @@
 [![Coverage][badge_coverage]][link_coverage]
 [![License][badge_license]][link_license]
 
-With this application you instantly get a unique, random URL that you can use to test and debug Webhooks and HTTP requests.
-
-> Original project idea: [fredsted/webhook.site](https://github.com/fredsted/webhook.site)
+This application allows you to test and debug Webhooks and HTTP requests using unique (random) URLs. You can customize response code, `content-type` HTTP header, response content and set some delay for the HTTP responses. Main idea was looked [here](https://github.com/fredsted/webhook.site).
 
 <p align="center">
   <img src="https://hsto.org/webt/_r/ne/yt/_rneytazmfi6nqrka9r5nkdramc.png" alt="screenshot" width="925" />
 </p>
 
-### Dependencies
+This application is written in GoLang and works very fast. It comes with a tiny UI (written in `Vue.js`), which you can customize however you want. Websockets are also used for incoming webhook notifications in UI - you don't need any 3rd party solutions (like `pusher.com`) for this!
 
-_WIP_
+### :fire: Features list
 
-All what you need to start this application - is a [redis server](https://redis.io/), which is running on your host or in docker container.
+- Customizable front-end, based on `vue.js` (without the need for an builder/bundler)
+- Liveness/readiness probes (routes `/live` and `/ready` respectively)
+- Can be started without any 3rd party dependencies
+- Metrics in prometheus format (route `/metrics`)
+- Multi-arch docker image, based on `scratch`
+- Unprivileged user in docker image is used
+- Well-tested and documented source code
+- Built-in CLI health check sub-command
+- JSON/human-readable logging formats
+- Customizable webhook responses
+- Built-in Websockets support
+- Low memory/cpu usage
+- Free and open-source
+- Ready to scale
 
-## Starting
+### Storage
 
-_WIP_
+At the moment 2 types of data storage are supported - **memory** and **redis server** (flag `--storage-driver`).
 
-Download compiled application from [releases page][link_releases] _(also you will need to download `./web` directory from this repository)_ or compile from sources and run it locally:
+The **memory** driver is useful for fast local debugging when recorded requests will not be needed after app stopping. The **Redis driver**, on the contrary, stores all the data on the redis server, and the data will not be lost after app restarting. When running multiple app instances (behind the load balancer), it is also necessary to use the redis driver.
 
-```bash
-$ git clone https://github.com/tarampampam/webhook-tester.git ./webhook-tester && cd $_
-$ go build -ldflags="-s -w" ./cmd/webhook-tester/
-$ ./webhook-tester serve --port 8080 --redis-host 127.0.0.1 --redis-port 6379
+### Pub/sub
+
+Publishing/subscribing are used to send notifications using WebSockets, and also supports 2 types of driver - **memory** and **redis server** (flag `--pubsub-driver`).
+
+For multiple app instances redis driver must be used.
+
+## Installing
+
+Download the latest binary file for your os/arch from [releases page][link_releases] or use our [docker image][link_docker_hub] ([ghcr.io][link_ghcr]). Also, you may need in [`./web`](web) directory content for web UI access.
+
+## Usage
+
+This application supports next sub-commands:
+
+Sub-command   | Description
+------------- | -----------
+`serve`       | Start HTTP server
+`healthcheck` | Health checker for the HTTP server (use case - docker healthcheck) _(hidden in CLI help)_
+`version`     | Display application version
+
+And global flags:
+
+Flag              | Description
+----------------- | -----------
+`--verbose`, `-v` | Verbose output
+`--debug`         | Debug output
+`--log-json`      | Logs in JSON format
+
+### HTTP server starting
+
+`serve` sub-command allows to use next flags:
+
+Flag                      | Description                              | Default value              | Environment variable
+------------------------- | ---------------------------------------- | -------------------------- | --------------------
+`--listen`, `-l`          | IP address to listen on                  | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`
+`--port`, `-p`            | TCP port number                          | `8080`                     | `LISTEN_PORT`
+`--public`                | Path to the directory with public assets | `%app_bin%/web`            | `PUBLIC_DIR`
+`--storage-driver`        | Storage engine (`memory` or `redis`)     | `memory`                   | `STORAGE_DRIVER`
+`--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)     | `memory`                   | `PUBSUB_DRIVER`
+`--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`) | `redis://127.0.0.1:6379/0` | `REDIS_DSN`
+`--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`) | `[]` |
+`--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited) | `65536` |
+`--max-requests`          | Maximum stored requests per session (max `65535`) | `128`             | `MAX_REQUESTS`
+`--session-ttl`           | Session lifetime (examples: `48h`, `1h30m`) | `168h`                  | `SESSION_TTL`
+`--ws-max-clients`        | Maximal websocket clients (`0` = unlimited) | `0`                     | `WS_MAX_CLIENTS`
+`--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited) | `0` | `WS_MAX_LIFETIME`
+
+> Environment variables have higher priority then flag values.
+
+Server starting command example:
+
+```shell
+$ ./webhook-tester serve \
+    --port 8080
+    --public ./web
+    --storage-driver redis
+    --pubsub-driver redis
+    --redis-dsn redis://redis-host:6379/0
+    --max-requests 512
+    --ignore-header-prefix X-Forwarded-
+    --ignore-header-prefix X-Reverse-Proxy-
+    --ws-max-clients 30000
+    --ws-max-lifetime 6h
 ```
 
-> For this `redis` server must be installed and started locally on `6379` port. Or you can try to use [cloud version](https://redislabs.com/try-free/) of `redis`.
+After that you can navigate your browser to `http://127.0.0.1:8080/` try to send your first HTTP request for the webhook-tester!
 
-Or use ready docker image for this. Simple `docker-compose` file below:
+### Using docker
+
+[![image stats](https://dockeri.co/image/tarampampam/webhook-tester)][link_docker_tags]
+
+> All supported image tags [can be found here][link_docker_hub] and [here][link_ghcr].
+
+Just execute in your terminal:
+
+```shell
+$ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X
+```
+
+> Important notice: do **not** use `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
+
+Where `X.X.X` is image tag _(application version)_. Simple `docker-compose` file below:
 
 ```yaml
 version: '3.4'
@@ -49,61 +133,24 @@ volumes:
 
 services:
   app:
-    image: tarampampam/webhook-tester:latest
-    command: serve --port 8080 --redis-host redis
+    image: tarampampam/webhook-tester:X.X.X
+    command: serve --port 8080 --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
     ports:
       - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
 
   redis:
-    image: redis:6.0.5-alpine
+    image: redis:6.0.9-alpine
     volumes:
       - redis-data:/data:cached
     ports:
       - 6379
 ```
 
-> Important notice: do **not** use `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
+## Demo
 
-[![image stats](https://dockeri.co/image/tarampampam/webhook-tester)][link_docker_tags]
+I can't guarantee that this links will available forever, but you can use this application by the following links:
 
-All supported image tags [can be found here][link_docker_tags].
-
-### Additional configuration
-
-All supported `serve` command flags can be found by running `docker run --rm -t tarampampam/webhook-tester serve -h`.
-
-### Allowed environment variables
-
-_WIP_
-
-Variable name    | Description
-:--------------: | :---------:
-`LISTEN_ADDR`    | IP address to listen on
-`LISTEN_PORT`    | TCP port number
-`PUBLIC_DIR`     | Directory with public assets
-`MAX_REQUESTS`   | Maximum stored requests per session
-`SESSION_TTL`    | Session lifetime (in seconds)
-`REDIS_HOST`     | Redis server hostname or IP address
-`REDIS_PORT`     | Redis server TCP port number
-`REDIS_PASSWORD` | Redis server password (optional)
-`REDIS_DB_NUM`   | Redis database number
-`REDIS_MAX_CONN` | Maximum redis connections
-`PUSHER_APP_ID`  | Pusher application ID
-`PUSHER_KEY`     | Pusher key
-`PUSHER_SECRET`  | Pusher secret
-`PUSHER_CLUSTER` | Pusher cluster
-
-### Liveness/readiness probes
-
-HTTP get `/live` and `/ready` respectively.
-
-### Testing
-
-For application testing we use built-in golang testing feature and `docker-ce` + `docker-compose` as develop environment. So, just write into your terminal after repository cloning:
-
-```shell
-$ make test
-```
+- <https://web.hook.sh/>
 
 ## Changes log
 
@@ -151,3 +198,4 @@ This is open-sourced software licensed under the [MIT License][link_license].
 [link_issues]:https://github.com/tarampampam/webhook-tester/issues
 [link_create_issue]:https://github.com/tarampampam/webhook-tester/issues/new/choose
 [link_pulls]:https://github.com/tarampampam/webhook-tester/pulls
+[link_ghcr]:https://github.com/users/tarampampam/packages/container/package/webhook-tester

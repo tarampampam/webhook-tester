@@ -10,8 +10,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-// RedisStorage is redis storage implementation.
-type RedisStorage struct { // TODO remove `Storage` postfix
+// Redis is redis storage implementation.
+type Redis struct {
 	ctx         context.Context
 	rdb         *redis.Client
 	ttl         time.Duration
@@ -19,9 +19,9 @@ type RedisStorage struct { // TODO remove `Storage` postfix
 	json        jsoniter.API
 }
 
-// NewRedisStorage creates new redis storage instance.
-func NewRedisStorage(ctx context.Context, rdb *redis.Client, sessionTTL time.Duration, maxRequests uint16) *RedisStorage { //nolint:lll
-	return &RedisStorage{
+// NewRedis creates new redis storage instance.
+func NewRedis(ctx context.Context, rdb *redis.Client, sessionTTL time.Duration, maxRequests uint16) *Redis { //nolint:lll
+	return &Redis{
 		ctx:         ctx,
 		rdb:         rdb,
 		ttl:         sessionTTL,
@@ -31,7 +31,7 @@ func NewRedisStorage(ctx context.Context, rdb *redis.Client, sessionTTL time.Dur
 }
 
 // GetSession returns session data.
-func (s *RedisStorage) GetSession(uuid string) (Session, error) {
+func (s *Redis) GetSession(uuid string) (Session, error) {
 	value, err := s.rdb.Get(s.ctx, redisKey(uuid).session()).Bytes()
 
 	if err != nil {
@@ -54,7 +54,7 @@ func (s *RedisStorage) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *RedisStorage) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *Redis) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
 	sData := redisSession{
 		RespContent:     content,
 		RespCode:        code,
@@ -77,7 +77,7 @@ func (s *RedisStorage) CreateSession(content string, code uint16, contentType st
 	return id, nil
 }
 
-func (s *RedisStorage) deleteKeys(keys ...string) (bool, error) {
+func (s *Redis) deleteKeys(keys ...string) (bool, error) {
 	cmdResult := s.rdb.Del(s.ctx, keys...)
 
 	if err := cmdResult.Err(); err != nil {
@@ -94,12 +94,12 @@ func (s *RedisStorage) deleteKeys(keys ...string) (bool, error) {
 }
 
 // DeleteSession deletes session with passed UUID.
-func (s *RedisStorage) DeleteSession(uuid string) (bool, error) {
+func (s *Redis) DeleteSession(uuid string) (bool, error) {
 	return s.deleteKeys(redisKey(uuid).session())
 }
 
 // DeleteRequests deletes stored requests for session with passed UUID.
-func (s *RedisStorage) DeleteRequests(sessionUUID string) (bool, error) {
+func (s *Redis) DeleteRequests(sessionUUID string) (bool, error) {
 	key := redisKey(sessionUUID)
 
 	// get request UUIDs, associated with session
@@ -123,7 +123,7 @@ func (s *RedisStorage) DeleteRequests(sessionUUID string) (bool, error) {
 
 // CreateRequest creates new request in storage using passed data and updates expiration time for session and all
 // stored requests for the session.
-func (s *RedisStorage) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:funlen,lll
+func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:funlen,lll
 	var (
 		now = time.Now()
 		key = redisKey(sessionUUID)
@@ -206,7 +206,7 @@ func (s *RedisStorage) CreateRequest(sessionUUID, clientAddr, method, content, u
 }
 
 // GetRequest returns request data.
-func (s *RedisStorage) GetRequest(sessionUUID, requestUUID string) (Request, error) {
+func (s *Redis) GetRequest(sessionUUID, requestUUID string) (Request, error) {
 	value, err := s.rdb.Get(s.ctx, redisKey(sessionUUID).request(requestUUID)).Bytes()
 
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *RedisStorage) GetRequest(sessionUUID, requestUUID string) (Request, err
 }
 
 // GetAllRequests returns all request as a slice of structures.
-func (s *RedisStorage) GetAllRequests(sessionUUID string) ([]Request, error) {
+func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
 	var key = redisKey(sessionUUID)
 
 	if exists, existsErr := s.rdb.Exists(s.ctx, key.requests()).Result(); existsErr != nil {
@@ -282,7 +282,7 @@ func (s *RedisStorage) GetAllRequests(sessionUUID string) ([]Request, error) {
 }
 
 // DeleteRequest deletes stored request with passed session and request UUIDs.
-func (s *RedisStorage) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
+func (s *Redis) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
 	var key = redisKey(sessionUUID)
 
 	if _, err := s.rdb.ZRem(s.ctx, key.requests(), requestUUID).Result(); err != nil {

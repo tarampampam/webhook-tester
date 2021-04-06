@@ -3,6 +3,7 @@
         <main-header
             :current-web-hook-url="sessionRequestURI"
             :session-lifetime-sec="sessionLifetimeSec"
+            :max-body-size-bytes="maxBodySize"
             :version="appVersion"
             @on-new-url="newSessionHandler"
         ></main-header>
@@ -148,7 +149,7 @@
                 appVersion: null,
                 sessionLifetimeSec: null,
                 maxRequests: 50,
-                maxBodySize: 0, // in bytes // TODO append this value into UI
+                maxBodySize: 0, // in bytes
 
                 sessionUUID: null,
                 requestUUID: null,
