@@ -125,6 +125,7 @@ func TestServer_Register(t *testing.T) {
 				http.MethodPatch, http.MethodDelete, http.MethodOptions, http.MethodTrace,
 			},
 		},
+		{name: "metrics", route: "/metrics", methods: []string{http.MethodGet}},
 		{name: "ready", route: "/ready", methods: []string{http.MethodGet, http.MethodHead}},
 		{name: "live", route: "/live", methods: []string{http.MethodGet, http.MethodHead}},
 		{name: "static", route: "/", methods: []string{http.MethodGet, http.MethodHead}},

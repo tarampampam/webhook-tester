@@ -15,6 +15,13 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
+type fakeMetrics struct {
+	c int
+}
+
+func (f *fakeMetrics) IncrementActiveClients() { f.c++ }
+func (f *fakeMetrics) DecrementActiveClients() { f.c-- }
+
 func TestHandler_ServeHTTPErrors(t *testing.T) {
 	var cases = []struct {
 		name           string
@@ -44,7 +51,7 @@ func TestHandler_ServeHTTPErrors(t *testing.T) {
 				rr      = httptest.NewRecorder()
 				stor    = storage.NewInMemoryStorage(time.Second*2, 32)
 				ps      = pubsub.NewInMemory()
-				handler = session.NewHandler(context.Background(), config.Config{}, stor, ps, ps)
+				handler = session.NewHandler(context.Background(), config.Config{}, stor, ps, ps, &fakeMetrics{})
 			)
 
 			defer func() { _ = stor.Close(); _ = ps.Close() }()

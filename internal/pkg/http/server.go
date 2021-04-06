@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
@@ -66,9 +69,11 @@ func (s *Server) Register(
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
 ) error {
+	registry := metrics.NewRegistry()
+
 	s.registerGlobalMiddlewares()
 
-	if err := s.registerHandlers(ctx, cfg, stor, pub, sub, publicDir, rdb); err != nil {
+	if err := s.registerHandlers(ctx, cfg, stor, pub, sub, publicDir, rdb, registry); err != nil {
 		return err
 	}
 
@@ -95,14 +100,19 @@ func (s *Server) registerHandlers(
 	sub pubsub.Subscriber,
 	publicDir string,
 	rdb *redis.Client,
+	registry *prometheus.Registry,
 ) error {
-	if err := s.registerWebHookHandlers(ctx, cfg, stor, pub); err != nil {
+	if err := s.registerWebHookHandlers(ctx, cfg, stor, pub, registry); err != nil {
 		return err
 	}
 
 	s.registerAPIHandlers(cfg, stor, pub)
-	s.registerWebsocketHandlers(ctx, cfg, stor, pub, sub)
-	s.registerServiceHandlers(ctx, rdb)
+
+	if err := s.registerWebsocketHandlers(ctx, cfg, stor, pub, sub, registry); err != nil {
+		return err
+	}
+
+	s.registerServiceHandlers(ctx, rdb, registry)
 
 	if publicDir != "" {
 		if err := s.registerFileServerHandler(publicDir); err != nil {
