@@ -39,7 +39,7 @@ jobs:
         uses: zricethezav/gitleaks-action@v1.5.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
 
   eslint:
-    name: Unit tests
+    name: ESLint
     runs-on: ubuntu-20.04
     steps:
       - name: Set up NodeJS
@@ -65,7 +65,7 @@ jobs:
         run: yarn install
 
       - name: Run ESLint
-        run: eslint ./web --ext .js,.vue
+        run: ./node_modules/.bin/eslint ./web --ext .js,.vue
 
   go-test:
     name: Unit tests
