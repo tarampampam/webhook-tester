@@ -26,7 +26,7 @@ func TestMiddleware(t *testing.T) {
 				panic(errors.New("foo error"))
 			}),
 			giveRequest: func() *http.Request {
-				rq, _ := http.NewRequest(http.MethodGet, "http://testing/foo/bar", nil)
+				rq, _ := http.NewRequest(http.MethodGet, "http://testing/foo/bar", http.NoBody)
 
 				return rq
 			},
@@ -56,7 +56,7 @@ func TestMiddleware(t *testing.T) {
 				panic("bar error")
 			}),
 			giveRequest: func() *http.Request {
-				rq, _ := http.NewRequest(http.MethodGet, "http://testing/foo/bar", nil)
+				rq, _ := http.NewRequest(http.MethodGet, "http://testing/foo/bar", http.NoBody)
 
 				return rq
 			},

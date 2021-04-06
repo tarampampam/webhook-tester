@@ -44,12 +44,12 @@ func TestFlags(t *testing.T) {
 		{giveName: "max-requests", wantShorthand: "", wantDefault: "128"},
 		{giveName: "session-ttl", wantShorthand: "", wantDefault: "168h0m0s"},
 		{giveName: "ignore-header-prefix", wantShorthand: "", wantDefault: "[]"},
+		{giveName: "max-request-body-size", wantShorthand: "", wantDefault: "65536"},
 		{giveName: "redis-dsn", wantShorthand: "", wantDefault: "redis://127.0.0.1:6379/0"},
-		{giveName: "broadcast-driver", wantShorthand: "", wantDefault: "none"},
-		{giveName: "pusher-app-id", wantShorthand: "", wantDefault: ""},
-		{giveName: "pusher-key", wantShorthand: "", wantDefault: ""},
-		{giveName: "pusher-secret", wantShorthand: "", wantDefault: ""},
-		{giveName: "pusher-cluster", wantShorthand: "", wantDefault: "eu"},
+		{giveName: "storage-driver", wantShorthand: "", wantDefault: "memory"},
+		{giveName: "pubsub-driver", wantShorthand: "", wantDefault: "memory"},
+		{giveName: "ws-max-clients", wantShorthand: "", wantDefault: "0"},
+		{giveName: "ws-max-lifetime", wantShorthand: "", wantDefault: "0s"},
 	}
 
 	for _, tt := range cases {
@@ -163,21 +163,30 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			wantErrorStrings: []string{"unsupported storage driver", "barbaz"},
 		},
 		{
-			name: "Broadcast Driver Flag Wrong Argument",
+			name: "PubSub Driver Flag Wrong Argument",
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "foobar",
+				"--pubsub-driver", "foobar",
 			},
-			wantErrorStrings: []string{"unsupported broadcast driver", "foobar"},
+			wantErrorStrings: []string{"unsupported pub/sub driver", "foobar"},
 		},
 		{
-			name:    "Broadcast Driver Flag Wrong Env Value",
-			giveEnv: map[string]string{"BROADCAST_DRIVER": "barbaz"},
+			name:    "PubSub Driver Flag Wrong Env Value",
+			giveEnv: map[string]string{"PUBSUB_DRIVER": "barbaz"},
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "foobar",
+				"--pubsub-driver", "foobar",
 			},
-			wantErrorStrings: []string{"unsupported broadcast driver", "barbaz"},
+			wantErrorStrings: []string{"unsupported pub/sub driver", "barbaz"},
+		},
+		{
+			name: "PubSub Redis Driver Flag With Wrong Redis DSN",
+			giveArgs: []string{
+				"--public", "",
+				"--pubsub-driver", "redis",
+				"--redis-dsn", "foo://bar",
+			},
+			wantErrorStrings: []string{"wrong redis DSN", "foo://bar"},
 		},
 		{
 			name: "Redis DSN Flag Wrong Argument",
@@ -233,104 +242,38 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			wantErrorStrings: []string{"wrong session lifetime", "2d"},
 		},
 		{
-			name: "Pusher App ID Flag Wrong Argument",
+			name: "Maximal Websocket Clients Flag Wrong Argument",
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "", // empty
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "foo_cluster",
+				"--ws-max-clients", "-111",
 			},
-			wantErrorStrings: []string{"pusher application ID does not set"},
+			wantErrorStrings: []string{"invalid argument", "-111", "ws-max-clients"},
 		},
 		{
-			name:    "Pusher App ID Flag Wrong Env Value",
-			giveEnv: map[string]string{"PUSHER_APP_ID": ""}, // empty
+			name:    "Maximal Websocket Clients Flag Wrong Env Value",
+			giveEnv: map[string]string{"WS_MAX_CLIENTS": "-111"},
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "foo_cluster",
+				"--ws-max-clients", "123", // correct value
 			},
-			wantErrorStrings: []string{"pusher application ID does not set"},
+			wantErrorStrings: []string{"wrong maximal websocket clients count", "-111"},
 		},
 		{
-			name: "Pusher App Key Flag Wrong Argument",
+			name: "Maximal Websocket TTL Flag Wrong Argument",
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "", // empty
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "foo_cluster",
+				"--ws-max-lifetime", "2d",
 			},
-			wantErrorStrings: []string{"pusher key does not set"},
+			wantErrorStrings: []string{"invalid argument", "2d", "ws-max-lifetime"},
 		},
 		{
-			name:    "Pusher App Key Flag Wrong Env Value",
-			giveEnv: map[string]string{"PUSHER_KEY": ""}, // empty
+			name:    "Maximal Websocket TTL Flag Wrong Env Value",
+			giveEnv: map[string]string{"WS_MAX_LIFETIME": "2d"},
 			giveArgs: []string{
 				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key", // NOT empty
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "foo_cluster",
+				"--ws-max-lifetime", "1h", // correct value
 			},
-			wantErrorStrings: []string{"pusher key does not set"},
-		},
-		{
-			name: "Pusher App Secret Flag Wrong Argument",
-			giveArgs: []string{
-				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "", // empty
-				"--pusher-cluster", "foo_cluster",
-			},
-			wantErrorStrings: []string{"pusher secret does not set"},
-		},
-		{
-			name:    "Pusher App Secret Flag Wrong Env Value",
-			giveEnv: map[string]string{"PUSHER_SECRET": ""}, // empty
-			giveArgs: []string{
-				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "foo_secret", // NOT empty
-				"--pusher-cluster", "foo_cluster",
-			},
-			wantErrorStrings: []string{"pusher secret does not set"},
-		},
-		{
-			name: "Pusher App Cluster Flag Wrong Argument",
-			giveArgs: []string{
-				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "", // empty
-			},
-			wantErrorStrings: []string{"pusher cluster does not set"},
-		},
-		{
-			name:    "Pusher App Cluster Flag Wrong Env Value",
-			giveEnv: map[string]string{"PUSHER_CLUSTER": ""}, // empty
-			giveArgs: []string{
-				"--public", "",
-				"--broadcast-driver", "pusher",
-				"--pusher-app-id", "foo_app_id",
-				"--pusher-key", "foo_key",
-				"--pusher-secret", "foo_secret",
-				"--pusher-cluster", "foo_cluster", // NOT empty
-			},
-			wantErrorStrings: []string{"pusher cluster does not set"},
+			wantErrorStrings: []string{"wrong maximal single websocket lifetime", "2d"},
 		},
 	} {
 		tt := tt
@@ -452,29 +395,7 @@ func startAndStopServer(t *testing.T, port int, args []string) string {
 	return output
 }
 
-func TestSuccessfulCommandRunningUsingDefaultBroadcastDriver(t *testing.T) {
-	// get TCP port number for a test
-	port, err := getRandomTCPPort(t)
-	assert.NoError(t, err)
-
-	// start mini-redis
-	mini, err := miniredis.Run()
-	assert.NoError(t, err)
-
-	defer mini.Close()
-
-	output := startAndStopServer(t, port, []string{
-		"--public", "",
-		"--port", strconv.Itoa(port),
-		"--redis-dsn", fmt.Sprintf("redis://127.0.0.1:%s/0", mini.Port()),
-	})
-
-	assert.Contains(t, output, "Server starting")
-	assert.Contains(t, output, "Stopping by OS signal")
-	assert.Contains(t, output, "Server stopping")
-}
-
-func TestSuccessfulCommandRunningUsingRedisStorageAndPusherBroadcastDriver(t *testing.T) {
+func TestSuccessfulCommandRunningUsingRedisDrivers(t *testing.T) {
 	// get TCP port number for a test
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
@@ -489,12 +410,8 @@ func TestSuccessfulCommandRunningUsingRedisStorageAndPusherBroadcastDriver(t *te
 		"--public", "",
 		"--port", strconv.Itoa(port),
 		"--storage-driver", "redis",
+		"--pubsub-driver", "redis",
 		"--redis-dsn", fmt.Sprintf("redis://127.0.0.1:%s/0", mini.Port()),
-		"--broadcast-driver", "pusher",
-		"--pusher-app-id", "foo_app_id",
-		"--pusher-key", "foo_key",
-		"--pusher-secret", "foo_secret",
-		"--pusher-cluster", "foo_cluster",
 	})
 
 	assert.Contains(t, output, "Server starting")
@@ -502,15 +419,23 @@ func TestSuccessfulCommandRunningUsingRedisStorageAndPusherBroadcastDriver(t *te
 	assert.Contains(t, output, "Server stopping")
 }
 
-func TestSuccessfulCommandRunningUsingMemoryStorageAndNoneBroadcastDriver(t *testing.T) {
+func TestSuccessfulCommandRunningUsingMemoryDrivers(t *testing.T) {
 	// get TCP port number for a test
 	port, err := getRandomTCPPort(t)
 	assert.NoError(t, err)
 
+	// start mini-redis
+	mini, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	defer mini.Close()
+
 	output := startAndStopServer(t, port, []string{
 		"--public", "",
 		"--port", strconv.Itoa(port),
-		"--broadcast-driver", "none",
+		"--storage-driver", "memory",
+		"--pubsub-driver", "memory",
+		"--redis-dsn", fmt.Sprintf("redis://127.0.0.1:%s/0", mini.Port()),
 	})
 
 	assert.Contains(t, output, "Server starting")
@@ -540,6 +465,8 @@ func TestRunningUsingBusyPortFailing(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--public", "",
 		"--port", strconv.Itoa(port),
+		"--storage-driver", "redis",
+		"--pubsub-driver", "redis",
 		"--redis-dsn", fmt.Sprintf("redis://127.0.0.1:%s/0", mini.Port()),
 	})
 

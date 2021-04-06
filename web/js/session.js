@@ -1,5 +1,7 @@
 'use strict';
 
+/* global define */
+
 define([], () => {
     /**
      * @type {String}

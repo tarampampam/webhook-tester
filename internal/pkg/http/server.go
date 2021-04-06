@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"mime"
 	"net/http"
 	"strconv"
@@ -10,25 +9,19 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/panic"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
-
-type broadcaster interface {
-	Publish(channel string, event broadcast.Event) error
-}
 
 type (
 	Server struct {
 		log    *zap.Logger
 		server *http.Server
 		router *mux.Router
-
-		afterShutdown []func()
 	}
 )
 
@@ -50,14 +43,11 @@ func NewServer(log *zap.Logger) *Server {
 	)
 
 	return &Server{
-		log:           log,
-		server:        httpServer,
-		router:        router,
-		afterShutdown: make([]func(), 0, 1),
+		log:    log,
+		server: httpServer,
+		router: router,
 	}
 }
-
-func (s *Server) addOnShutdown(f func()) { s.afterShutdown = append(s.afterShutdown, f) }
 
 // Start server.
 func (s *Server) Start(ip string, port uint16) error {
@@ -67,36 +57,18 @@ func (s *Server) Start(ip string, port uint16) error {
 }
 
 // Register server routes, middlewares, etc.
-func (s *Server) Register(ctx context.Context, cfg config.Config, publicDir string, rdb *redis.Client) error {
-	var br broadcaster
-
-	switch cfg.BroadcastDriver {
-	case config.BroadcastDriverPusher:
-		br = broadcast.NewPusher(cfg.Pusher.AppID, cfg.Pusher.Key, cfg.Pusher.Secret, cfg.Pusher.Cluster)
-	case config.BroadcastDriverNone:
-		br = &broadcast.None{}
-	default:
-		return errors.New("unsupported broadcast driver")
-	}
-
-	var stor storage.Storage
-
-	switch cfg.StorageDriver {
-	case config.StorageDriverRedis:
-		stor = storage.NewRedisStorage(ctx, rdb, cfg.SessionTTL, cfg.MaxRequests)
-	case config.StorageDriverMemory:
-		inmemory := storage.NewInMemoryStorage(cfg.SessionTTL, cfg.MaxRequests)
-
-		s.addOnShutdown(func() { _ = inmemory.Close() })
-
-		stor = inmemory
-	default:
-		return errors.New("unsupported storage driver")
-	}
-
+func (s *Server) Register(
+	ctx context.Context,
+	cfg config.Config,
+	publicDir string,
+	rdb *redis.Client,
+	stor storage.Storage,
+	pub pubsub.Publisher,
+	sub pubsub.Subscriber,
+) error {
 	s.registerGlobalMiddlewares()
 
-	if err := s.registerHandlers(ctx, cfg, stor, br, publicDir, rdb); err != nil {
+	if err := s.registerHandlers(ctx, cfg, stor, pub, sub, publicDir, rdb); err != nil {
 		return err
 	}
 
@@ -118,16 +90,18 @@ func (s *Server) registerGlobalMiddlewares() {
 func (s *Server) registerHandlers(
 	ctx context.Context,
 	cfg config.Config,
-	storage storage.Storage,
-	br broadcaster,
+	stor storage.Storage,
+	pub pubsub.Publisher,
+	sub pubsub.Subscriber,
 	publicDir string,
 	rdb *redis.Client,
 ) error {
-	if err := s.registerWebHookHandlers(ctx, cfg, storage, br); err != nil {
+	if err := s.registerWebHookHandlers(ctx, cfg, stor, pub); err != nil {
 		return err
 	}
 
-	s.registerAPIHandlers(cfg, storage, br)
+	s.registerAPIHandlers(cfg, stor, pub)
+	s.registerWebsocketHandlers(ctx, cfg, stor, pub, sub)
 	s.registerServiceHandlers(ctx, rdb)
 
 	if publicDir != "" {
@@ -141,16 +115,8 @@ func (s *Server) registerHandlers(
 
 // registerCustomMimeTypes registers custom mime types.
 func (*Server) registerCustomMimeTypes() error {
-	return mime.AddExtensionType(".vue", "text/html; charset=utf-8")
+	return mime.AddExtensionType(".vue", "text/html; charset=utf-8") // this is my whim :)
 }
 
 // Stop server.
-func (s *Server) Stop(ctx context.Context) error {
-	defer func() {
-		for i := 0; i < len(s.afterShutdown); i++ {
-			s.afterShutdown[i]()
-		}
-	}()
-
-	return s.server.Shutdown(ctx)
-}
+func (s *Server) Stop(ctx context.Context) error { return s.server.Shutdown(ctx) }

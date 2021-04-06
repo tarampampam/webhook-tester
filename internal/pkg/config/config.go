@@ -2,14 +2,14 @@ package config
 
 import "time"
 
-type broadcastDriver string
+type pubSubDriver string
 
 const (
-	BroadcastDriverNone   broadcastDriver = "none"
-	BroadcastDriverPusher broadcastDriver = "pusher"
+	PubSubDriverMemory pubSubDriver = "memory"
+	PubSubDriverRedis  pubSubDriver = "redis"
 )
 
-func (d broadcastDriver) String() string { return string(d) }
+func (d pubSubDriver) String() string { return string(d) }
 
 type storageDriver string
 
@@ -24,15 +24,13 @@ type Config struct {
 	MaxRequests          uint16
 	SessionTTL           time.Duration
 	IgnoreHeaderPrefixes []string
-	MaxRequestBodySize   uint32 // maximal webhook request body size (in bytes)
+	MaxRequestBodySize   uint32 // maximal webhook request body size (in bytes), zero means unlimited
 
-	StorageDriver   storageDriver
-	BroadcastDriver broadcastDriver
+	StorageDriver storageDriver
+	PubSubDriver  pubSubDriver
 
-	Pusher struct {
-		AppID   string
-		Key     string
-		Secret  string
-		Cluster string
+	WebSockets struct {
+		MaxClients  uint32        // zero means unlimited
+		MaxLifetime time.Duration // zero means unlimited
 	}
 }
