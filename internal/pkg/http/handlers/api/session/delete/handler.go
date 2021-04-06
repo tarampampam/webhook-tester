@@ -34,7 +34,7 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 		}
 
 		// and recorded session requests
-		if _, err := storage.DeleteRequests(sessionUUID); err != nil { // TODO delete requests first and ignore error?
+		if _, err := storage.DeleteRequests(sessionUUID); err != nil {
 			responder.JSON(w, api.NewServerError(http.StatusInternalServerError, err.Error()))
 
 			return

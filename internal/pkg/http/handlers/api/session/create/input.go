@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -59,7 +60,6 @@ func (in input) Validate() error {
 	const (
 		minStatusCode, maxStatusCode = 100, 530
 		maxContentTypeLength         = 32
-		maxResponseDelay             = time.Second * 30
 		maxResponseContentLength     = 10240
 	)
 
@@ -67,7 +67,7 @@ func (in input) Validate() error {
 		return errors.New("wrong status code")
 	}
 
-	if len(in.ContentType) > maxContentTypeLength {
+	if utf8.RuneCountInString(in.ContentType) > maxContentTypeLength {
 		return errors.New("content-type value is too large")
 	}
 
@@ -75,7 +75,7 @@ func (in input) Validate() error {
 		return errors.New("delay is too much")
 	}
 
-	if len(in.ResponseContent) > maxResponseContentLength {
+	if utf8.RuneCountInString(in.ResponseContent) > maxResponseContentLength {
 		return errors.New("response content is too large")
 	}
 

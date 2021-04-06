@@ -44,7 +44,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 10)
+			s := storage.NewInMemory(time.Minute, 10)
 			defer s.Close()
 
 			var (
@@ -69,7 +69,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -101,7 +101,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	runtime.Gosched()
-	<-time.After(time.Millisecond) // FIXME goroutine must be done
+	<-time.After(time.Millisecond) // goroutine must be done
 
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 

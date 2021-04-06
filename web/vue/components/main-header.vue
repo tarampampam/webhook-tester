@@ -112,6 +112,7 @@
                                            class="form-control w-100"
                                            id="default-status-code"
                                            placeholder="200"
+                                           title="Between 100 and 530"
                                            v-model="newUrlData.statusCode">
                                 </div>
                             </div>
@@ -126,6 +127,7 @@
                                            class="form-control w-100"
                                            id="content-type"
                                            placeholder="text/plain"
+                                           title="application/json for example, maximal length is 32"
                                            v-model="newUrlData.contentType">
                                 </div>
                             </div>
@@ -137,9 +139,11 @@
                                            autocomplete="off"
                                            min="0"
                                            max="30"
+                                           maxlength="2"
                                            class="form-control w-100"
                                            id="response-delay"
                                            placeholder="0"
+                                           title="Between 0 and 30"
                                            v-model="newUrlData.responseDelay">
                                 </div>
                             </div>
@@ -151,7 +155,7 @@
                                               class="form-control w-100"
                                               id="response-body"
                                               rows="3"
-                                              maxlength="2048"
+                                              maxlength="10240"
                                               placeholder=""
                                               v-model="newUrlData.responseBody"></textarea>
                                 </div>

@@ -39,7 +39,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 1)
+			s := storage.NewInMemory(time.Minute, 1)
 			defer s.Close()
 
 			var (
@@ -61,7 +61,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -92,7 +92,7 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	runtime.Gosched()
-	<-time.After(time.Millisecond) // FIXME goroutine must be done
+	<-time.After(time.Millisecond) // goroutine must be done
 
 	assert.JSONEq(t, `[{
 		"client_address":"1.2.2.1",
@@ -106,7 +106,7 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
-	s := storage.NewInMemoryStorage(time.Minute, 3)
+	s := storage.NewInMemory(time.Minute, 3)
 	defer s.Close()
 
 	var (
@@ -167,7 +167,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 	handler.ServeHTTP(rr, req)
 
 	runtime.Gosched()
-	<-time.After(time.Millisecond) // FIXME goroutine must be done
+	<-time.After(time.Millisecond) // goroutine must be done
 
 	assert.JSONEq(t, `[{
 		"client_address":"1.1.1.1",

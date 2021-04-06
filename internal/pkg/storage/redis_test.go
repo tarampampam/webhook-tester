@@ -11,13 +11,13 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
-func TestRedisStorage_SessionCreateReadDelete(t *testing.T) {
+func TestRedis_SessionCreateReadDelete(t *testing.T) {
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
 	defer mini.Close()
 
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
+	s := storage.NewRedis(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 1)
 
 	sessionUUID, creationErr := s.CreateSession("foo bar", 201, "text/javascript", time.Second*123)
 	assert.NoError(t, creationErr)
@@ -49,13 +49,13 @@ func TestRedisStorage_SessionCreateReadDelete(t *testing.T) {
 	assert.NoError(t, gotSessionAgainErr)
 }
 
-func TestRedisStorage_RequestCreateReadDelete(t *testing.T) {
+func TestRedis_RequestCreateReadDelete(t *testing.T) {
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
 	defer mini.Close()
 
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedis(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.Nil(t, sessionCreationErr)
@@ -98,13 +98,13 @@ func TestRedisStorage_RequestCreateReadDelete(t *testing.T) {
 	assert.NoError(t, nowNoRequestErr)
 }
 
-func TestRedisStorage_RequestCreationLimit(t *testing.T) {
+func TestRedis_RequestCreationLimit(t *testing.T) {
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
 	defer mini.Close()
 
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 2)
+	s := storage.NewRedis(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 2)
 
 	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
 
@@ -128,13 +128,13 @@ func TestRedisStorage_RequestCreationLimit(t *testing.T) {
 	assert.Equal(t, "3.3.3.3", requests[1].ClientAddr())
 }
 
-func TestRedisStorage_GetAllRequests(t *testing.T) {
+func TestRedis_GetAllRequests(t *testing.T) {
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
 	defer mini.Close()
 
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedis(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)
@@ -157,13 +157,13 @@ func TestRedisStorage_GetAllRequests(t *testing.T) {
 	assert.Equal(t, "1.2.3.4", requests[0].ClientAddr())
 }
 
-func TestRedisStorage_DeleteRequests(t *testing.T) {
+func TestRedis_DeleteRequests(t *testing.T) {
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
 	defer mini.Close()
 
-	s := storage.NewRedisStorage(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
+	s := storage.NewRedis(context.TODO(), redis.NewClient(&redis.Options{Addr: mini.Addr()}), time.Minute, 10)
 
 	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)

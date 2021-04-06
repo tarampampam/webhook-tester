@@ -29,7 +29,7 @@ func (f *fakeMetrics) IncrementProcessedWebHooks() { f.c++ }
 func BenchmarkHandler_ServeHTTP(b *testing.B) {
 	b.ReportAllocs()
 
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -99,7 +99,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewInMemoryStorage(time.Minute, 10)
+			s := storage.NewInMemory(time.Minute, 10)
 			defer s.Close()
 
 			var (
@@ -129,7 +129,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccess(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -188,7 +188,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -220,7 +220,7 @@ func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -252,7 +252,7 @@ func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPDelay(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	var (
@@ -290,7 +290,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 }
 
 func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
-	s := storage.NewInMemoryStorage(time.Minute, 10)
+	s := storage.NewInMemory(time.Minute, 10)
 	defer s.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())

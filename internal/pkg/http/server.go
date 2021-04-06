@@ -29,8 +29,11 @@ type (
 )
 
 const (
-	defaultReadTimeout  = time.Second * 5
-	defaultWriteTimeout = time.Second * 15
+	readTimeout = time.Second * 5
+
+	// IMPORTANT! Must be grater then
+	// github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/api/session/create.maxResponseDelay value!
+	writeTimeout = time.Second * 31
 )
 
 // NewServer creates new server instance.
@@ -40,8 +43,8 @@ func NewServer(log *zap.Logger) *Server {
 		httpServer = &http.Server{
 			Handler:      router,
 			ErrorLog:     zap.NewStdLog(log),
-			ReadTimeout:  defaultReadTimeout,
-			WriteTimeout: defaultWriteTimeout, // TODO check with large webhook response delay
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
 		}
 	)
 
