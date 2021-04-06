@@ -65,7 +65,8 @@
                         <p>
                             You can bookmark this page to go back to the request contents at any time. Requests and the
                             tokens for the URL expire <strong>after {{ sessionLifetimeDays }}</strong> days of not being
-                            used.
+                            used. <span v-if="maxBodySizeBytes > 0">Maximal size for incoming requests is
+                            {{ maxBodySizeKb }} KiB.</span>
                         </p>
                     </div>
                     <div class="modal-footer">
@@ -203,6 +204,10 @@
                 type: Number,
                 default: null,
             },
+            maxBodySizeBytes: {
+                type: Number,
+                default: null,
+            },
             version: {
                 type: String,
                 default: 'unknown',
@@ -228,6 +233,14 @@
             sessionLifetimeDays: function () {
                 if (typeof this.sessionLifetimeSec === 'number') {
                     return Number((this.sessionLifetimeSec / 24 / 60 / 60).toFixed(1));
+                }
+
+                return 0;
+            },
+
+            maxBodySizeKb: function (){
+                if (typeof this.maxBodySizeBytes === 'number') {
+                    return Number((this.maxBodySizeBytes / 1024).toFixed(1));
                 }
 
                 return 0;
