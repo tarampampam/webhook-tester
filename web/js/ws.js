@@ -1,5 +1,7 @@
 'use strict';
 
+/* global define */
+
 define(['reconnectingWebsocket'], (rws) => {
     /**
      * @returns {String}

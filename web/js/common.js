@@ -1,5 +1,7 @@
 'use strict';
 
+/* global requirejs */
+
 requirejs.config({
     baseUrl: 'js',
     paths: {

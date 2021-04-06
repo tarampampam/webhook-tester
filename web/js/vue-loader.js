@@ -1,5 +1,7 @@
 'use strict';
 
+/* global define */
+
 define(['axios', 'httpVueLoader', 'Vue'], (axios, httpVueLoader, Vue) => {
     // @link <https://github.com/FranckFreiburger/http-vue-loader/#api>
     httpVueLoader.httpRequest = (url) => {

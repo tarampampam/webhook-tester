@@ -1,5 +1,6 @@
 'use strict';
 
+/* global define */
 /** @typedef {Vue} Vue */
 /** @typedef {Object} httpVueLoader */
 
@@ -17,9 +18,9 @@ define(
         const clip = new clipboard('.btn');
 
         // <https://clipboardjs.com/#events>
-        clip.on('error', function (e) {
+        clip.on('error', () => {
             izitoast.error({title: 'Copying error!', icon: 'fas fa-times'});
-        }).on('success', function (e) {
+        }).on('success', (e) => {
             izitoast.success({title: 'Copied!', message: e.text, icon: 'fas fa-copy', timeout: 4000});
             e.clearSelection();
         });

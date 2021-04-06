@@ -197,7 +197,7 @@
             requestContent: function () {
                 const request = this.getRequestByUUID(this.requestUUID);
 
-                if (typeof request === 'object' && request.hasOwnProperty('content') && request.content !== '') {
+                if (typeof request === 'object' && Object.prototype.hasOwnProperty.call(request, "content") && request.content !== '') {
                     return request.content;
                 }
 
@@ -224,7 +224,7 @@
                             sessionUUID: this.sessionUUID,
                             requestUUID: this.requestUUID,
                         }
-                    }).catch((err) => {
+                    }).catch(() => {
                         // do nothing
                     });
                 }
