@@ -69,6 +69,7 @@
         <div class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0" v-if="this.request.headers">
             <h4>Headers</h4>
             <div v-for="(header) in this.request.headers"
+                 :key="header.name"
                  class="row pb-1">
                 <div class="col-lg-4 col-xl-3 text-lg-right">
                     {{ header.name }}

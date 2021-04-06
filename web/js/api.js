@@ -1,5 +1,7 @@
 'use strict';
 
+/* global define */
+
 define(['axios'], (axios) => {
     /**
      * @returns {String}
@@ -16,7 +18,7 @@ define(['axios'], (axios) => {
     };
 
     /**
-     * @returns {Promise<APISettings>}
+     * @returns {Promise<APIVersion>}
      */
     const getAppVersion = () => {
         return new Promise((resolve, reject) => {

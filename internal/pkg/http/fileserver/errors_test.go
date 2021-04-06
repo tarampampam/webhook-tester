@@ -32,13 +32,13 @@ func TestJSONErrorHandler(t *testing.T) {
 	handler := JSONErrorHandler()
 
 	var (
-		req, _ = http.NewRequest(http.MethodGet, "", nil)
+		req, _ = http.NewRequest(http.MethodGet, "", http.NoBody)
 		rr     = httptest.NewRecorder()
 	)
 
 	assert.False(t, handler(rr, req, fs, http.StatusNotFound))
 
-	req, _ = http.NewRequest(http.MethodGet, "", nil)
+	req, _ = http.NewRequest(http.MethodGet, "", http.NoBody)
 	req.Header.Add("Accept", "application/json")
 
 	rr = httptest.NewRecorder()
@@ -60,7 +60,7 @@ func TestStaticHtmlPageErrorHandler(t *testing.T) {
 	handler := StaticHTMLPageErrorHandler()
 
 	var (
-		req, _ = http.NewRequest(http.MethodGet, "", nil)
+		req, _ = http.NewRequest(http.MethodGet, "", http.NoBody)
 		rr     = httptest.NewRecorder()
 	)
 
@@ -73,7 +73,7 @@ func TestStaticHtmlPageErrorHandler(t *testing.T) {
 
 	fs.Settings.ErrorFileName = "error.html"
 
-	req, _ = http.NewRequest(http.MethodGet, "", nil)
+	req, _ = http.NewRequest(http.MethodGet, "", http.NoBody)
 	rr = httptest.NewRecorder()
 
 	assert.True(t, handler(rr, req, fs, http.StatusBadGateway))

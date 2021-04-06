@@ -1,17 +1,19 @@
 /**
+ * @internal
+ *
  * This interfaces is used only for correct IDE type-hinting.
  */
 
 export interface APISettings {
-    version: string
-    pusher: {
-        key: string
-        cluster: string
-    }
     limits: {
         session_lifetime_sec: number
         max_requests: number
+        max_webhook_body_size: number
     }
+}
+
+export interface APIVersion {
+    version: string
 }
 
 export interface APIDeleteSession {

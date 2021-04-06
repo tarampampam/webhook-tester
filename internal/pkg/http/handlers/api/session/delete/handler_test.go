@@ -63,7 +63,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			assert.NoError(t, err)
 
 			var (
-				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
+				req, _  = http.NewRequest(http.MethodPost, "http://testing", http.NoBody)
 				rr      = httptest.NewRecorder()
 				handler = delete.NewHandler(s)
 			)

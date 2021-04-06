@@ -1,5 +1,7 @@
 'use strict';
 
+/* global define, hljs */
+
 define(['Vue', 'hljs'], (Vue) => {
     // <https://vuejsfeed.com/blog/vue-js-syntax-highlighting-with-highlight-js>
     Vue.directive('highlightjs', {
