@@ -1,6 +1,9 @@
 # Docs: <https://docs.codecov.io/docs/commit-status>
 
 coverage:
+  # coverage lower than 50 is red, higher than 90 green
+  range: 30..80
+
   status:
     project:
       default:
