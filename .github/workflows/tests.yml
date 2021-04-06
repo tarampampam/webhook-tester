@@ -65,7 +65,14 @@ jobs:
         run: yarn install
 
       - name: Run ESLint
-        run: ./node_modules/.bin/eslint ./web --ext .js,.vue
+        run: ./node_modules/.bin/eslint --output-file eslint_report.json --format json --ext .js,.vue ./web
+
+      - name: Annotate Code Linting Results
+        uses: ataylorme/eslint-annotate-action@1.1.2
+        if: always()
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          report-json: eslint_report.json
 
   go-test:
     name: Unit tests

@@ -160,7 +160,7 @@
         created() {
             this.$api.getAppVersion()
                 .then((ver) => this.appVersion = ver.version);
-
+foo();
             this.$api.getAppSettings()
                 .then((settings) => {
                     this.maxRequests = settings.limits.max_requests;
