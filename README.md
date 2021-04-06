@@ -19,9 +19,13 @@ With this application you instantly get a unique, random URL that you can use to
 
 ### Dependencies
 
+_WIP_
+
 All what you need to start this application - is a [redis server](https://redis.io/), which is running on your host or in docker container.
 
 ## Starting
+
+_WIP_
 
 Download compiled application from [releases page][link_releases] _(also you will need to download `./web` directory from this repository)_ or compile from sources and run it locally:
 
@@ -66,11 +70,9 @@ All supported image tags [can be found here][link_docker_tags].
 
 All supported `serve` command flags can be found by running `docker run --rm -t tarampampam/webhook-tester serve -h`.
 
-#### Pusher.com
-
-For incoming webhook notifications without index page refreshing, you can setup `pusher.com` as websocket provider. For this - [register new app](https://dashboard.pusher.com/channels) and start serving with following arguments: `./webhook-tester serve ... --pusher-app-id=YOUR_APP_ID --pusher-key=YOUR_KEY --pusher-secret=YOUR_SECRET --pusher-cluster=YOUR_CLUSTER`.
-
 ### Allowed environment variables
+
+_WIP_
 
 Variable name    | Description
 :--------------: | :---------:

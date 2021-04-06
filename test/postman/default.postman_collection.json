@@ -775,11 +775,7 @@
 									"pm.test('JSON object has correct structure', () => {\r",
 									"    var data = pm.response.json()\r",
 									"\r",
-									"    pm.expect(data).to.have.all.keys('broadcast_driver', 'pusher', 'limits')\r",
-									"\r",
-									"    pm.expect(data.pusher).to.have.all.keys('key', 'cluster')\r",
-									"    pm.expect(data.pusher.key).to.be.a('string')\r",
-									"    pm.expect(data.pusher.cluster).to.be.a('string')\r",
+									"    pm.expect(data).to.have.all.keys('limits')\r",
 									"\r",
 									"    pm.expect(data.limits).to.have.all.keys('max_requests', 'max_webhook_body_size', 'session_lifetime_sec')\r",
 									"    pm.expect(data.limits.max_requests).to.be.a('number')\r",
@@ -886,6 +882,26 @@
 					"item": [
 						{
 							"name": "Webhook",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
 							"request": {
 								"method": "GET",
 								"header": [],
@@ -1857,6 +1873,15 @@
 								],
 								"type": "text/javascript"
 							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
 						}
 					],
 					"request": {
@@ -1905,7 +1930,8 @@
 							"        pm.expect(res.code).to.equal(200)",
 							"        pm.collectionVariables.set('webhooksSessionUUID', res.json().uuid)",
 							"    });",
-							"}"
+							"}",
+							""
 						]
 					}
 				},
@@ -1939,13 +1965,6 @@
 					""
 				]
 			}
-		}
-	],
-	"variable": [
-		{
-			"id": "84cda07f-2942-48f1-b122-ec1d7964e0ec",
-			"key": "webhooksSessionUUID",
-			"value": ""
 		}
 	]
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +47,7 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 const serverShutdownTimeout = 5 * time.Second
 
 // run current command.
-func run( //nolint:funlen
+func run( //nolint:funlen,gocyclo
 	parentCtx context.Context,
 	log *zap.Logger,
 	cfg config.Config,
@@ -71,16 +73,16 @@ func run( //nolint:funlen
 		oss.Stop() // stop system signals listening
 	}()
 
-	var rdb *redis.Client // vam be nil, this is ok
+	var rdb *redis.Client // can be nil, that's ok
 
-	// establish connection with redis server, if this action is required (based on storage driver)
-	if cfg.StorageDriver == config.StorageDriverRedis {
+	// establish connection with the redis server, if this action is required (based on storage/pubsub drivers)
+	if cfg.StorageDriver == config.StorageDriverRedis || cfg.PubSubDriver == config.PubSubDriverRedis {
 		opt, optErr := redis.ParseURL(redisDSN)
 		if optErr != nil {
 			return optErr
 		}
 
-		rdb = redis.NewClient(opt).WithContext(ctx)
+		rdb = redis.NewClient(opt).WithContext(ctx) // TODO set ZAP logger for redis client
 
 		defer func() { _ = rdb.Close() }()
 
@@ -89,11 +91,51 @@ func run( //nolint:funlen
 		}
 	}
 
+	var stor storage.Storage
+
+	// create required storage driver
+	switch cfg.StorageDriver {
+	case config.StorageDriverRedis:
+		stor = storage.NewRedisStorage(ctx, rdb, cfg.SessionTTL, cfg.MaxRequests)
+
+	case config.StorageDriverMemory:
+		inmemory := storage.NewInMemoryStorage(cfg.SessionTTL, cfg.MaxRequests)
+		defer func() { _ = inmemory.Close() }()
+
+		stor = inmemory
+
+	default:
+		return errors.New("unsupported storage driver") // cannot be covered by tests
+	}
+
+	var (
+		pub pubsub.Publisher
+		sub pubsub.Subscriber
+	)
+
+	// create required pub/sub driver
+	switch cfg.PubSubDriver {
+	case config.PubSubDriverRedis:
+		redisPubSub := pubsub.NewRedis(ctx, rdb)
+		defer func() { _ = redisPubSub.Close() }()
+
+		pub, sub = redisPubSub, redisPubSub
+
+	case config.PubSubDriverMemory:
+		memoryPubSub := pubsub.NewInMemory()
+		defer func() { _ = memoryPubSub.Close() }()
+
+		pub, sub = memoryPubSub, memoryPubSub
+
+	default:
+		return errors.New("unsupported pub/sub driver") // cannot be covered by tests
+	}
+
 	// create HTTP server
 	server := appHttp.NewServer(log)
 
 	// register server routes, middlewares, etc.
-	if err := server.Register(ctx, cfg, publicDir, rdb); err != nil {
+	if err := server.Register(ctx, cfg, publicDir, rdb, stor, pub, sub); err != nil {
 		return err
 	}
 
@@ -111,7 +153,9 @@ func run( //nolint:funlen
 			zap.Duration("session ttl", cfg.SessionTTL),
 			zap.Strings("ignore prefixes", cfg.IgnoreHeaderPrefixes),
 			zap.String("storage driver", cfg.StorageDriver.String()),
-			zap.String("broadcast driver", cfg.BroadcastDriver.String()),
+			zap.String("pub/sub driver", cfg.PubSubDriver.String()),
+			zap.Uint32("max websocket clients", cfg.WebSockets.MaxClients),
+			zap.Duration("single websocket ttl", cfg.WebSockets.MaxLifetime),
 		}
 
 		if cfg.StorageDriver == config.StorageDriverRedis {

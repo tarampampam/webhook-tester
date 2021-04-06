@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/broadcast"
+	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -44,11 +43,13 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			defer s.Close()
 
 			var (
-				req, _  = http.NewRequest(http.MethodPost, "http://test", nil)
+				req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)
 				rr      = httptest.NewRecorder()
-				br      = broadcast.None{}
-				handler = clear.NewHandler(s, &br)
+				ps      = pubsub.NewInMemory()
+				handler = clear.NewHandler(s, ps)
 			)
+
+			defer func() { _ = ps.Close() }()
 
 			if tt.giveReqVars != nil {
 				req = mux.SetURLVars(req, tt.giveReqVars)
@@ -69,23 +70,11 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	var (
 		req, _  = http.NewRequest(http.MethodPost, "http://test", http.NoBody)
 		rr      = httptest.NewRecorder()
-		br      = broadcast.None{}
-		handler = clear.NewHandler(s, &br)
+		ps      = pubsub.NewInMemory()
+		handler = clear.NewHandler(s, ps)
 	)
 
-	var (
-		brChannel string
-		brEvent   broadcast.Event
-		brCount   int
-		brMutex   sync.Mutex
-	)
-
-	br.OnPublish(func(ch string, e broadcast.Event) {
-		brMutex.Lock()
-		brChannel, brEvent = ch, e
-		brCount++
-		brMutex.Unlock()
-	})
+	defer func() { _ = ps.Close() }()
 
 	// create session
 	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
@@ -98,6 +87,10 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, requests, 1) // is not empty
 
+	// subscribe for events
+	eventsCh := make(chan pubsub.Event, 3)
+	assert.NoError(t, ps.Subscribe(sessionUUID, eventsCh))
+
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
 
 	handler.ServeHTTP(rr, req)
@@ -107,11 +100,9 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 
-	brMutex.Lock()
-	assert.Equal(t, 1, brCount)
-	assert.Equal(t, sessionUUID, brChannel)
-	assert.Equal(t, "requests-deleted", brEvent.Name())
-	brMutex.Unlock()
+	e := <-eventsCh
+	assert.Equal(t, "requests-deleted", e.Name())
+	assert.Equal(t, "*", string(e.Data()))
 
 	requests, err = s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)

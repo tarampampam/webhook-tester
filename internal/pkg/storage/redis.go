@@ -11,7 +11,7 @@ import (
 )
 
 // RedisStorage is redis storage implementation.
-type RedisStorage struct {
+type RedisStorage struct { // TODO remove `Storage` postfix
 	ctx         context.Context
 	rdb         *redis.Client
 	ttl         time.Duration

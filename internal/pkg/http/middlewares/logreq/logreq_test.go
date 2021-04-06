@@ -28,7 +28,7 @@ func TestMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusUnsupportedMediaType)
 			}),
 			giveRequest: func() (req *http.Request) {
-				req, _ = http.NewRequest(http.MethodGet, "http://unit/test/?foo=bar&baz", nil)
+				req, _ = http.NewRequest(http.MethodGet, "http://unit/test/?foo=bar&baz", http.NoBody)
 				req.RemoteAddr = "4.3.2.1:567"
 				req.Header.Set("User-Agent", "Foo Useragent")
 
@@ -51,7 +51,7 @@ func TestMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}),
 			giveRequest: func() (req *http.Request) {
-				req, _ = http.NewRequest(http.MethodGet, "http://testing", nil)
+				req, _ = http.NewRequest(http.MethodGet, "http://testing", http.NoBody)
 				req.RemoteAddr = "4.4.4.4:567"
 				req.Header.Set("X-Forwarded-For", "10.0.0.1, 10.0.0.2, 10.0.0.3")
 				req.Header.Set("X-Real-IP", "10.0.1.1")
@@ -69,7 +69,7 @@ func TestMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}),
 			giveRequest: func() (req *http.Request) {
-				req, _ = http.NewRequest(http.MethodGet, "http://testing", nil)
+				req, _ = http.NewRequest(http.MethodGet, "http://testing", http.NoBody)
 				req.RemoteAddr = "8.8.8.8:567"
 				req.Header.Set("X-Forwarded-For", "10.0.0.1, 10.0.0.2, 10.0.0.3")
 				req.Header.Set("X-Real-IP", "10.0.1.1")
@@ -86,7 +86,7 @@ func TestMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}),
 			giveRequest: func() (req *http.Request) {
-				req, _ = http.NewRequest(http.MethodGet, "http://testing", nil)
+				req, _ = http.NewRequest(http.MethodGet, "http://testing", http.NoBody)
 				req.RemoteAddr = "1.2.3.4:567"
 				req.Header.Set("X-Forwarded-For", "10.0.0.1, 10.0.0.2, 10.0.0.3")
 

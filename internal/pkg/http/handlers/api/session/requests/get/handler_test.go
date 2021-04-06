@@ -47,7 +47,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 			defer s.Close()
 
 			var (
-				req, _  = http.NewRequest(http.MethodPost, "http://testing", nil)
+				req, _  = http.NewRequest(http.MethodPost, "http://testing", http.NoBody)
 				rr      = httptest.NewRecorder()
 				handler = get.NewHandler(s)
 			)
