@@ -49,7 +49,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - `serve` sub-command flags:`--redis-host`, `--redis-port`, `--redis-db-num`
 - Environment variables support: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB_NUM`
 - Property `version` from `/api/settings` JSON-object response
-- Pusher support (replaces with pub/sub + websockets)
+- Pusher support (replaced with pub/sub + websockets)
 
 ### Fixed
 
