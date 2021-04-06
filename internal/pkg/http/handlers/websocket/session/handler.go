@@ -59,8 +59,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// extract session UUID from request path
-	sessionUUID, ok := mux.Vars(r)["sessionUUID"]
-	if !ok {
+	sessionUUID, exists := mux.Vars(r)["sessionUUID"]
+	if !exists {
 		http.Error(w, "cannot extract session UUID", http.StatusInternalServerError)
 
 		return

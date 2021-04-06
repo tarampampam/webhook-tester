@@ -35,6 +35,8 @@ services:
       - --redis-dsn=redis://redis:6379/0
       - --max-requests=12
       - --ignore-header-prefix=foo
+      - --ws-max-clients=20
+      - --ws-max-lifetime=1m
     depends_on:
       - redis
 

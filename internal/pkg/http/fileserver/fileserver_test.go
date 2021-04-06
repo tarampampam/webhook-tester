@@ -246,7 +246,7 @@ func TestFileServer_ServeHTTP(t *testing.T) {
 			assert.NoError(t, fsErr)
 
 			var (
-				req, _ = http.NewRequest(tt.giveRequestMethod, tt.giveRequestURI, nil)
+				req, _ = http.NewRequest(tt.giveRequestMethod, tt.giveRequestURI, http.NoBody)
 				rr     = httptest.NewRecorder()
 			)
 

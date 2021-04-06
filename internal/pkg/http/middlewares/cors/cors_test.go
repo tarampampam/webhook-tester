@@ -12,7 +12,7 @@ import (
 
 func TestMiddleware(t *testing.T) {
 	var (
-		req, _  = http.NewRequest(http.MethodGet, "http://testing", nil)
+		req, _  = http.NewRequest(http.MethodGet, "http://testing", http.NoBody)
 		rr      = httptest.NewRecorder()
 		handled bool
 	)

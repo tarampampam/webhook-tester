@@ -37,7 +37,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			var (
-				req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)
+				req, _ = http.NewRequest(http.MethodPost, "http://testing", http.NoBody)
 				rr     = httptest.NewRecorder()
 				cfg    = config.Config{}
 			)
@@ -59,7 +59,7 @@ func BenchmarkNewGetSettingsHandler(b *testing.B) {
 	b.ReportAllocs()
 
 	var (
-		req, _ = http.NewRequest(http.MethodPost, "http://testing", nil)
+		req, _ = http.NewRequest(http.MethodPost, "http://testing", http.NoBody)
 		rr     = httptest.NewRecorder()
 		cfg    = config.Config{}
 	)
