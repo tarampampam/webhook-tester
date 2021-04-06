@@ -166,7 +166,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: End-to-End tests (${{ matrix.storage-driver }} storage)
+    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -240,7 +240,7 @@ jobs:
           path: ./docker-image.tar
 
   docker-image-e2e:
-    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage)
+    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
