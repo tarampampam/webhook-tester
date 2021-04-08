@@ -15,7 +15,7 @@
 This application allows you to test and debug Webhooks and HTTP requests using unique (random) URLs. You can customize response code, `content-type` HTTP header, response content and set some delay for the HTTP responses. Main idea was looked [here](https://github.com/fredsted/webhook.site).
 
 <p align="center">
-  <img src="https://hsto.org/webt/oi/ak/tf/oiaktfv5f9-9bjrivo_4grmh3h8.png" alt="screenshot" width="925" />
+  <img src="/assets/app-animated.png?raw=true" alt="screenshot" width="925" />
 </p>
 
 This application is written in GoLang and works very fast. It comes with a tiny UI (written in `Vue.js`), which you can customize however you want. Websockets are also used for incoming webhook notifications in UI - you don't need any 3rd party solutions (like `pusher.com`) for this!
