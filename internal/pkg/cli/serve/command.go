@@ -27,7 +27,7 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 		Use:     "serve",
 		Aliases: []string{"s", "server"},
 		Short:   "Start HTTP server",
-		Long:    "Environment variables have higher priority then flags",
+		Long:    "Environment variables have higher priority than flags",
 		PreRunE: func(*cobra.Command, []string) error {
 			if err := f.overrideUsingEnv(); err != nil {
 				return err
