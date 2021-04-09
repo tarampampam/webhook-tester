@@ -12,7 +12,7 @@
 [![Image size][badge_size_latest]][link_docker_hub]
 [![License][badge_license]][link_license]
 
-This application allows you to test and debug Webhooks and HTTP requests using unique (random) URLs. You can customize response code, `content-type` HTTP header, response content and set some delay for the HTTP responses. Main idea was looked [here](https://github.com/fredsted/webhook.site).
+This application allows you to test and debug Webhooks and HTTP requests using unique (random) URLs. You can customize the response code, `content-type` HTTP header, response content and set some delay for the HTTP responses. The main idea is viewed [here](https://github.com/fredsted/webhook.site).
 
 <p align="center">
   <img src="/assets/app-animated.png?raw=true" alt="screenshot" width="925" />
@@ -22,7 +22,7 @@ This application is written in GoLang and works very fast. It comes with a tiny 
 
 ### :fire: Features list
 
-- Customizable front-end, based on `vue.js` (without the need for an builder/bundler)
+- Customizable front-end, based on `vue.js` (without the need for a builder/bundler)
 - Liveness/readiness probes (routes `/live` and `/ready` respectively)
 - Can be started without any 3rd party dependencies
 - Metrics in prometheus format (route `/metrics`)
@@ -41,21 +41,21 @@ This application is written in GoLang and works very fast. It comes with a tiny 
 
 At the moment 2 types of data storage are supported - **memory** and **redis server** (flag `--storage-driver`).
 
-The **memory** driver is useful for fast local debugging when recorded requests will not be needed after app stopping. The **Redis driver**, on the contrary, stores all the data on the redis server, and the data will not be lost after app restarting. When running multiple app instances (behind the load balancer), it is also necessary to use the redis driver.
+The **memory** driver is useful for fast local debugging when recorded requests will not be needed after the app stops. The **Redis driver**, on the contrary, stores all the data on the redis server, and the data will not be lost after the app restarts. When running multiple app instances (behind the load balancer), it is also necessary to use the redis driver.
 
 ### Pub/sub
 
-Publishing/subscribing are used to send notifications using WebSockets, and also supports 2 types of driver - **memory** and **redis server** (flag `--pubsub-driver`).
+Publishing/subscribing are used to send notifications using WebSockets, and it also supports 2 types of driver - **memory** and **redis server** (flag `--pubsub-driver`).
 
 For multiple app instances redis driver must be used.
 
 ## Installing
 
-Download the latest binary file for your os/arch from [releases page][link_releases] or use our [docker image][link_docker_hub] ([ghcr.io][link_ghcr]). Also, you may need in [`./web`](web) directory content for web UI access.
+Download the latest binary file for your os/arch from the [releases page][link_releases] or use our [docker image][link_docker_hub] ([ghcr.io][link_ghcr]). Also, you may need in [`./web`](web) directory content for web UI access.
 
 ## Usage
 
-This application supports next sub-commands:
+This application supports the next sub-commands:
 
 Sub-command   | Description
 ------------- | -----------
@@ -90,7 +90,7 @@ Flag                      | Description                              | Default v
 `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited) | `0`                     | `WS_MAX_CLIENTS`
 `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited) | `0` | `WS_MAX_LIFETIME`
 
-> Environment variables have higher priority then flag values.
+> Environment variables have higher priority than flag values.
 
 Server starting command example:
 
@@ -122,7 +122,7 @@ Just execute in your terminal:
 $ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X serve
 ```
 
-> Important notice: do **not** use `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
+> Important notice: do **not** use the `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
 
 Where `X.X.X` is image tag _(application version)_. Simple `docker-compose` file below:
 
@@ -149,7 +149,7 @@ services:
 
 ## Demo
 
-I can't guarantee that this links will available forever, but you can use this application by the following links:
+I can't guarantee that these links will be available forever, but you can use this application by the following links:
 
 - <https://web.hook.sh/>
 
@@ -171,7 +171,7 @@ New versions publishing is very simple - just "publish" new release using repo r
 [![Issues][badge_issues]][link_issues]
 [![Issues][badge_pulls]][link_pulls]
 
-If you will find any package errors, please, [make an issue][link_create_issue] in current repository.
+If you find any package errors, please, [make an issue][link_create_issue] in current repository.
 
 ## License
 
