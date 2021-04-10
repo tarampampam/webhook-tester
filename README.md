@@ -82,7 +82,7 @@ Flag                      | Description                              | Default v
 `--public`                | Path to the directory with public assets | `%app_bin%/web`            | `PUBLIC_DIR`
 `--storage-driver`        | Storage engine (`memory` or `redis`)     | `memory`                   | `STORAGE_DRIVER`
 `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)     | `memory`                   | `PUBSUB_DRIVER`
-`--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`) | `redis://127.0.0.1:6379/0` | `REDIS_DSN`
+`--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`; format: `redis://<user>:<password>@<host>:<port>/<db_number>`) | `redis://127.0.0.1:6379/0` | `REDIS_DSN`
 `--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`) | `[]` |
 `--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited) | `65536` |
 `--max-requests`          | Maximum stored requests per session (max `65535`) | `128`             | `MAX_REQUESTS`
