@@ -68,7 +68,7 @@ jobs:
         run: ./node_modules/.bin/eslint --output-file eslint_report.json --format json --ext .js,.vue ./web
 
       - name: Annotate Code Linting Results
-        uses: ataylorme/eslint-annotate-action@1.1.2
+        uses: ataylorme/eslint-annotate-action@1.1.3
         if: always()
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
