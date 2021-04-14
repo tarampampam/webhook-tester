@@ -3,9 +3,9 @@
 version: '3.4'
 
 volumes:
-  tmp-data:
-  redis-data:
-  golint-cache:
+  tmp-data: {}
+  redis-data: {}
+  golint-cache: {}
 
 services:
   app: &app-service
@@ -19,11 +19,14 @@ services:
       - /etc/group:/etc/group:ro
       - .:/src:rw
       - tmp-data:/tmp:rw
+    depends_on:
+      redis:
+        condition: service_healthy
 
   web:
     <<: *app-service
     ports:
-      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
+      - 8080:8080/tcp # Open <http://127.0.0.1:8080>
     command:
       - go
       - run
@@ -39,15 +42,21 @@ services:
       - --ignore-header-prefix=foo
       - --ws-max-clients=20
       - --ws-max-lifetime=1m
-    depends_on:
-      - redis
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:8080/live']
+      interval: 5s
+      timeout: 2s
 
   redis:
     image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
       - redis-data:/data:rw
     ports:
-      - 6379
+      - 6379/tcp
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping']
+      interval: 1s
+      timeout: 2s
 
   golint:
     image: golangci/golangci-lint:v1.39-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
