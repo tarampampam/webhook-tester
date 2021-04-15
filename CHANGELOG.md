@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Fixed
+
+- Request body code highlighting [#77]
+
+[#77]:https://github.com/tarampampam/webhook-tester/issues/77
+
 ## v0.3.0
 
 ### Added

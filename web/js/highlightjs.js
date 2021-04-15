@@ -9,16 +9,18 @@ define(['Vue', 'hljs'], (Vue) => {
         bind: function (el, binding) {
             el.querySelectorAll('code').forEach((target) => {
                 if (binding.value) {
-                    target.innerHTML = binding.value;
+                    target.className = 'hljs' // reset highlighting language
+                    target.innerText = binding.value;
                 }
-                hljs.highlightBlock(target);
+                hljs.highlightElement(target);
             })
         },
         componentUpdated: function (el, binding) {
             el.querySelectorAll('code').forEach((target) => {
                 if (binding.value) {
-                    target.innerHTML = binding.value;
-                    hljs.highlightBlock(target);
+                    target.className = 'hljs' // reset highlighting language
+                    target.innerText = binding.value;
+                    hljs.highlightElement(target);
                 }
             })
         }
