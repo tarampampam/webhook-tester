@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ### Changed
 
-- Json request payloads noy pretty-printed [#78]
+- JSON request payloads now pretty-printed [#78]
 
 ### Fixed
 
