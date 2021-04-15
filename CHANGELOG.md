@@ -6,11 +6,16 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ## UNRELEASED
 
+### Changed
+
+- Json request payloads noy pretty-printed [#78]
+
 ### Fixed
 
 - Request body code highlighting [#77]
 
 [#77]:https://github.com/tarampampam/webhook-tester/issues/77
+[#78]:https://github.com/tarampampam/webhook-tester/issues/78
 
 ## v0.3.0
 

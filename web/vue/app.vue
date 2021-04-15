@@ -199,7 +199,13 @@
                 const request = this.getRequestByUUID(this.requestUUID);
 
                 if (typeof request === 'object' && Object.prototype.hasOwnProperty.call(request, "content") && request.content !== '') {
-                    return request.content;
+                    try { // decorate json
+                        const jsonObject = JSON.parse(request.content); // is json?
+
+                        return JSON.stringify(jsonObject, null, 2);
+                    } catch (e) {
+                        return request.content; // fallback
+                    }
                 }
 
                 return '// empty request body';
