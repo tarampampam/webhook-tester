@@ -104,7 +104,7 @@
 
                         <div class="pt-3">
                             <h4>Request body</h4>
-                            <pre v-highlightjs="requestContent"><code class="javascript"></code></pre>
+                            <pre v-highlightjs="requestContent"><code></code></pre>
                         </div>
                     </div>
                     <index-empty
