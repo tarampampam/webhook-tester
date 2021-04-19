@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func NewHandler(storage storage.Storage) http.HandlerFunc {
+func NewHandler(storage storage.Storage) http.HandlerFunc { //nolint:funlen
 	return func(w http.ResponseWriter, r *http.Request) {
 		sessionUUID, sessionFound := mux.Vars(r)["sessionUUID"]
 		if !sessionFound {
