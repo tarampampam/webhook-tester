@@ -67,14 +67,3 @@ services:
       - golint-cache:/tmp/golint:rw
     working_dir: /src
     command: /bin/true
-
-  node:
-    image: node:15-alpine
-    working_dir: /src
-    environment:
-      HOME: /tmp
-    volumes:
-      - /etc/passwd:/etc/passwd:ro
-      - /etc/group:/etc/group:ro
-      - .:/src:rw
-      - tmp-data:/tmp:rw
