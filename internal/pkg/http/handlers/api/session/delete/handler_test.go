@@ -59,7 +59,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			s := storage.NewInMemory(time.Minute, 10)
 			defer s.Close()
 
-			sessionUUID, err := s.CreateSession("", 201, "", 0)
+			sessionUUID, err := s.CreateSession([]byte{}, 201, "", 0)
 			assert.NoError(t, err)
 
 			var (

@@ -43,7 +43,7 @@ func BenchmarkHandler_ServeHTTP(b *testing.B) {
 
 	defer func() { _ = ps.Close() }()
 
-	sessionUUID, _ := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, _ := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "222"})
 
@@ -85,7 +85,7 @@ func TestHandler_ServeHTTPRequestErrors(t *testing.T) {
 		{
 			name: "too large body request",
 			giveReqVars: func(s storage.Storage) map[string]string {
-				sUUID, err := s.CreateSession("", 202, "", 0)
+				sUUID, err := s.CreateSession([]byte{}, 202, "", 0)
 				assert.NoError(t, err)
 
 				return map[string]string{"sessionUUID": sUUID}
@@ -149,7 +149,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	req.Header.Set("X-Real-IP", "3.3.3.3")
 	req.Header.Set("cf-connecting-ip", "2.2.2.2, 2.1.1.2")
 
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
@@ -177,7 +177,7 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	assert.Equal(t, 1, m.c)
 
 	assert.Equal(t, http.MethodPost, requests[0].Method())
-	assert.Equal(t, "foo=bar", requests[0].Content())
+	assert.Equal(t, []byte("foo=bar"), requests[0].Content())
 	assert.Equal(t, map[string]string{
 		"Foo":              "blah",
 		"X-Forwarded-For":  "4.4.4.4",
@@ -200,7 +200,7 @@ func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
 
 	defer func() { _ = ps.Close() }()
 
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "222"})
@@ -215,7 +215,7 @@ func TestHandler_ServeHTTPSuccessCustomCode(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, http.MethodPut, requests[0].Method())
-	assert.Equal(t, "", requests[0].Content())
+	assert.Equal(t, []byte(""), requests[0].Content())
 	assert.Empty(t, requests[0].Headers())
 }
 
@@ -232,7 +232,7 @@ func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
 
 	defer func() { _ = ps.Close() }()
 
-	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 203, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID, "statusCode": "999"}) // wrong code
@@ -247,7 +247,7 @@ func TestHandler_ServeHTTPSuccessWrongCustomCode(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, http.MethodPut, requests[0].Method())
-	assert.Equal(t, "", requests[0].Content())
+	assert.Equal(t, []byte(""), requests[0].Content())
 	assert.Empty(t, requests[0].Headers())
 }
 
@@ -264,7 +264,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 
 	defer func() { _ = ps.Close() }()
 
-	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Millisecond*100)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 203, "foo/bar", time.Millisecond*100)
 	assert.NoError(t, err)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
@@ -285,7 +285,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, http.MethodPut, requests[0].Method())
-	assert.Equal(t, "", requests[0].Content())
+	assert.Equal(t, []byte(""), requests[0].Content())
 	assert.Empty(t, requests[0].Headers())
 }
 
@@ -304,7 +304,7 @@ func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
 
 	defer func() { _ = ps.Close() }()
 
-	sessionUUID, err := s.CreateSession("foo", 203, "foo/bar", time.Hour)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 203, "foo/bar", time.Hour)
 	assert.NoError(t, err)
 
 	req = mux.SetURLVars(req, map[string]string{"sessionUUID": sessionUUID})
@@ -320,6 +320,6 @@ func TestHandler_ServeHTTPContextCancellation(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, http.MethodPut, requests[0].Method())
-	assert.Equal(t, "", requests[0].Content())
+	assert.Equal(t, []byte(""), requests[0].Content())
 	assert.Empty(t, requests[0].Headers())
 }

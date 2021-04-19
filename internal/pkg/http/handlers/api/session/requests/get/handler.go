@@ -1,6 +1,7 @@
 package get
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"sort"
@@ -59,7 +60,7 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 			UUID:          request.UUID(),
 			ClientAddr:    request.ClientAddr(),
 			Method:        request.Method(),
-			Content:       request.Content(),
+			ContentBase64: base64.StdEncoding.EncodeToString(request.Content()),
 			Headers:       headers,
 			URI:           request.URI(),
 			CreatedAtUnix: request.CreatedAt().Unix(),

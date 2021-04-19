@@ -77,11 +77,11 @@ func TestHandler_ServeHTTPSuccess(t *testing.T) {
 	defer func() { _ = ps.Close() }()
 
 	// create session
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	// create request for the session
-	_, err = s.CreateRequest(sessionUUID, "", "", "", "", nil)
+	_, err = s.CreateRequest(sessionUUID, "", "", "", []byte{}, nil)
 	assert.NoError(t, err)
 	requests, err := s.GetAllRequests(sessionUUID)
 	assert.NoError(t, err)

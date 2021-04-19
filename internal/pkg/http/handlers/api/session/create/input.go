@@ -1,6 +1,7 @@
 package create
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"time"
@@ -13,15 +14,15 @@ type input struct {
 	StatusCode      uint16
 	ContentType     string
 	Delay           time.Duration
-	ResponseContent string
+	ResponseContent []byte
 }
 
 func parseInput(body []byte) (*input, error) {
 	var bodyPayload struct {
-		StatusCode       *uint16 `json:"status_code"`    // optional
-		ContentType      *string `json:"content_type"`   // optional
-		ResponseDelaySec *uint8  `json:"response_delay"` // optional
-		ResponseContent  *string `json:"response_body"`  // optional
+		StatusCode            *uint16 `json:"status_code"`             // optional
+		ContentType           *string `json:"content_type"`            // optional
+		ResponseDelaySec      *uint8  `json:"response_delay"`          // optional
+		ResponseContentBase64 *string `json:"response_content_base64"` // optional
 	}
 
 	if err := jsoniter.ConfigFastest.Unmarshal(body, &bodyPayload); err != nil {
@@ -30,10 +31,9 @@ func parseInput(body []byte) (*input, error) {
 
 	// init with defaults
 	var p = input{
-		StatusCode:      http.StatusOK,
-		ContentType:     "text/plain",
-		Delay:           time.Duration(0),
-		ResponseContent: "",
+		StatusCode:  http.StatusOK,
+		ContentType: "text/plain",
+		Delay:       time.Duration(0),
 	}
 
 	// override default values with passed if last is presents
@@ -49,8 +49,15 @@ func parseInput(body []byte) (*input, error) {
 		p.Delay = time.Duration(*v) * time.Second
 	}
 
-	if v := bodyPayload.ResponseContent; v != nil {
-		p.ResponseContent = *v
+	if v := bodyPayload.ResponseContentBase64; v != nil {
+		data, err := base64.StdEncoding.DecodeString(*v)
+		if err != nil {
+			return nil, errors.New("cannot decode response body (wrong base64)")
+		}
+
+		p.ResponseContent = data
+	} else {
+		p.ResponseContent = []byte{}
 	}
 
 	return &p, nil
@@ -75,7 +82,7 @@ func (in input) Validate() error {
 		return errors.New("delay is too much")
 	}
 
-	if utf8.RuneCountInString(in.ResponseContent) > maxResponseContentLength {
+	if utf8.RuneCount(in.ResponseContent) > maxResponseContentLength {
 		return errors.New("response content is too large")
 	}
 
