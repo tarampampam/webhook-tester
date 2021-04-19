@@ -109,7 +109,7 @@
                                 <ul class="nav nav-pills">
                                     <li class="nav-item">
                                         <span
-                                            class="btn nav-link"
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
                                             :class="{ 'active': requestContentViewMode === 'text' }"
                                             @click="requestContentViewMode='text'"
                                         >
@@ -118,7 +118,7 @@
                                     </li>
                                     <li class="nav-item">
                                         <span
-                                            class="btn nav-link"
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
                                             :class="{ 'active': requestContentViewMode === 'binary' }"
                                             @click="requestContentViewMode='binary'"
                                         >
@@ -130,7 +130,7 @@
                                         v-if="getRequestByUUID(this.requestUUID) !== undefined"
                                     >
                                         <span
-                                            class="btn nav-link"
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
                                             @click="handleDownloadRequestContent"
                                         >
                                             <i class="fas fa-download"></i> Download
