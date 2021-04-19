@@ -34,8 +34,6 @@ fmt: ## Run source code formatter tools
 	docker-compose run $(DC_RUN_ARGS) --no-deps app go mod tidy
 
 lint: ## Run app linters
-	if [ ! -d "./node_modules" ]; then docker-compose run $(DC_RUN_ARGS) --no-deps node yarn install --pure-lockfile; fi # install node deps
-	docker-compose run $(DC_RUN_ARGS) --no-deps node ./node_modules/.bin/eslint --color --ext .js,.vue ./web
 	docker-compose run --rm --no-deps golint golangci-lint run
 
 gotest: ## Run app tests
@@ -64,5 +62,4 @@ restart: down up ## Restart all containers
 
 clean: ## Make clean
 	docker-compose down -v -t 1
-	rm -R ./webhook-tester ./node_modules ./yarn.lock ./package-lock.json
 	-docker rmi $(APP_NAME):local -f

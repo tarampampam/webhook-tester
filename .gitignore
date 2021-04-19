@@ -3,11 +3,6 @@
 /.idea
 /.vscode
 
-# JS
-/node_modules
-/yarn.lock
-/package-lock.json
-
 # Temp dirs & trash
 /temp
 /tmp

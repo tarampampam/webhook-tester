@@ -38,42 +38,6 @@ jobs:
       - name: Check for GitLeaks
         uses: zricethezav/gitleaks-action@v1.6.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
 
-  eslint:
-    name: ESLint
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Set up NodeJS
-        uses: actions/setup-node@v2
-        with:
-          node-version: '15'
-
-      - name: Check out code
-        uses: actions/checkout@v2
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-
-      - name: Node Modules Cache
-        uses: actions/cache@v2 # Docs: <https://git.io/JfAKn#node---yarn>
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
-          restore-keys: ${{ runner.os }}-yarn-
-
-      - name: Install Node Modules
-        run: yarn install --pure-lockfile --emoji
-
-      - name: Run ESLint
-        run: ./node_modules/.bin/eslint --output-file eslint_report.json --format json --ext .js,.vue ./web
-
-      - name: Annotate Code Linting Results
-        uses: ataylorme/eslint-annotate-action@1.1.3
-        if: always()
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          report-json: eslint_report.json
-
   go-test:
     name: Unit tests
     runs-on: ubuntu-20.04
@@ -121,7 +85,7 @@ jobs:
             arch: 386
           - os: windows
             arch: 386
-    needs: [golangci-lint, go-test, eslint]
+    needs: [golangci-lint, go-test]
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -203,7 +167,7 @@ jobs:
   docker-image:
     name: Build docker image
     runs-on: ubuntu-20.04
-    needs: [golangci-lint, go-test, eslint]
+    needs: [golangci-lint, go-test]
     steps:
       - name: Check out code
         uses: actions/checkout@v2

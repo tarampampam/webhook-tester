@@ -23,7 +23,6 @@ tests:
   - '.golangci.yml'
   - 'codecov.yml'
   - '.codecov.yml'
-  - '.eslintrc.yml'
 
 frontend:
   - 'web/**/*'
