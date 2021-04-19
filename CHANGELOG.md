@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - UI Binary request viewer
 - Possibility to download request content using UI
 
+### Fixed
+
+- API handler "all session requests" sorting order
+
 ## v0.3.1
 
 ### Changed

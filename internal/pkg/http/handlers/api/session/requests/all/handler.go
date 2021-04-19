@@ -72,6 +72,9 @@ func NewHandler(storage storage.Storage) http.HandlerFunc {
 			})
 		}
 
+		// sort requests from newest to oldest
+		sort.SliceStable(result, func(j, k int) bool { return result[j].CreatedAtUnix > result[k].CreatedAtUnix })
+
 		responder.JSON(w, result)
 	}
 }
