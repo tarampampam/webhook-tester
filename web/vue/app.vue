@@ -28,13 +28,13 @@
                         <request-plate
                             v-for="r in this.requests"
                             class="request-plate"
-                            :uuid="r.uuid"
-                            :client-address="r.client_address"
+                            :uuid="r.UUID"
+                            :client-address="r.clientAddress"
                             :method="r.method"
-                            :when="r.when"
-                            :key="r.uuid"
-                            :class="{ active: requestUUID === r.uuid }"
-                            @click.native="requestUUID = r.uuid"
+                            :when="r.createdAt"
+                            :key="r.UUID"
+                            :class="{ active: requestUUID === r.UUID }"
+                            @click.native="requestUUID = r.UUID"
                             @on-delete="deleteRequestHandler"
                         ></request-plate>
                     </div>
@@ -104,7 +104,59 @@
 
                         <div class="pt-3">
                             <h4>Request body</h4>
-                            <pre v-highlightjs="requestContent"><code></code></pre>
+
+                            <div v-if="requestContentExists">
+                                <ul class="nav nav-pills">
+                                    <li class="nav-item">
+                                        <span
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
+                                            :class="{ 'active': requestContentViewMode === 'text' }"
+                                            @click="requestContentViewMode='text'"
+                                        >
+                                            <i class="fas fa-font"></i> Text view
+                                        </span>
+                                    </li>
+                                    <li class="nav-item">
+                                        <span
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
+                                            :class="{ 'active': requestContentViewMode === 'binary' }"
+                                            @click="requestContentViewMode='binary'"
+                                        >
+                                            <i class="fas fa-atom"></i> Binary view
+                                        </span>
+                                    </li>
+                                    <li
+                                        class="nav-item"
+                                        v-if="getRequestByUUID(this.requestUUID) !== undefined"
+                                    >
+                                        <span
+                                            class="btn nav-link pl-4 pr-4 pt-1 pb-1"
+                                            @click="handleDownloadRequestContent"
+                                        >
+                                            <i class="fas fa-download"></i> Download
+                                        </span>
+                                    </li>
+                                </ul>
+                                <div class="tab-content pt-2 pb-2">
+                                    <div
+                                        class="tab-pane active"
+                                        v-if="requestContentViewMode === 'text'"
+                                    >
+                                        <pre v-highlightjs="requestContent"><code></code></pre>
+                                    </div>
+                                    <div
+                                        class="tab-pane active pt-2"
+                                        v-if="requestContentViewMode === 'binary'"
+                                    >
+                                        <hex-view
+                                            :content="requestBinaryContent"
+                                        ></hex-view>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="pt-1 pb-1">
+                                <p class="text-muted small text-monospace">// empty request body</p>
+                            </div>
                         </div>
                     </div>
                     <index-empty
@@ -122,6 +174,8 @@
 
     'use strict';
 
+    const textDecoder = new TextDecoder("utf-8");
+
     module.exports = {
         /**
          * Force the Vue instance to re-render. Note it does not affect all child components, only the instance
@@ -136,15 +190,18 @@
             'request-plate': 'url:/vue/components/request-plate.vue',
             'request-details': 'url:/vue/components/request-details.vue',
             'index-empty': 'url:/vue/components/index-empty.vue',
+            'hex-view': 'url:/vue/components/hex-view.vue',
         },
 
         data: function () {
             return {
-                /** @type {RecordedRequest[]} */
+                /** @type {APIRecordedRequest[]} */
                 requests: [],
 
                 autoRequestNavigate: true,
                 showRequestDetails: true,
+
+                requestContentViewMode: 'text', // or 'binary'
 
                 appVersion: null,
                 sessionLifetimeSec: null,
@@ -164,9 +221,9 @@
 
             this.$api.getAppSettings()
                 .then((settings) => {
-                    this.maxRequests = settings.limits.max_requests;
-                    this.sessionLifetimeSec = settings.limits.session_lifetime_sec;
-                    this.maxBodySize = settings.limits.max_webhook_body_size;
+                    this.maxRequests = settings.limits.maxRequests;
+                    this.sessionLifetimeSec = settings.limits.sessionLifetimeSec;
+                    this.maxBodySize = settings.limits.maxWebhookBodySize;
                 });
 
             this.wsRefreshConnection();
@@ -193,22 +250,38 @@
             },
 
             /**
+             * @returns {Boolean}
+             */
+            requestContentExists: function () {
+                const request = this.getRequestByUUID(this.requestUUID);
+
+                return request !== undefined && request.content.length > 0;
+            },
+
+            /**
              * @returns {String}
              */
             requestContent: function () {
                 const request = this.getRequestByUUID(this.requestUUID);
 
-                if (typeof request === 'object' && Object.prototype.hasOwnProperty.call(request, "content") && request.content !== '') {
-                    try { // decorate json
-                        const jsonObject = JSON.parse(request.content); // is json?
-
-                        return JSON.stringify(jsonObject, null, 2);
-                    } catch (e) {
-                        return request.content; // fallback
-                    }
+                if (request !== undefined && request.content.length > 0) {
+                    return textDecoder.decode(request.content);
                 }
 
-                return '// empty request body';
+                return '';
+            },
+
+            /**
+             * @returns {Uint8Array}
+             */
+            requestBinaryContent: function () {
+                const request = this.getRequestByUUID(this.requestUUID);
+
+                if (request !== undefined && request.content.length > 0) {
+                    return request.content;
+                }
+
+                return new Uint8Array(0);
             },
         },
 
@@ -282,12 +355,12 @@
 
             /**
              * @param {String} uuid
-             * @returns {RecordedRequest|undefined}
+             * @returns {APIRecordedRequest|undefined}
              */
             getRequestByUUID(uuid) {
                 if (typeof uuid === 'string' && this.requests.length > 0) {
                     for (let i = 0; i < this.requests.length; i++) {
-                        if (this.requests[i].uuid === uuid) {
+                        if (this.requests[i].UUID === uuid) {
                             return this.requests[i];
                         }
                     }
@@ -295,6 +368,7 @@
 
                 return undefined;
             },
+
             /**
              * @param {String} uuid
              * @returns {Number|undefined}
@@ -302,7 +376,7 @@
             getRequestIndexByUUID(uuid) {
                 if (typeof uuid === 'string' && this.requests.length > 0) {
                     for (let i = 0; i < this.requests.length; i++) {
-                        if (this.requests[i].uuid === uuid) {
+                        if (this.requests[i].UUID === uuid) {
                             return i;
                         }
                     }
@@ -310,13 +384,14 @@
 
                 return undefined;
             },
+
             /**
              * @returns {Number|undefined}
              */
             getCurrentRequestIndex() {
                 if (this.requests.length > 0) {
                     for (let i = 0; i < this.requests.length; i++) {
-                        if (this.requests[i].uuid === this.requestUUID) {
+                        if (this.requests[i].UUID === this.requestUUID) {
                             return i;
                         }
                     }
@@ -334,23 +409,6 @@
             },
 
             /**
-             * @param {APIRecordedRequest} rawRequest
-             *
-             * @returns {RecordedRequest}
-             */
-            formatRequestObject(rawRequest) {
-                return {
-                    uuid: rawRequest.uuid,
-                    client_address: rawRequest.client_address,
-                    method: rawRequest.method.toLowerCase(),
-                    when: new Date(rawRequest.created_at_unix * 1000),
-                    content: rawRequest.content,
-                    headers: rawRequest.headers,
-                    url: rawRequest.url,
-                }
-            },
-
-            /**
              * @returns {Promise<undefined>}
              */
             reloadRequests() {
@@ -358,7 +416,7 @@
                     this.$api.getAllSessionRequests(this.sessionUUID)
                         .then((requests) => {
                             this.requests.splice(0, this.requests.length); // make clear
-                            requests.forEach((request) => this.requests.push(this.formatRequestObject(request)));
+                            requests.forEach((request) => this.requests.push(request));
                             resolve();
                         })
                         .catch((err) => reject(err))
@@ -375,8 +433,8 @@
                 const startNewSession = () => {
                     this.$api.startNewSession({})
                         .then((newSessionData) => {
-                            this.sessionUUID = newSessionData.uuid;
-                            this.$session.setLocalSessionUUID(newSessionData.uuid);
+                            this.sessionUUID = newSessionData.UUID;
+                            this.$session.setLocalSessionUUID(newSessionData.UUID);
 
                             this.reloadRequests()
                                 .catch((err) => this.$izitoast.error({title: `Cannot retrieve requests: ${err.message}`}))
@@ -398,6 +456,7 @@
                     startNewSession()
                 }
             },
+
             initRequest() {
                 const routeRequestUUID = this.$route.params.requestUUID;
 
@@ -409,29 +468,32 @@
             navigateFirstRequest() {
                 const first = this.requests[0];
 
-                if (first !== undefined && first.uuid !== this.requestUUID) {
-                    this.requestUUID = first.uuid;
+                if (first !== undefined && first.UUID !== this.requestUUID) {
+                    this.requestUUID = first.UUID;
                 }
             },
+
             navigatePreviousRequest() {
                 const current = this.getCurrentRequestIndex(), prev = this.requests[current - 1];
 
-                if (prev !== undefined && prev.uuid !== this.requestUUID) {
-                    this.requestUUID = prev.uuid;
+                if (prev !== undefined && prev.UUID !== this.requestUUID) {
+                    this.requestUUID = prev.UUID;
                 }
             },
+
             navigateNextRequest() {
                 const current = this.getCurrentRequestIndex(), next = this.requests[current + 1];
 
-                if (next !== undefined && next.uuid !== this.requestUUID) {
-                    this.requestUUID = next.uuid;
+                if (next !== undefined && next.UUID !== this.requestUUID) {
+                    this.requestUUID = next.UUID;
                 }
             },
+
             navigateLastRequest() {
                 const last = this.requests[this.requests.length - 1];
 
-                if (last !== undefined && last.uuid !== this.requestUUID) {
-                    this.requestUUID = last.uuid;
+                if (last !== undefined && last.UUID !== this.requestUUID) {
+                    this.requestUUID = last.UUID;
                 }
             },
 
@@ -453,6 +515,7 @@
                     this.requests.splice(currentIndex, 1); // remove request object from stack
                 }
             },
+
             clearRequests() {
                 this.requests.splice(0, this.requests.length);
                 this.requestUUID = null;
@@ -471,6 +534,7 @@
 
                 this.clearRequests();
             },
+
             /**
              * @param {String} uuid
              */
@@ -485,15 +549,24 @@
 
                 this.deleteRequest(uuid);
             },
+
             /**
-             * @param {NewSessionData} urlSettings
+             * @typedef {Object} NewSessionSettings
+             * @property {Number} [statusCode]
+             * @property {String} [contentType]
+             * @property {Number} [responseDelay]
+             * @property {Uint8Array} [responseBody]
+             * @property {Boolean} destroyCurrentSession
+             */
+            /**
+             * @param {NewSessionSettings} urlSettings
              */
             newSessionHandler(urlSettings) {
                 this.$api.startNewSession({
-                    content_type: urlSettings.contentType,
-                    status_code: urlSettings.statusCode,
-                    response_delay: urlSettings.responseDelay,
-                    response_body: urlSettings.responseBody,
+                    contentType: urlSettings.contentType,
+                    statusCode: urlSettings.statusCode,
+                    responseDelay: urlSettings.responseDelay,
+                    responseContent: urlSettings.responseBody,
                 })
                     .then((newSessionData) => {
                         if (urlSettings.destroyCurrentSession === true) {
@@ -501,14 +574,15 @@
                                 .catch((err) => this.$izitoast.error({title: `Cannot destroy current session: ${err.message}`}))
                         }
 
-                        this.sessionUUID = newSessionData.uuid;
-                        this.$session.setLocalSessionUUID(newSessionData.uuid);
+                        this.sessionUUID = newSessionData.UUID;
+                        this.$session.setLocalSessionUUID(newSessionData.UUID);
 
                         this.clearRequests();
                         this.$izitoast.success({title: 'New session started!'});
                     })
                     .catch((err) => this.$izitoast.error({title: `Cannot create new session: ${err.message}`}))
             },
+
             /**
              * @param {String} requestUUID
              */
@@ -523,13 +597,29 @@
                 this.$api.getSessionRequest(this.sessionUUID, requestUUID)
                     .then((request) => {
                         // push at the first position
-                        this.requests.unshift(this.formatRequestObject(request))
+                        this.requests.unshift(request)
 
                         if (this.requestUUID === null || this.autoRequestNavigate === true) {
                             this.navigateFirstRequest();
                         }
                     })
                     .catch((err) => this.$izitoast.error({title: `Cannot load request with UUID ${requestUUID}: ${err.message}`}))
+            },
+
+            handleDownloadRequestContent() {
+                const request = this.getRequestByUUID(this.requestUUID);
+
+                if (request !== undefined && request.content.length > 0) {
+                    const $body = document.body, $a = document.createElement('a');
+
+                    $a.setAttribute('href', 'data:application/octet-stream;charset=utf-8,' + encodeURIComponent(textDecoder.decode(request.content)));
+                    $a.setAttribute('download', this.requestUUID + '.bin');
+                    $a.style.display = 'none';
+
+                    $body.appendChild($a);
+                    $a.click();
+                    $body.removeChild($a);
+                }
             },
         }
     }

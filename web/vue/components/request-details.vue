@@ -33,12 +33,12 @@
             <div class="row pb-1">
                 <div class="col-lg-3 text-lg-right">From</div>
                 <div class="col-lg-9">
-                    <a :href="'https://who.is/whois-ip/ip-address/' + request.client_address"
+                    <a :href="'https://who.is/whois-ip/ip-address/' + request.clientAddress"
                        target="_blank"
                        rel="noreferrer"
                        title="WhoIs?"
                     >
-                        <strong>{{ request.client_address }}</strong>
+                        <strong>{{ request.clientAddress }}</strong>
                     </a>
                 </div>
             </div>
@@ -124,7 +124,7 @@
              * @returns {String}
              */
             getRequestURI: function () {
-                let uri = (typeof this.request === 'object' && typeof this.request.url === 'string')
+                let uri = (typeof this.request === 'object' && this.request !== null && typeof this.request.url === 'string')
                     ? this.request.url.replace(/^\/+/g, '')
                     : '...';
 
@@ -132,7 +132,7 @@
             },
 
             methodClass: function () {
-                if (typeof this.request === 'object' && typeof this.request.method === 'string') {
+                if (typeof this.request === 'object' && this.request !== null && typeof this.request.method === 'string') {
                     switch (this.request.method.toLowerCase()) {
                         case 'get':
                             return 'badge-success';
@@ -151,8 +151,8 @@
              * @returns {Number}
              */
             contentLength() {
-                if (typeof this.request === 'object' && typeof this.request.content === 'string') {
-                    return (new TextEncoder().encode(this.request.content)).length;
+                if (typeof this.request === 'object' && this.request !== null) {
+                    return this.request.content.length;
                 }
 
                 return 0;
@@ -165,8 +165,8 @@
 
         methods: {
             updateFormattedWhen() {
-                this.formattedWhen = this.request !== null && this.request.when != null
-                    ? `${this.$moment(this.request.when).format('YYYY-MM-D h:mm:ss a')} (${this.$moment(this.request.when).fromNow()})`
+                this.formattedWhen = this.request !== null && this.request.createdAt != null
+                    ? `${this.$moment(this.request.createdAt).format('YYYY-MM-D h:mm:ss a')} (${this.$moment(this.request.createdAt).fromNow()})`
                     : '';
             }
         }

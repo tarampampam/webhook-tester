@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Changed
+
+- For redis storage `json` encoder/decoder replaced with [msgpack](https://github.com/vmihailenco/msgpack)
+- Storage now accepts and returns request content as a bytes slice
+- Response content for session creation handler must be base64-encoded
+- All API handlers return request body and session response base64-encoded (JSON request and response property `content` replaced with `content_base64`)
+
+### Added
+
+- UI Binary request viewer
+- Possibility to download request content using UI
+
 ## v0.3.1
 
 ### Changed

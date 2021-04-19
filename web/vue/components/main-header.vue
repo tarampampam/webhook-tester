@@ -194,6 +194,8 @@
 
     'use strict';
 
+    const textEncoder = new TextEncoder();
+
     module.exports = {
         props: {
             currentWebHookUrl: {
@@ -249,32 +251,27 @@
 
         methods: {
             newURL() {
-                let data = {
-                    statusCode: this.newUrlData.statusCode,
-                    contentType: this.newUrlData.contentType,
-                    responseDelay: this.newUrlData.responseDelay,
-                    responseBody: this.newUrlData.responseBody,
-                    destroyCurrentSession: this.newUrlData.destroyCurrentSession,
+                /** @type NewSessionSettings */
+                const data = {};
+
+                if (this.newUrlData.statusCode != null) {
+                    data.statusCode = Number(this.newUrlData.statusCode);
                 }
 
-                if (data.statusCode != null) {
-                    data.statusCode = Number(data.statusCode);
+                if (this.newUrlData.contentType != null) {
+                    data.contentType = String(this.newUrlData.contentType);
                 }
 
-                if (data.contentType != null) {
-                    data.contentType = String(data.contentType);
+                if (this.newUrlData.responseDelay != null) {
+                    data.responseDelay = Number(this.newUrlData.responseDelay);
                 }
 
-                if (data.responseDelay != null) {
-                    data.responseDelay = Number(data.responseDelay);
+                if (this.newUrlData.responseBody != null) {
+                    data.responseBody = textEncoder.encode(this.newUrlData.responseBody);
                 }
 
-                if (data.responseBody != null) {
-                    data.responseBody = String(data.responseBody);
-                }
-
-                if (data.destroyCurrentSession != null) {
-                    data.destroyCurrentSession = Boolean(data.destroyCurrentSession);
+                if (this.newUrlData.destroyCurrentSession != null) {
+                    data.destroyCurrentSession = Boolean(this.newUrlData.destroyCurrentSession);
                 }
 
                 // <https://michaelnthiessen.com/pass-function-as-prop/>

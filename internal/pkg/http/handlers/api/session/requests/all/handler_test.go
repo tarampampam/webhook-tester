@@ -1,6 +1,7 @@
 package all_test
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -71,7 +72,7 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 	)
 
 	// create session
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	// create ONE request for the session
@@ -79,8 +80,8 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 		sessionUUID,
 		"1.2.2.1",
 		"PUT",
-		"foobar",
 		"http://example.com/foo",
+		[]byte("foobar"),
 		map[string]string{"aaa": "bar", "bbb": "foo"},
 	)
 	assert.NoError(t, err)
@@ -96,7 +97,7 @@ func TestHandler_ServeHTTPSuccessSingle(t *testing.T) {
 
 	assert.JSONEq(t, `[{
 		"client_address":"1.2.2.1",
-		"content":"foobar",
+		"content_base64":"`+base64.StdEncoding.EncodeToString([]byte("foobar"))+`",
 		"created_at_unix":`+strconv.FormatInt(request.CreatedAt().Unix(), 10)+`,
 		"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
 		"method":"PUT",
@@ -116,7 +117,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 	)
 
 	// create session
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	// create THREE requests for the session
@@ -124,16 +125,16 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		sessionUUID,
 		"1.1.1.1",
 		"PUT",
-		"foobar",
 		"http://example.com/foo1",
+		[]byte("foobar"),
 		nil,
 	)
 	request1UUID, _ := s.CreateRequest(
 		sessionUUID,
 		"1.1.1.1",
 		"PUT",
-		"foobar",
 		"http://example.com/foo1",
+		[]byte("foobar"),
 		map[string]string{"bbb": "foo", "aaa": "bar"},
 	)
 
@@ -143,8 +144,8 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		sessionUUID,
 		"2.2.2.2",
 		"PUT",
-		"foobar",
 		"http://example.com/foo2",
+		[]byte("foobar"),
 		nil,
 	)
 
@@ -154,8 +155,8 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		sessionUUID,
 		"3.3.3.3",
 		"PUT",
-		"foobar",
 		"http://example.com/foo3",
+		[]byte("foobar"),
 		map[string]string{"aaa": "bar"},
 	)
 	request1, _ := s.GetRequest(sessionUUID, request1UUID)
@@ -169,9 +170,11 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 	runtime.Gosched()
 	<-time.After(time.Millisecond) // goroutine must be done
 
+	contentBase64 := base64.StdEncoding.EncodeToString([]byte("foobar"))
+
 	assert.JSONEq(t, `[{
 		"client_address":"1.1.1.1",
-		"content":"foobar",
+		"content_base64":"`+contentBase64+`",
 		"created_at_unix":`+strconv.FormatInt(request1.CreatedAt().Unix(), 10)+`,
 		"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
 		"method":"PUT",
@@ -179,7 +182,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		"uuid":"`+request1.UUID()+`"
 	},{
 		"client_address":"2.2.2.2",
-		"content":"foobar",
+		"content_base64":"`+contentBase64+`",
 		"created_at_unix":`+strconv.FormatInt(request2.CreatedAt().Unix(), 10)+`,
 		"headers":[],
 		"method":"PUT",
@@ -187,7 +190,7 @@ func TestHandler_ServeHTTPSuccessMultiple(t *testing.T) { // must be sorted
 		"uuid":"`+request2.UUID()+`"
 	},{
 		"client_address":"3.3.3.3",
-		"content":"foobar",
+		"content_base64":"`+contentBase64+`",
 		"created_at_unix":`+strconv.FormatInt(request3.CreatedAt().Unix(), 10)+`,
 		"headers":[{"name": "aaa", "value": "bar"}],
 		"method":"PUT",

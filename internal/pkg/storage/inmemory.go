@@ -11,7 +11,7 @@ import (
 
 type inmemorySession struct {
 	uuid        string
-	content     string
+	content     []byte
 	code        uint16
 	contentType string
 	delay       time.Duration
@@ -22,7 +22,7 @@ type inmemorySession struct {
 }
 
 func (s *inmemorySession) UUID() string         { return s.uuid }        // UUID unique session ID.
-func (s *inmemorySession) Content() string      { return s.content }     // Content session server content.
+func (s *inmemorySession) Content() []byte      { return s.content }     // Content session server response content.
 func (s *inmemorySession) Code() uint16         { return s.code }        // Code default server response code.
 func (s *inmemorySession) ContentType() string  { return s.contentType } // ContentType response content type.
 func (s *inmemorySession) Delay() time.Duration { return s.delay }       // Delay before response sending.
@@ -32,7 +32,7 @@ type inmemoryRequest struct {
 	uuid       string
 	clientAddr string
 	method     string
-	content    string
+	content    []byte
 	headers    map[string]string
 	uri        string
 	createdAt  time.Time
@@ -41,7 +41,7 @@ type inmemoryRequest struct {
 func (r *inmemoryRequest) UUID() string               { return r.uuid }       // UUID returns unique request ID.
 func (r *inmemoryRequest) ClientAddr() string         { return r.clientAddr } // ClientAddr client hostname or IP.
 func (r *inmemoryRequest) Method() string             { return r.method }     // Method HTTP method name.
-func (r *inmemoryRequest) Content() string            { return r.content }    // Content request body (payload).
+func (r *inmemoryRequest) Content() []byte            { return r.content }    // Content request body (payload).
 func (r *inmemoryRequest) Headers() map[string]string { return r.headers }    // Headers HTTP request headers.
 func (r *inmemoryRequest) URI() string                { return r.uri }        // URI Uniform Resource Identifier.
 func (r *inmemoryRequest) CreatedAt() time.Time       { return r.createdAt }  // CreatedAt creation time.
@@ -169,7 +169,7 @@ func (s *InMemory) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *InMemory) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *InMemory) CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
 	if s.isClosed() {
 		return "", ErrClosed
 	}
@@ -238,7 +238,7 @@ func (s *InMemory) DeleteRequests(uuid string) (bool, error) {
 
 // CreateRequest creates new request in storage using passed data and updates expiration time for session and all
 // stored requests for the session.
-func (s *InMemory) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:lll
+func (s *InMemory) CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error) { //nolint:lll
 	session, err := s.GetSession(sessionUUID)
 	if err != nil {
 		return "", err
