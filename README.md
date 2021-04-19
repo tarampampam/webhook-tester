@@ -30,6 +30,7 @@ This application is written in GoLang and works very fast. It comes with a tiny 
 - Unprivileged user in docker image is used
 - Well-tested and documented source code
 - Built-in CLI health check sub-command
+- Recorded request binary view using UI
 - JSON/human-readable logging formats
 - Customizable webhook responses
 - Built-in Websockets support
