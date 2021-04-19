@@ -14,7 +14,7 @@ type Storage interface {
 
 	// CreateSession creates new session in storage using passed data.
 	// Session UUID without error will be returned on success.
-	CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error)
+	CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error)
 
 	// DeleteSession deletes session with passed UUID.
 	DeleteSession(uuid string) (bool, error)
@@ -26,7 +26,7 @@ type Storage interface {
 	// stored requests for the session.
 	// Session with passed UUID must exists.
 	// Request UUID without error will be returned on success.
-	CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error)
+	CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error)
 
 	// GetRequest returns request data.
 	// If request was not found - `nil, nil` will be returned.
@@ -43,7 +43,7 @@ type Storage interface {
 // Session describes session settings (like response data and any additional information).
 type Session interface {
 	UUID() string         // UUID returns unique session identifier.
-	Content() string      // Content returns session server content.
+	Content() []byte      // Content returns session server response content.
 	Code() uint16         // Code returns default server response code.
 	ContentType() string  // ContentType returns response content type.
 	Delay() time.Duration // Delay returns delay before response sending.
@@ -55,7 +55,7 @@ type Request interface {
 	UUID() string               // UUID returns unique request identifier.
 	ClientAddr() string         // ClientAddr returns client hostname or IP address (who sent this request).
 	Method() string             // Method returns HTTP method name (eg.: 'GET', 'POST').
-	Content() string            // Content returns request body (payload).
+	Content() []byte            // Content returns request body (payload).
 	Headers() map[string]string // Headers returns HTTP request headers.
 	URI() string                // URI returns Uniform Resource Identifier.
 	CreatedAt() time.Time       // CreatedAt returns creation time (accuracy to seconds).

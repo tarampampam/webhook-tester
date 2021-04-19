@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Redis is redis storage implementation.
@@ -16,7 +16,6 @@ type Redis struct {
 	rdb         *redis.Client
 	ttl         time.Duration
 	maxRequests uint16
-	json        jsoniter.API
 }
 
 // NewRedis creates new redis storage instance.
@@ -26,7 +25,6 @@ func NewRedis(ctx context.Context, rdb *redis.Client, sessionTTL time.Duration, 
 		rdb:         rdb,
 		ttl:         sessionTTL,
 		maxRequests: maxRequests,
-		json:        jsoniter.ConfigFastest,
 	}
 }
 
@@ -44,8 +42,8 @@ func (s *Redis) GetSession(uuid string) (Session, error) {
 
 	var sData = redisSession{}
 
-	if jsonErr := s.json.Unmarshal(value, &sData); jsonErr != nil {
-		return nil, jsonErr
+	if msgpackErr := msgpack.Unmarshal(value, &sData); msgpackErr != nil {
+		return nil, msgpackErr
 	}
 
 	sData.Uuid = uuid
@@ -54,7 +52,7 @@ func (s *Redis) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *Redis) CreateSession(content string, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *Redis) CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
 	sData := redisSession{
 		RespContent:     content,
 		RespCode:        code,
@@ -63,14 +61,14 @@ func (s *Redis) CreateSession(content string, code uint16, contentType string, d
 		TS:              time.Now().Unix(),
 	}
 
-	asJSON, jsonErr := s.json.Marshal(sData)
-	if jsonErr != nil {
-		return "", jsonErr
+	packed, msgpackErr := msgpack.Marshal(sData)
+	if msgpackErr != nil {
+		return "", msgpackErr
 	}
 
 	id := NewUUID()
 
-	if err := s.rdb.Set(s.ctx, redisKey(id).session(), asJSON, s.ttl).Err(); err != nil {
+	if err := s.rdb.Set(s.ctx, redisKey(id).session(), packed, s.ttl).Err(); err != nil {
 		return "", err
 	}
 
@@ -123,13 +121,13 @@ func (s *Redis) DeleteRequests(sessionUUID string) (bool, error) {
 
 // CreateRequest creates new request in storage using passed data and updates expiration time for session and all
 // stored requests for the session.
-func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, content, uri string, headers map[string]string) (string, error) { //nolint:funlen,lll
+func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error) { //nolint:funlen,lll
 	var (
 		now = time.Now()
 		key = redisKey(sessionUUID)
 	)
 
-	asJSON, jsonErr := s.json.Marshal(redisRequest{
+	packed, msgpackErr := msgpack.Marshal(redisRequest{
 		ReqClientAddr: clientAddr,
 		ReqMethod:     method,
 		ReqContent:    content,
@@ -137,8 +135,8 @@ func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, content, uri stri
 		ReqURI:        uri,
 		TS:            now.Unix(),
 	})
-	if jsonErr != nil {
-		return "", jsonErr
+	if msgpackErr != nil {
+		return "", msgpackErr
 	}
 
 	id := NewUUID()
@@ -149,7 +147,7 @@ func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, content, uri stri
 			Score:  float64(now.UnixNano()),
 			Member: id,
 		})
-		pipe.Set(s.ctx, key.request(id), asJSON, s.ttl)
+		pipe.Set(s.ctx, key.request(id), packed, s.ttl)
 
 		return nil
 	}); err != nil {
@@ -218,8 +216,8 @@ func (s *Redis) GetRequest(sessionUUID, requestUUID string) (Request, error) {
 	}
 
 	rData := redisRequest{}
-	if jsonErr := s.json.Unmarshal(value, &rData); jsonErr != nil {
-		return nil, jsonErr
+	if msgpackErr := msgpack.Unmarshal(value, &rData); msgpackErr != nil {
+		return nil, msgpackErr
 	}
 
 	rData.Uuid = requestUUID
@@ -263,10 +261,10 @@ func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
 		}
 
 		for i := 0; i < len(UUIDs); i++ {
-			if json, ok := rawRequests[i].(string); ok {
+			if packed, ok := rawRequests[i].(string); ok {
 				rData := redisRequest{}
 
-				if err := s.json.Unmarshal([]byte(json), &rData); err == nil { // errors with wrong json ignored
+				if err := msgpack.Unmarshal([]byte(packed), &rData); err == nil { // errors with wrong data ignored
 					rData.Uuid = UUIDs[i]
 					result = append(result, &rData)
 				}
@@ -299,35 +297,35 @@ func (s redisKey) requests() string         { return s.session() + ":requests" }
 func (s redisKey) request(id string) string { return s.session() + ":requests:" + id }       // request data.
 
 type redisSession struct {
-	Uuid            string `json:"-"` //nolint:golint,stylecheck
-	RespContent     string `json:"resp_content"`
-	RespCode        uint16 `json:"resp_code"`
-	RespContentType string `json:"resp_content_type"`
-	RespDelay       int64  `json:"resp_delay_nano"` // FIXME was `resp_delay_sec`, backwards incompatible
-	TS              int64  `json:"created_at_unix"`
+	Uuid            string `msgpack:"-"` //nolint:golint,stylecheck
+	RespContent     []byte `msgpack:"c"`
+	RespCode        uint16 `msgpack:"cd"`
+	RespContentType string `msgpack:"ct"`
+	RespDelay       int64  `msgpack:"d"`
+	TS              int64  `msgpack:"t"`
 }
 
 func (s *redisSession) UUID() string         { return s.Uuid }                     // UUID unique session ID.
-func (s *redisSession) Content() string      { return s.RespContent }              // Content session server content.
+func (s *redisSession) Content() []byte      { return s.RespContent }              // Content session server content.
 func (s *redisSession) Code() uint16         { return s.RespCode }                 // Code default server response code.
 func (s *redisSession) ContentType() string  { return s.RespContentType }          // ContentType response content type.
 func (s *redisSession) Delay() time.Duration { return time.Duration(s.RespDelay) } // Delay before response sending.
 func (s *redisSession) CreatedAt() time.Time { return time.Unix(s.TS, 0) }         // CreatedAt creation time.
 
 type redisRequest struct {
-	Uuid          string            `json:"-"` //nolint:golint,stylecheck
-	ReqClientAddr string            `json:"client_addr"`
-	ReqMethod     string            `json:"method"`
-	ReqContent    string            `json:"content"`
-	ReqHeaders    map[string]string `json:"headers"`
-	ReqURI        string            `json:"uri"`
-	TS            int64             `json:"created_at_unix"`
+	Uuid          string            `msgpack:"-"` //nolint:golint,stylecheck
+	ReqClientAddr string            `msgpack:"a"`
+	ReqMethod     string            `msgpack:"m"`
+	ReqContent    []byte            `msgpack:"c"`
+	ReqHeaders    map[string]string `msgpack:"h"`
+	ReqURI        string            `msgpack:"u"`
+	TS            int64             `msgpack:"t"`
 }
 
 func (r *redisRequest) UUID() string               { return r.Uuid }             // UUID returns unique request ID.
 func (r *redisRequest) ClientAddr() string         { return r.ReqClientAddr }    // ClientAddr client hostname or IP.
 func (r *redisRequest) Method() string             { return r.ReqMethod }        // Method HTTP method name.
-func (r *redisRequest) Content() string            { return r.ReqContent }       // Content request body (payload).
+func (r *redisRequest) Content() []byte            { return r.ReqContent }       // Content request body (payload).
 func (r *redisRequest) Headers() map[string]string { return r.ReqHeaders }       // Headers HTTP request headers.
 func (r *redisRequest) URI() string                { return r.ReqURI }           // URI Uniform Resource Identifier.
 func (r *redisRequest) CreatedAt() time.Time       { return time.Unix(r.TS, 0) } // CreatedAt creation time.

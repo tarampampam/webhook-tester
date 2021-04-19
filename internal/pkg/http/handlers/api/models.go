@@ -26,7 +26,7 @@ type (
 		UUID          string                 `json:"uuid"`
 		ClientAddr    string                 `json:"client_address"`
 		Method        string                 `json:"method"`
-		Content       string                 `json:"content"`
+		ContentBase64 string                 `json:"content_base64"`
 		Headers       []SessionRequestHeader `json:"headers"`
 		URI           string                 `json:"url"`
 		CreatedAtUnix int64                  `json:"created_at_unix"`

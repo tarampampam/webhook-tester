@@ -102,8 +102,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 		sUUID,
 		realip.FromHTTPRequest(r),
 		r.Method,
-		string(body),
 		r.RequestURI,
+		body,
 		h.headerToStringsMap(r.Header),
 	); err != nil {
 		h.error(w, http.StatusInternalServerError, "request saving in storage failed: "+err.Error())
@@ -135,7 +135,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:f
 	w.Header().Set("Content-Type", session.ContentType())
 	w.WriteHeader(h.getRequiredHTTPCode(r, session))
 
-	_, _ = w.Write([]byte(session.Content()))
+	_, _ = w.Write(session.Content())
 }
 
 func (h *Handler) error(w http.ResponseWriter, code int, msg string) {

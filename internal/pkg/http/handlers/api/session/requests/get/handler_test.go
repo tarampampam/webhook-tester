@@ -1,6 +1,7 @@
 package get_test
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -75,7 +76,7 @@ func TestHandler_RequestReading(t *testing.T) {
 	)
 
 	// create session
-	sessionUUID, err := s.CreateSession("foo", 202, "foo/bar", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
 	assert.NoError(t, err)
 
 	// create ONE request for the session
@@ -83,8 +84,8 @@ func TestHandler_RequestReading(t *testing.T) {
 		sessionUUID,
 		"1.2.2.1",
 		"PUT",
-		"foobar",
 		"http://example.com/foo",
+		[]byte("foobar"),
 		map[string]string{"bbb": "foo", "aaa": "bar"},
 	)
 	assert.NoError(t, err)
@@ -97,7 +98,7 @@ func TestHandler_RequestReading(t *testing.T) {
 
 	assert.JSONEq(t, `{
 		"client_address":"1.2.2.1",
-		"content":"foobar",
+		"content_base64":"`+base64.StdEncoding.EncodeToString([]byte("foobar"))+`",
 		"created_at_unix":`+strconv.FormatInt(request.CreatedAt().Unix(), 10)+`,
 		"headers":[{"name": "aaa", "value": "bar"},{"name": "bbb", "value": "foo"}],
 		"method":"PUT",
