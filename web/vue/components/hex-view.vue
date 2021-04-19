@@ -99,10 +99,9 @@
 
         methods: {
             /**
-             * @param {ArrayLike} arr
              * @return {ArrayLike}
              */
-            lines(arr) {
+            lines() {
                 return this.content.reduce((rows, key, index) => (
                         index % this.bytesPerRow === 0
                             ? rows.push([key])

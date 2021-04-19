@@ -162,12 +162,12 @@ func TestHandlerSessionCreation(t *testing.T) {
 	resp := struct {
 		UUID             string `json:"uuid"`
 		ResponseSettings struct {
-			Content       string `json:"content_base64"`
-			Code          uint16 `json:"code"`
-			ContentType   string `json:"content_type"`
-			DelaySec      uint8  `json:"delay_sec"`
-			CreatedAtUnix int64  `json:"created_at_unix"`
+			Content     string `json:"content_base64"`
+			Code        uint16 `json:"code"`
+			ContentType string `json:"content_type"`
+			DelaySec    uint8  `json:"delay_sec"`
 		} `json:"response"`
+		CreatedAtUnix int64 `json:"created_at_unix"`
 	}{}
 
 	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
@@ -179,7 +179,7 @@ func TestHandlerSessionCreation(t *testing.T) {
 	assert.Equal(t, uint16(234), resp.ResponseSettings.Code)
 	assert.Equal(t, "foo/text", resp.ResponseSettings.ContentType)
 	assert.Equal(t, uint8(1), resp.ResponseSettings.DelaySec)
-	assert.Equal(t, time.Now().Unix(), resp.ResponseSettings.CreatedAtUnix)
+	assert.Equal(t, time.Now().Unix(), resp.CreatedAtUnix)
 }
 
 func TestHandlerSessionCreationWithDefaults(t *testing.T) {
@@ -204,12 +204,12 @@ func TestHandlerSessionCreationWithDefaults(t *testing.T) {
 	resp := struct {
 		UUID             string `json:"uuid"`
 		ResponseSettings struct {
-			Content       string `json:"content_base64"`
-			Code          uint16 `json:"code"`
-			ContentType   string `json:"content_type"`
-			DelaySec      uint8  `json:"delay_sec"`
-			CreatedAtUnix int64  `json:"created_at_unix"`
+			Content     string `json:"content_base64"`
+			Code        uint16 `json:"code"`
+			ContentType string `json:"content_type"`
+			DelaySec    uint8  `json:"delay_sec"`
 		} `json:"response"`
+		CreatedAtUnix int64 `json:"created_at_unix"`
 	}{}
 
 	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
@@ -221,5 +221,5 @@ func TestHandlerSessionCreationWithDefaults(t *testing.T) {
 	assert.Equal(t, uint16(200), resp.ResponseSettings.Code)
 	assert.Equal(t, "text/plain", resp.ResponseSettings.ContentType)
 	assert.Equal(t, uint8(0), resp.ResponseSettings.DelaySec)
-	assert.Equal(t, time.Now().Unix(), resp.ResponseSettings.CreatedAtUnix)
+	assert.Equal(t, time.Now().Unix(), resp.CreatedAtUnix)
 }
