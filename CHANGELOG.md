@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Changed
+
+- For redis storage `json` encoder/decoder replaced with [msgpack](https://github.com/vmihailenco/msgpack)
+- Storage now accepts and returns request content as a bytes slice
 ## v0.3.1
 
 ### Changed

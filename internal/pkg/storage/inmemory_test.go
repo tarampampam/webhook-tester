@@ -13,7 +13,7 @@ func TestInMemoryWebSockets_SessionCreateReadDelete(t *testing.T) {
 	s := storage.NewInMemory(time.Minute, 1, time.Second)
 	defer s.Close()
 
-	sessionUUID, creationErr := s.CreateSession("foo bar", 201, "text/javascript", time.Second*123)
+	sessionUUID, creationErr := s.CreateSession([]byte("foo bar"), 201, "text/javascript", time.Second*123)
 	assert.NoError(t, creationErr)
 
 	noSession, noSessionErr := s.GetSession("foo")
@@ -27,7 +27,7 @@ func TestInMemoryWebSockets_SessionCreateReadDelete(t *testing.T) {
 	assert.Equal(t, time.Now().Unix(), gotSession.CreatedAt().Unix())
 	assert.Equal(t, (time.Second * 123).Nanoseconds(), gotSession.Delay().Nanoseconds())
 	assert.Equal(t, "text/javascript", gotSession.ContentType())
-	assert.Equal(t, "foo bar", gotSession.Content())
+	assert.Equal(t, []byte("foo bar"), gotSession.Content())
 	assert.Equal(t, uint16(201), gotSession.Code())
 	assert.Equal(t, sessionUUID, gotSession.UUID())
 
@@ -48,15 +48,15 @@ func TestInMemoryWebSockets_RequestCreateReadDelete(t *testing.T) {
 	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
-	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, sessionCreationErr := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 	assert.Nil(t, sessionCreationErr)
 
 	requestUUID, creationErr := s.CreateRequest(
 		sessionUUID,
 		"2.3.4.5",
 		"GET",
-		`{"foo":123}`,
 		"https://example.com/test",
+		[]byte(`{"foo":123}`),
 		map[string]string{"foo": "bar"},
 	)
 	assert.Nil(t, creationErr)
@@ -69,7 +69,7 @@ func TestInMemoryWebSockets_RequestCreateReadDelete(t *testing.T) {
 	request, getRequestErr := s.GetRequest(sessionUUID, requestUUID)
 	assert.Nil(t, getRequestErr)
 	assert.Equal(t, "2.3.4.5", request.ClientAddr())
-	assert.Equal(t, `{"foo":123}`, request.Content())
+	assert.Equal(t, []byte(`{"foo":123}`), request.Content())
 	assert.Equal(t, map[string]string{"foo": "bar"}, request.Headers())
 	assert.Equal(t, "https://example.com/test", request.URI())
 	assert.Equal(t, "GET", request.Method())
@@ -93,21 +93,21 @@ func TestInMemoryWebSockets_RequestCreationLimit(t *testing.T) {
 	s := storage.NewInMemory(time.Minute, 2, time.Nanosecond*100)
 	defer s.Close()
 
-	sessionUUID, _ := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, _ := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 
-	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", `{"foo":123}`, "https://example.com/test", nil)
+	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "https://example.com/test", []byte(`{"foo":123}`), nil)
 
 	requests, _ := s.GetAllRequests(sessionUUID)
 	assert.Len(t, requests, 1)
 
-	_, _ = s.CreateRequest(sessionUUID, "2.2.2.2", "GET", `{"foo":123}`, "https://example.com/test", nil)
+	_, _ = s.CreateRequest(sessionUUID, "2.2.2.2", "GET", "https://example.com/test", []byte(`{"foo":123}`), nil)
 
 	requests, _ = s.GetAllRequests(sessionUUID)
 	assert.Len(t, requests, 2)
 	assert.Equal(t, "1.1.1.1", requests[0].ClientAddr())
 	assert.Equal(t, "2.2.2.2", requests[1].ClientAddr())
 
-	_, _ = s.CreateRequest(sessionUUID, "3.3.3.3", "GET", `{"foo":123}`, "https://example.com/test", nil)
+	_, _ = s.CreateRequest(sessionUUID, "3.3.3.3", "GET", "https://example.com/test", []byte(`{"foo":123}`), nil)
 
 	requests, _ = s.GetAllRequests(sessionUUID)
 	assert.Len(t, requests, 2)
@@ -119,7 +119,7 @@ func TestInMemoryWebSockets_GetAllRequests(t *testing.T) {
 	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
-	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, sessionCreationErr := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)
 
 	noRequests, noRequestsErr := s.GetAllRequests(sessionUUID)
@@ -130,7 +130,7 @@ func TestInMemoryWebSockets_GetAllRequests(t *testing.T) {
 	assert.Nil(t, noRequestsWrongSession)
 	assert.NoError(t, noRequestsWrongSessionErr)
 
-	requestUUID, creationErr := s.CreateRequest(sessionUUID, "1.2.3.4", "GET", `{"foo":123}`, "https://test", nil)
+	requestUUID, creationErr := s.CreateRequest(sessionUUID, "1.2.3.4", "GET", "https://test", []byte(`{"foo":123}`), nil)
 	assert.NoError(t, creationErr)
 	assert.NotEmpty(t, requestUUID)
 
@@ -144,15 +144,15 @@ func TestInMemoryWebSockets_DeleteRequests(t *testing.T) {
 	s := storage.NewInMemory(time.Minute, 10, time.Nanosecond*100)
 	defer s.Close()
 
-	sessionUUID, sessionCreationErr := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, sessionCreationErr := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 	assert.NoError(t, sessionCreationErr)
 
 	res, delErr := s.DeleteRequests(sessionUUID)
 	assert.False(t, res)
 	assert.NoError(t, delErr)
 
-	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", `{"foo":123}`, "https://test", nil)
-	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", `{"foo":123}`, "https://test", nil)
+	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "https://test", []byte(`{"foo":123}`), nil)
+	_, _ = s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "https://test", []byte(`{"foo":123}`), nil)
 
 	requests, _ := s.GetAllRequests(sessionUUID)
 	assert.Len(t, requests, 2)
@@ -169,7 +169,7 @@ func TestInMemoryWebSockets_CreateRequestExpired(t *testing.T) {
 	s := storage.NewInMemory(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
-	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, sessionUUID)
 
@@ -188,10 +188,10 @@ func TestInMemoryWebSockets_GetRequestExpired(t *testing.T) {
 	s := storage.NewInMemory(time.Millisecond*10, 10, time.Minute)
 	defer s.Close()
 
-	sessionUUID, err := s.CreateSession("foo bar", 201, "text/javascript", 0)
+	sessionUUID, err := s.CreateSession([]byte("foo bar"), 201, "text/javascript", 0)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, sessionUUID)
-	requestUUID, err := s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "", "", nil)
+	requestUUID, err := s.CreateRequest(sessionUUID, "1.1.1.1", "GET", "", []byte{}, nil)
 	assert.NoError(t, err)
 
 	request, err := s.GetRequest(sessionUUID, requestUUID)
@@ -214,7 +214,7 @@ func TestInMemoryWebSockets_ClosedStateProducesError(t *testing.T) {
 	_, err := s.GetSession("foo")
 	assert.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = s.CreateSession("foo", 202, "foo/bar", time.Second)
+	_, err = s.CreateSession([]byte("foo"), 202, "foo/bar", time.Second)
 	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.DeleteSession("foo")
@@ -223,7 +223,7 @@ func TestInMemoryWebSockets_ClosedStateProducesError(t *testing.T) {
 	_, err = s.DeleteRequests("foo")
 	assert.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = s.CreateRequest("foo", "1.1.1.1", "GET", "", "", nil)
+	_, err = s.CreateRequest("foo", "1.1.1.1", "GET", "", []byte{}, nil)
 	assert.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = s.GetRequest("foo", "bar")
@@ -248,14 +248,14 @@ func TestInMemoryWebSockets_Concurrent(t *testing.T) {
 		wg.Add(1)
 
 		go func() {
-			sUUID, err := s.CreateSession("foo", 202, "foo/bar", time.Second)
+			sUUID, err := s.CreateSession([]byte("foo"), 202, "foo/bar", time.Second)
 			assert.NoError(t, err)
 
 			_, err = s.GetSession(sUUID)
 			assert.NoError(t, err)
 
 			for j := 1; j < 50; j++ {
-				reqUUID, err2 := s.CreateRequest(sUUID, "1.1.1.1", "GET", "", "", nil)
+				reqUUID, err2 := s.CreateRequest(sUUID, "1.1.1.1", "GET", "", []byte{}, nil)
 				assert.NotEmpty(t, reqUUID)
 				assert.NoError(t, err2)
 
