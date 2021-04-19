@@ -11,6 +11,11 @@ requirejs.config({
             'https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min',
             'https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min',
         ],
+        // Yet another Base64 transcoder
+        // Docs: <https://github.com/dankogai/js-base64>
+        Base64: [
+            'https://cdn.jsdelivr.net/npm/js-base64@3.6.0/base64.min'
+        ],
         // JS framework for UI
         // Docs: <https://vuejs.org/v2/api/>
         Vue: [
