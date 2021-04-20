@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/go-redis/redis/v8"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
@@ -26,8 +26,6 @@ type (
 
 		closedMu sync.Mutex
 		closed   bool
-
-		json jsoniter.API
 	}
 
 	redisSubscription struct {
@@ -45,14 +43,13 @@ func NewRedis(ctx context.Context, rdb *redis.Client) *Redis {
 		ctx:  ctx,
 		rdb:  rdb,
 		subs: make(map[string]*redisSubscription),
-		json: jsoniter.ConfigFastest,
 	}
 }
 
 // redisEvent is an internal structure for events serialization.
 type redisEvent struct {
-	Name string `json:"n"`
-	Data []byte `json:"d"`
+	Name string `msgpack:"n"`
+	Data []byte `msgpack:"d"`
 }
 
 // Publish an event into passed channel.
@@ -65,7 +62,7 @@ func (ps *Redis) Publish(channelName string, event Event) error {
 		return errors.New("closed")
 	}
 
-	b, err := ps.json.Marshal(redisEvent{Name: event.Name(), Data: event.Data()})
+	b, err := msgpack.Marshal(redisEvent{Name: event.Name(), Data: event.Data()})
 	if err != nil {
 		return err
 	}
@@ -134,7 +131,7 @@ func (ps *Redis) Subscribe(channelName string, channel chan<- Event) error { //n
 					}
 
 					var rawEvent redisEvent
-					if err := ps.json.Unmarshal([]byte(msg.Payload), &rawEvent); err != nil {
+					if err := msgpack.Unmarshal([]byte(msg.Payload), &rawEvent); err != nil {
 						continue
 					}
 
