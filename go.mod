@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/alicebob/miniredis/v2 v2.14.3
-	github.com/fatih/color v1.10.0
+	github.com/fatih/color v1.11.0
 	github.com/felixge/httpsnoop v1.0.2
 	github.com/go-redis/redis/v8 v8.8.2
 	github.com/google/uuid v1.2.0
