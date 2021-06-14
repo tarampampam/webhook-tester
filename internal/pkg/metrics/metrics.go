@@ -1,7 +1,10 @@
 // Package metrics contains custom prometheus metrics and registry factories.
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+)
 
 // NewRegistry creates new prometheus registry with pre-registered common collectors.
 func NewRegistry() *prometheus.Registry {
@@ -9,8 +12,8 @@ func NewRegistry() *prometheus.Registry {
 
 	// register common metric collectors // TODO add application uptime metric?
 	registry.MustRegister(
-		prometheus.NewGoCollector(),
-		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
 	return registry
