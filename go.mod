@@ -7,7 +7,7 @@ require (
 	github.com/fatih/color v1.12.0
 	github.com/felixge/httpsnoop v1.0.2
 	github.com/go-redis/redis/v8 v8.11.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/json-iterator/go v1.1.11
