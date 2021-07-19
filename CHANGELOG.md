@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ### Changed
 
-- Go updated from `1.16.3` up to `1.16.5`
+- Go updated from `1.16.3` up to `1.16.6`
 
 ## v0.4.0
 
