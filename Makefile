@@ -22,7 +22,7 @@ help: ## Show this help
 
 image: ## Build docker image with app
 	docker build -f ./Dockerfile -t $(APP_NAME):local .
-	docker run $(APP_NAME):local version
+	docker run --rm $(APP_NAME):local version
 	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):local ...`';
 
 build: ## Build app binary file
