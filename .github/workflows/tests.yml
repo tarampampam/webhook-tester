@@ -127,7 +127,7 @@ jobs:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: /tmp/webhook-tester
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   e2e:
     name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
@@ -202,6 +202,7 @@ jobs:
         with:
           name: docker-image
           path: ./docker-image.tar
+          retention-days: 1
 
   docker-image-e2e:
     name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)

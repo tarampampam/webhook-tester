@@ -44,14 +44,6 @@ jobs:
           LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.values.outputs.version }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.binary-name }}" ./cmd/webhook-tester/
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{ steps.values.outputs.binary-name }}
-          path: ${{ steps.values.outputs.binary-name }}
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -73,11 +65,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1 # Action page: <https://github.com/docker/setup-buildx-action>
 
-      - name: Docker login in default registry
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_LOGIN }}" --password-stdin
+      - name: Login to default Container Registry
+        uses: docker/login-action@v1 # Action page: <https://github.com/docker/login-action>
+        with:
+          username: ${{ secrets.DOCKER_LOGIN }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Docker login in ghcr.io # Auth docs: <https://git.io/JLDaw>
-        run: echo "${{ secrets.GHCR_PASSWORD }}" | docker login ghcr.io -u tarampampam --password-stdin
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1 # Action page: <https://github.com/docker/login-action>
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PASSWORD }}
 
       - name: Generate builder values
         id: values
@@ -89,8 +88,8 @@ jobs:
             --platform "linux/amd64,linux/386,linux/arm64,linux/arm/v6,linux/arm/v7" \
             --tag "tarampampam/webhook-tester:${{ steps.values.outputs.version }}" \
             --tag "tarampampam/webhook-tester:latest" \
-            --tag "ghcr.io/tarampampam/webhook-tester:${{ steps.values.outputs.version }}" \
-            --tag "ghcr.io/tarampampam/webhook-tester:latest" \
+            --tag "ghcr.io/${{ github.actor }}/webhook-tester:${{ steps.values.outputs.version }}" \
+            --tag "ghcr.io/${{ github.actor }}/webhook-tester:latest" \
             --build-arg "APP_VERSION=${{ steps.values.outputs.version }}" \
             --file ./Dockerfile \
             --push \
