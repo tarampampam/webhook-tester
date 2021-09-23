@@ -2,17 +2,24 @@ name: tests
 
 on:
   push:
-    branches:
-      - master
-    tags-ignore:
-      - '**'
-    paths-ignore:
-      - '**.md'
+    branches: [master, main]
+    paths-ignore: ['**.md']
+    tags-ignore: ['**']
   pull_request:
-    paths-ignore:
-      - '**.md'
+    paths-ignore: ['**.md']
 
 jobs:
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with: {fetch-depth: 0}
+
+      - name: Check for GitLeaks
+        uses: zricethezav/gitleaks-action@v1.6.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
+
   golangci-lint:
     name: Golang-CI (lint)
     runs-on: ubuntu-20.04
@@ -26,26 +33,13 @@ jobs:
           version: v1.38 # without patch version
           only-new-issues: false # show only new issues if it's a pull request
 
-  gitleaks:
-    name: Gitleaks
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Check for GitLeaks
-        uses: zricethezav/gitleaks-action@v1.6.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
-
   go-test:
     name: Unit tests
     runs-on: ubuntu-20.04
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
+        with: {go-version: 1.17}
 
       - name: Check out code
         uses: actions/checkout@v2
@@ -89,15 +83,13 @@ jobs:
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
+        with: {go-version: 1.17}
 
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Generate version value
-        id: version # for PR this value will be `merge@__hash__`, SO: <https://stackoverflow.com/a/59780579/2252921>
-        run: echo "::set-output name=value::`echo ${GITHUB_REF##*/} | sed -e 's/^[vV ]*//'`@`echo ${GITHUB_SHA} | cut -c1-8`"
+      - uses: gacts/github-slug@v1
+        id: slug
 
       - name: Go modules Cache # Docs: <https://git.io/JfAKn#go---modules>
         uses: actions/cache@v2
@@ -114,7 +106,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.version.outputs.value }}
+          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.branch-name-slug }}@${{ steps.slug.outputs.commit-hash-short }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
 
       - name: Try to execute
@@ -172,15 +164,14 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Generate version value
-        id: version # for PR this value will be `merge@__hash__`, SO: <https://stackoverflow.com/a/59780579/2252921>
-        run: echo "::set-output name=value::`echo ${GITHUB_REF##*/} | sed -e 's/^[vV ]*//'`@`echo ${GITHUB_SHA} | cut -c1-8`"
+      - uses: gacts/github-slug@v1
+        id: slug
 
       - name: Build image
         run: |
           docker build \
             -t webhook-tester:local \
-            --build-arg "APP_VERSION=${{ steps.version.outputs.value }}" \
+            --build-arg "APP_VERSION=${{ steps.slug.outputs.branch-name-slug }}@${{ steps.slug.outputs.commit-hash-short }}" \
             -f ./Dockerfile \
             .
 
