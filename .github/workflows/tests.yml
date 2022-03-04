@@ -182,8 +182,18 @@ jobs:
       - name: Try to execute
         run: docker run --rm webhook-tester:local version
 
+      - name: Save docker image
+        run: docker save webhook-tester:local > ./docker-image.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-image
+          path: ./docker-image.tar
+          retention-days: 1
+
   scan-docker-image:
-    name: Scan the docker image
+    name: Scan docker image
     runs-on: ubuntu-20.04
     needs: [docker-image]
     steps:
