@@ -27,8 +27,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with: {go-version: 1.17}
+
       - name: Run linter
-        uses: golangci/golangci-lint-action@v2 # Action page: <https://github.com/golangci/golangci-lint-action>
+        uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
         with:
           version: v1.38 # without patch version
           only-new-issues: false # show only new issues if it's a pull request
@@ -178,13 +182,6 @@ jobs:
       - name: Try to execute
         run: docker run --rm webhook-tester:local version
 
-      - name: Scan image
-        uses: anchore/scan-action@v3 # action page: <https://github.com/anchore/scan-action>
-        with:
-          image: webhook-tester:local
-          fail-build: true
-          severity-cutoff: low # negligible, low, medium, high or critical
-
       - name: Save docker image
         run: docker save webhook-tester:local > ./docker-image.tar
 
@@ -194,6 +191,31 @@ jobs:
           name: docker-image
           path: ./docker-image.tar
           retention-days: 1
+
+  scan-docker-image:
+    name: Scan docker image
+    runs-on: ubuntu-20.04
+    needs: [docker-image]
+    steps:
+      - uses: actions/checkout@v3 # is needed for `upload-sarif` action
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: docker-image
+          path: .artifact
+
+      - uses: aquasecurity/trivy-action@0.2.2 # action page: <https://github.com/aquasecurity/trivy-action>
+        with:
+          input: .artifact/docker-image.tar
+          format: sarif
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: 1
+          output: trivy-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@v1
+        if: always()
+        continue-on-error: true
+        with: {sarif_file: trivy-results.sarif}
 
   docker-image-e2e:
     name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
