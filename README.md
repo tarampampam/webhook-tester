@@ -148,12 +148,6 @@ services:
       - 6379
 ```
 
-## Demo
-
-I can't guarantee that these links will be available forever, but you can use this application by the following links:
-
-- <https://web.hook.sh/>
-
 ## Changes log
 
 [![Release date][badge_release_date]][link_releases]
