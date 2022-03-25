@@ -3,7 +3,7 @@ module github.com/tarampampam/webhook-tester
 go 1.18
 
 require (
-	github.com/alicebob/miniredis/v2 v2.18.0
+	github.com/alicebob/miniredis/v2 v2.20.0
 	github.com/fatih/color v1.13.0
 	github.com/felixge/httpsnoop v1.0.2
 	github.com/go-redis/redis/v8 v8.11.4
@@ -38,7 +38,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
+	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
