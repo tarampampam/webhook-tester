@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: {fetch-depth: 0}
 
       - name: Check for GitLeaks
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -46,7 +46,7 @@ jobs:
         with: {go-version: 1.18}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 2 # Fixes codecov error 'Issue detecting commit SHA'
 
@@ -90,7 +90,7 @@ jobs:
         with: {go-version: 1.18}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - uses: gacts/github-slug@v1
         id: slug
@@ -136,7 +136,7 @@ jobs:
     needs: [build]
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Start redis server
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
@@ -166,7 +166,7 @@ jobs:
     needs: [golangci-lint, go-test]
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - uses: gacts/github-slug@v1
         id: slug
@@ -228,7 +228,7 @@ jobs:
     needs: [docker-image]
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Create docker network
         run: docker network create "app-network"
