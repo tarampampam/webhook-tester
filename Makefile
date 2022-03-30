@@ -3,10 +3,13 @@
 # Makefile readme (en): <https://www.gnu.org/software/make/manual/html_node/index.html#SEC_Contents>
 
 SHELL = /bin/sh
-LDFLAGS = "-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$(shell git rev-parse HEAD)"
+COMMIT_STR = $(shell git rev-parse --short HEAD)
+TAG_STR = $(shell git describe --abbrev=0 --tags)
+VERSION = "$(TAG_STR)-$(COMMIT_STR)"
+LDFLAGS = "-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$(VERSION)"
 
 DC_RUN_ARGS = --rm --user "$(shell id -u):$(shell id -g)"
-APP_NAME = $(notdir $(CURDIR))
+APP_NAME = tarampampam/$(notdir $(CURDIR))
 
 .PHONY : help \
          image build fmt lint gotest test cover redis-cli \
@@ -21,9 +24,9 @@ help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[32m%-11s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 image: ## Build docker image with app
-	docker build -f ./Dockerfile -t $(APP_NAME):local .
-	docker run --rm $(APP_NAME):local version
-	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):local ...`';
+	docker build --build-arg "APP_VERSION=$(VERSION)" -f ./Dockerfile -t $(APP_NAME):$(VERSION) .
+	docker run --rm $(APP_NAME):$(VERSION) version
+	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):$(VERSION) ...`';
 
 build: ## Build app binary file
 	docker-compose -f docker-compose-dev.yml run $(DC_RUN_ARGS) -e "CGO_ENABLED=0" --no-deps app go build -trimpath -ldflags $(LDFLAGS) -o ./webhook-tester ./cmd/webhook-tester/
@@ -62,4 +65,4 @@ restart: down up ## Restart all containers
 
 clean: ## Make clean
 	docker-compose -f docker-compose-dev.yml down -v -t 1
-	-docker rmi $(APP_NAME):local -f
+	-docker rmi $(APP_NAME):$(VERSION) -f
