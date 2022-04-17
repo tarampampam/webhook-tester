@@ -13,42 +13,34 @@ jobs:
     name: Gitleaks
     runs-on: ubuntu-20.04
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with: {fetch-depth: 0}
 
-      - name: Check for GitLeaks
-        uses: zricethezav/gitleaks-action@v1.6.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
+      - uses: zricethezav/gitleaks-action@v1.6.0 # Action page: <https://github.com/zricethezav/gitleaks-action>
 
   golangci-lint:
     name: Golang-CI (lint)
     runs-on: ubuntu-20.04
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with: {go-version: 1.17} # On v1.18 I had a lot of errors
+      - uses: actions/setup-go@v3
+        with: {go-version: 1.18}
 
-      - name: Run linter
-        uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
+      - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
         with:
-          version: v1.38 # without patch version
+          version: v1.45 # without patch version
           only-new-issues: false # show only new issues if it's a pull request
 
   go-test:
     name: Unit tests
     runs-on: ubuntu-20.04
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - uses: actions/setup-go@v2
         with: {go-version: 1.18}
 
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 2 # Fixes codecov error 'Issue detecting commit SHA'
+      - uses: actions/checkout@v3
+        with: {fetch-depth: 2} # Fixes codecov error 'Issue detecting commit SHA'
 
       - name: Go modules Cache # Docs: <https://git.io/JfAKn#go---modules>
         uses: actions/cache@v3
@@ -63,9 +55,8 @@ jobs:
       - name: Run Unit tests
         run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
 
-      - name: Upload Coverage report to CodeCov
+      - uses: codecov/codecov-action@v2 # https://github.com/codecov/codecov-action
         continue-on-error: true
-        uses: codecov/codecov-action@v2 # https://github.com/codecov/codecov-action
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: /tmp/coverage.txt
@@ -79,18 +70,13 @@ jobs:
         os: [linux, windows, darwin] # linux, freebsd, darwin, windows
         arch: [amd64]                # amd64, 386
         include:
-          - os: linux
-            arch: 386
-          - os: windows
-            arch: 386
+          - {os: linux, arch: 386}
     needs: [golangci-lint, go-test]
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - uses: actions/setup-go@v2
         with: {go-version: 1.18}
 
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - uses: gacts/github-slug@v1
         id: slug
@@ -117,8 +103,7 @@ jobs:
         if: matrix.os == 'linux'
         run: /tmp/webhook-tester version && /tmp/webhook-tester -h
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: /tmp/webhook-tester
@@ -135,8 +120,7 @@ jobs:
         pubsub-driver: [memory, redis]
     needs: [build]
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Start redis server
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
@@ -165,8 +149,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: [golangci-lint, go-test]
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - uses: gacts/github-slug@v1
         id: slug
@@ -227,18 +210,15 @@ jobs:
         pubsub-driver: [memory, redis]
     needs: [docker-image]
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Create docker network
-        run: docker network create "app-network"
+      - run: docker network create "app-network"
 
       - name: Start redis server
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
         run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:6.0.9-alpine
 
-      - name: Download builded docker image
-        uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v2
         with:
           name: docker-image
           path: .artifact

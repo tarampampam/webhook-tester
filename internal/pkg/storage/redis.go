@@ -244,7 +244,7 @@ func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
 		return nil, allErr
 	}
 
-	result := make([]Request, 0, 8)
+	result := make([]Request, 0, 8) //nolint:gomnd
 
 	if len(UUIDs) > 0 {
 		// convert request UUIDs into storage keys

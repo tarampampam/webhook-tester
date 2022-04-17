@@ -55,7 +55,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		&f.listen.port,
 		"port",
 		"p",
-		8080,
+		8080, //nolint:gomnd
 		fmt.Sprintf("TCP port number [$%s]", env.ListenPort),
 	)
 	flagSet.StringVarP(
@@ -69,7 +69,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		&f.maxRequests,
 		"max-requests",
 		"",
-		128,
+		128, //nolint:gomnd
 		fmt.Sprintf("maximum stored requests per session (max 65535) [$%s]", env.MaxSessionRequests),
 	)
 	flagSet.DurationVarP(
@@ -136,7 +136,7 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 	}
 
 	if envVar, exists := env.ListenPort.Lookup(); exists {
-		if p, err := strconv.ParseUint(envVar, 10, 16); err == nil {
+		if p, err := strconv.ParseUint(envVar, 10, 16); err == nil { //nolint:gomnd
 			f.listen.port = uint16(p)
 		} else {
 			return fmt.Errorf("wrong TCP port environment variable [%s] value", envVar)
@@ -148,7 +148,7 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 	}
 
 	if envVar, exists := env.MaxSessionRequests.Lookup(); exists {
-		if p, err := strconv.ParseUint(envVar, 10, 16); err == nil {
+		if p, err := strconv.ParseUint(envVar, 10, 16); err == nil { //nolint:gomnd
 			f.maxRequests = uint16(p)
 		} else {
 			return fmt.Errorf("wrong maximum session requests [%s] value", envVar)
@@ -176,7 +176,7 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 	}
 
 	if envVar, exists := env.WebsocketMaxClients.Lookup(); exists {
-		if p, err := strconv.ParseUint(envVar, 10, 32); err == nil {
+		if p, err := strconv.ParseUint(envVar, 10, 32); err == nil { //nolint:gomnd
 			f.websocket.maxClients = uint32(p)
 		} else {
 			return fmt.Errorf("wrong maximal websocket clients count [%s] value", envVar)

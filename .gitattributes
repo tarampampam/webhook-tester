@@ -1,0 +1,9 @@
+# Text files have auto line endings
+* text=auto
+
+# Go source files always have LF line endings
+*.go text eol=lf
+
+# Disable next extensions in project "used languages" list
+Makefile linguist-detectable=false
+*.html linguist-detectable=false

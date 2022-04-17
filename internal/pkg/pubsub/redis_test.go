@@ -63,7 +63,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 		go func() { // each of subscriber must receive a copy of published event
 			defer wg.Done()
 
-			ch := make(chan pubsub.Event)
+			ch := make(chan pubsub.Event, 2)
 			defer close(ch)
 
 			assert.NoError(t, ps.Subscribe("foo", ch))
@@ -94,7 +94,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 		}()
 	}
 
-	<-time.After(time.Millisecond) // make sure that all subscribes was subscribed successfully
+	<-time.After(time.Millisecond * 50) // make sure that all subscribes was subscribed successfully
 
 	assert.NoError(t, ps.Publish("foo", event1))
 	assert.NoError(t, ps.Publish("foo", event2))
@@ -149,7 +149,7 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Publish("foo", pubsub.NewRequestRegisteredEvent("bar")))
 
-			<-time.After(time.Millisecond * 5)
+			<-time.After(time.Millisecond * 15)
 
 			assert.Len(t, ch1, 0)
 			assert.Len(t, ch2, 1)
