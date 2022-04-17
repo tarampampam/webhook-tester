@@ -19,6 +19,7 @@ func TestMiddleware(t *testing.T) {
 		name              string
 		giveRequest       func() *http.Request
 		giveHandler       http.Handler
+		wantOutput        bool
 		checkOutputFields func(t *testing.T, in map[string]interface{})
 	}{
 		{
@@ -34,6 +35,7 @@ func TestMiddleware(t *testing.T) {
 
 				return
 			},
+			wantOutput: true,
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
 				assert.Equal(t, http.MethodGet, in["method"])
 				assert.NotZero(t, in["duration"])
@@ -59,6 +61,7 @@ func TestMiddleware(t *testing.T) {
 
 				return
 			},
+			wantOutput: true,
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
 				assert.Equal(t, "10.1.1.1", in["remote addr"])
 			},
@@ -76,6 +79,7 @@ func TestMiddleware(t *testing.T) {
 
 				return
 			},
+			wantOutput: true,
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
 				assert.Equal(t, "10.0.1.1", in["remote addr"])
 			},
@@ -92,9 +96,23 @@ func TestMiddleware(t *testing.T) {
 
 				return
 			},
+			wantOutput: true,
 			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
 				assert.Equal(t, "10.0.0.1", in["remote addr"])
 			},
+		},
+		{
+			name: "healthcheck skipped",
+			giveHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}),
+			giveRequest: func() (req *http.Request) {
+				req, _ = http.NewRequest(http.MethodGet, "http://unit/test/?foo=bar&baz", http.NoBody)
+				req.Header.Set("User-Agent", "HealthCheck/Internal")
+
+				return
+			},
+			wantOutput: false,
 		},
 	}
 
@@ -109,11 +127,14 @@ func TestMiddleware(t *testing.T) {
 
 				logreq.New(log).Middleware(tt.giveHandler).ServeHTTP(rr, tt.giveRequest())
 			})
+			if tt.wantOutput {
+				var asJSON map[string]interface{}
+				assert.NoError(t, json.Unmarshal([]byte(output), &asJSON), "logger output must be valid JSON")
 
-			var asJSON map[string]interface{}
-			assert.NoError(t, json.Unmarshal([]byte(output), &asJSON), "logger output must be valid JSON")
-
-			tt.checkOutputFields(t, asJSON)
+				tt.checkOutputFields(t, asJSON)
+			} else {
+				assert.Empty(t, output)
+			}
 		})
 	}
 }
