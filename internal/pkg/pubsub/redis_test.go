@@ -37,7 +37,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	var event1, event2 = pubsub.NewRequestRegisteredEvent("bar"), pubsub.NewRequestRegisteredEvent("baz")
@@ -63,7 +63,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 		go func() { // each of subscriber must receive a copy of published event
 			defer wg.Done()
 
-			ch := make(chan pubsub.Event)
+			ch := make(chan pubsub.Event, 2)
 			defer close(ch)
 
 			assert.NoError(t, ps.Subscribe("foo", ch))
@@ -94,7 +94,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 		}()
 	}
 
-	<-time.After(time.Millisecond) // make sure that all subscribes was subscribed successfully
+	<-time.After(time.Millisecond * 50) // make sure that all subscribes was subscribed successfully
 
 	assert.NoError(t, ps.Publish("foo", event1))
 	assert.NoError(t, ps.Publish("foo", event2))
