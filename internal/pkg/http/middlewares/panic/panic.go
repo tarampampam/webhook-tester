@@ -31,7 +31,7 @@ func New(log *zap.Logger) mux.MiddlewareFunc {
 						err = fmt.Errorf("%v", rec)
 					}
 
-					stackBuf := make([]byte, 1024)
+					stackBuf := make([]byte, 1024) //nolint:gomnd
 					// do NOT use `debug.Stack()` here for skipping one unimportant call trace in stacktrace
 					for {
 						n := runtime.Stack(stackBuf, false)
