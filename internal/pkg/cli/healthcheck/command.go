@@ -24,7 +24,7 @@ func NewCommand(checker checker) *cobra.Command {
 		Hidden:  true,
 		PreRunE: func(*cobra.Command, []string) error {
 			if envPort, exists := env.ListenPort.Lookup(); exists && envPort != "" {
-				if p, err := strconv.ParseUint(envPort, 10, 16); err == nil {
+				if p, err := strconv.ParseUint(envPort, 10, 16); err == nil { //nolint:gomnd
 					port = uint16(p)
 				} else {
 					return fmt.Errorf("wrong TCP port environment variable [%s] value", envPort)
@@ -42,7 +42,7 @@ func NewCommand(checker checker) *cobra.Command {
 		&port,
 		"port",
 		"p",
-		8080,
+		8080, //nolint:gomnd
 		fmt.Sprintf("TCP port number [$%s]", env.ListenPort),
 	)
 

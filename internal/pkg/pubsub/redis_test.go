@@ -37,7 +37,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	var event1, event2 = pubsub.NewRequestRegisteredEvent("bar"), pubsub.NewRequestRegisteredEvent("baz")
@@ -149,7 +149,7 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Publish("foo", pubsub.NewRequestRegisteredEvent("bar")))
 
-			<-time.After(time.Millisecond * 5)
+			<-time.After(time.Millisecond * 15)
 
 			assert.Len(t, ch1, 0)
 			assert.Len(t, ch2, 1)
