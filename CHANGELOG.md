@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Go updated from `1.16.3` up to `1.18.0`
 
+### Fixed
+
+- Internal healthcheck in logs disabled [#150]
+
+[#150]:https://github.com/tarampampam/webhook-tester/issues/150
+
 ## v0.4.0
 
 ### Changed
