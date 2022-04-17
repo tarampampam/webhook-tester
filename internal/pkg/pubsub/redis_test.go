@@ -27,6 +27,8 @@ func TestRedis_PublishErrors(t *testing.T) {
 }
 
 func TestRedis_PublishAndReceive(t *testing.T) {
+	t.Parallel()
+
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
@@ -35,7 +37,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	var event1, event2 = pubsub.NewRequestRegisteredEvent("bar"), pubsub.NewRequestRegisteredEvent("baz")
@@ -120,6 +122,8 @@ func TestRedis_Close(t *testing.T) {
 }
 
 func TestRedis_Unsubscribe(t *testing.T) {
+	t.Parallel()
+
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
@@ -177,6 +181,8 @@ func TestRedis_Subscribe(t *testing.T) {
 }
 
 func TestRedis_UnsubscribeWithChannelClosingWithoutReading(t *testing.T) {
+	t.Parallel()
+
 	mini, err := miniredis.Run()
 	assert.NoError(t, err)
 
