@@ -127,7 +127,7 @@ jobs:
         run: docker run --rm -d -p "6379:6379/tcp" redis:6.0.9-alpine
 
       - name: Download compiled binary file
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: webhook-tester-linux-amd64
           path: .artifact
@@ -182,7 +182,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3 # is needed for `upload-sarif` action
 
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .artifact
@@ -218,7 +218,7 @@ jobs:
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
         run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:6.0.9-alpine
 
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .artifact
