@@ -103,7 +103,7 @@ jobs:
         if: matrix.os == 'linux'
         run: /tmp/webhook-tester version && /tmp/webhook-tester -h
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: /tmp/webhook-tester
@@ -169,7 +169,7 @@ jobs:
         run: docker save webhook-tester:local > ./docker-image.tar
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: docker-image
           path: ./docker-image.tar
