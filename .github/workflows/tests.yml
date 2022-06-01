@@ -188,7 +188,7 @@ jobs:
           name: docker-image
           path: .artifact
 
-      - uses: aquasecurity/trivy-action@0.2.5 # action page: <https://github.com/aquasecurity/trivy-action>
+      - uses: aquasecurity/trivy-action@0.3.0 # action page: <https://github.com/aquasecurity/trivy-action>
         with:
           input: .artifact/docker-image.tar
           format: sarif
