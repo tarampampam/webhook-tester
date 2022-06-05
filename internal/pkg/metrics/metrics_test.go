@@ -14,5 +14,5 @@ func TestNewRegistry(t *testing.T) {
 	count, err := testutil.GatherAndCount(registry)
 
 	assert.NoError(t, err)
-	assert.True(t, count >= 35, "not enough common metrics")
+	assert.True(t, count >= 30, "not enough common metrics")
 }
