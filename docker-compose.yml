@@ -46,7 +46,7 @@ services:
       timeout: 2s
 
   redis:
-    image: redis:7.0.0-alpine # Image page: <https://hub.docker.com/_/redis>
+    image: redis:7.0.1-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
       - redis-data:/data:rw
     ports:
