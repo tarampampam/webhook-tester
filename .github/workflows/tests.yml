@@ -33,9 +33,6 @@ jobs:
         with: {go-version: 1.18}
 
       - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
-        with:
-          version: v1.45 # without patch version
-          only-new-issues: false # show only new issues if it's a pull request
 
   go-test:
     name: Unit tests
@@ -129,7 +126,7 @@ jobs:
 
       - name: Start redis server
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
-        run: docker run --rm -d -p "6379:6379/tcp" redis:6.0.9-alpine
+        run: docker run --rm -d -p "6379:6379/tcp" redis:7-alpine
 
       - name: Download compiled binary file
         uses: actions/download-artifact@v3
@@ -221,7 +218,7 @@ jobs:
 
       - name: Start redis server
         if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
-        run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:6.0.9-alpine
+        run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:7-alpine
 
       - uses: actions/download-artifact@v3
         with:

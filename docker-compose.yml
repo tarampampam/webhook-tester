@@ -19,13 +19,12 @@ services:
       - .:/src:rw
       - tmp-data:/tmp:rw
     depends_on:
-      redis:
-        condition: service_healthy
+      redis: {condition: service_healthy}
 
   web:
     <<: *app-service
     ports:
-      - 8080:8080/tcp # Open <http://127.0.0.1:8080>
+      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
     command:
       - go
       - run
@@ -47,15 +46,15 @@ services:
       timeout: 2s
 
   redis:
-    image: redis:6.0.9-alpine # Image page: <https://hub.docker.com/_/redis>
+    image: redis:7.0.0-alpine # Image page: <https://hub.docker.com/_/redis>
     volumes:
       - redis-data:/data:rw
     ports:
-      - 6379/tcp
+      - '6379/tcp'
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli ping']
-      interval: 1s
-      timeout: 2s
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 500ms
+      timeout: 1s
 
   golint:
     image: golangci/golangci-lint:v1.45-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
