@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setupxcx-go@v3
+      - uses: actions/setup-go@v3
         with: {go-version: 1.18}
 
       - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
