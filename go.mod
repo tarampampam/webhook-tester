@@ -3,7 +3,7 @@ module github.com/tarampampam/webhook-tester
 go 1.18
 
 require (
-	github.com/alicebob/miniredis/v2 v2.21.0
+	github.com/alicebob/miniredis/v2 v2.22.0
 	github.com/fatih/color v1.13.0
 	github.com/felixge/httpsnoop v1.0.3
 	github.com/go-redis/redis/v8 v8.11.5
