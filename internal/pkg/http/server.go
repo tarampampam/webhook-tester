@@ -8,16 +8,18 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/middlewares/panic"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	"go.uber.org/zap"
 )
 
 type (
@@ -41,10 +43,11 @@ func NewServer(log *zap.Logger) *Server {
 	var (
 		router     = mux.NewRouter()
 		httpServer = &http.Server{
-			Handler:      router,
-			ErrorLog:     zap.NewStdLog(log),
-			ReadTimeout:  readTimeout,
-			WriteTimeout: writeTimeout,
+			Handler:           router,
+			ErrorLog:          zap.NewStdLog(log),
+			ReadHeaderTimeout: readTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
 		}
 	)
 
