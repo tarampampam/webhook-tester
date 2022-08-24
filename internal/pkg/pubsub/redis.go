@@ -156,9 +156,8 @@ func (ps *Redis) Subscribe(channelName string, channel chan<- Event) error { //n
 	return nil
 }
 
-// Unsubscribe the subscription to the named channel for the passed events channel. Be careful with channel closing:
-//	close(channel)
-// This can call the panics if some Event's scheduled for publishing.
+// Unsubscribe the subscription to the named channel for the passed events channel. Be careful with channel closing,
+// this can call the panics if some Event's scheduled for publishing.
 func (ps *Redis) Unsubscribe(channelName string, channel chan Event) error {
 	if channelName == "" {
 		return errors.New("empty channel name is not allowed")
