@@ -34,10 +34,10 @@ WORKDIR /tmp/rootfs
 
 RUN set -x \
     && mkdir -p \
-        ./etc/ssl \
-        ./etc/apache2 \
-        ./bin \
-        ./opt/webhook-tester \
+    ./etc/ssl \
+    ./etc/apache2 \
+    ./bin \
+    ./opt/webhook-tester \
     && cp -R /etc/ssl/certs ./etc/ssl/certs \
     && cp /etc/mime.types ./etc/mime.types \
     && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
@@ -72,7 +72,7 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
     "/bin/webhook-tester", "healthcheck", \
     "--log-json", \
     "--port", "8080" \
-]
+    ]
 
 ENV PUBLIC_DIR="/opt/webhook-tester/web"
 
