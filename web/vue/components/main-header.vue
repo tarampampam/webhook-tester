@@ -9,15 +9,6 @@
                 <li class="nav-item d-inline-block" data-toggle="modal" data-target="#help-modal">
                     <span class="nav-link"><i class="fas fa-question mr-1"></i> Help</span>
                 </li>
-                <li class="nav-item d-inline-block">
-                    <a class="nav-link"
-                       href="https://github.com/tarampampam/webhook-tester"
-                       target="_blank"
-                       rel="noopener"
-                    >
-                        <i class="fab fa-github mr-1"></i> GitHub
-                    </a>
-                </li>
             </ul>
         </div>
 
