@@ -34,6 +34,7 @@
                         <p>
                             <strong>Webhook Tester</strong> allows you to easily test webhooks and other types of HTTP
                             requests. Here's your unique URL:
+                        </p>
                         <p>
                             <code id="help-modal-current-url">{{ currentWebHookUrl }}</code>
                             <button class="btn btn-outline-info btn-sm ml-2"
