@@ -80,7 +80,7 @@ jobs:
           platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v6,linux/arm/v7
           build-args: "APP_VERSION=${{ steps.slug.outputs.version }}"
           tags: |
-            tarampampam/webhook-tester:${{ steps.slug.outputs.version }}
-            tarampampam/webhook-tester:latest
+            hatamiarash7/webhook-tester:${{ steps.slug.outputs.version }}
+            hatamiarash7/webhook-tester:latest
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version }}
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest
