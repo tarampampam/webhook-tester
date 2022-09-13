@@ -22,21 +22,21 @@ This application is written in GoLang and works very fast. It comes with a tiny 
 
 ### :fire: Features list
 
--   Customizable front-end, based on `vue.js` (without the need for a builder/bundler)
--   Liveness/readiness probes (routes `/live` and `/ready` respectively)
--   Can be started without any 3rd party dependencies
--   Metrics in prometheus format (route `/metrics`)
--   Multi-arch docker image, based on `scratch`
--   Unprivileged user in docker image is used
--   Well-tested and documented source code
--   Built-in CLI health check sub-command
--   Recorded request binary view using UI
--   JSON/human-readable logging formats
--   Customizable webhook responses
--   Built-in Websockets support
--   Low memory/cpu usage
--   Free and open-source
--   Ready to scale
+- Customizable front-end, based on `vue.js` (without the need for a builder/bundler)
+- Liveness/readiness probes (routes `/live` and `/ready` respectively)
+- Can be started without any 3rd party dependencies
+- Metrics in prometheus format (route `/metrics`)
+- Multi-arch docker image, based on `scratch`
+- Unprivileged user in docker image is used
+- Well-tested and documented source code
+- Built-in CLI health check sub-command
+- Recorded request binary view using UI
+- JSON/human-readable logging formats
+- Customizable webhook responses
+- Built-in Websockets support
+- Low memory/cpu usage
+- Free and open-source
+- Ready to scale
 
 ### Storage
 
@@ -59,7 +59,7 @@ Download the latest binary file for your os/arch from the [releases page][link_r
 This application supports the next sub-commands:
 
 | Sub-command   | Description                                                                               |
-| ------------- | ----------------------------------------------------------------------------------------- |
+|---------------|-------------------------------------------------------------------------------------------|
 | `serve`       | Start HTTP server                                                                         |
 | `healthcheck` | Health checker for the HTTP server (use case - docker healthcheck) _(hidden in CLI help)_ |
 | `version`     | Display application version                                                               |
@@ -67,7 +67,7 @@ This application supports the next sub-commands:
 And global flags:
 
 | Flag              | Description         |
-| ----------------- | ------------------- |
+|-------------------|---------------------|
 | `--verbose`, `-v` | Verbose output      |
 | `--debug`         | Debug output        |
 | `--log-json`      | Logs in JSON format |
@@ -77,7 +77,7 @@ And global flags:
 `serve` sub-command allows to use next flags:
 
 | Flag                      | Description                                                                       | Default value              | Environment variable |
-| ------------------------- | --------------------------------------------------------------------------------- | -------------------------- | -------------------- |
+|---------------------------|-----------------------------------------------------------------------------------|----------------------------|----------------------|
 | `--listen`, `-l`          | IP address to listen on                                                           | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`        |
 | `--port`, `-p`            | TCP port number                                                                   | `8080`                     | `LISTEN_PORT`        |
 | `--public`                | Path to the directory with public assets                                          | `%app_bin%/web`            | `PUBLIC_DIR`         |
@@ -128,24 +128,24 @@ $ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X serve
 Where `X.X.X` is image tag _(application version)_. Simple `docker-compose` file below:
 
 ```yaml
-version: "3.4"
+version: '3.4'
 
 volumes:
-    redis-data:
+  redis-data:
 
 services:
-    app:
-        image: tarampampam/webhook-tester:X.X.X
-        command: serve --port 8080 --log-json --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
-        ports:
-            - "8080:8080/tcp" # Open <http://127.0.0.1:8080>
+  app:
+    image: tarampampam/webhook-tester:X.X.X
+    command: serve --port 8080 --log-json --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
+    ports:
+      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
 
-    redis:
-        image: redis:6.0.9-alpine
-        volumes:
-            - redis-data:/data:cached
-        ports:
-            - 6379
+  redis:
+    image: redis:6.0.9-alpine
+    volumes:
+      - redis-data:/data:cached
+    ports:
+      - 6379
 ```
 
 ## Changes log
@@ -172,26 +172,27 @@ If you find any package errors, please, [make an issue][link_create_issue] in cu
 
 This is open-sourced software licensed under the [MIT License][link_license].
 
-[badge_build]: https://img.shields.io/github/workflow/status/tarampampam/webhook-tester/tests?maxAge=30&logo=github
-[badge_release]: https://img.shields.io/github/workflow/status/tarampampam/webhook-tester/release?maxAge=30&label=release&logo=github
-[badge_coverage]: https://img.shields.io/codecov/c/github/tarampampam/webhook-tester/master.svg?maxAge=30
-[badge_release_version]: https://img.shields.io/github/release/tarampampam/webhook-tester.svg?maxAge=30
-[badge_size_latest]: https://img.shields.io/docker/image-size/tarampampam/webhook-tester/latest?maxAge=30
-[badge_language]: https://img.shields.io/github/go-mod/go-version/tarampampam/webhook-tester?longCache=true
-[badge_license]: https://img.shields.io/github/license/tarampampam/webhook-tester.svg?longCache=true
-[badge_release_date]: https://img.shields.io/github/release-date/tarampampam/webhook-tester.svg?maxAge=180
-[badge_commits_since_release]: https://img.shields.io/github/commits-since/tarampampam/webhook-tester/latest.svg?maxAge=45
-[badge_issues]: https://img.shields.io/github/issues/tarampampam/webhook-tester.svg?maxAge=45
-[badge_pulls]: https://img.shields.io/github/issues-pr/tarampampam/webhook-tester.svg?maxAge=45
-[link_coverage]: https://codecov.io/gh/tarampampam/webhook-tester
-[link_build]: https://github.com/tarampampam/webhook-tester/actions
-[link_docker_hub]: https://hub.docker.com/r/tarampampam/webhook-tester/
-[link_docker_tags]: https://hub.docker.com/r/tarampampam/webhook-tester/tags
-[link_license]: https://github.com/tarampampam/webhook-tester/blob/master/LICENSE
-[link_releases]: https://github.com/tarampampam/webhook-tester/releases
-[link_commits]: https://github.com/tarampampam/webhook-tester/commits
-[link_changes_log]: https://github.com/tarampampam/webhook-tester/blob/master/CHANGELOG.md
-[link_issues]: https://github.com/tarampampam/webhook-tester/issues
-[link_create_issue]: https://github.com/tarampampam/webhook-tester/issues/new/choose
-[link_pulls]: https://github.com/tarampampam/webhook-tester/pulls
-[link_ghcr]: https://github.com/users/tarampampam/packages/container/package/webhook-tester
+[badge_build]:https://img.shields.io/github/workflow/status/tarampampam/webhook-tester/tests?maxAge=30&logo=github
+[badge_release]:https://img.shields.io/github/workflow/status/tarampampam/webhook-tester/release?maxAge=30&label=release&logo=github
+[badge_coverage]:https://img.shields.io/codecov/c/github/tarampampam/webhook-tester/master.svg?maxAge=30
+[badge_release_version]:https://img.shields.io/github/release/tarampampam/webhook-tester.svg?maxAge=30
+[badge_size_latest]:https://img.shields.io/docker/image-size/tarampampam/webhook-tester/latest?maxAge=30
+[badge_language]:https://img.shields.io/github/go-mod/go-version/tarampampam/webhook-tester?longCache=true
+[badge_license]:https://img.shields.io/github/license/tarampampam/webhook-tester.svg?longCache=true
+[badge_release_date]:https://img.shields.io/github/release-date/tarampampam/webhook-tester.svg?maxAge=180
+[badge_commits_since_release]:https://img.shields.io/github/commits-since/tarampampam/webhook-tester/latest.svg?maxAge=45
+[badge_issues]:https://img.shields.io/github/issues/tarampampam/webhook-tester.svg?maxAge=45
+[badge_pulls]:https://img.shields.io/github/issues-pr/tarampampam/webhook-tester.svg?maxAge=45
+
+[link_coverage]:https://codecov.io/gh/tarampampam/webhook-tester
+[link_build]:https://github.com/tarampampam/webhook-tester/actions
+[link_docker_hub]:https://hub.docker.com/r/tarampampam/webhook-tester/
+[link_docker_tags]:https://hub.docker.com/r/tarampampam/webhook-tester/tags
+[link_license]:https://github.com/tarampampam/webhook-tester/blob/master/LICENSE
+[link_releases]:https://github.com/tarampampam/webhook-tester/releases
+[link_commits]:https://github.com/tarampampam/webhook-tester/commits
+[link_changes_log]:https://github.com/tarampampam/webhook-tester/blob/master/CHANGELOG.md
+[link_issues]:https://github.com/tarampampam/webhook-tester/issues
+[link_create_issue]:https://github.com/tarampampam/webhook-tester/issues/new/choose
+[link_pulls]:https://github.com/tarampampam/webhook-tester/pulls
+[link_ghcr]:https://github.com/users/tarampampam/packages/container/package/webhook-tester

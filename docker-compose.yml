@@ -1,5 +1,5 @@
 # Docker-compose file is used only for local development. This is not production-ready example
-version: "3.8"
+version: '3.8'
 
 volumes:
   tmp-data: {}
@@ -19,12 +19,12 @@ services:
       - .:/src:rw
       - tmp-data:/tmp:rw
     depends_on:
-      redis: { condition: service_healthy }
+      redis: {condition: service_healthy}
 
   web:
     <<: *app-service
     ports:
-      - "8080:8080/tcp" # Open <http://127.0.0.1:8080>
+      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
     command:
       - go
       - run
@@ -41,7 +41,7 @@ services:
       - --ws-max-clients=20
       - --ws-max-lifetime=1m
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8080/live"]
+      test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:8080/live']
       interval: 5s
       timeout: 2s
 
@@ -50,9 +50,9 @@ services:
     volumes:
       - redis-data:/data:rw
     ports:
-      - "6379/tcp"
+      - '6379/tcp'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 500ms
       timeout: 1s
 

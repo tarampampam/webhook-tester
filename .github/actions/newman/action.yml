@@ -4,17 +4,17 @@ description: Newman is CLI collection runner for Postman
 
 inputs:
   collection:
-    description: "Path to the file with postman collection"
+    description: 'Path to the file with postman collection'
     required: true
-    default: "./test/postman/default.postman_collection.json"
+    default: './test/postman/default.postman_collection.json'
   environment:
-    description: "Path to the file with postman environment"
+    description: 'Path to the file with postman environment'
     required: true
-    default: "./test/postman/default.postman_environment.json"
+    default: './test/postman/default.postman_environment.json'
   baseurl:
-    description: "Application base url"
+    description: 'Application base url'
     required: true
-    default: "http://127.0.0.1:8080"
+    default: 'http://127.0.0.1:8080'
 
 runs:
   using: "composite"
