@@ -4,11 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
-## UNRELEASED
+## v0.4.3
 
 ### Changed
 
 - Go updated from `1.18` up to `1.19`
+
+### Fixed
+
+- HTML pages markup (thx [@hatamiarash7](https://github.com/hatamiarash7))
 
 ## v0.4.2
 
