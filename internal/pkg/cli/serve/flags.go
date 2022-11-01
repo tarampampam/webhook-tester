@@ -177,7 +177,7 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 	}
 
 	if envVar, exists := env.WebsocketMaxClients.Lookup(); exists {
-		if p, err := strconv.ParseUint(envVar, 10, 32); err == nil { //nolint:gomnd
+		if p, err := strconv.ParseUint(envVar, 10, 32); err == nil {
 			f.websocket.maxClients = uint32(p)
 		} else {
 			return fmt.Errorf("wrong maximal websocket clients count [%s] value", envVar)
