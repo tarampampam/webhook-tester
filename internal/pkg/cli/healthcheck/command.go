@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/env"
 )
 
@@ -24,7 +25,7 @@ func NewCommand(checker checker) *cobra.Command {
 		Hidden:  true,
 		PreRunE: func(*cobra.Command, []string) error {
 			if envPort, exists := env.ListenPort.Lookup(); exists && envPort != "" {
-				if p, err := strconv.ParseUint(envPort, 10, 16); err == nil { //nolint:gomnd
+				if p, err := strconv.ParseUint(envPort, 10, 16); err == nil {
 					port = uint16(p)
 				} else {
 					return fmt.Errorf("wrong TCP port environment variable [%s] value", envPort)
