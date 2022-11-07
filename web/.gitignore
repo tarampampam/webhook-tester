@@ -1,0 +1,8 @@
+## Vendor
+/node_modules
+
+## Distributive
+/dist
+
+## Etc
+/temp/src-old

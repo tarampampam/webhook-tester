@@ -48,6 +48,9 @@ cover: ## Run app tests with coverage report
 shell: ## Start shell into container with golang
 	docker-compose run $(DC_RUN_ARGS) app bash
 
+node-shell: ## Start shell into a container with node
+	docker-compose run $(DC_RUN_ARGS) node sh
+
 redis-cli: ## Start redis-cli
 	docker-compose run --rm --no-deps redis redis-cli -h redis -p 6379
 

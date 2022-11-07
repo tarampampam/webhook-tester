@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/fatih/color"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/cli"
 )
 
