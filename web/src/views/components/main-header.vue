@@ -212,6 +212,7 @@
 <script lang="ts">
 import {defineComponent, reactive} from 'vue'
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
+import {NewSessionSettings} from '../types'
 import {Modal} from 'bootstrap'
 
 const textEncoder = new TextEncoder();
@@ -223,14 +224,6 @@ const state: {
   $helpModal: undefined,
   $newUrlModal: undefined,
 })
-
-export interface NewSessionSettings {
-  statusCode?: number
-  responseDelay?: number
-  contentType?: string
-  responseContent?: Uint8Array
-  destroyCurrentSession?: boolean
-}
 
 export default defineComponent({
   components: {
@@ -282,7 +275,7 @@ export default defineComponent({
 
   computed: {
     sessionLifetimeDays: function (): number {
-      if (typeof this.sessionLifetimeSec === 'number') {
+      if (typeof this.sessionLifetimeSec === 'number' && isFinite(this.sessionLifetimeSec)) {
         return Number((this.sessionLifetimeSec / 24 / 60 / 60).toFixed(1))
       }
 
@@ -290,7 +283,7 @@ export default defineComponent({
     },
 
     maxBodySizeKb: function (): number {
-      if (typeof this.maxBodySizeBytes === 'number') {
+      if (typeof this.maxBodySizeBytes === 'number' && isFinite(this.maxBodySizeBytes)) {
         return Number((this.maxBodySizeBytes / 1024).toFixed(1))
       }
 
@@ -342,7 +335,9 @@ export default defineComponent({
       window.open(this.currentWebHookUrl, '_blank');
     },
   },
-  emits: ['createNewUrl'],
+  emits: [
+    'createNewUrl',
+  ],
 })
 </script>
 

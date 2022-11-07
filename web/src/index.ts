@@ -1,6 +1,17 @@
 import {createApp} from 'vue'
 import {library} from '@fortawesome/fontawesome-svg-core'
-import {faArrowUpRightFromSquare, faPlus, faQuestion} from '@fortawesome/free-solid-svg-icons'
+import {
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight,
+  faArrowUpRightFromSquare,
+  faAtom,
+  faDownload,
+  faFont,
+  faPlus,
+  faQuestion
+} from '@fortawesome/free-solid-svg-icons'
 import {faGithub} from '@fortawesome/free-brands-svg-icons'
 import {faCopy} from '@fortawesome/free-regular-svg-icons'
 import ClipboardJS from 'clipboard'
@@ -13,6 +24,13 @@ library.add( // https://fontawesome.com/icons
   faCopy,
   faPlus,
   faArrowUpRightFromSquare,
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight,
+  faFont,
+  faAtom,
+  faDownload,
 )
 
 createApp(index)

@@ -21,7 +21,7 @@ module.exports = {
   },
   output: {
     path: distDir,
-    filename: '[name].[chunkhash].js',
+    filename: 'scripts.js?v=[chunkhash]',
     clean: true,
   },
   optimization: {
@@ -74,7 +74,7 @@ module.exports = {
     }),
     new VueLoaderPlugin(),
     new MiniCssExtractPlugin({ // https://github.com/webpack-contrib/mini-css-extract-plugin
-      filename: 'style.[contenthash].css'
+      filename: 'styles.css?v=[contenthash]'
     }),
     new HtmlWebpackPlugin({ // https://github.com/jantimon/html-webpack-plugin#options
       inject: 'body',

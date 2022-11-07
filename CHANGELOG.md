@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Added
+
+- ...
+
+### Changed
+
+- Frontend building using WebPack
+- VueJS updated from v2 to v3
+- Bootstrap updated from v4 to v5
+
 ## v0.4.3
 
 ### Changed
