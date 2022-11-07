@@ -5,11 +5,20 @@
     "test": "jest"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.2.0",
+    "@fortawesome/free-brands-svg-icons": "^6.2.0",
+    "@fortawesome/free-regular-svg-icons": "^6.2.0",
+    "@fortawesome/free-solid-svg-icons": "^6.2.0",
+    "@fortawesome/vue-fontawesome": "^3.0.1",
+    "@popperjs/core": "^2.11.6",
     "bootstrap": "^5.2.2",
     "bootswatch": "^5.2.2",
+    "clipboard": "^2.0.11",
+    "izitoast": "^1.4.0",
     "vue": "^3.2.41"
   },
   "devDependencies": {
+    "@types/bootstrap": "^5.2.5",
     "@types/jest": "^27.4.1",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.7.1",

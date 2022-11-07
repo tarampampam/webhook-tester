@@ -34,5 +34,5 @@ export default defineComponent({
 @import "~bootswatch/dist/darkly/variables";
 @import "~bootstrap/scss/bootstrap";
 @import "~bootswatch/dist/darkly/bootswatch";
-
+@import "~izitoast/dist/css/iziToast";
 </style>
