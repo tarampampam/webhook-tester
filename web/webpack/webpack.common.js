@@ -5,6 +5,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 const JsonMinimizerPlugin = require('json-minimizer-webpack-plugin')
 const TerserPlugin = require('terser-webpack-plugin')
 const {VueLoaderPlugin} = require('vue-loader')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
 const srcDir = path.join(__dirname, '..', 'src')
 const publicDir = path.join(__dirname, '..', 'public')
@@ -54,11 +55,11 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: ['vue-style-loader', 'css-loader'],
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
       {
         test: /\.scss$/,
-        use: ['vue-style-loader', 'css-loader', 'sass-loader'],
+        use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader'],
       },
       {
         test: /\.vue$/,
@@ -72,6 +73,9 @@ module.exports = {
       __VUE_PROD_DEVTOOLS__: false,
     }),
     new VueLoaderPlugin(),
+    new MiniCssExtractPlugin({ // https://github.com/webpack-contrib/mini-css-extract-plugin
+      filename: 'style.[contenthash].css'
+    }),
     new HtmlWebpackPlugin({ // https://github.com/jantimon/html-webpack-plugin#options
       inject: 'body',
       chunks: ['index'],
