@@ -1,6 +1,6 @@
 <template>
   <header class="navbar navbar-expand flex-column flex-md-row flex-sm-row p-3 navbar-dark bg-primary">
-    <span class="navbar-brand me-0 me-md-2">
+    <span class="navbar-brand me-0 pt-0 me-md-2">
       WebHook Tester
     </span>
 
@@ -94,9 +94,9 @@
             <p>So the URL will respond with a <code>404: Not Found</code>.</p>
             <p>
               You can bookmark this page to go back to the request contents at any time. Requests and the
-              tokens for the URL expire <strong>after {{ sessionLifetimeDays }}</strong> days of not being
-              used. <span v-if="maxBodySizeBytes > 0">Maximal size for incoming requests is
-                            {{ maxBodySizeKb }} KiB.</span>
+              tokens for the URL expire <strong>after {{ sessionLifetimeDays }}</strong> days if not being
+              used.
+              <span v-if="maxBodySizeBytes > 0">Maximal size for incoming requests is{{ maxBodySizeKb }} KiB.</span>
             </p>
           </div>
           <div class="modal-footer">
@@ -176,7 +176,7 @@
                             rows="3"
                             maxlength="10240"
                             placeholder=""
-                            v-model="newUrlData.responseBody"/>
+                            v-model="newUrlData.responseContent"/>
               </div>
             </div>
             <div class="form-group row pt-2">
@@ -224,6 +224,14 @@ const state: {
   $newUrlModal: undefined,
 })
 
+export interface NewSessionSettings {
+  statusCode?: number
+  responseDelay?: number
+  contentType?: string
+  responseContent?: Uint8Array
+  destroyCurrentSession?: boolean
+}
+
 export default defineComponent({
   components: {
     'font-awesome-icon': FontAwesomeIcon,
@@ -235,11 +243,11 @@ export default defineComponent({
     },
     sessionLifetimeSec: {
       type: Number,
-      default: null,
+      default: Infinity,
     },
     maxBodySizeBytes: {
       type: Number,
-      default: null,
+      default: Infinity,
     },
     version: {
       type: String,
@@ -249,19 +257,19 @@ export default defineComponent({
 
   data(): {
     newUrlData: {
-      statusCode: number | null
-      contentType: string | null
-      responseDelay: number | null
-      responseBody: string | null
+      statusCode?: number
+      contentType?: string
+      responseDelay?: number
+      responseContent?: string
       destroyCurrentSession: boolean
     }
   } {
     return {
       newUrlData: {
-        statusCode: null,
-        contentType: null,
-        responseDelay: null,
-        responseBody: null,
+        statusCode: undefined,
+        contentType: undefined,
+        responseDelay: undefined,
+        responseContent: undefined,
         destroyCurrentSession: true,
       },
     }
@@ -304,37 +312,37 @@ export default defineComponent({
     },
 
     newURL(): void {
-      /** @type NewSessionSettings */
-      const data: { [key: string]: any } = {};
+      const data: NewSessionSettings = {}
 
-      if (this.newUrlData.statusCode != null) {
-        data.statusCode = Number(this.newUrlData.statusCode);
+      if (this.newUrlData.statusCode) {
+        data.statusCode = Number(this.newUrlData.statusCode)
       }
 
-      if (this.newUrlData.contentType != null) {
-        data.contentType = String(this.newUrlData.contentType);
+      if (this.newUrlData.contentType) {
+        data.contentType = String(this.newUrlData.contentType)
       }
 
-      if (this.newUrlData.responseDelay != null) {
-        data.responseDelay = Number(this.newUrlData.responseDelay);
+      if (this.newUrlData.responseDelay) {
+        data.responseDelay = Number(this.newUrlData.responseDelay)
       }
 
-      if (this.newUrlData.responseBody != null) {
-        data.responseBody = textEncoder.encode(this.newUrlData.responseBody);
+      if (this.newUrlData.responseContent) {
+        data.responseContent = textEncoder.encode(this.newUrlData.responseContent)
       }
 
-      if (this.newUrlData.destroyCurrentSession != null) {
-        data.destroyCurrentSession = Boolean(this.newUrlData.destroyCurrentSession);
-      }
+      data.destroyCurrentSession = Boolean(this.newUrlData.destroyCurrentSession)
 
       // <https://michaelnthiessen.com/pass-function-as-prop/>
-      this.$emit('on-new-url', data);
+      this.$emit('createNewUrl', data)
+
+      this.closeNewUrlModal()
     },
 
     openInNewTab() {
       window.open(this.currentWebHookUrl, '_blank');
     },
   },
+  emits: ['createNewUrl'],
 })
 </script>
 

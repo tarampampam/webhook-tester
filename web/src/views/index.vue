@@ -1,31 +1,53 @@
 <template>
   <main-header
-    :current-web-hook-url="sessionRequestURI"
-    :session-lifetime-sec="sessionLifetimeSec"
-    :max-body-size-bytes="maxBodySize"
+    :currentWebHookUrl="sessionRequestURI"
+    :sessionLifetimeSec="sessionLifetimeSec"
+    :maxBodySizeBytes="maxBodySize"
     :version="appVersion"
-    @on-new-url="newSessionHandler"
+    @createNewUrl="newSessionHandler"
   ></main-header>
 </template>
 
 <script lang="ts">
 import {defineComponent} from 'vue'
-import MainHeader from './components/main-header.vue'
+import MainHeader, {NewSessionSettings} from './components/main-header.vue'
 
 export default defineComponent({
   components: {
     'main-header': MainHeader,
   },
-  data() {
-    return {}
+  data(): {
+    sessionUUID?: string
+    sessionLifetimeSec: number
+    maxBodySize: number
+    appVersion: string
+  } {
+    return {
+      sessionUUID: undefined,
+      sessionLifetimeSec: Infinity,
+      maxBodySize: 0, // in bytes
+      appVersion: '0.0.0',
+    }
   },
-  methods: {},
   created(): void {
     //
   },
   mounted() {
-    // hide main loading spinner
-    document.getElementById('main-loader')?.remove()
+    document.getElementById('main-loader')?.remove() // hide main loading spinner
+  },
+  computed: {
+    sessionRequestURI: function (): string {
+      const uuid = this.sessionUUID
+        ? this.sessionUUID
+        : '________-____-____-____-____________'
+
+      return `${window.location.origin}/${uuid}`
+    },
+  },
+  methods: {
+    newSessionHandler(urlSettings: NewSessionSettings): void {
+      console.log(urlSettings)
+    },
   },
 })
 </script>
