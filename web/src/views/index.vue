@@ -1,25 +1,38 @@
 <template>
-  <main>
-    Index
-  </main>
+  <main-header
+    :current-web-hook-url="sessionRequestURI"
+    :session-lifetime-sec="sessionLifetimeSec"
+    :max-body-size-bytes="maxBodySize"
+    :version="appVersion"
+    @on-new-url="newSessionHandler"
+  ></main-header>
 </template>
 
 <script lang="ts">
 import {defineComponent} from 'vue'
+import MainHeader from './components/main-header.vue'
 
 export default defineComponent({
-  components: {},
+  components: {
+    'main-header': MainHeader,
+  },
   data() {
     return {}
   },
   methods: {},
   created(): void {
-    console.log('Index created')
+    //
+  },
+  mounted() {
+    // hide main loading spinner
+    document.getElementById('main-loader')?.remove()
   },
 })
 </script>
 
-<style lang="scss" src="./styles/colors.scss"/>
-<style lang="scss" scoped>
-//
+<style lang="scss">
+@import "~bootswatch/dist/darkly/variables";
+@import "~bootstrap/scss/bootstrap";
+@import "~bootswatch/dist/darkly/bootswatch";
+
 </style>

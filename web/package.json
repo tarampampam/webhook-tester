@@ -5,6 +5,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "bootstrap": "^5.2.2",
+    "bootswatch": "^5.2.2",
     "vue": "^3.2.41"
   },
   "devDependencies": {
