@@ -9,7 +9,7 @@ info:
 tags:
   - name: api
   - name: websocket
-  - name: healthz
+  - name: health
   - name: metrics
   - name: webhook
 
@@ -18,31 +18,6 @@ servers:
     description: Current server
 
 paths:
-  /api/settings:
-    get:
-      tags: [api]
-      summary: Get application settings
-      operationId: apiSettings
-      responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  max_requests: {type: number, maximum: 65535, example: 128}
-                  max_webhook_body_size:
-                    type: number
-                    description: Maximal webhook request body size (in bytes), zero means unlimited
-                    maximum: 4294967295
-                    example: 1024
-                  session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-
   /api/version:
     get:
       tags: [api]
@@ -57,6 +32,38 @@ paths:
                 type: object
                 additionalProperties: false
                 properties: {version: {type: string, example: ['0.0.1', '1.2.3@undefined']}}
+                required: [version]
+        "5XX":
+          description: Internal error
+          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+
+  /api/settings:
+    get:
+      tags: [api]
+      summary: Get application settings
+      operationId: apiSettings
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  limits:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      max_requests: {type: number, maximum: 65535, example: 128}
+                      max_webhook_body_size:
+                        type: number
+                        description: Maximal webhook request body size (in bytes), zero means unlimited
+                        maximum: 4294967295
+                        example: 1024
+                      session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
+                    required: [max_requests, max_webhook_body_size, session_lifetime_sec]
+                required: [limits]
         "5XX":
           description: Internal error
           content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
@@ -96,6 +103,8 @@ paths:
                       content_type: {$ref: '#/components/schemas/ContentType'}
                       code: {$ref: '#/components/schemas/StatusCode'}
                       delay_sec: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
+                    required: [content_base64, content_type, code, delay_sec]
+                required: [uuid, response, created_at_unix]
         "400":
           description: Bad request
           content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
@@ -118,6 +127,7 @@ paths:
                 type: object
                 additionalProperties: false
                 properties: {success: {type: boolean, enum: [true]}}
+                required: [success]
         "404":
           description: Not found
           content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
@@ -160,6 +170,7 @@ paths:
                 type: object
                 additionalProperties: false
                 properties: {success: {type: boolean, enum: [true]}}
+                required: [success]
         "404":
           description: Requests for session was not found
           content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
@@ -201,6 +212,7 @@ paths:
                 type: object
                 additionalProperties: false
                 properties: {success: {type: boolean, enum: [true]}}
+                required: [success]
         "404":
           description: Session or request was not found
           content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
@@ -229,7 +241,7 @@ paths:
 
   /ready:
     get: # + head?
-      tags: [healthz]
+      tags: [health]
       summary: Readiness probe
       description: App is ready to serve traffic?
       operationId: readinessProbe
@@ -239,7 +251,7 @@ paths:
 
   /live:
     get: # + head?
-      tags: [healthz]
+      tags: [health]
       summary: Liveness probe
       description: App is alive or dead?
       operationId: livenessProbe
@@ -286,7 +298,7 @@ paths:
   /{session_uuid}/{status_code}:
     get:
       tags: &wh-code-tag [webhook]
-      summary: &wh-code-sum Webhook endpoint
+      summary: &wh-code-sum Webhook endpoint with a status code
       operationId: webhookWithCode
       parameters: &wh-code-params
         - {$ref: '#/components/parameters/SessionUUID'}
@@ -311,7 +323,7 @@ paths:
   /{session_uuid}/{any}:
     get:
       tags: &wh-any-tag [webhook]
-      summary: &wh-any-sum Webhook endpoint
+      summary: &wh-any-sum Webhook endpoint with any postfix
       operationId: webhookWithAny
       parameters: &wh-any-params
         - {$ref: '#/components/parameters/SessionUUID'}
@@ -419,10 +431,12 @@ components:
               value:
                 type: string
                 example: 'X-Header-Value'
+            required: [name, value]
         url:
           type: string
           example: 'https://example.com/path?query=string'
         created_at_unix: {$ref: '#/components/schemas/UnixTime'}
+      required: [uuid, client_address, method, content_base64, headers, url, created_at_unix]
 
     RequestFailed:
       description: Request processing error (server-side error, bad request and so on)

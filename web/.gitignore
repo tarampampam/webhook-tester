@@ -1,6 +1,9 @@
 ## Vendor
 /node_modules
 
+## Generated code
+/src/api/schema.ts
+
 ## Distributive
 /dist
 

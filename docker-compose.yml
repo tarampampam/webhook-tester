@@ -73,5 +73,5 @@ services:
     volumes:
       - /etc/passwd:/etc/passwd:ro
       - /etc/group:/etc/group:ro
-      - ./web:/src:rw
-    working_dir: /src
+      - .:/src:rw
+    working_dir: /src/web

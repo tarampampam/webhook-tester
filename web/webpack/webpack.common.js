@@ -68,6 +68,7 @@ module.exports = {
     ],
   },
   plugins: [
+    new webpack.IgnorePlugin({resourceRegExp: /^\.\/locale$/, contextRegExp: /moment$/}), // https://github.com/jmblog/how-to-optimize-momentjs-with-webpack
     new webpack.DefinePlugin({ // https://github.com/vuejs/vue-next/tree/master/packages/vue#bundler-build-feature-flags
       __VUE_OPTIONS_API__: true,
       __VUE_PROD_DEVTOOLS__: false,
@@ -80,9 +81,15 @@ module.exports = {
       inject: 'body',
       chunks: ['index'],
       template: path.join(publicDir, 'index.html'),
+      minify: {
+        minifyCSS: true,
+        collapseWhitespace: true,
+        keepClosingSlash: true,
+        removeComments: true,
+      }
     }),
     new CopyPlugin({
-      patterns: [{from: '.', to: '.', context: assetsDir, globOptions: {ignore: ['**/*.md', '**/*.txt']}}],
+      patterns: [{from: '.', to: '.', context: assetsDir, globOptions: {ignore: ['**/*.md']}}],
     }),
   ],
 }
