@@ -46,48 +46,12 @@
       <div class="col-sm-7 col-md-8 col-lg-9 col-xl-10 py-3 ps-md-4" role="main">
         <div v-if="requests.length > 0 && requestUUID">
           <div class="row pt-2">
-            <div class="col-6">
-              <div class="btn-group pb-1" role="group">
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm"
-                  @click.prevent="navigateFirstRequest"
-                  :class="{disabled: requests.length <= 1}"
-                >
-                  <font-awesome-icon icon="fa-solid fa-angles-left" class="pe-1"/>
-                  First request
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm"
-                  @click="navigatePreviousRequest"
-                  :class="{disabled: requests.length <= 1 || !requestUUID}"
-                >
-                  <font-awesome-icon icon="fa-solid fa-angle-left" class="pe-1"/>
-                  Previous
-                </button>
-              </div>
-              <div class="btn-group pb-1 ms-1" role="group">
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm"
-                  @click="navigateNextRequest"
-                  :class="{disabled: requests.length <= 1 || !requestUUID}"
-                >
-                  Next
-                  <font-awesome-icon icon="fa-solid fa-angle-right" class="ps-1"/>
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm"
-                  @click="navigateLastRequest"
-                  :class="{disabled: requests.length <= 1}"
-                >
-                  Last request
-                  <font-awesome-icon icon="fa-solid fa-angles-right" class="ps-1"/>
-                </button>
-              </div>
-            </div>
+            <requests-navigator
+              class="col-6"
+              :requests="requests"
+              :requestUUID="requestUUID"
+              @changed="(uuid: string) => requestUUID = uuid"
+            />
             <div class="col-6 pb-1 text-end">
               <div class="form-check d-inline-block">
                 <input
@@ -121,53 +85,10 @@
           <div class="pt-3">
             <h4>Request body</h4>
 
-            <div v-if="requestContentExists">
-              <ul class="nav nav-pills">
-                <li class="nav-item">
-                  <span
-                    class="btn nav-link ps-4 pe-4 pt-1 pb-1"
-                    :class="{ 'active': requestContentViewMode === 'text' }"
-                    @click="requestContentViewMode='text'"
-                  >
-                    <font-awesome-icon icon="fa-solid fa-font"/> Text view
-                  </span>
-                </li>
-                <li class="nav-item">
-                  <span
-                    class="btn nav-link pl-4 pr-4 pt-1 pb-1"
-                    :class="{ 'active': requestContentViewMode === 'binary' }"
-                    @click="requestContentViewMode='binary'"
-                  >
-                    <font-awesome-icon icon="fa-solid fa-atom"/> Binary view
-                  </span>
-                </li>
-                <li
-                  class="nav-item"
-                  v-if="getRequestByUUID(requestUUID)"
-                >
-                  <span
-                    class="btn nav-link pl-4 pr-4 pt-1 pb-1"
-                    @click="handleDownloadRequestContent"
-                  >
-                    <font-awesome-icon icon="fa-solid fa-download"/> Download
-                  </span>
-                </li>
-              </ul>
-              <div class="tab-content pt-2 pb-2">
-                <div
-                  class="tab-pane active"
-                  v-if="requestContentViewMode === 'text'"
-                >
-                  <highlightjs autodetect :code="requestContentPretty" />
-                </div>
-                <div
-                  class="tab-pane active pt-2"
-                  v-if="requestContentViewMode === 'binary'"
-                >
-                <hex-view :content="requestBinaryContent"></hex-view>
-                </div>
-              </div>
-            </div>
+            <request-body
+              v-if="requestUUID && getRequestByUUID(requestUUID).content.length"
+              :request="getRequestByUUID(requestUUID)"
+            />
             <div v-else class="pt-1 pb-1">
               <p class="text-muted small text-monospace">// empty request body</p>
             </div>
@@ -187,8 +108,9 @@ import {defineComponent} from 'vue'
 import IndexEmpty from './components/index-empty.vue'
 import MainHeader from './components/main-header.vue'
 import RequestPlate from './components/request-plate.vue'
+import RequestsNavigator from './components/requests-navigator.vue'
 import RequestDetails from './components/request-details.vue'
-import HexView from './components/hex-view.vue'
+import RequestBody from './components/request-body.vue'
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
 import {NewSessionSettings} from './types'
 import {
@@ -207,7 +129,6 @@ import {newRenewableSessionConnection} from '../websocket/websocket'
 import iziToast from 'izitoast'
 import {getLocalSessionUUID, setLocalSessionUUID} from '../session'
 import {isValidUUID} from '../utils'
-import hljsVuePlugin from "@highlightjs/vue-plugin";
 
 const textDecoder = new TextDecoder('utf-8')
 
@@ -218,10 +139,10 @@ export default defineComponent({
     'font-awesome-icon': FontAwesomeIcon,
     'main-header': MainHeader,
     'request-plate': RequestPlate,
+    'requests-navigator': RequestsNavigator,
     'request-details': RequestDetails,
     'index-empty': IndexEmpty,
-    'hex-view': HexView,
-    'highlightjs': hljsVuePlugin.component,
+    'request-body': RequestBody,
   },
   data(): {
     requests: RecordedRequest[]
@@ -259,6 +180,22 @@ export default defineComponent({
     }
   },
   created(): void {
+    // this.$router.beforeEach((from, to): boolean => { // false: cancel the current navigation, true: next navigation guard is called
+    //   console.log(from, to)
+    //
+    //   const {sessionUUID, requestUUID} = to.params
+    //
+    //   if (typeof sessionUUID === 'string') {
+    //     this.sessionUUID = sessionUUID
+    //   }
+    //
+    //   if (typeof requestUUID === 'string') {
+    //     this.requestUUID = requestUUID
+    //   }
+    //
+    //   return true
+    // })
+
     getAppVersion()
       .then((ver) => this.appVersion = ver)
       .catch(errorsHandler)
@@ -297,40 +234,6 @@ export default defineComponent({
 
       return false
     },
-
-    requestContent: function (): string {
-      if (this.requestUUID) {
-        const request = this.getRequestByUUID(this.requestUUID)
-
-        if (request && request.content.length > 0) {
-          return textDecoder.decode(request.content)
-        }
-      }
-
-      return ''
-    },
-
-    requestContentPretty: function (): string {
-      try { // decorate json
-        return JSON.stringify(JSON.parse(this.requestContent), undefined, 2)
-      } catch (e) {
-        // wrong json
-      }
-
-      return ''
-    },
-
-    requestBinaryContent: function (): Uint8Array {
-      if (this.requestUUID) {
-        const request = this.getRequestByUUID(this.requestUUID)
-
-        if (request && request.content.length > 0) {
-          return request.content
-        }
-      }
-
-      return new Uint8Array(0)
-    },
   },
 
   watch: {
@@ -338,7 +241,9 @@ export default defineComponent({
       if (this.$route.params.sessionUUID !== this.sessionUUID) {
         this.$router.push({
           name: 'request',
-          params: {sessionUUID: this.sessionUUID}
+          params: {
+            sessionUUID: this.sessionUUID,
+          }
         }).catch(errorsHandler)
       }
 
@@ -347,7 +252,8 @@ export default defineComponent({
     requestUUID() {
       if (this.$route.params.requestUUID !== this.requestUUID) {
         this.$router.push({
-          name: 'request', params: {
+          name: 'request',
+          params: {
             sessionUUID: this.sessionUUID,
             requestUUID: this.requestUUID,
           }
@@ -400,7 +306,7 @@ export default defineComponent({
                     this.requests.unshift(request) // push at the first position
 
                     if (!this.requestUUID || this.autoRequestNavigate) {
-                      this.navigateFirstRequest()
+                      this.requestUUID = requestUUID
                     }
                   })
                   .catch((err): void => {
@@ -494,24 +400,16 @@ export default defineComponent({
 
       this.deleteRequest(requestUUID)
     },
-    handleDownloadRequestContent(): void {
-      if (this.requestUUID) {
-        const request = this.getRequestByUUID(this.requestUUID)
 
-        if (request && request.content.length > 0) {
-          const $body = document.body
-          const $a = document.createElement('a')
-          const raw = encodeURIComponent(textDecoder.decode(request.content))
 
-          $a.setAttribute('href', 'data:application/octet-stream;charset=utf-8,' + raw)
-          $a.setAttribute('download', this.requestUUID + '.bin')
-          $a.style.display = 'none'
-
-          $body.appendChild($a)
-          $a.click()
-          $body.removeChild($a)
+    getRequestIndexByUUID(uuid: string): number | undefined {
+      for (let i = 0; i < this.requests.length; i++) {
+        if (this.requests[i].UUID === uuid) {
+          return i
         }
       }
+
+      return undefined
     },
 
     deleteRequest(requestUUID: string): void {
@@ -521,9 +419,9 @@ export default defineComponent({
         if (requestUUID !== this.requestUUID) {
           // do nothing
         } else if (this.requests[currentIndex + 1]) {
-          this.navigateNextRequest()
+          this.requestUUID = this.requests[currentIndex + 1].UUID // navigate to next request
         } else if (this.requests[currentIndex - 1]) {
-          this.navigatePreviousRequest()
+          this.requestUUID = this.requests[currentIndex - 1].UUID // navigate to previous request
         }
 
         this.requests.splice(currentIndex, 1) // remove request object from stack
@@ -533,18 +431,6 @@ export default defineComponent({
     clearRequests(): void {
       this.requests.splice(0, this.requests.length)
       this.requestUUID = undefined
-    },
-
-    getCurrentRequestIndex(): number | undefined {
-      if (this.requests.length > 0) {
-        for (let i = 0; i < this.requests.length; i++) {
-          if (this.requests[i].UUID === this.requestUUID) {
-            return i
-          }
-        }
-      }
-
-      return undefined
     },
 
     getRequestByUUID(uuid: string): RecordedRequest | undefined {
@@ -601,8 +487,10 @@ export default defineComponent({
 
         reloadRequests()
           .then(() => {
-            if (!this.requestUUID || this.getRequestIndexByUUID(this.requestUUID) === undefined) {
-              this.navigateFirstRequest()
+            if (!this.requestUUID || this.getRequestByUUID(this.requestUUID) === undefined) {
+              if (this.requests[0]) {
+                this.requestUUID = this.requests[0].UUID // navigate first request
+              }
             }
           })
           .catch((): void => newSession())
@@ -616,53 +504,6 @@ export default defineComponent({
 
       if (isValidUUID(routeRequestUUID)) {
         this.requestUUID = routeRequestUUID
-      }
-    },
-
-    getRequestIndexByUUID(uuid: string): number | undefined {
-      for (let i = 0; i < this.requests.length; i++) {
-        if (this.requests[i].UUID === uuid) {
-          return i
-        }
-      }
-
-      return undefined
-    },
-
-    navigateFirstRequest(): void {
-      const first = this.requests[0]
-
-      if (first && first.UUID !== this.requestUUID) {
-        this.requestUUID = first.UUID
-      }
-    },
-    navigatePreviousRequest(): void {
-      const current = this.getCurrentRequestIndex()
-
-      if (current !== undefined) {
-        const prev = this.requests[current - 1]
-
-        if (prev && prev.UUID !== this.requestUUID) {
-          this.requestUUID = prev.UUID
-        }
-      }
-    },
-    navigateNextRequest(): void {
-      const current = this.getCurrentRequestIndex()
-
-      if (current !== undefined) {
-        const next = this.requests[current + 1]
-
-        if (next && next.UUID !== this.requestUUID) {
-          this.requestUUID = next.UUID
-        }
-      }
-    },
-    navigateLastRequest(): void {
-      const last = this.requests[this.requests.length - 1]
-
-      if (last && last.UUID !== this.requestUUID) {
-        this.requestUUID = last.UUID
       }
     },
   },
@@ -687,15 +528,7 @@ export default defineComponent({
   top: -.15em;
 }
 
-.request-plate {
-  cursor: pointer;
-}
-
 .button-delete-all {
   top: -2px;
-}
-
-.hljs {
-  background-color: transparent;
 }
 </style>

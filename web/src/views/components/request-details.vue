@@ -2,18 +2,9 @@
   <div class="row request-details">
     <div class="col-md-12 col-lg-5 col-xl-4">
       <div class="row">
-        <div class="col-7">
+        <div class="col-lg-3"></div>
+        <div class="col-lg-9">
           <h4>Request details</h4>
-        </div>
-        <div class="col-5 text-end">
-          <button
-            class="btn btn-primary btn-sm"
-            v-bind:data-clipboard-text="permalink"
-            type="button"
-            data-clipboard
-          >
-            Copy permalink
-          </button>
         </div>
       </div>
 

@@ -53,8 +53,8 @@ new ClipboardJS('[data-clipboard]') // <https://clipboardjs.com/#events>
 const router = createRouter({
   history: createWebHashHistory(), // https://router.vuejs.org/guide/essentials/history-mode.html#hash-mode
   routes: [
-    {path: '/', name: 'index', component: index},
-    {path: '/:sessionUUID?/:requestUUID?', name: 'request', props: true, component: index},
+    {path: '/', name: 'index', component: {}},
+    {path: '/:sessionUUID?/:requestUUID?', name: 'request', component: {}},
   ],
 })
 
