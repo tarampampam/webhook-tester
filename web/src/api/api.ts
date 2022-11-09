@@ -100,19 +100,23 @@ export interface RecordedRequest {
   createdAt: Date
 }
 
+function convertRecordedRequest(r: components['schemas']['SessionRequest']): RecordedRequest {
+  return {
+    UUID: r.uuid,
+    clientAddress: r.client_address,
+    method: r.method,
+    content: textEncoder.encode(Base64.decode(r.content_base64)),
+    headers: r.headers.map(h => ({name: h.name, value: h.value})),
+    url: r.url,
+    createdAt: new Date(r.created_at_unix * 1000),
+  }
+}
+
 export function getSessionRequest(sessionUUID: string, requestUUID: string): Promise<RecordedRequest> {
   return new Promise((resolve, reject) => {
     fetcher.path('/api/session/{session_uuid}/requests/{request_uuid}').method('get').create()
       .call(fetcher, {session_uuid: sessionUUID, request_uuid: requestUUID})
-      .then((resp) => resolve({
-        UUID: resp.data.uuid,
-        clientAddress: resp.data.client_address,
-        method: resp.data.method,
-        content: textEncoder.encode(Base64.decode(resp.data.content_base64)),
-        headers: resp.data.headers.map(h => ({name: h.name, value: h.value})),
-        url: resp.data.url,
-        createdAt: new Date(resp.data.created_at_unix * 1000),
-      }))
+      .then((resp) => resolve(convertRecordedRequest(resp.data)))
       .catch(reject)
   })
 }
@@ -121,15 +125,7 @@ export function getAllSessionRequests(sessionUUID: string): Promise<RecordedRequ
   return new Promise((resolve, reject) => {
     fetcher.path('/api/session/{session_uuid}/requests').method('get').create()
       .call(fetcher, {session_uuid: sessionUUID})
-      .then((resp) => resolve(resp.data.map((req: components['schemas']['SessionRequest']) => ({
-        UUID: req.uuid,
-        clientAddress: req.client_address,
-        method: req.method,
-        content: textEncoder.encode(Base64.decode(req.content_base64)),
-        headers: req.headers.map(h => ({name: h.name, value: h.value})),
-        url: req.url,
-        createdAt: new Date(req.created_at_unix * 1000),
-      }))))
+      .then((resp) => resolve(resp.data.map((r) => convertRecordedRequest(r))))
       .catch(reject)
   })
 }

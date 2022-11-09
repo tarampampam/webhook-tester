@@ -34,7 +34,7 @@
             :method="r.method"
             :when="r.createdAt"
             :class="{ active: requestUUID === r.UUID }"
-            @click.native="requestUUID = r.UUID"
+            @click="requestUUID = r.UUID"
             @onDelete="deleteRequestHandler"
           ></request-plate>
         </div>
@@ -44,7 +44,7 @@
       </div>
 
       <div class="col-sm-7 col-md-8 col-lg-9 col-xl-10 py-3 ps-md-4" role="main">
-        <div v-if="requests.length > 0 && requestUUID">
+        <div v-if="requests.length > 0">
           <div class="row pt-2">
             <requests-navigator
               class="col-6"
@@ -78,16 +78,15 @@
           <request-details
             v-if="showRequestDetails"
             class="pt-3"
-            :request="getRequestByUUID(requestUUID)"
-            :uuid="requestUUID"
+            :request="request()"
           ></request-details>
 
           <div class="pt-3">
             <h4>Request body</h4>
 
             <request-body
-              v-if="requestUUID && getRequestByUUID(requestUUID).content.length"
-              :request="getRequestByUUID(requestUUID)"
+              v-if="request() && request().content.length"
+              :request="request()"
             />
             <div v-else class="pt-1 pb-1">
               <p class="text-muted small text-monospace">// empty request body</p>
@@ -213,9 +212,6 @@ export default defineComponent({
     this.initSession()
     this.initRequest()
   },
-  mounted() {
-    document.getElementById('main-loader')?.remove() // hide main loading spinner
-  },
   computed: {
     sessionRequestURI: function (): string {
       const uuid = this.sessionUUID
@@ -223,16 +219,6 @@ export default defineComponent({
         : '________-____-____-____-____________'
 
       return `${window.location.origin}/${uuid}`
-    },
-
-    requestContentExists: function (): boolean {
-      if (this.requestUUID) {
-        const request = this.getRequestByUUID(this.requestUUID)
-
-        return request !== undefined && request.content.length > 0
-      }
-
-      return false
     },
   },
 
@@ -266,7 +252,7 @@ export default defineComponent({
         this.requests.splice(this.maxRequests, this.requests.length)
 
         if (this.requestUUID) {
-          if (!this.getRequestByUUID(this.requestUUID)) {
+          if (!this.request()) {
             this.requestUUID = undefined
           }
         }
@@ -275,6 +261,18 @@ export default defineComponent({
   },
 
   methods: {
+    request(): RecordedRequest | undefined {
+      if (this.requestUUID && this.requests.length) {
+        for (let i = 0; i < this.requests.length; i++) {
+          if (this.requests[i].UUID === this.requestUUID) {
+            return this.requests[i]
+          }
+        }
+      }
+
+      return undefined
+    },
+
     wsRefreshConnection(): void {
       enum names {
         requestRegistered = 'request-registered',
@@ -383,6 +381,7 @@ export default defineComponent({
         this.clearRequests()
       }
     },
+
     deleteRequestHandler(requestUUID: string): void {
       if (this.sessionUUID) {
         deleteSessionRequest(this.sessionUUID, requestUUID)
@@ -401,48 +400,35 @@ export default defineComponent({
       this.deleteRequest(requestUUID)
     },
 
-
-    getRequestIndexByUUID(uuid: string): number | undefined {
-      for (let i = 0; i < this.requests.length; i++) {
-        if (this.requests[i].UUID === uuid) {
-          return i
-        }
-      }
-
-      return undefined
-    },
-
     deleteRequest(requestUUID: string): void {
-      const currentIndex = this.getRequestIndexByUUID(requestUUID)
+      if (this.requestUUID) {
+        let currentRequestIdx: number | undefined = undefined
 
-      if (currentIndex !== undefined) {
-        if (requestUUID !== this.requestUUID) {
-          // do nothing
-        } else if (this.requests[currentIndex + 1]) {
-          this.requestUUID = this.requests[currentIndex + 1].UUID // navigate to next request
-        } else if (this.requests[currentIndex - 1]) {
-          this.requestUUID = this.requests[currentIndex - 1].UUID // navigate to previous request
+        for (let i = 0; i < this.requests.length; i++) {
+          if (this.requests[i].UUID === requestUUID) {
+            currentRequestIdx = i
+
+            break
+          }
         }
 
-        this.requests.splice(currentIndex, 1) // remove request object from stack
+        if (currentRequestIdx !== undefined) {
+          if (requestUUID !== this.requestUUID) {
+            // do nothing
+          } else if (this.requests[currentRequestIdx + 1]) {
+            this.requestUUID = this.requests[currentRequestIdx + 1].UUID // navigate to next request
+          } else if (this.requests[currentRequestIdx - 1]) {
+            this.requestUUID = this.requests[currentRequestIdx - 1].UUID // navigate to previous request
+          }
+
+          this.requests.splice(currentRequestIdx, 1) // remove request object from stack
+        }
       }
     },
 
     clearRequests(): void {
       this.requests.splice(0, this.requests.length)
       this.requestUUID = undefined
-    },
-
-    getRequestByUUID(uuid: string): RecordedRequest | undefined {
-      if (this.requests.length > 0) {
-        for (let i = 0; i < this.requests.length; i++) {
-          if (this.requests[i].UUID === uuid) {
-            return this.requests[i]
-          }
-        }
-      }
-
-      return undefined
     },
 
     initSession(): void {
@@ -487,7 +473,7 @@ export default defineComponent({
 
         reloadRequests()
           .then(() => {
-            if (!this.requestUUID || this.getRequestByUUID(this.requestUUID) === undefined) {
+            if (!this.requestUUID || !this.request()) {
               if (this.requests[0]) {
                 this.requestUUID = this.requests[0].UUID // navigate first request
               }

@@ -61,4 +61,7 @@ const router = createRouter({
 createApp(index)
   .use(router)
   .use(hljsVuePlugin)
+  .use(() => {
+    document.getElementById('main-loader')?.remove() // hide main loading spinner
+  })
   .mount('#app')

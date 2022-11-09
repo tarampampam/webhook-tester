@@ -11,26 +11,27 @@
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">URL</div>
         <div class="col-lg-9 text-break">
-          <code><a :href="getRequestURI">{{ getRequestURI }}</a></code>
+          <code v-if="request"><a :href="requestURI" target="_blank">{{ requestURI }}</a></code>
         </div>
       </div>
 
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">Method</div>
         <div class="col-lg-9">
-          <span class="badge text-uppercase" :class="methodClass">{{ request.method.toUpperCase() }}</span>
+          <span class="badge text-uppercase" :class="methodClass" v-if="request">{{ request.method.toUpperCase() }}</span>
         </div>
       </div>
 
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">From</div>
         <div class="col-lg-9">
-          <a :href="'https://who.is/whois-ip/ip-address/' + request.clientAddress"
+          <a v-if="request"
+             :href="'https://who.is/whois-ip/ip-address/' + request.clientAddress"
              target="_blank"
              rel="noreferrer"
              title="WhoIs?"
           >
-            <strong>{{ request.clientAddress }}</strong>
+            <strong v-if="request">{{ request.clientAddress }}</strong>
           </a>
         </div>
       </div>
@@ -38,14 +39,14 @@
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">When</div>
         <div class="col-lg-9">
-          <span>{{ formattedWhen }}</span>
+          <span v-if="request">{{ formattedWhen }}</span>
         </div>
       </div>
 
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">Size</div>
         <div class="col-lg-9">
-          <span v-if="contentLength">{{ contentLength }} bytes</span>
+          <span v-if="request && contentLength">{{ contentLength }} bytes</span>
           <span v-else class="text-muted">&mdash;</span>
         </div>
       </div>
@@ -53,19 +54,19 @@
       <div class="row pb-1">
         <div class="col-lg-3 text-lg-end">ID</div>
         <div class="col-lg-9 text-break">
-          <code>{{ uuid }}</code>
+          <code v-if="request">{{ request.UUID }}</code>
         </div>
       </div>
     </div>
 
-    <div class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0" v-if="this.request.headers">
-      <h4 class="row">
+    <div class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0" v-if="request && request.headers">
+      <div class="row">
         <div class="col-lg-4 col-xl-3"></div>
         <div class="col-lg-8 col-xl-9">
-          HTTP headers
+          <h4>HTTP headers</h4>
         </div>
-      </h4>
-      <div v-for="(header) in this.request.headers"
+      </div>
+      <div v-for="(header) in request.headers"
            :key="header.name"
            class="row pb-1">
         <div class="col-lg-4 col-xl-3 text-lg-end">
@@ -87,49 +88,42 @@ import {RecordedRequest} from '../../api/api'
 export default defineComponent({
   props: {
     request: {
-      type: Object as () => RecordedRequest,
-      default: null,
-    },
-    uuid: {
-      type: String,
-      default: null,
+      type: Object as () => RecordedRequest | undefined,
+      default: undefined,
     },
   },
 
   data(): {
     intervalId: number | undefined
     formattedWhen: string
-    permalink: string
   } {
     return {
       intervalId: undefined,
       formattedWhen: '',
-      permalink: window.location.href,
     }
-  },
-
-  watch: {
-    uuid(): void {
-      this.updateFormattedWhen()
-      this.permalink = window.location.href // force update
-    },
   },
 
   mounted(): void {
     this.updateFormattedWhen()
-    this.intervalId = window.setInterval(() => this.updateFormattedWhen(), 1000)
+    this.intervalId = window.setInterval(this.updateFormattedWhen, 1000)
+  },
+
+  watch: {
+    request(): void {
+      this.updateFormattedWhen() // force update
+    },
   },
 
   computed: {
-    getRequestURI: function (): string {
-      let uri = (typeof this.request === 'object' && this.request && typeof this.request.url === 'string')
+    requestURI(): string {
+      let uri = (this.request && typeof this.request.url.length)
         ? this.request.url.replace(/^\/+/g, '')
         : '...'
 
       return `${window.location.origin}/${uri}`
     },
 
-    methodClass: function (): string {
+    methodClass(): string {
       if (this.request && this.request.method) {
         switch (this.request.method.toLowerCase()) {
           case 'get':
@@ -150,7 +144,7 @@ export default defineComponent({
     },
   },
 
-  beforeDestroy: function (): void {
+  beforeDestroy(): void {
     window.clearInterval(this.intervalId)
   },
 
