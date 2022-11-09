@@ -1,7 +1,7 @@
 <template>
   <div class="request-plate list-group-item list-group-item-action flex-column py-3 px-3" :class="methodClass">
     <div class="d-flex w-100 justify-content-between">
-      <h5 class="mb-1 text-nowrap">{{ clientAddress }}</h5>
+      <h5 class="mb-1 text-nowrap">{{ request.clientAddress }}</h5>
       <button type="button" class="btn-close position-relative small" title="Delete" @click="remove"></button>
     </div>
     <p class="when small m-0">{{ formattedWhen }}</p>
@@ -11,27 +11,20 @@
 <script lang="ts">
 import {defineComponent} from 'vue'
 import moment from 'moment'
+import {RecordedRequest} from '../../api/api'
 
 export default defineComponent({
   props: {
-    uuid: {
-      type: String,
-    },
-    clientAddress: {
-      type: String,
-      default: 'XXX.XXX.XXX.XXX',
-    },
-    method: {
-      type: String,
-      default: '',
-    },
-    when: {
-      type: Date,
+    request: {
+      type: Object as () => RecordedRequest | undefined,
       default: undefined,
     },
   },
 
-  data() {
+  data(): {
+    intervalId: undefined | number
+    formattedWhen: string
+  } {
     return {
       intervalId: undefined as undefined | number,
       formattedWhen: '',
@@ -41,7 +34,13 @@ export default defineComponent({
   mounted(): void {
     this.updateFormattedWhen()
 
-    this.intervalId = window.setInterval(() => this.updateFormattedWhen(), 150)
+    this.intervalId = window.setInterval(this.updateFormattedWhen, 150)
+  },
+
+  watch: {
+    request(): void {
+      this.updateFormattedWhen() // force update
+    },
   },
 
   beforeDestroy(): void {
@@ -50,8 +49,8 @@ export default defineComponent({
 
   computed: {
     methodClass: function (): string {
-      if (typeof this.method === 'string') {
-        switch (this.method.toLowerCase()) {
+      if (this.request) {
+        switch (this.request.method.toLowerCase()) {
           case 'get':
             return 'border-success'
           case 'head':
@@ -79,18 +78,24 @@ export default defineComponent({
 
   methods: {
     remove(e): void {
-      this.$emit('onDelete', this.uuid)
+      if (this.request) {
+        this.$emit('onDelete', this.request.UUID)
 
-      e.preventDefault()
-      e.stopPropagation()
+        e.preventDefault()
+        e.stopPropagation()
 
-      this.updateFormattedWhen()
+        this.updateFormattedWhen()
+      }
     },
 
     updateFormattedWhen(): void {
-      this.formattedWhen = this.when
-        ? `${moment(this.when).format('h:mm:ss a')} (${moment(this.when).fromNow()})`
-        : ''
+      if (this.request) {
+        this.formattedWhen = `${moment(this.request.createdAt).format('h:mm:ss a')} (${moment(this.request.createdAt).fromNow()})`
+
+        return
+      }
+
+      this.formattedWhen = ''
     }
   },
   emits: [

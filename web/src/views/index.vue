@@ -9,7 +9,7 @@
 
   <div class="container-fluid mb-2">
     <div class="row flex-xl-nowrap">
-      <div class="sidebar col-sm-5 col-md-4 col-lg-3 col-xl-2 px-2 py-0">
+      <div class="sidebar px-2 py-0">
         <div class="ps-3 pt-4 pe-3 pb-3">
           <div class="d-flex w-100 justify-content-between">
             <h5 class="text-uppercase mb-0">
@@ -29,13 +29,10 @@
           <request-plate
             v-for="r in requests"
             :key="r.UUID"
-            :uuid="r.UUID"
-            :client-address="r.clientAddress"
-            :method="r.method"
-            :when="r.createdAt"
+            :request="r"
             :class="{ active: requestUUID === r.UUID }"
             @click="requestUUID = r.UUID"
-            @onDelete="deleteRequestHandler"
+            @onDelete="(uuid: string) => deleteRequestHandler(uuid)"
           ></request-plate>
         </div>
         <div v-else class="text-muted text-center mt-3">
@@ -43,7 +40,7 @@
         </div>
       </div>
 
-      <div class="col-sm-7 col-md-8 col-lg-9 col-xl-10 py-3 ps-md-4" role="main">
+      <div class="col py-3 ps-md-4" role="main">
         <div v-if="requests.length > 0">
           <div class="row pt-2">
             <requests-navigator
@@ -507,6 +504,17 @@ export default defineComponent({
 .btn:active {
   outline: none !important;
   box-shadow: none;
+}
+
+.sidebar {
+  flex: 0 0 300px;
+}
+
+@media (max-width: 690px) {
+  .sidebar {
+    flex: 0 0 100%;
+    width: 100%;
+  }
 }
 
 .total-requests-count {

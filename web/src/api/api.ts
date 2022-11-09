@@ -15,7 +15,7 @@ export function getAppVersion(): Promise<string> {
   })
 }
 
-export interface APISettingsResponse {
+interface APISettingsResponse {
   limits: {
     maxRequests: number
     maxWebhookBodySize: number
@@ -38,14 +38,14 @@ export function getAppSettings(): Promise<APISettingsResponse> {
   })
 }
 
-export interface APINewSessionRequest {
+interface APINewSessionRequest {
   statusCode?: number
   contentType?: string
   responseDelay?: number
   responseContent?: Uint8Array
 }
 
-export interface APINewSessionResponse {
+interface APINewSessionResponse {
   UUID: string
   response: {
     content: Uint8Array
