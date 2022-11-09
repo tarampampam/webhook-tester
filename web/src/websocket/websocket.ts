@@ -12,7 +12,9 @@ function getWebsocketBaseUri(): string{
   return result + '/ws'
 }
 
-type WebsocketHandler = (name: string, data: string) => void
+type eventNames = 'request-registered' | 'request-deleted' | 'requests-deleted'
+
+type WebsocketHandler = (name: eventNames, data: string) => void
 
 export function newRenewableSessionConnection(sessionUUID: string, onMessage: WebsocketHandler): ReconnectingWebSocket {
   const ws = new ReconnectingWebSocket(getWebsocketBaseUri() + '/session/' + sessionUUID, undefined, {

@@ -1,4 +1,4 @@
-const storageSessionUuidKey = 'session_uuid'
+const storageSessionUuidKey = 'session_uuid_v2'
 
 export function getLocalSessionUUID(): string | undefined {
   const value = localStorage.getItem(storageSessionUuidKey)

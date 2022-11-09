@@ -1,6 +1,6 @@
 <template>
   <main-header
-    :currentWebHookUrl="sessionRequestURI"
+    :currentWebHookUrl="currentWebHookUrl"
     :sessionLifetimeSec="sessionLifetimeSec"
     :maxBodySizeBytes="maxBodySize"
     :version="appVersion"
@@ -16,10 +16,12 @@
               Requests
               <span class="badge bg-primary rounded-pill ms-1 total-requests-count">{{ requests.length }}</span>
             </h5>
-            <button type="button"
-                    class="btn btn-outline-danger btn-sm position-relative button-delete-all"
-                    v-if="requests.length > 0"
-                    @click="deleteAllRequestsHandler">
+            <button
+              type="button"
+              class="btn btn-outline-danger btn-sm position-relative button-delete-all"
+              v-if="requests.length > 0"
+              @click="deleteAllRequestsHandler"
+            >
               Delete all
             </button>
           </div>
@@ -92,7 +94,7 @@
         </div>
         <index-empty
           v-else
-          :currentWebHookUrl="sessionRequestURI"
+          :currentWebHookUrl="currentWebHookUrl"
         ></index-empty>
       </div>
     </div>
@@ -125,6 +127,7 @@ import {newRenewableSessionConnection} from '../websocket/websocket'
 import iziToast from 'izitoast'
 import {getLocalSessionUUID, setLocalSessionUUID} from '../session'
 import {isValidUUID} from '../utils'
+import {Fetcher} from "openapi-typescript-fetch/dist/esm";
 
 const textDecoder = new TextDecoder('utf-8')
 
@@ -148,7 +151,6 @@ export default defineComponent({
 
     autoRequestNavigate: boolean
     showRequestDetails: boolean
-    requestContentViewMode: 'text' | 'binary'
 
     maxRequests: number
     sessionLifetimeSec: number
@@ -165,7 +167,6 @@ export default defineComponent({
 
       autoRequestNavigate: true,
       showRequestDetails: true,
-      requestContentViewMode: 'text' as 'text' | 'binary',
 
       maxRequests: Infinity as number,
       sessionLifetimeSec: Infinity as number,
@@ -176,22 +177,6 @@ export default defineComponent({
     }
   },
   created(): void {
-    // this.$router.beforeEach((from, to): boolean => { // false: cancel the current navigation, true: next navigation guard is called
-    //   console.log(from, to)
-    //
-    //   const {sessionUUID, requestUUID} = to.params
-    //
-    //   if (typeof sessionUUID === 'string') {
-    //     this.sessionUUID = sessionUUID
-    //   }
-    //
-    //   if (typeof requestUUID === 'string') {
-    //     this.requestUUID = requestUUID
-    //   }
-    //
-    //   return true
-    // })
-
     getAppVersion()
       .then((ver) => this.appVersion = ver)
       .catch(errorsHandler)
@@ -204,13 +189,55 @@ export default defineComponent({
       })
       .catch(errorsHandler)
 
-    this.wsRefreshConnection()
+    this.$router.beforeEach((from, to): boolean => { // false: cancel the current navigation, true: next navigation guard is called
+      const {sessionUUID, requestUUID} = from.params as {[key: string]: string | undefined}
 
-    this.initSession()
-    this.initRequest()
+      if (isValidUUID(sessionUUID) && sessionUUID !== this.sessionUUID) {
+        this.sessionUUID = sessionUUID
+      }
+
+      if (isValidUUID(requestUUID) && requestUUID !== this.requestUUID) {
+        this.requestUUID = requestUUID
+      }
+
+      return true
+    })
+
+    this.$router.isReady()
+      .then(() => {
+        const routeSessionUUID = this.$route.params.sessionUUID as string | undefined
+        const localSessionUUID = getLocalSessionUUID()
+
+        console.log('routeSessionUUID', routeSessionUUID, this.$route)
+
+        switch (true) {
+          case routeSessionUUID && isValidUUID(routeSessionUUID): {
+            this.sessionUUID = routeSessionUUID
+
+            break
+          }
+
+          case localSessionUUID && isValidUUID(localSessionUUID): {
+            this.sessionUUID = localSessionUUID
+
+            break
+          }
+
+          default: {
+            startNewSession({})
+              .then(sessionData => this.sessionUUID = sessionData.UUID)
+              .then((): void => iziToast.info({title: 'A new session was started'}))
+          }
+        }
+      })
   },
+
+  beforeRouteUpdate(to, from) {
+    console.log(to, from)
+  },
+
   computed: {
-    sessionRequestURI: function (): string {
+    currentWebHookUrl: function (): string {
       const uuid = this.sessionUUID
         ? this.sessionUUID
         : '________-____-____-____-____________'
@@ -220,27 +247,61 @@ export default defineComponent({
   },
 
   watch: {
-    sessionUUID() {
-      if (this.$route.params.sessionUUID !== this.sessionUUID) {
+    sessionUUID(uuid: string | undefined, old: string | undefined): void {
+      if (uuid !== old) {
         this.$router.push({
           name: 'request',
           params: {
-            sessionUUID: this.sessionUUID,
-          }
-        }).catch(errorsHandler)
-      }
+            sessionUUID: uuid,
+            requestUUID: undefined,
+          },
+        }).then(() => {
+          this.sessionUUID = uuid
+          this.requestUUID = undefined // always unset the request UUID on session change
 
-      this.wsRefreshConnection()
+          if (uuid) {
+            getAllSessionRequests(uuid)
+              .then((requests): void => {
+                this.requests.splice(0, this.requests.length) // make clear
+                this.requests.push(...requests)
+              })
+              .then((): void => {
+                if (!this.requestUUID && this.requests.length) {
+                  this.requestUUID = this.requests[0].UUID // navigate to the first request
+                }
+              })
+              .then((): void => setLocalSessionUUID(uuid))
+              .then((): void => this.renewWebsocketConnection(uuid))
+              .catch((err): void => {
+                const status: number | undefined = err['status']
+
+                if (status === 404) { // session was not found
+                  startNewSession({})
+                    .then(sessionData => this.sessionUUID = sessionData.UUID)
+                    .then((): void => iziToast.info({title: 'The requested session was not found, a new one was made'}))
+                } else {
+                  errorsHandler(err)
+                }
+              })
+          }
+        })
+      }
     },
-    requestUUID() {
-      if (this.$route.params.requestUUID !== this.requestUUID) {
+    requestUUID(uuid: string | undefined, old: string | undefined): void {
+      if (!this.sessionUUID) { // no active session
+        uuid = undefined
+      }
+console.log('requestUUID', uuid)
+      if (uuid !== old) {
         this.$router.push({
           name: 'request',
           params: {
             sessionUUID: this.sessionUUID,
-            requestUUID: this.requestUUID,
-          }
-        }).catch(errorsHandler)
+            requestUUID: uuid,
+          },
+        }).then(() => {
+          this.requestUUID = uuid
+        })
       }
     },
     requests() {
@@ -270,64 +331,49 @@ export default defineComponent({
       return undefined
     },
 
-    wsRefreshConnection(): void {
-      enum names {
-        requestRegistered = 'request-registered',
-        requestDeleted = 'request-deleted',
-        requestsDeleted = 'requests-deleted',
-      }
-
+    renewWebsocketConnection(sessionUUID: string): void {
       if (this.ws) {
         this.ws.close()
         this.ws = undefined
       }
 
-      if (this.sessionUUID) {
-        this.ws = newRenewableSessionConnection(this.sessionUUID, (name, data): void => {
-          switch (name) { // route incoming events
-            case names.requestRegistered: {
-              const requestUUID = data
+      this.ws = newRenewableSessionConnection(sessionUUID, (name, data): void => {
+        switch (name) { // route incoming events
+          case 'request-registered': {
+            iziToast.info({title: 'New request', message: 'New incoming webhook request', timeout: 2000})
 
-              iziToast.info({
-                title: 'New request',
-                message: 'New incoming webhook request',
-                timeout: 2000,
-                closeOnClick: true,
-              })
+            if (this.sessionUUID) {
+              getSessionRequest(this.sessionUUID, data)
+                .then((request) => {
+                  this.requests.unshift(request) // push at the first position
 
-              if (this.sessionUUID) {
-                getSessionRequest(this.sessionUUID, requestUUID)
-                  .then((request) => {
-                    this.requests.unshift(request) // push at the first position
+                  if (!this.requestUUID || this.autoRequestNavigate) {
+                    this.requestUUID = data
+                  }
+                })
+                .catch((err): void => {
+                  iziToast.error({title: `Cannot load request with UUID ${data}: ${err.message}`})
 
-                    if (!this.requestUUID || this.autoRequestNavigate) {
-                      this.requestUUID = requestUUID
-                    }
-                  })
-                  .catch((err): void => {
-                    iziToast.error({title: `Cannot load request with UUID ${requestUUID}: ${err.message}`})
-
-                    errorsHandler(err)
-                  })
-              }
-
-              break
+                  errorsHandler(err)
+                })
             }
 
-            case names.requestDeleted: {
-              this.deleteRequest(data)
-
-              break
-            }
-
-            case names.requestsDeleted: {
-              this.clearRequests()
-
-              break
-            }
+            break
           }
-        })
-      }
+
+          case 'request-deleted': {
+            this.deleteRequest(data)
+
+            break
+          }
+
+          case 'requests-deleted': {
+            this.clearRequests()
+
+            break
+          }
+        }
+      })
     },
 
     newSessionHandler(urlSettings: NewSessionSettings): void {
@@ -337,7 +383,7 @@ export default defineComponent({
         responseDelay: urlSettings.responseDelay,
         responseContent: urlSettings.responseContent,
       })
-        .then((newSessionData) => {
+        .then((sessionData): void => {
           if (urlSettings.destroyCurrentSession === true && this.sessionUUID) {
             deleteSession(this.sessionUUID)
               .catch((err): void => {
@@ -347,18 +393,17 @@ export default defineComponent({
               })
           }
 
-          this.sessionUUID = newSessionData.UUID
-          setLocalSessionUUID(newSessionData.UUID)
-
-          this.clearRequests()
-          iziToast.success({title: 'New session started!'})
+          this.sessionUUID = sessionData.UUID
         })
+        .then((): void => this.clearRequests())
+        .then((): void => iziToast.success({title: 'New session started!'}))
         .catch((err): void => {
           iziToast.error({title: `Cannot create new session: ${err.message}`})
 
           errorsHandler(err)
         })
     },
+
     deleteAllRequestsHandler(): void {
       if (this.sessionUUID) {
         deleteAllSessionRequests(this.sessionUUID)
@@ -419,6 +464,10 @@ export default defineComponent({
           }
 
           this.requests.splice(currentRequestIdx, 1) // remove request object from stack
+
+          if (this.requests.length === 0) {
+            this.requestUUID = undefined
+          }
         }
       }
     },
@@ -426,68 +475,6 @@ export default defineComponent({
     clearRequests(): void {
       this.requests.splice(0, this.requests.length)
       this.requestUUID = undefined
-    },
-
-    initSession(): void {
-      const localSessionUUID = getLocalSessionUUID()
-      const routeSessionUUID = this.$route.params.sessionUUID as string | undefined
-
-      const reloadRequests = (): Promise<void> => {
-        return new Promise((resolve, reject) => {
-          if (this.sessionUUID) {
-            getAllSessionRequests(this.sessionUUID)
-              .then((requests) => {
-                this.requests.splice(0, this.requests.length) // make clear
-                requests.forEach((request) => this.requests.push(request))
-
-                resolve()
-              })
-              .catch(reject)
-          } else {
-            resolve()
-          }
-        })
-      }
-
-      const newSession = (): void => {
-        startNewSession({})
-          .then((newSessionData) => {
-            this.sessionUUID = newSessionData.UUID
-            setLocalSessionUUID(newSessionData.UUID)
-
-            reloadRequests()
-              .catch((err) => iziToast.error({title: `Cannot retrieve requests: ${err.message}`}))
-          })
-          .catch((err) => iziToast.error({title: `Cannot create new session: ${err.message}`}))
-      }
-
-      const sessionUUID = isValidUUID(routeSessionUUID)
-        ? routeSessionUUID
-        : (isValidUUID(localSessionUUID) ? localSessionUUID : undefined)
-
-      if (sessionUUID) {
-        this.sessionUUID = sessionUUID
-
-        reloadRequests()
-          .then(() => {
-            if (!this.requestUUID || !this.request()) {
-              if (this.requests[0]) {
-                this.requestUUID = this.requests[0].UUID // navigate first request
-              }
-            }
-          })
-          .catch((): void => newSession())
-      } else {
-        newSession()
-      }
-    },
-
-    initRequest(): void {
-      const routeRequestUUID = this.$route.params.requestUUID as string | undefined
-
-      if (isValidUUID(routeRequestUUID)) {
-        this.requestUUID = routeRequestUUID
-      }
     },
   },
 })
