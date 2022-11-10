@@ -11,15 +11,19 @@
           @click="openHelpModal"
         >
           <span class="nav-link">
-            <font-awesome-icon icon="fa-question fa-solid"/>
+            <font-awesome-icon icon="fa-question fa-solid" />
             Help
           </span>
         </li>
         <li
           class="nav-item d-inline-block"
         >
-          <a class="nav-link" href="https://github.com/tarampampam/webhook-tester" target="_blank">
-            <font-awesome-icon icon="fa-brands fa-github"/>
+          <a
+            class="nav-link"
+            href="https://github.com/tarampampam/webhook-tester"
+            target="_blank"
+          >
+            <font-awesome-icon icon="fa-brands fa-github" />
             GitHub
           </a>
         </li>
@@ -27,11 +31,16 @@
     </div>
 
     <div class="form-inline my-2 my-lg-0">
-      <button class="btn btn-success my-2 my-sm-0 border-0"
-              v-bind:data-clipboard-text="currentWebHookUrl"
-              data-clipboard
-              @click.middle="openInNewTab">
-        <font-awesome-icon icon="fa-regular fa-copy" class="me-1"/>
+      <button
+        class="btn btn-success my-2 my-sm-0 border-0"
+        :data-clipboard-text="currentWebHookUrl"
+        data-clipboard
+        @click.middle="openInNewTab"
+      >
+        <font-awesome-icon
+          icon="fa-regular fa-copy"
+          class="me-1"
+        />
         Copy Webhook URL
       </button>
       <button
@@ -39,19 +48,36 @@
         data-toggle="modal"
         @click="openNewUrlModal"
       >
-        <font-awesome-icon icon="fa-solid fa-plus" class="me-1"/>
+        <font-awesome-icon
+          icon="fa-solid fa-plus"
+          class="me-1"
+        />
         New URL
       </button>
     </div>
 
-    <div class="modal fade" id="help-modal" tabindex="-1" role="dialog" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div
+      class="modal fade"
+      id="help-modal"
+      tabindex="-1"
+      role="dialog"
+      aria-hidden="true"
+    >
+      <div
+        class="modal-dialog modal-lg modal-dialog-centered"
+        role="document"
+      >
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
               What is WebHook Tester?
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            />
           </div>
           <div class="modal-body">
             <p>
@@ -60,34 +86,54 @@
             </p>
             <p>
               <code id="help-modal-current-url">{{ currentWebHookUrl }}</code>
-              <button class="btn btn-outline-info btn-sm ms-2 me-1"
-                      data-clipboard-target="#help-modal-current-url"
-                      data-clipboard>
-                <font-awesome-icon icon="fa-regular fa-copy" class="me-1"/>
+              <button
+                class="btn btn-outline-info btn-sm ms-2 me-1"
+                data-clipboard-target="#help-modal-current-url"
+                data-clipboard
+              >
+                <font-awesome-icon
+                  icon="fa-regular fa-copy"
+                  class="me-1"
+                />
                 Copy
               </button>
-              <a target="_blank"
-                 class="btn btn-outline-info btn-sm"
-                 :href="currentWebHookUrl">
-                <font-awesome-icon icon="fa-arrow-up-right-from-square" class="me-1"/>
+              <a
+                target="_blank"
+                class="btn btn-outline-info btn-sm"
+                :href="currentWebHookUrl"
+              >
+                <font-awesome-icon
+                  icon="fa-arrow-up-right-from-square"
+                  class="me-1"
+                />
                 Try it!
               </a>
             </p>
             <p>Any requests sent to that URL are instantly logged here - you don't even have to refresh.</p>
-            <hr/>
+            <hr>
             <p>Append a status code to the url, e.g.:</p>
             <p>
               <code id="help-modal-current-url-custom-status">{{ currentWebHookUrl }}/404</code>
-              <button class="btn btn-outline-info btn-sm ms-2 me-1"
-                      data-clipboard-target="#help-modal-current-url-custom-status"
-                      data-clipboard>
-                <font-awesome-icon icon="fa-regular fa-copy" class="me-1"/>
+              <button
+                class="btn btn-outline-info btn-sm ms-2 me-1"
+                data-clipboard-target="#help-modal-current-url-custom-status"
+                data-clipboard
+              >
+                <font-awesome-icon
+                  icon="fa-regular fa-copy"
+                  class="me-1"
+                />
                 Copy
               </button>
-              <a target="_blank"
-                 class="btn btn-outline-info btn-sm"
-                 :href="currentWebHookUrl + '/404'">
-                <font-awesome-icon icon="fa-arrow-up-right-from-square" class="me-1"/>
+              <a
+                target="_blank"
+                class="btn btn-outline-info btn-sm"
+                :href="currentWebHookUrl + '/404'"
+              >
+                <font-awesome-icon
+                  icon="fa-arrow-up-right-from-square"
+                  class="me-1"
+                />
                 Try it!
               </a>
             </p>
@@ -108,12 +154,28 @@
       </div>
     </div>
 
-    <div class="modal fade" id="new-url-modal" tabindex="-1" role="dialog" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered" role="document">
+    <div
+      class="modal fade"
+      id="new-url-modal"
+      tabindex="-1"
+      role="dialog"
+      aria-hidden="true"
+    >
+      <div
+        class="modal-dialog modal-dialog-centered"
+        role="document"
+      >
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Configure URL</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <h5 class="modal-title">
+              Configure URL
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            />
           </div>
           <div class="modal-body">
             <p>
@@ -121,74 +183,94 @@
               code, content-type header and the content.
             </p>
             <div class="form-group row">
-              <label class="d-block col-md-4 col-form-label col-form-label-sm text-end"
-                     for="default-status-code">Default status code</label>
+              <label
+                class="d-block col-md-4 col-form-label col-form-label-sm text-end"
+                for="default-status-code"
+              >Default status code</label>
               <div class="col-md-8">
-                <input type="number"
-                       autocomplete="off"
-                       min="100"
-                       max="530"
-                       class="form-control w-100"
-                       id="default-status-code"
-                       placeholder="200"
-                       title="Between 100 and 530"
-                       v-model="newUrlData.statusCode">
+                <input
+                  type="number"
+                  autocomplete="off"
+                  min="100"
+                  max="530"
+                  class="form-control w-100"
+                  id="default-status-code"
+                  placeholder="200"
+                  title="Between 100 and 530"
+                  v-model="newUrlData.statusCode"
+                >
               </div>
             </div>
             <div class="form-group row">
-              <label class="d-block col-md-4 col-form-label col-form-label-sm text-end"
-                     for="content-type">Content Type</label>
+              <label
+                class="d-block col-md-4 col-form-label col-form-label-sm text-end"
+                for="content-type"
+              >Content Type</label>
               <div class="col-md-8">
-                <input type="text"
-                       autocomplete="off"
-                       minlength="1"
-                       maxlength="32"
-                       class="form-control w-100"
-                       id="content-type"
-                       placeholder="text/plain"
-                       title="application/json for example, maximal length is 32"
-                       v-model="newUrlData.contentType">
+                <input
+                  type="text"
+                  autocomplete="off"
+                  minlength="1"
+                  maxlength="32"
+                  class="form-control w-100"
+                  id="content-type"
+                  placeholder="text/plain"
+                  title="application/json for example, maximal length is 32"
+                  v-model="newUrlData.contentType"
+                >
               </div>
             </div>
             <div class="form-group row">
-              <label class="d-block col-md-4 col-form-label col-form-label-sm text-end"
-                     for="response-delay">Delay before response</label>
+              <label
+                class="d-block col-md-4 col-form-label col-form-label-sm text-end"
+                for="response-delay"
+              >Delay before response</label>
               <div class="col-md-8">
-                <input type="number"
-                       autocomplete="off"
-                       min="0"
-                       max="30"
-                       maxlength="2"
-                       class="form-control w-100"
-                       id="response-delay"
-                       placeholder="0"
-                       title="Between 0 and 30"
-                       v-model="newUrlData.responseDelay">
+                <input
+                  type="number"
+                  autocomplete="off"
+                  min="0"
+                  max="30"
+                  maxlength="2"
+                  class="form-control w-100"
+                  id="response-delay"
+                  placeholder="0"
+                  title="Between 0 and 30"
+                  v-model="newUrlData.responseDelay"
+                >
               </div>
             </div>
             <div class="form-group row">
-              <label class="d-block col-md-4 col-form-label col-form-label-sm text-end"
-                     for="response-body">Response body</label>
+              <label
+                class="d-block col-md-4 col-form-label col-form-label-sm text-end"
+                for="response-body"
+              >Response body</label>
               <div class="col-md-8">
-                  <textarea autocomplete="off"
-                            class="form-control w-100"
-                            id="response-body"
-                            rows="3"
-                            maxlength="10240"
-                            placeholder=""
-                            v-model="newUrlData.responseContent"/>
+                <textarea
+                  autocomplete="off"
+                  class="form-control w-100"
+                  id="response-body"
+                  rows="3"
+                  maxlength="10240"
+                  placeholder=""
+                  v-model="newUrlData.responseContent"
+                />
               </div>
             </div>
             <div class="form-group row pt-2">
-              <div class="col-md-4"></div>
+              <div class="col-md-4" />
               <div class="col-md-8">
                 <div class="form-check">
-                  <input type="checkbox"
-                         class="form-check-input"
-                         id="new-session-destroy-current"
-                         v-model="newUrlData.destroyCurrentSession">
-                  <label class="form-check-label d-inline-block"
-                         for="new-session-destroy-current">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="new-session-destroy-current"
+                    v-model="newUrlData.destroyCurrentSession"
+                  >
+                  <label
+                    class="form-check-label d-inline-block"
+                    for="new-session-destroy-current"
+                  >
                     Destroy current session
                   </label>
                 </div>
@@ -196,10 +278,20 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="closeNewUrlModal">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+              @click="closeNewUrlModal"
+            >
               Cancel
             </button>
-            <button type="button" class="btn btn-primary" data-dismiss="modal" @click="newURL">
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              @click="newURL"
+            >
               Create
             </button>
           </div>

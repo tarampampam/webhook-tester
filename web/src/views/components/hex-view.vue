@@ -1,22 +1,28 @@
 <template>
-  <div class="container-fluid" v-if="content">
+  <div
+    class="container-fluid"
+    v-if="content"
+  >
     <div
       v-if="content && content.length > 256"
       class="alert alert-secondary"
     >
       <p class="mb-0">
         HEX viewer may have performance problems with large request payloads. Please, make a
-        <a href="https://github.com/tarampampam/webhook-tester/pulls" target="_blank">PR in the project
+        <a
+          href="https://github.com/tarampampam/webhook-tester/pulls"
+          target="_blank"
+        >PR in the project
           repository</a> if you know how to solve this.
       </p>
     </div>
 
     <div class="row">
-      <div class="col-xl-1 col-lg-2 d-none d-xl-block d-lg-block"></div>
+      <div class="col-xl-1 col-lg-2 d-none d-xl-block d-lg-block" />
       <div class="col-xl-5 col-lg-7 text-muted font-monospace text-nowrap">
         <span
           v-for="(colIdx, colNum) in bytesPerRow"
-          v-bind:key="colIdx"
+          :key="colIdx"
           :class="{ 'text-info': selectedCol === colNum }"
           class="me-2"
         >{{ numToHex(colNum, 2) }}</span>
@@ -27,7 +33,7 @@
     </div>
     <div
       v-for="(bytesRow, rowNum) in lines()"
-      v-bind:key="rowNum"
+      :key="rowNum"
       class="row"
     >
       <div class="col-xl-1 col-lg-2 d-none d-xl-block d-lg-block font-monospace text-muted">
@@ -36,19 +42,19 @@
       <div class="col-xl-5 col-lg-7 font-monospace">
         <span
           v-for="(byte, byteNum) in bytesRow"
-          v-bind:key="byteNum"
+          :key="byteNum"
           class="me-2"
         >
-        <span
-          :class="{ 'text-warning': selectedRow === rowNum && selectedCol === byteNum }"
-          @mouseover="handleChangeSelected(rowNum, byteNum)"
-        >{{ numToHex(byte, 2) }}</span>
+          <span
+            :class="{ 'text-warning': selectedRow === rowNum && selectedCol === byteNum }"
+            @mouseover="handleChangeSelected(rowNum, byteNum)"
+          >{{ numToHex(byte, 2) }}</span>
         </span>
       </div>
       <div class="col-xl-6 col-lg-3 d-none d-xl-block d-lg-block font-monospace">
         <span
           v-for="(byte, byteNum) in bytesRow"
-          v-bind:key="byteNum"
+          :key="byteNum"
           :class="{ 'text-warning': selectedRow === rowNum && selectedCol === byteNum }"
           @mouseover="handleChangeSelected(rowNum, byteNum)"
         >{{ byteToASCII(byte) }}</span>

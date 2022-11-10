@@ -1,10 +1,22 @@
 <template>
-  <div class="request-plate list-group-item list-group-item-action flex-column py-3 px-3" :class="methodClass">
+  <div
+    class="request-plate list-group-item list-group-item-action flex-column py-3 px-3"
+    :class="methodClass"
+  >
     <div class="d-flex w-100 justify-content-between">
-      <h5 class="mb-1 text-nowrap">{{ request.clientAddress }}</h5>
-      <button type="button" class="btn-close position-relative small" title="Delete" @click="remove"></button>
+      <h5 class="mb-1 text-nowrap">
+        {{ request.clientAddress }}
+      </h5>
+      <button
+        type="button"
+        class="btn-close position-relative small"
+        title="Delete"
+        @click="remove"
+      />
     </div>
-    <p class="when small m-0">{{ formattedWhen }}</p>
+    <p class="when small m-0">
+      {{ formattedWhen }}
+    </p>
   </div>
 </template>
 

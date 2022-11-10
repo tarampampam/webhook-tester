@@ -1,5 +1,5 @@
 import {createApp} from 'vue'
-import { createRouter, createWebHashHistory } from 'vue-router'
+import {createRouter, createWebHashHistory} from 'vue-router'
 import {library} from '@fortawesome/fontawesome-svg-core'
 import {
   faAngleLeft,
@@ -9,7 +9,8 @@ import {
   faArrowUpRightFromSquare,
   faAtom,
   faDownload,
-  faFont, faPersonRunning,
+  faFont,
+  faPersonRunning,
   faPlus,
   faQuestion
 } from '@fortawesome/free-solid-svg-icons'
@@ -17,7 +18,7 @@ import {faGithub} from '@fortawesome/free-brands-svg-icons'
 import {faCopy} from '@fortawesome/free-regular-svg-icons'
 import ClipboardJS from 'clipboard'
 import iziToast from 'izitoast'
-import index from './views/index.vue'
+import mainApp from './views/main-app.vue'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
 import hljsVuePlugin from '@highlightjs/vue-plugin'
@@ -58,7 +59,7 @@ const router = createRouter({
   ],
 })
 
-createApp(index)
+createApp(mainApp)
   .use(router)
   .use(hljsVuePlugin)
   .use(() => {

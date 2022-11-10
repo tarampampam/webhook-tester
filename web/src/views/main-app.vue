@@ -1,107 +1,131 @@
 <template>
-  <main-header
-    :currentWebHookUrl="currentWebHookUrl"
-    :sessionLifetimeSec="sessionLifetimeSec"
-    :maxBodySizeBytes="maxBodySize"
-    :version="appVersion"
-    @createNewUrl="startNewSession"
-  ></main-header>
+  <main>
+    <main-header
+      :current-web-hook-url="currentWebHookUrl"
+      :session-lifetime-sec="sessionLifetimeSec"
+      :max-body-size-bytes="maxBodySize"
+      :version="appVersion"
+      @createNewUrl="startNewSession"
+    />
 
-  <div class="container-fluid mb-2">
-    <div class="row flex-xl-nowrap">
-      <div
-        class="sidebar px-2 py-0"
-        @click.self="switchToRequest(undefined)"
-      >
-        <div class="ps-3 pt-4 pe-3 pb-3">
-          <div class="d-flex w-100 justify-content-between">
-            <h5 class="text-uppercase mb-0">
-              Requests
-              <span class="badge bg-primary rounded-pill ms-1 total-requests-count">{{ requests.length }}</span>
-            </h5>
-            <button
-              type="button"
-              class="btn btn-outline-danger btn-sm position-relative button-delete-all"
-              v-if="requests.length > 0"
-              @click="deleteAllRequests(true)"
-            >
-              Delete all
-            </button>
-          </div>
-        </div>
-
-        <div class="list-group" v-if="requests.length > 0">
-          <request-plate
-            v-for="r in requests"
-            :key="r.UUID"
-            :request="r"
-            :class="{ active: requestUUID === r.UUID }"
-            @click="switchToRequest(r.UUID)"
-            @onDelete="(uuid: string) => deleteRequest(uuid, true)"
-          ></request-plate>
-        </div>
-        <div v-else class="text-muted text-center mt-3">
-          <span class="spinner-border spinner-border-sm me-1"></span> Waiting for first request
-        </div>
-      </div>
-
-      <div class="col py-3 ps-md-4" role="main">
-        <div v-if="requests.length > 0 && requestExist(requestUUID)">
-          <div class="row pt-2">
-            <requests-navigator
-              class="col-6"
-              :requests="requests"
-              :requestUUID="requestUUID"
-              @changed="(uuid: string) => switchToRequest(uuid)"
-            />
-            <div class="col-6 pb-1 text-end">
-              <div class="form-check d-inline-block">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  id="show-details"
-                  v-model="showRequestDetails"
-                >
-                <label class="form-check-label" for="show-details">Show details</label>
-              </div>
-              <div class="form-check d-inline-block ms-3"
-                   title="Automatically select and go to the latest incoming webhook request">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  id="auto-navigate"
-                  v-model="autoRequestNavigate"
-                >
-                <label class="form-check-label" for="auto-navigate">Auto navigate</label>
-              </div>
+    <div class="container-fluid mb-2">
+      <div class="row flex-xl-nowrap">
+        <div
+          class="sidebar px-2 py-0"
+          @click.self="switchToRequest(undefined)"
+        >
+          <div class="ps-3 pt-4 pe-3 pb-3">
+            <div class="d-flex w-100 justify-content-between">
+              <h5 class="text-uppercase mb-0">
+                Requests
+                <span class="badge bg-primary rounded-pill ms-1 total-requests-count">{{ requests.length }}</span>
+              </h5>
+              <button
+                type="button"
+                class="btn btn-outline-danger btn-sm position-relative button-delete-all"
+                v-if="requests.length > 0"
+                @click="deleteAllRequests(true)"
+              >
+                Delete all
+              </button>
             </div>
           </div>
 
-          <request-details
-            v-if="showRequestDetails"
-            class="pt-3"
-            :request="request()"
-          ></request-details>
+          <div
+            class="list-group"
+            v-if="requests.length > 0"
+          >
+            <request-plate
+              v-for="r in requests"
+              :key="r.UUID"
+              :request="r"
+              :class="{ active: requestUUID === r.UUID }"
+              @click="switchToRequest(r.UUID)"
+              @onDelete="(uuid: string) => deleteRequest(uuid, true)"
+            />
+          </div>
+          <div
+            v-else
+            class="text-muted text-center mt-3"
+          >
+            <span class="spinner-border spinner-border-sm me-1" /> Waiting for first request
+          </div>
+        </div>
 
-          <div class="pt-3">
-            <h4>Request body</h4>
+        <div
+          class="col py-3 ps-md-4"
+          role="main"
+        >
+          <div v-if="requests.length > 0 && requestExist(requestUUID)">
+            <div class="row pt-2">
+              <requests-navigator
+                class="col-6"
+                :requests="requests"
+                :request-u-u-i-d="requestUUID"
+                @changed="(uuid: string) => switchToRequest(uuid)"
+              />
+              <div class="col-6 pb-1 text-end">
+                <div class="form-check d-inline-block">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="show-details"
+                    v-model="showRequestDetails"
+                  >
+                  <label
+                    class="form-check-label"
+                    for="show-details"
+                  >Show details</label>
+                </div>
+                <div
+                  class="form-check d-inline-block ms-3"
+                  title="Automatically select and go to the latest incoming webhook request"
+                >
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="auto-navigate"
+                    v-model="autoRequestNavigate"
+                  >
+                  <label
+                    class="form-check-label"
+                    for="auto-navigate"
+                  >Auto navigate</label>
+                </div>
+              </div>
+            </div>
 
-            <request-body
-              v-if="request() && request().content.length"
+            <request-details
+              v-if="showRequestDetails"
+              class="pt-3"
               :request="request()"
             />
-            <div v-else class="pt-1 pb-1">
-              <p class="text-muted small text-monospace">// empty request body</p>
+
+            <div class="pt-3">
+              <h4>Request body</h4>
+
+              <request-body
+                v-if="request() && request().content.length"
+                :request="request()"
+              />
+              <div
+                v-else
+                class="pt-1 pb-1"
+              >
+                <p class="text-muted small text-monospace">
+                  // empty request body
+                </p>
+              </div>
             </div>
           </div>
+          <index-empty
+            v-else
+            :current-web-hook-url="currentWebHookUrl"
+          />
         </div>
-        <index-empty
-          v-else
-          :currentWebHookUrl="currentWebHookUrl"
-        ></index-empty>
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script lang="ts">
@@ -112,7 +136,6 @@ import RequestPlate from './components/request-plate.vue'
 import RequestsNavigator from './components/requests-navigator.vue'
 import RequestDetails from './components/request-details.vue'
 import RequestBody from './components/request-body.vue'
-import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
 import {NewSessionSettings} from './types'
 import {
   deleteAllSessionRequests,
@@ -137,7 +160,6 @@ const errorsHandler = console.error
 
 export default defineComponent({
   components: {
-    'font-awesome-icon': FontAwesomeIcon,
     'main-header': MainHeader,
     'request-plate': RequestPlate,
     'requests-navigator': RequestsNavigator,
@@ -213,20 +235,21 @@ export default defineComponent({
   },
 
   watch: {
-    $route(to: RouteLocationNormalized, from: RouteLocationNormalized): void {
+    $route(to: RouteLocationNormalized): void {
       switch (to.name as 'index' | 'request' | undefined) {
-        case 'index': // the index page requested
-          const local = this.getLocalSessionUUID()
+        case 'index': {// the index page requested
+          const localSessionUUID = this.getLocalSessionUUID()
 
-          if (local) {
-            this.navigateToSession(this.$router, local) // redirect to the existing session
+          if (localSessionUUID) {
+            this.navigateToSession(this.$router, localSessionUUID) // redirect to the existing session
           } else {
             this.startNewSession({}) // start a new session with defaults
           }
 
           break
+        }
 
-        case 'request': // session (+request) page requested
+        case 'request': { // session (+request) page requested
           const {sessionUUID, requestUUID} = to.params as { [key: string]: string | undefined }
 
           if (typeof sessionUUID !== 'string' || !isValidUUID(sessionUUID)) {
@@ -268,6 +291,7 @@ export default defineComponent({
                 })
             }
           }
+        }
       }
     },
 
@@ -392,8 +416,8 @@ export default defineComponent({
         })
     },
 
-    deleteAllRequests(onServer: boolean | any): void {
-      if (onServer === true && this.sessionUUID) {
+    deleteAllRequests(onServer: boolean): void {
+      if (onServer && this.sessionUUID) {
         deleteAllSessionRequests(this.sessionUUID)
           .then((success) => {
             if (!success) {
@@ -411,8 +435,8 @@ export default defineComponent({
       this.requests.splice(0, this.requests.length)
     },
 
-    deleteRequest(requestUUID: string, onServer: boolean | any): void {
-      if (onServer === true && this.sessionUUID) {
+    deleteRequest(requestUUID: string, onServer: boolean): void {
+      if (onServer && this.sessionUUID) {
         deleteSessionRequest(this.sessionUUID, requestUUID)
           .then((success) => {
             if (!success) {

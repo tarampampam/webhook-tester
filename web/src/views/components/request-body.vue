@@ -7,7 +7,7 @@
           :class="{ 'active': mode === 'text' }"
           @click="mode='text'"
         >
-          <font-awesome-icon icon="fa-solid fa-font"/> Text view
+          <font-awesome-icon icon="fa-solid fa-font" /> Text view
         </span>
       </li>
       <li class="nav-item">
@@ -16,7 +16,7 @@
           :class="{ 'active': mode === 'binary' }"
           @click="mode='binary'"
         >
-          <font-awesome-icon icon="fa-solid fa-atom"/> Binary view
+          <font-awesome-icon icon="fa-solid fa-atom" /> Binary view
         </span>
       </li>
       <li
@@ -27,7 +27,7 @@
           class="btn nav-link pl-4 pr-4 pt-1 pb-1"
           @click="download"
         >
-          <font-awesome-icon icon="fa-solid fa-download"/> Download
+          <font-awesome-icon icon="fa-solid fa-download" /> Download
         </span>
       </li>
     </ul>
@@ -36,13 +36,16 @@
         class="tab-pane active"
         v-if="mode === 'text'"
       >
-        <highlightjs autodetect :code="content(true)" />
+        <highlightjs
+          autodetect
+          :code="content(true)"
+        />
       </div>
       <div
         class="tab-pane active pt-2"
         v-if="mode === 'binary'"
       >
-        <hex-view :content="request.content"></hex-view>
+        <hex-view :content="request.content" />
       </div>
     </div>
   </div>

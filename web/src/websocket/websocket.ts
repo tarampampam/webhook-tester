@@ -22,17 +22,17 @@ export function newRenewableSessionConnection(sessionUUID: string, handlers: {
   })
 
   ws.addEventListener('message', (msg): void => {
-    const j = JSON.parse(msg.data) as {name: 'request-registered' | 'request-deleted' | 'requests-deleted', data: any}
+    const j = JSON.parse(msg.data) as {name: 'request-registered' | 'request-deleted' | 'requests-deleted', data: unknown}
 
     switch (j.name) {
       case 'request-registered':
-        if (handlers.onRequestRegistered) {
+        if (handlers.onRequestRegistered && typeof j.data === 'string') {
           handlers.onRequestRegistered(j.data)
         }
         break
 
       case 'request-deleted':
-        if (handlers.onRequestDeleted) {
+        if (handlers.onRequestDeleted && typeof j.data === 'string') {
           handlers.onRequestDeleted(j.data)
         }
         break

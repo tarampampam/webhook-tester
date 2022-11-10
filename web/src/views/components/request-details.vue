@@ -2,34 +2,48 @@
   <div class="row request-details">
     <div class="col-md-12 col-lg-5 col-xl-4">
       <div class="row">
-        <div class="col-lg-3"></div>
+        <div class="col-lg-3" />
         <div class="col-lg-9">
           <h4>Request details</h4>
         </div>
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">URL</div>
+        <div class="col-lg-3 text-lg-end">
+          URL
+        </div>
         <div class="col-lg-9 text-break">
-          <code v-if="request"><a :href="requestURI" target="_blank">{{ requestURI }}</a></code>
+          <code v-if="request"><a
+            :href="requestURI"
+            target="_blank"
+          >{{ requestURI }}</a></code>
         </div>
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">Method</div>
+        <div class="col-lg-3 text-lg-end">
+          Method
+        </div>
         <div class="col-lg-9">
-          <span class="badge text-uppercase" :class="methodClass" v-if="request">{{ request.method.toUpperCase() }}</span>
+          <span
+            class="badge text-uppercase"
+            :class="methodClass"
+            v-if="request"
+          >{{ request.method.toUpperCase() }}</span>
         </div>
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">From</div>
+        <div class="col-lg-3 text-lg-end">
+          From
+        </div>
         <div class="col-lg-9">
-          <a v-if="request"
-             :href="'https://who.is/whois-ip/ip-address/' + request.clientAddress"
-             target="_blank"
-             rel="noreferrer"
-             title="WhoIs?"
+          <a
+            v-if="request"
+            :href="'https://who.is/whois-ip/ip-address/' + request.clientAddress"
+            target="_blank"
+            rel="noreferrer"
+            title="WhoIs?"
           >
             <strong v-if="request">{{ request.clientAddress }}</strong>
           </a>
@@ -37,38 +51,52 @@
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">When</div>
+        <div class="col-lg-3 text-lg-end">
+          When
+        </div>
         <div class="col-lg-9">
           <span v-if="request">{{ formattedWhen }}</span>
         </div>
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">Size</div>
+        <div class="col-lg-3 text-lg-end">
+          Size
+        </div>
         <div class="col-lg-9">
           <span v-if="request && contentLength">{{ contentLength }} bytes</span>
-          <span v-else class="text-muted">&mdash;</span>
+          <span
+            v-else
+            class="text-muted"
+          >&mdash;</span>
         </div>
       </div>
 
       <div class="row pb-1">
-        <div class="col-lg-3 text-lg-end">ID</div>
+        <div class="col-lg-3 text-lg-end">
+          ID
+        </div>
         <div class="col-lg-9 text-break">
           <code v-if="request">{{ request.UUID }}</code>
         </div>
       </div>
     </div>
 
-    <div class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0" v-if="request && request.headers">
+    <div
+      class="col-md-12 col-lg-7 col-xl-8 mt-3 mt-md-3 mt-lg-0"
+      v-if="request && request.headers"
+    >
       <div class="row">
-        <div class="col-lg-4 col-xl-3"></div>
+        <div class="col-lg-4 col-xl-3" />
         <div class="col-lg-8 col-xl-9">
           <h4>HTTP headers</h4>
         </div>
       </div>
-      <div v-for="(header) in request.headers"
-           :key="header.name"
-           class="row pb-1">
+      <div
+        v-for="(header) in request.headers"
+        :key="header.name"
+        class="row pb-1"
+      >
         <div class="col-lg-4 col-xl-3 text-lg-end">
           {{ header.name }}
         </div>
@@ -116,7 +144,7 @@ export default defineComponent({
 
   computed: {
     requestURI(): string {
-      let uri = (this.request && typeof this.request.url.length)
+      const uri = (this.request && typeof this.request.url.length)
         ? this.request.url.replace(/^\/+/g, '')
         : '...'
 

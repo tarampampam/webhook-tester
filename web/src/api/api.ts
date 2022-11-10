@@ -49,9 +49,9 @@ interface APINewSessionResponse {
   UUID: string
   response: {
     content: Uint8Array
-    code: Number
+    code: number
     contentType: string
-    delaySec: Number
+    delaySec: number
   }
   createdAt: Date
 }

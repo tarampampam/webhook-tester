@@ -1,13 +1,19 @@
 <template>
   <div>
-    <div class="btn-group pb-1" role="group">
+    <div
+      class="btn-group pb-1"
+      role="group"
+    >
       <button
         type="button"
         class="btn btn-secondary btn-sm"
         @click="navigateFirstRequest"
         :class="{disabled: requests.length <= 1 || isFirstRequest}"
       >
-        <font-awesome-icon icon="fa-solid fa-angles-left" class="pe-1"/>
+        <font-awesome-icon
+          icon="fa-solid fa-angles-left"
+          class="pe-1"
+        />
         First request
       </button>
       <button
@@ -16,11 +22,17 @@
         @click="navigatePreviousRequest"
         :class="{disabled: requests.length <= 1 || !requestUUID || isFirstRequest}"
       >
-        <font-awesome-icon icon="fa-solid fa-angle-left" class="pe-1"/>
+        <font-awesome-icon
+          icon="fa-solid fa-angle-left"
+          class="pe-1"
+        />
         Previous
       </button>
     </div>
-    <div class="btn-group pb-1 ms-1" role="group">
+    <div
+      class="btn-group pb-1 ms-1"
+      role="group"
+    >
       <button
         type="button"
         class="btn btn-secondary btn-sm"
@@ -28,7 +40,10 @@
         :class="{disabled: requests.length <= 1 || !requestUUID || isLastRequest}"
       >
         Next
-        <font-awesome-icon icon="fa-solid fa-angle-right" class="ps-1"/>
+        <font-awesome-icon
+          icon="fa-solid fa-angle-right"
+          class="ps-1"
+        />
       </button>
       <button
         type="button"
@@ -37,7 +52,10 @@
         :class="{disabled: requests.length <= 1 || isLastRequest}"
       >
         Last request
-        <font-awesome-icon icon="fa-solid fa-angles-right" class="ps-1"/>
+        <font-awesome-icon
+          icon="fa-solid fa-angles-right"
+          class="ps-1"
+        />
       </button>
     </div>
   </div>
@@ -56,7 +74,7 @@ export default defineComponent({
   props: {
     requests: {
       type: Array as () => RecordedRequest[],
-      default: [],
+      default: () => [],
     },
     requestUUID: {
       type: String,

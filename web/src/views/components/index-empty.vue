@@ -6,26 +6,43 @@
     <p class="text-muted">
       Any requests sent to that URL are logged here instantly — you don't even have to refresh!
     </p>
-    <hr/>
+    <hr>
     <p>
       Here's your unique URL that was created just now:
     </p>
     <p>
       <code id="current-webhook-url-text">{{ currentWebHookUrl }}</code>
-      <button class="btn btn-primary btn-sm ms-2"
-              data-clipboard-target="#current-webhook-url-text"
-              data-clipboard>
-        <font-awesome-icon icon="fa-regular fa-copy" class="pe-1"/>
+      <button
+        class="btn btn-primary btn-sm ms-2"
+        data-clipboard-target="#current-webhook-url-text"
+        data-clipboard
+      >
+        <font-awesome-icon
+          icon="fa-regular fa-copy"
+          class="pe-1"
+        />
         Copy
       </button>
-      <a target="_blank"
-         class="btn btn-primary btn-sm ms-1"
-         :href="currentWebHookUrl">
-        <font-awesome-icon icon="fa-arrow-up-right-from-square" class="pe-1"/>
+      <a
+        target="_blank"
+        class="btn btn-primary btn-sm ms-1"
+        :href="currentWebHookUrl"
+      >
+        <font-awesome-icon
+          icon="fa-arrow-up-right-from-square"
+          class="pe-1"
+        />
         Open in a new tab
       </a>
-      <button class="btn btn-primary btn-sm ms-1" @click="testXHR" title="Using random HTTP method">
-        <font-awesome-icon icon="fa-solid fa-person-running" class="pe-1"/>
+      <button
+        class="btn btn-primary btn-sm ms-1"
+        @click="testXHR"
+        title="Using random HTTP method"
+      >
+        <font-awesome-icon
+          icon="fa-solid fa-person-running"
+          class="pe-1"
+        />
         XHR
       </button>
     </p>
@@ -36,14 +53,19 @@
       <code>
         $ <span id="current-webhook-curl-text">curl -v -X POST -d "foo=bar" {{ currentWebHookUrl }}</span>
       </code>
-      <button class="btn btn-primary btn-sm ms-2"
-              data-clipboard-target="#current-webhook-curl-text"
-              data-clipboard>
-        <font-awesome-icon icon="fa-regular fa-copy" class="me-1"/>
+      <button
+        class="btn btn-primary btn-sm ms-2"
+        data-clipboard-target="#current-webhook-curl-text"
+        data-clipboard
+      >
+        <font-awesome-icon
+          icon="fa-regular fa-copy"
+          class="me-1"
+        />
         Copy
       </button>
     </p>
-    <hr/>
+    <hr>
     <p>
       Bookmark this page to go back to the requests at any time. For more info, click<strong>Help</strong>.
     </p>
