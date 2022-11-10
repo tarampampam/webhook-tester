@@ -1,11 +1,33 @@
-test
-.editorconfig
+## Git & tools
 .git
 .github
+/Makefile
+
+## IDEs
 .idea
 .vscode
-temp
-tmp
-LICENSE
-Makefile
-webhook-tester
+
+## Configs
+.editorconfig
+
+## Assets
+/assets
+/web/dist
+/webhook-tester
+
+## Vendor
+/web/node_modules
+/web/src/api/schema.ts
+
+## Temp
+/test
+/temp
+/tmp
+
+## etc
+/*.md
+/*.env
+/web/*.log
+.DS_Store
+*.cache
+*.out

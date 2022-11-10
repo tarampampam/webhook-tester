@@ -7,5 +7,5 @@
 ## Distributive
 /dist
 
-## Etc
-/temp/src-old
+## etc
+*.log

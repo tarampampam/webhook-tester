@@ -67,9 +67,10 @@ services:
     command: /bin/true
 
   node:
-    image: node:16-alpine
+    image: node:19-alpine
     environment:
       HOME: /tmp
+      NPM_CONFIG_UPDATE_NOTIFIER: false
     volumes:
       - /etc/passwd:/etc/passwd:ro
       - /etc/group:/etc/group:ro

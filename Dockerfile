@@ -1,5 +1,22 @@
 # syntax=docker/dockerfile:1.2
 
+# Image page: <https://hub.docker.com/_/node>
+FROM node:19-alpine as frontend
+
+COPY . /src
+
+WORKDIR /src/web
+
+# install node dependencies
+RUN set -x \
+    && npm config set update-notifier false \
+    && npm ci --no-audit --prefer-offline
+
+# build the frontend (built artifact can be found in /src/web/dist)
+RUN set -x \
+    && npm run gen \
+    && npm run build
+
 # Image page: <https://hub.docker.com/_/golang>
 FROM golang:1.19-alpine as builder
 
@@ -18,11 +35,13 @@ WORKDIR /src
 
 COPY . /src
 
+COPY --from=frontend /src/web/dist /src/web/dist
+
 # arguments to pass on each go tool link invocation
 ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
 
 RUN set -x \
-    && go version \
+    && go generate ./... \
     && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/ \
     && /tmp/webhook-tester version \
     && /tmp/webhook-tester -h
