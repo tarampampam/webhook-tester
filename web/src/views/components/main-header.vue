@@ -345,4 +345,8 @@ export default defineComponent({
 .nav-link {
   cursor: pointer;
 }
+
+hr {
+  opacity: .05;
+}
 </style>

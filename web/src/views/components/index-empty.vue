@@ -92,4 +92,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+hr {
+  opacity: .05;
+}
 </style>

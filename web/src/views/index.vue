@@ -117,7 +117,8 @@ import {NewSessionSettings} from './types'
 import {
   deleteAllSessionRequests,
   deleteSession,
-  deleteSessionRequest, getAllSessionRequests,
+  deleteSessionRequest,
+  getAllSessionRequests,
   getAppSettings,
   getAppVersion,
   getSessionRequest,
@@ -128,7 +129,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket'
 import {newRenewableSessionConnection} from '../websocket/websocket'
 import iziToast from 'izitoast'
 import routes from './mixins/routes'
-import session from './mixins/session'
+import local from './mixins/local'
 import {RouteLocationNormalized} from 'vue-router'
 import {isValidUUID} from '../utils'
 
@@ -147,7 +148,7 @@ export default defineComponent({
 
   mixins: [
     routes,
-    session,
+    local,
   ],
 
   data(): {
@@ -185,6 +186,9 @@ export default defineComponent({
   },
 
   created(): void {
+    this.autoRequestNavigate = this.getLocalBool('auto-navigate', true)
+    this.showRequestDetails = this.getLocalBool('show-details', true)
+
     getAppVersion()
       .then((ver) => this.appVersion = ver)
       .catch(errorsHandler)
@@ -278,7 +282,15 @@ export default defineComponent({
           }
         }
       },
-    }
+    },
+
+    autoRequestNavigate(v: boolean): void {
+      this.setLocalBool('auto-navigate', v)
+    },
+
+    showRequestDetails(v: boolean): void {
+      this.setLocalBool('show-details', v)
+    },
   },
 
   methods: {
@@ -445,6 +457,8 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+$web-font-path: false; // disable external font named "Lato"
+
 @import "~bootswatch/dist/darkly/variables";
 @import "~bootstrap/scss/bootstrap";
 @import "~bootswatch/dist/darkly/bootswatch";
