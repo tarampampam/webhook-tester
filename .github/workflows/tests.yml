@@ -55,129 +55,129 @@ jobs:
       - run: npm run build
         working-directory: web
 
-  #  golangci-lint:
-#    name: Golang-CI (lint)
-#    runs-on: ubuntu-20.04
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - uses: actions/setup-go@v3
-#        with: {go-version: 1.19}
-#
-#      - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
-#
-#  go-test:
-#    name: Unit tests
-#    runs-on: ubuntu-20.04
-#    steps:
-#      - uses: actions/setup-go@v3
-#        with: {go-version: 1.19}
-#
-#      - uses: actions/checkout@v3
-#        with: {fetch-depth: 2} # Fixes codecov error 'Issue detecting commit SHA'
-#
-#      - uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.cache/go-build
-#            ~/go/pkg/mod
-#          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#          restore-keys: ${{ runner.os }}-go-
-#
-#      - name: Install Go dependencies
-#        run: go mod download
-#
-#      - name: Run Unit tests
-#        run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
-#
-#      - uses: codecov/codecov-action@v3 # https://github.com/codecov/codecov-action
-#        continue-on-error: true
-#        with:
-#          token: ${{ secrets.CODECOV_TOKEN }}
-#          file: /tmp/coverage.txt
-#
-#  build:
-#    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
-#    runs-on: ubuntu-20.04
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os: [linux, windows, darwin] # linux, freebsd, darwin, windows
-#        arch: [amd64]                # amd64, 386
-#    needs: [golangci-lint, go-test]
-#    steps:
-#      - uses: actions/setup-go@v3
-#        with: {go-version: 1.19}
-#
-#      - uses: actions/checkout@v3
-#
-#      - {uses: gacts/github-slug@v1, id: slug}
-#
-#      - uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.cache/go-build
-#            ~/go/pkg/mod
-#          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#          restore-keys: ${{ runner.os }}-go-
-#
-#      - name: Build application
-#        env:
-#          GOOS: ${{ matrix.os }}
-#          GOARCH: ${{ matrix.arch }}
-#          CGO_ENABLED: 0
-#          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.branch-name-slug }}@${{ steps.slug.outputs.commit-hash-short }}
-#        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
-#
-#      - name: Try to execute
-#        if: matrix.os == 'linux'
-#        run: /tmp/webhook-tester version && /tmp/webhook-tester -h
-#
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
-#          path: /tmp/webhook-tester
-#          if-no-files-found: error
-#          retention-days: 3
-#
-#  e2e:
-#    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
-#    runs-on: ubuntu-20.04
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        storage-driver: [memory, redis]
-#        pubsub-driver: [memory, redis]
-#    needs: [build]
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Start redis server
-#        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
-#        run: docker run --rm -d -p "6379:6379/tcp" redis:7-alpine
-#
-#      - name: Download compiled binary file
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: webhook-tester-linux-amd64
-#          path: .artifact
-#
-#      - name: Prepare binary file to run
-#        working-directory: .artifact
-#        run: mv ./webhook-tester ./../app && chmod +x ./../app
-#
-#      - name: Start HTTP server
-#        run: ./app serve --port 8081 --public ./web --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
-#
-#      - name: Run Newman
-#        uses: ./.github/actions/newman
-#        with:
-#          baseurl: 'http://127.0.0.1:8081'
+  golangci-lint:
+    name: Golang-CI (lint)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with: {go-version: 1.19}
+
+      - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
+
+  go-test:
+    name: Unit tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/setup-go@v3
+        with: {go-version: 1.19}
+
+      - uses: actions/checkout@v3
+        with: {fetch-depth: 2} # Fixes codecov error 'Issue detecting commit SHA'
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Install Go dependencies
+        run: go mod download
+
+      - name: Run Unit tests
+        run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
+
+      - uses: codecov/codecov-action@v3 # https://github.com/codecov/codecov-action
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: /tmp/coverage.txt
+
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, windows, darwin] # linux, freebsd, darwin, windows
+        arch: [amd64]                # amd64, 386
+    needs: [golangci-lint, go-test, frontend]
+    steps:
+      - uses: actions/setup-go@v3
+        with: {go-version: 1.19}
+
+      - uses: actions/checkout@v3
+
+      - {uses: gacts/github-slug@v1, id: slug}
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Build application
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.branch-name-slug }}@${{ steps.slug.outputs.commit-hash-short }}
+        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
+
+      - name: Try to execute
+        if: matrix.os == 'linux'
+        run: /tmp/webhook-tester version && /tmp/webhook-tester -h
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/webhook-tester
+          if-no-files-found: error
+          retention-days: 3
+
+  e2e:
+    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
+        pubsub-driver: [memory, redis]
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Start redis server
+        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
+        run: docker run --rm -d -p "6379:6379/tcp" redis:7-alpine
+
+      - name: Download compiled binary file
+        uses: actions/download-artifact@v3
+        with:
+          name: webhook-tester-linux-amd64
+          path: .artifact
+
+      - name: Prepare binary file to run
+        working-directory: .artifact
+        run: mv ./webhook-tester ./../app && chmod +x ./../app
+
+      - name: Start HTTP server
+        run: ./app serve --port 8081 --public ./web --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
+
+      - name: Run Newman
+        uses: ./.github/actions/newman
+        with:
+          baseurl: 'http://127.0.0.1:8081'
 
   docker-image:
     name: Build docker image
     runs-on: ubuntu-20.04
-#    needs: [golangci-lint, go-test]
+    needs: [golangci-lint, go-test, frontend]
     steps:
       - uses: actions/checkout@v3
 
@@ -204,70 +204,70 @@ jobs:
           path: ./docker-image.tar
           retention-days: 1
 
-#  scan-docker-image:
-#    name: Scan docker image
-#    runs-on: ubuntu-20.04
-#    needs: [docker-image]
-#    steps:
-#      - uses: actions/checkout@v3 # is needed for `upload-sarif` action
-#
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: docker-image
-#          path: .artifact
-#
-#      - uses: aquasecurity/trivy-action@0.8.0 # action page: <https://github.com/aquasecurity/trivy-action>
-#        with:
-#          input: .artifact/docker-image.tar
-#          format: sarif
-#          severity: MEDIUM,HIGH,CRITICAL
-#          exit-code: 1
-#          output: trivy-results.sarif
-#
-#      - uses: github/codeql-action/upload-sarif@v2
-#        if: always()
-#        continue-on-error: true
-#        with: {sarif_file: trivy-results.sarif}
-#
-#  docker-image-e2e:
-#    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
-#    runs-on: ubuntu-20.04
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        storage-driver: [memory, redis]
-#        pubsub-driver: [memory, redis]
-#    needs: [docker-image]
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - run: docker network create "app-network"
-#
-#      - name: Start redis server
-#        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
-#        run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:7-alpine
-#
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: docker-image
-#          path: .artifact
-#
-#      - name: Prepare image to run
-#        working-directory: .artifact
-#        run: docker load < docker-image.tar
-#
-#      - name: Run docker image with app
-#        run: |
-#          docker run --rm -d \
-#            --network "app-network" \
-#            -p "8081:8081/tcp" \
-#            -e "STORAGE_DRIVER=${{ matrix.storage-driver }}" \
-#            -e "PUBSUB_DRIVER=${{ matrix.pubsub-driver }}" \
-#            -e "REDIS_DSN=redis://redis:6379/0" \
-#            -e "LISTEN_PORT=8081" \
-#              webhook-tester:local
-#
-#      - name: Run Newman
-#        uses: ./.github/actions/newman
-#        with:
-#          baseurl: 'http://127.0.0.1:8081'
+  scan-docker-image:
+    name: Scan docker image
+    runs-on: ubuntu-20.04
+    needs: [docker-image]
+    steps:
+      - uses: actions/checkout@v3 # is needed for `upload-sarif` action
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .artifact
+
+      - uses: aquasecurity/trivy-action@0.8.0 # action page: <https://github.com/aquasecurity/trivy-action>
+        with:
+          input: .artifact/docker-image.tar
+          format: sarif
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: 1
+          output: trivy-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        continue-on-error: true
+        with: {sarif_file: trivy-results.sarif}
+
+  docker-image-e2e:
+    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
+        pubsub-driver: [memory, redis]
+    needs: [docker-image]
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: docker network create "app-network"
+
+      - name: Start redis server
+        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
+        run: docker run --rm -d --network "app-network" -p "6379:6379/tcp" --name=redis redis:7-alpine
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .artifact
+
+      - name: Prepare image to run
+        working-directory: .artifact
+        run: docker load < docker-image.tar
+
+      - name: Run docker image with app
+        run: |
+          docker run --rm -d \
+            --network "app-network" \
+            -p "8081:8081/tcp" \
+            -e "STORAGE_DRIVER=${{ matrix.storage-driver }}" \
+            -e "PUBSUB_DRIVER=${{ matrix.pubsub-driver }}" \
+            -e "REDIS_DSN=redis://redis:6379/0" \
+            -e "LISTEN_PORT=8081" \
+              webhook-tester:local
+
+      - name: Run Newman
+        uses: ./.github/actions/newman
+        with:
+          baseurl: 'http://127.0.0.1:8081'
