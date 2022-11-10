@@ -3,7 +3,6 @@
     "gen": "openapi-typescript ./../api/openapi.yml --immutable-types --output ./src/api/schema.ts",
     "watch": "webpack --config webpack/webpack.dev.js --watch",
     "build": "webpack --config webpack/webpack.prod.js",
-    "test": "jest",
     "lint": "eslint ./src --ext .ts,.vue"
   },
   "dependencies": {
@@ -27,7 +26,6 @@
   },
   "devDependencies": {
     "@types/bootstrap": "^5.2.5",
-    "@types/jest": "^27.4.1",
     "@typescript-eslint/eslint-plugin": "^5.42.1",
     "@typescript-eslint/parser": "^5.42.1",
     "@vue/eslint-config-typescript": "^11.0.2",
@@ -37,14 +35,12 @@
     "eslint-plugin-vue": "^9.7.0",
     "filemanager-webpack-plugin": "^7.0.0",
     "html-webpack-plugin": "^5.5.0",
-    "jest": "^27.5.1",
     "json-minimizer-webpack-plugin": "^4.0.0",
     "mini-css-extract-plugin": "^2.6.1",
     "openapi-typescript": "^5.4.1",
     "sass": "^1.55.0",
     "sass-loader": "^13.1.0",
     "terser-webpack-plugin": "^5.3.6",
-    "ts-jest": "^27.1.4",
     "ts-loader": "^9.4.1",
     "type-fest": "^3.1.0",
     "typescript": "^4.8.4",
@@ -57,22 +53,5 @@
   },
   "engines": {
     "node": ">=16"
-  },
-  "jest": {
-    "roots": [
-      "src"
-    ],
-    "collectCoverageFrom": [
-      "src/**/*.{js,ts}"
-    ],
-    "coverageReporters": [
-      "clover",
-      "json",
-      "text"
-    ],
-    "testEnvironment": "jsdom",
-    "transform": {
-      "^.+\\.ts$": "ts-jest"
-    }
   }
 }
