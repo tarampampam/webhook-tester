@@ -64,6 +64,10 @@ jobs:
       - uses: actions/setup-go@v3
         with: {go-version: 1.19}
 
+      - run: mkdir ./web/dist
+
+      - run: go generate ./...
+
       - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
 
   go-test:
@@ -84,11 +88,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
 
-      - name: Install Go dependencies
-        run: go mod download
+      - run: mkdir ./web/dist
 
-      - name: Run Unit tests
-        run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
+      - run: go mod download
+
+      - run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
 
       - uses: codecov/codecov-action@v3 # https://github.com/codecov/codecov-action
         continue-on-error: true
@@ -109,9 +113,29 @@ jobs:
       - uses: actions/setup-go@v3
         with: {go-version: 1.19}
 
+      - uses: actions/setup-node@v3
+        with: {node-version: 19}
+
       - uses: actions/checkout@v3
 
-      - {uses: gacts/github-slug@v1, id: slug}
+      - id: npm-cache-dir
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - run: npm ci
+        working-directory: web
+
+      - run: npm run gen
+        working-directory: web
+
+      - run: npm run build
+        working-directory: web
 
       - uses: actions/cache@v3
         with:
@@ -120,6 +144,10 @@ jobs:
             ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
+
+      - run: go generate ./...
+
+      - {uses: gacts/github-slug@v1, id: slug}
 
       - name: Build application
         env:
