@@ -14,7 +14,7 @@
         type="button"
         class="btn btn-secondary btn-sm"
         @click="navigatePreviousRequest"
-        :class="{disabled: requests.length <= 1 || !requestUUID}"
+        :class="{disabled: requests.length <= 1 || !requestUUID || isFirstRequest}"
       >
         <font-awesome-icon icon="fa-solid fa-angle-left" class="pe-1"/>
         Previous
@@ -25,7 +25,7 @@
         type="button"
         class="btn btn-secondary btn-sm"
         @click="navigateNextRequest"
-        :class="{disabled: requests.length <= 1 || !requestUUID}"
+        :class="{disabled: requests.length <= 1 || !requestUUID || isLastRequest}"
       >
         Next
         <font-awesome-icon icon="fa-solid fa-angle-right" class="ps-1"/>

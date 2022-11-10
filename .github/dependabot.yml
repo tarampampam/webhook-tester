@@ -9,6 +9,12 @@ updates:
     reviewers: [tarampampam]
     assignees: [tarampampam]
 
+  - package-ecosystem: npm
+    directory: /web
+    schedule: {interval: monthly}
+    reviewers: [tarampampam]
+    assignees: [tarampampam]
+
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: monthly}
