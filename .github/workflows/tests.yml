@@ -43,13 +43,13 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: ${{ runner.os }}-node-
 
-      - run: npm ci
+      - {working-directory: web, run: npm ci}
 
-      - run: npm run gen
+      - {working-directory: web, run: npm run gen}
 
-      - run: npm run lint
+      - {working-directory: web, run: npm run lint}
 
-      - run: npm run build
+      - {working-directory: web, run: npm run build}
 
   #  golangci-lint:
 #    name: Golang-CI (lint)
