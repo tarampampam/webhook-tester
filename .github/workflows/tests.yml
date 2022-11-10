@@ -64,7 +64,8 @@ jobs:
       - uses: actions/setup-go@v3
         with: {go-version: 1.19}
 
-      - run: mkdir ./web/dist
+      - run: mkdir ./dist && touch ./dist/index.html
+        working-directory: web
 
       - run: go generate ./...
 
@@ -88,7 +89,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
 
-      - run: mkdir ./web/dist
+      - run: mkdir ./dist && touch ./dist/index.html
+        working-directory: web
 
       - run: go mod download
 
