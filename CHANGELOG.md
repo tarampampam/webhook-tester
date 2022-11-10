@@ -6,15 +6,16 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ## UNRELEASED
 
-### Added
-
-- ...
-
 ### Changed
 
 - Frontend building using WebPack
 - VueJS updated from v2 to v3
 - Bootstrap updated from v4 to v5
+- All frontend dependencies are now built-in (no external network requests are needed anymore)
+
+### Fixed
+
+- A lot of small frontend issues
 
 ## v0.4.3
 

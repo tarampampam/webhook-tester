@@ -1,8 +1,8 @@
-# IDEs
+## IDEs
 /.idea
 /.vscode
 
-# Temp dirs & trash
+## Temp dirs & trash
 /temp
 /tmp
 *.env
