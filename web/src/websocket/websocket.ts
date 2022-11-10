@@ -12,19 +12,37 @@ function getWebsocketBaseUri(): string{
   return result + '/ws'
 }
 
-type eventNames = 'request-registered' | 'request-deleted' | 'requests-deleted'
-
-type WebsocketHandler = (name: eventNames, data: string) => void
-
-export function newRenewableSessionConnection(sessionUUID: string, onMessage: WebsocketHandler): ReconnectingWebSocket {
+export function newRenewableSessionConnection(sessionUUID: string, handlers: {
+  onRequestRegistered?: (requestUUID: string) => void,
+  onRequestDeleted?: (requestUUID: string) => void,
+  onRequestsDeleted?: () => void,
+}): ReconnectingWebSocket {
   const ws = new ReconnectingWebSocket(getWebsocketBaseUri() + '/session/' + sessionUUID, undefined, {
     maxReconnectionDelay: 10000,
   })
 
-  ws.addEventListener('message', (msg) => {
-    const j = JSON.parse(msg.data)
+  ws.addEventListener('message', (msg): void => {
+    const j = JSON.parse(msg.data) as {name: 'request-registered' | 'request-deleted' | 'requests-deleted', data: any}
 
-    onMessage(j.name, j.data)
+    switch (j.name) {
+      case 'request-registered':
+        if (handlers.onRequestRegistered) {
+          handlers.onRequestRegistered(j.data)
+        }
+        break
+
+      case 'request-deleted':
+        if (handlers.onRequestDeleted) {
+          handlers.onRequestDeleted(j.data)
+        }
+        break
+
+      case 'requests-deleted':
+        if (handlers.onRequestsDeleted) {
+          handlers.onRequestsDeleted()
+        }
+        break
+    }
   })
 
   return ws

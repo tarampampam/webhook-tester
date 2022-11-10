@@ -9,7 +9,10 @@
 
   <div class="container-fluid mb-2">
     <div class="row flex-xl-nowrap">
-      <div class="sidebar px-2 py-0">
+      <div
+        class="sidebar px-2 py-0"
+        @click.self="switchToRequest(undefined)"
+      >
         <div class="ps-3 pt-4 pe-3 pb-3">
           <div class="d-flex w-100 justify-content-between">
             <h5 class="text-uppercase mb-0">
@@ -20,7 +23,7 @@
               type="button"
               class="btn btn-outline-danger btn-sm position-relative button-delete-all"
               v-if="requests.length > 0"
-              @click="deleteAllRequests"
+              @click="deleteAllRequests(true)"
             >
               Delete all
             </button>
@@ -33,7 +36,7 @@
             :key="r.UUID"
             :request="r"
             :class="{ active: requestUUID === r.UUID }"
-            @click="requestUUID = r.UUID"
+            @click="switchToRequest(r.UUID)"
             @onDelete="(uuid: string) => deleteRequest(uuid, true)"
           ></request-plate>
         </div>
@@ -43,13 +46,13 @@
       </div>
 
       <div class="col py-3 ps-md-4" role="main">
-        <div v-if="requests.length > 0">
+        <div v-if="requests.length > 0 && requestExist(requestUUID)">
           <div class="row pt-2">
             <requests-navigator
               class="col-6"
               :requests="requests"
               :requestUUID="requestUUID"
-              @changed="(uuid: string) => requestUUID = uuid"
+              @changed="(uuid: string) => switchToRequest(uuid)"
             />
             <div class="col-6 pb-1 text-end">
               <div class="form-check d-inline-block">
@@ -114,8 +117,7 @@ import {NewSessionSettings} from './types'
 import {
   deleteAllSessionRequests,
   deleteSession,
-  deleteSessionRequest,
-  getAllSessionRequests,
+  deleteSessionRequest, getAllSessionRequests,
   getAppSettings,
   getAppVersion,
   getSessionRequest,
@@ -125,17 +127,12 @@ import {
 import ReconnectingWebSocket from 'reconnecting-websocket'
 import {newRenewableSessionConnection} from '../websocket/websocket'
 import iziToast from 'izitoast'
-import {isValidUUID} from '../utils'
 import routes from './mixins/routes'
 import session from './mixins/session'
 import {RouteLocationNormalized} from 'vue-router'
+import {isValidUUID} from '../utils'
 
 const errorsHandler = console.error
-
-type RouteParts = {
-  sessionUUID?: string | undefined
-  requestUUID?: string | undefined
-}
 
 export default defineComponent({
   components: {
@@ -193,7 +190,7 @@ export default defineComponent({
       .catch(errorsHandler)
 
     getAppSettings()
-      .then((s) => {
+      .then((s): void => {
         this.maxRequests = s.limits.maxRequests
         this.sessionLifetimeSec = s.limits.sessionLifetimeSec
         this.maxBodySize = s.limits.maxWebhookBodySize
@@ -213,117 +210,75 @@ export default defineComponent({
 
   watch: {
     $route(to: RouteLocationNormalized, from: RouteLocationNormalized): void {
-      console.dir(to)
-
-      switch (to.name) {
+      switch (to.name as 'index' | 'request' | undefined) {
         case 'index': // the index page requested
           const local = this.getLocalSessionUUID()
 
           if (local) {
-            this.$router.push({name: 'request', params: {sessionUUID: local}}) // redirect to the existing session
+            this.navigateToSession(this.$router, local) // redirect to the existing session
           } else {
-            this.startNewSession({}, (uuid) => { // start a new session with defaults
-              this.setLocalSessionUUID(uuid) // save new session UUID in the storage
-
-              this.$router.push({name: 'request', params: {sessionUUID: uuid}}) // redirect to a new session
-            })
+            this.startNewSession({}) // start a new session with defaults
           }
 
           break
 
         case 'request': // session (+request) page requested
           const {sessionUUID, requestUUID} = to.params as { [key: string]: string | undefined }
-console.log('$route watcher', 'sessionUUID=', sessionUUID, 'requestUUID=', requestUUID)
+
           if (typeof sessionUUID !== 'string' || !isValidUUID(sessionUUID)) {
-            iziToast.error({title: 'Wrong session requested'})
+            iziToast.error({title: 'Was requested wrong session ID'})
 
-            this.$router.push({name: 'index'}) // redirect to the index page on invalid session uuid
-          } else { // session UUID was changed
-            getAllSessionRequests(sessionUUID) // reload requests
-              .then((requests): void => {
-                this.sessionUUID = sessionUUID
-                this.setLocalSessionUUID(sessionUUID)
+            this.navigateToIndex(this.$router)
+          } else { // valid session UUID requested
+            if (sessionUUID !== this.sessionUUID) { // another session was requested
+              this.requestUUID = undefined
 
-                this.requests.splice(0, this.requests.length) // make clear
-                this.requests.push(...requests)
-              })
-              .then((): void => this.renewWebsocketConnection(sessionUUID))
-              .then((): void => {
-                if (requestUUID && isValidUUID(requestUUID) && this.requestExist(requestUUID)) {
-                  console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+              getAllSessionRequests(sessionUUID) // reload requests
+                .then((requests): void => {
+                  this.sessionUUID = sessionUUID
 
-                  this.requestUUID = requestUUID
-                } else if (!this.requestUUID && this.requests.length) {
-                  this.requestUUID = this.requests[0].UUID // navigate to the first request (if possible)
-                }
-              })
-              .catch((err): void => {
-                const status: number | undefined = err['status']
+                  this.requests.splice(0, this.requests.length) // make clear
+                  this.requests.push(...requests)
+                })
+                .then((): void => this.renewWebsocketConnection(sessionUUID))
+                .then((): void => {
+                  if (requestUUID && isValidUUID(requestUUID) && this.requestExist(requestUUID)) {
+                    this.switchToRequest(requestUUID) // switch to the requested
+                  } else if (!this.requestUUID && this.requests.length) {
+                    this.switchToRequest(this.requests[0].UUID) // switch to the first request (if possible)
+                  }
+                })
+                .catch((err): void => {
+                  const status: number | undefined = err['status']
 
-                if (status === 404) { // session was not found
-                  this.removeLocalSessionUUID()
-                  this.sessionUUID = undefined
-                  iziToast.error({title: 'The requested session was not found (or she was expired)'})
+                  if (status === 404) { // session was not found
+                    this.removeLocalSessionUUID()
+                    this.sessionUUID = undefined
 
-                  this.$router.push({name: 'index'}) // redirect to the index page to create a new one
-                } else {
-                  errorsHandler(err)
-                }
-              })
+                    iziToast.error({title: 'The requested session was not found (or she was expired)'})
+
+                    this.$router.push({name: 'index'}) // redirect to the index page to create a new one
+                  } else {
+                    errorsHandler(err)
+                  }
+                })
+            }
           }
-          break
       }
     },
 
-    sessionUUID(uuid: string | undefined, old: string | undefined): void {
-      console.log('__sessionUUID watcher', 'uuid=', uuid, 'old=', old)
-      if (uuid !== old && isValidUUID(uuid) && this.$route.params.sessionUUID !== uuid) {
+    requests: { // limit maximal requests length
+      deep: true,
+      handler(): void {
+        if (this.requests.length > this.maxRequests) {
+          this.requests.splice(this.maxRequests, this.requests.length - this.maxRequests)
 
-        this.$router
-          .push({
-            name: 'request',
-            params: {
-              sessionUUID: uuid,
-              requestUUID: this.$route.params.requestUUID, // as-is
-            },
-          })
-          //.then((): void => this.requestUUID = undefined) // always unset the request UUID on session change
-          .catch(errorsHandler)
-      }
-    },
-
-    requestUUID(uuid: string | undefined, old: string | undefined): void {
-      // console.log('__requestUUID watcher', 'uuid=', uuid, 'old=', old)
-      //
-      // if (!this.sessionUUID) { // no active session
-      //   uuid = undefined
-      // }
-      //
-      // if (uuid !== old && uuid !== "" && this.$route.params.requestUUID !== uuid) {
-      //   this.$router
-      //     .push({
-      //       name: 'request',
-      //       params: {
-      //         sessionUUID: this.$route.params.sessionUUID, // as-is
-      //         requestUUID: uuid,
-      //       },
-      //     })
-      //     .catch(errorsHandler)
-      // }
-    },
-
-    requests() {
-      // limit maximal requests length
-      if (this.requests.length > this.maxRequests) {
-        this.requests.splice(this.maxRequests, this.requests.length)
-
-        if (this.requestUUID) {
-          if (!this.request()) {
-            this.requestUUID = undefined
+          if (this.requestUUID && !this.requestExist(this.requestUUID)) {
+            this.switchToRequest(undefined)
           }
         }
-      }
-    },
+      },
+    }
   },
 
   methods: {
@@ -349,52 +304,50 @@ console.log('$route watcher', 'sessionUUID=', sessionUUID, 'requestUUID=', reque
       return false
     },
 
+    switchToRequest(uuid: string | undefined): void {
+      this.requestUUID = uuid
+
+      if (this.sessionUUID) {
+        if (uuid === undefined) {
+          this.navigateToSession(this.$router, this.sessionUUID)
+        } else {
+          this.navigateToRequest(this.$router, this.sessionUUID, uuid)
+        }
+      }
+    },
+
     renewWebsocketConnection(sessionUUID: string): void {
       if (this.ws) {
         this.ws.close()
         this.ws = undefined
       }
-console.info('websocket connection renewed', 'sessionUUID=', sessionUUID)
-      this.ws = newRenewableSessionConnection(sessionUUID, (name, data): void => {
-        switch (name) { // route incoming events
-          case 'request-registered': {
-            iziToast.info({title: 'New request', message: 'New incoming webhook request', timeout: 2000})
 
-            if (this.sessionUUID) {
-              getSessionRequest(this.sessionUUID, data)
-                .then((request) => {
-                  this.requests.unshift(request) // push at the first position
+      this.ws = newRenewableSessionConnection(sessionUUID, {
+        onRequestRegistered: (requestUUID) => {
+          iziToast.info({title: 'New request', message: 'New incoming webhook request', timeout: 2000})
 
-                  if (!this.requestUUID || this.autoRequestNavigate) {
-                    this.requestUUID = data
-                  }
-                })
-                .catch((err): void => {
-                  iziToast.error({title: `Cannot load request with UUID ${data}: ${err.message}`})
+          if (this.sessionUUID) {
+            getSessionRequest(this.sessionUUID, requestUUID)
+              .then((request) => {
+                this.requests.unshift(request) // push at the first position
 
-                  errorsHandler(err)
-                })
-            }
+                if (!this.requestUUID || this.autoRequestNavigate) {
+                  this.switchToRequest(requestUUID)
+                }
+              })
+              .catch((err): void => {
+                iziToast.error({title: `Cannot load request with UUID ${requestUUID}: ${err.message}`})
 
-            break
+                errorsHandler(err)
+              })
           }
-
-          case 'request-deleted': {
-            this.deleteRequest(data, false)
-
-            break
-          }
-
-          case 'requests-deleted': {
-            this.deleteAllRequests(false)
-
-            break
-          }
-        }
+        },
+        onRequestDeleted: (requestUUID) => this.deleteRequest(requestUUID, false),
+        onRequestsDeleted: () => this.deleteAllRequests(false),
       })
     },
 
-    startNewSession(urlSettings: NewSessionSettings, callback?: (sessionUUID: string) => void): void {
+    startNewSession(urlSettings: NewSessionSettings): void {
       startNewSession({
         contentType: urlSettings.contentType,
         statusCode: urlSettings.statusCode,
@@ -412,10 +365,11 @@ console.info('websocket connection renewed', 'sessionUUID=', sessionUUID)
           }
 
           this.sessionUUID = sessionData.UUID
+          this.requestUUID = undefined
 
-          if (typeof callback === 'function') {
-            callback(sessionData.UUID)
-          }
+          this.setLocalSessionUUID(sessionData.UUID)
+          this.renewWebsocketConnection(sessionData.UUID)
+          this.navigateToSession(this.$router, sessionData.UUID)
         })
         .then((): void => this.deleteAllRequests(false))
         .then((): void => iziToast.success({title: 'New session started!'}))
@@ -426,8 +380,8 @@ console.info('websocket connection renewed', 'sessionUUID=', sessionUUID)
         })
     },
 
-    deleteAllRequests(onServer: boolean): void {
-      if (onServer && this.sessionUUID) {
+    deleteAllRequests(onServer: boolean | any): void {
+      if (onServer === true && this.sessionUUID) {
         deleteAllSessionRequests(this.sessionUUID)
           .then((success) => {
             if (!success) {
@@ -441,12 +395,12 @@ console.info('websocket connection renewed', 'sessionUUID=', sessionUUID)
           })
       }
 
-      this.requestUUID = undefined
+      this.switchToRequest(undefined)
       this.requests.splice(0, this.requests.length)
     },
 
-    deleteRequest(requestUUID: string, onServer: boolean): void {
-      if (onServer && this.sessionUUID) {
+    deleteRequest(requestUUID: string, onServer: boolean | any): void {
+      if (onServer === true && this.sessionUUID) {
         deleteSessionRequest(this.sessionUUID, requestUUID)
           .then((success) => {
             if (!success) {
@@ -474,15 +428,15 @@ console.info('websocket connection renewed', 'sessionUUID=', sessionUUID)
         if (requestUUID !== this.requestUUID) {
           // do nothing
         } else if (this.requests[currentRequestIdx + 1]) {
-          this.requestUUID = this.requests[currentRequestIdx + 1].UUID // navigate to next request
+          this.switchToRequest(this.requests[currentRequestIdx + 1].UUID) // navigate to next request
         } else if (this.requests[currentRequestIdx - 1]) {
-          this.requestUUID = this.requests[currentRequestIdx - 1].UUID // navigate to previous request
+          this.switchToRequest(this.requests[currentRequestIdx - 1].UUID) // navigate to previous request
         }
 
         this.requests.splice(currentRequestIdx, 1) // remove request object from stack
 
         if (this.requests.length === 0) {
-          this.requestUUID = undefined
+          this.switchToRequest(undefined)
         }
       }
     },

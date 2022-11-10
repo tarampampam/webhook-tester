@@ -1,32 +1,30 @@
 import {defineComponent} from 'vue'
-import {NavigationFailure, RouteLocationNormalized} from 'vue-router'
+import {NavigationFailure, Router} from 'vue-router'
 
-interface RouteParts {
-  sessionUUID: string | undefined
-  requestUUID: string | undefined
-}
+type NavigationResult = Promise<void | NavigationFailure | undefined>
 
 export default defineComponent({
   methods: {
-    navigateToIndex(
-      sessionUUID: string | undefined | null,
-      requestUUID: string | undefined | null,
-    ): Promise<void | NavigationFailure | undefined> {
-      const params = this.getFromRoute(this.$router.currentRoute.value)
+    navigateToIndex(router: Router): NavigationResult {
+      return router.push({name: 'index'})
+    },
 
-      if (sessionUUID !== null) {
-        params.sessionUUID = sessionUUID
-      }
-
-      if (requestUUID !== null) {
-        params.requestUUID = requestUUID
-      }
-
-      return this.$router.replace({
+    navigateToSession(router: Router, uuid: string): NavigationResult {
+      return router.push({
         name: 'request',
         params: {
-          sessionUUID: params.sessionUUID,
-          requestUUID: params.requestUUID,
+          sessionUUID: uuid,
+          requestUUID: undefined,
+        },
+      })
+    },
+
+    navigateToRequest(router: Router, sessionUUID: string, uuid: string): NavigationResult {
+      return router.push({
+        name: 'request',
+        params: {
+          sessionUUID: sessionUUID,
+          requestUUID: uuid,
         },
       })
     },
