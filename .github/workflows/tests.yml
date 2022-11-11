@@ -46,7 +46,7 @@ jobs:
       - run: npm ci
         working-directory: web
 
-      - run: npm run gen
+      - run: npm run generate
         working-directory: web
 
       - run: npm run lint
@@ -133,7 +133,7 @@ jobs:
       - run: npm ci
         working-directory: web
 
-      - run: npm run gen && npm run build
+      - run: npm run generate && npm run build
         working-directory: web
 
       - uses: actions/cache@v3

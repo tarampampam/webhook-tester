@@ -14,7 +14,7 @@ RUN set -x \
 
 # build the frontend (built artifact can be found in /src/web/dist)
 RUN set -x \
-    && npm run gen \
+    && npm run generate \
     && npm run build
 
 # Image page: <https://hub.docker.com/_/golang>
@@ -24,13 +24,9 @@ FROM golang:1.19-alpine as builder
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
 ARG APP_VERSION="undefined@docker"
 
-#RUN set -x \
-#    # packages mailcap and apache2 are needed for /etc/mime.types and /etc/apache2/mime.types files respectively
-#    && apk add --no-cache mailcap apache2
+COPY . /src
 
 WORKDIR /src
-
-COPY . /src
 
 COPY --from=frontend /src/web/dist /src/web/dist
 
@@ -51,10 +47,7 @@ WORKDIR /tmp/rootfs
 RUN set -x \
     && mkdir -p \
         ./etc \
-#        ./etc/apache2 \
         ./bin \
-#    && cp /etc/mime.types ./etc/mime.types \
-#    && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && mv /tmp/webhook-tester ./bin/webhook-tester

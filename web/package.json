@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "gen": "openapi-typescript ./../api/openapi.yml --immutable-types --output ./src/api/schema.ts",
+    "generate": "openapi-typescript ./../api/openapi.yml --immutable-types --output ./src/api/schema.ts",
     "watch": "webpack --config webpack/webpack.dev.js --watch",
     "build": "webpack --config webpack/webpack.prod.js",
     "lint": "eslint ./src --ext .ts,.vue"

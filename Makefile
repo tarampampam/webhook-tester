@@ -19,7 +19,7 @@ image: ## Build docker image with the app
 	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):local ...`'
 
 frontend: node-install ## Build the frontend
-	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'npm run gen && npm run build'
+	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'npm run generate && npm run build'
 
 gen: ## Run code-generation
 	docker-compose run $(DC_RUN_ARGS) --no-deps app go generate ./...
