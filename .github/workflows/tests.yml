@@ -133,10 +133,7 @@ jobs:
       - run: npm ci
         working-directory: web
 
-      - run: npm run gen
-        working-directory: web
-
-      - run: npm run build
+      - run: npm run gen && npm run build
         working-directory: web
 
       - uses: actions/cache@v3
@@ -197,7 +194,7 @@ jobs:
         run: mv ./webhook-tester ./../app && chmod +x ./../app
 
       - name: Start HTTP server
-        run: ./app serve --port 8081 --public ./web --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
+        run: ./app serve --port 8081 --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
 
       - name: Run Newman
         uses: ./.github/actions/newman
