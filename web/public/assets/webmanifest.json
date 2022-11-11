@@ -1,0 +1,16 @@
+{
+  "name": "WebHook Tester",
+  "short_name": "WebHook Tester",
+  "description": "Allows you to easily test webhooks and other types of HTTP requests",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#222222",
+  "background_color": "#222222",
+  "display": "standalone"
+}

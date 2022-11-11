@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"testing"
@@ -16,8 +15,9 @@ import (
 	"github.com/kami-zh/go-capturer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/cli/serve"
 	"go.uber.org/zap"
+
+	"github.com/tarampampam/webhook-tester/internal/pkg/cli/serve"
 )
 
 func TestProperties(t *testing.T) {
@@ -31,7 +31,7 @@ func TestProperties(t *testing.T) {
 func TestFlags(t *testing.T) {
 	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 	exe, _ := os.Executable()
-	exe = path.Dir(exe)
+	exe = path.Dir(exe) //nolint:ineffassign
 
 	cases := []struct {
 		giveName      string
@@ -40,7 +40,6 @@ func TestFlags(t *testing.T) {
 	}{
 		{giveName: "listen", wantShorthand: "l", wantDefault: "0.0.0.0"},
 		{giveName: "port", wantShorthand: "p", wantDefault: "8080"},
-		{giveName: "public", wantShorthand: "", wantDefault: filepath.Join(exe, "web")},
 		{giveName: "max-requests", wantShorthand: "", wantDefault: "128"},
 		{giveName: "session-ttl", wantShorthand: "", wantDefault: "168h0m0s"},
 		{giveName: "ignore-header-prefix", wantShorthand: "", wantDefault: "[]"},
@@ -71,7 +70,7 @@ func TestFlags(t *testing.T) {
 
 func TestSuccessfulFlagsPreparing(t *testing.T) {
 	cmd := serve.NewCommand(context.Background(), zap.NewNop())
-	cmd.SetArgs([]string{"--public", ""})
+	cmd.SetArgs([]string{})
 
 	var executed bool
 
@@ -99,7 +98,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Listen Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"-l", "256.256.256.256", // 255 is max
 			},
 			wantErrorStrings: []string{"wrong IP address", "256.256.256.256"},
@@ -108,7 +106,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Listen Flag Wrong Env Value",
 			giveEnv: map[string]string{"LISTEN_ADDR": "256.256.256.256"}, // 255 is max
 			giveArgs: []string{
-				"--public", "",
 				"-l", "0.0.0.0", // `-l` flag must be ignored
 			},
 			wantErrorStrings: []string{"wrong IP address", "256.256.256.256"},
@@ -116,7 +113,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Port Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"-p", "65536", // 65535 is max
 			},
 			wantErrorStrings: []string{"invalid argument", "65536", "value out of range"},
@@ -125,30 +121,13 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Port Flag Wrong Env Value",
 			giveEnv: map[string]string{"LISTEN_PORT": "65536"}, // 65535 is max
 			giveArgs: []string{
-				"--public", "",
 				"-p", "8090", // `-p` flag must be ignored
 			},
 			wantErrorStrings: []string{"wrong TCP port", "environment variable", "65536"},
 		},
 		{
-			name: "Public Dir Flag Wrong Argument",
-			giveArgs: []string{
-				"--public", "/tmp/nonexistent/bar/baz",
-			},
-			wantErrorStrings: []string{"wrong public assets directory", "/tmp/nonexistent/bar/baz"},
-		},
-		{
-			name:    "Public Dir Flag Wrong Env Value",
-			giveEnv: map[string]string{"PUBLIC_DIR": "/tmp/nonexistent/bar/baz"},
-			giveArgs: []string{
-				"--public", ".", // `--public` flag must be ignored
-			},
-			wantErrorStrings: []string{"wrong public assets directory", "/tmp/nonexistent/bar/baz"},
-		},
-		{
 			name: "Storage Driver Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--storage-driver", "foobar",
 			},
 			wantErrorStrings: []string{"unsupported storage driver", "foobar"},
@@ -157,7 +136,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Storage Driver Flag Wrong Env Value",
 			giveEnv: map[string]string{"STORAGE_DRIVER": "barbaz"},
 			giveArgs: []string{
-				"--public", "",
 				"--storage-driver", "memory",
 			},
 			wantErrorStrings: []string{"unsupported storage driver", "barbaz"},
@@ -165,7 +143,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "PubSub Driver Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--pubsub-driver", "foobar",
 			},
 			wantErrorStrings: []string{"unsupported pub/sub driver", "foobar"},
@@ -174,7 +151,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "PubSub Driver Flag Wrong Env Value",
 			giveEnv: map[string]string{"PUBSUB_DRIVER": "barbaz"},
 			giveArgs: []string{
-				"--public", "",
 				"--pubsub-driver", "foobar",
 			},
 			wantErrorStrings: []string{"unsupported pub/sub driver", "barbaz"},
@@ -182,7 +158,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "PubSub Redis Driver Flag With Wrong Redis DSN",
 			giveArgs: []string{
-				"--public", "",
 				"--pubsub-driver", "redis",
 				"--redis-dsn", "foo://bar",
 			},
@@ -191,7 +166,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Redis DSN Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--storage-driver", "redis",
 				"--redis-dsn", "foo://bar",
 			},
@@ -201,7 +175,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Redis DSN Flag Wrong Env Value",
 			giveEnv: map[string]string{"REDIS_DSN": "bar://baz"},
 			giveArgs: []string{
-				"--public", "",
 				"--storage-driver", "redis",
 				"--redis-dsn", "foo://123.123.123.123:1234/0", // `--redis-dsn` flag must be ignored
 			},
@@ -210,7 +183,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Max Requests Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--max-requests", "65536", // 65535 max
 			},
 			wantErrorStrings: []string{"invalid argument", "65536", "value out of range"},
@@ -219,7 +191,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Max Requests Flag Wrong Env Value",
 			giveEnv: map[string]string{"MAX_REQUESTS": "65536"},
 			giveArgs: []string{
-				"--public", "",
 				"--max-requests", "128", // `--max-requests` flag must be ignored
 			},
 			wantErrorStrings: []string{"wrong maximum session requests", "65536"},
@@ -227,7 +198,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Session TTL Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--session-ttl", "1d", // wrong
 			},
 			wantErrorStrings: []string{"invalid argument", "1d"},
@@ -236,7 +206,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Session TTL Flag Wrong Env Value",
 			giveEnv: map[string]string{"SESSION_TTL": "2d"},
 			giveArgs: []string{
-				"--public", "",
 				"--session-ttl", "1h",
 			},
 			wantErrorStrings: []string{"wrong session lifetime", "2d"},
@@ -244,7 +213,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Maximal Websocket Clients Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--ws-max-clients", "-111",
 			},
 			wantErrorStrings: []string{"invalid argument", "-111", "ws-max-clients"},
@@ -253,7 +221,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Maximal Websocket Clients Flag Wrong Env Value",
 			giveEnv: map[string]string{"WS_MAX_CLIENTS": "-111"},
 			giveArgs: []string{
-				"--public", "",
 				"--ws-max-clients", "123", // correct value
 			},
 			wantErrorStrings: []string{"wrong maximal websocket clients count", "-111"},
@@ -261,7 +228,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 		{
 			name: "Maximal Websocket TTL Flag Wrong Argument",
 			giveArgs: []string{
-				"--public", "",
 				"--ws-max-lifetime", "2d",
 			},
 			wantErrorStrings: []string{"invalid argument", "2d", "ws-max-lifetime"},
@@ -270,7 +236,6 @@ func TestFlagsWorkingWithoutCommandExecution(t *testing.T) {
 			name:    "Maximal Websocket TTL Flag Wrong Env Value",
 			giveEnv: map[string]string{"WS_MAX_LIFETIME": "2d"},
 			giveArgs: []string{
-				"--public", "",
 				"--ws-max-lifetime", "1h", // correct value
 			},
 			wantErrorStrings: []string{"wrong maximal single websocket lifetime", "2d"},
@@ -407,7 +372,6 @@ func TestSuccessfulCommandRunningUsingRedisDrivers(t *testing.T) {
 	defer mini.Close()
 
 	output := startAndStopServer(t, port, []string{
-		"--public", "",
 		"--port", strconv.Itoa(port),
 		"--storage-driver", "redis",
 		"--pubsub-driver", "redis",
@@ -431,7 +395,6 @@ func TestSuccessfulCommandRunningUsingMemoryDrivers(t *testing.T) {
 	defer mini.Close()
 
 	output := startAndStopServer(t, port, []string{
-		"--public", "",
 		"--port", strconv.Itoa(port),
 		"--storage-driver", "memory",
 		"--pubsub-driver", "memory",
@@ -463,7 +426,6 @@ func TestRunningUsingBusyPortFailing(t *testing.T) {
 	cmd := serve.NewCommand(context.Background(), zap.NewNop())
 	cmd.SilenceUsage = true
 	cmd.SetArgs([]string{
-		"--public", "",
 		"--port", strconv.Itoa(port),
 		"--storage-driver", "redis",
 		"--pubsub-driver", "redis",

@@ -10,7 +10,6 @@ import (
 func TestConstants(t *testing.T) {
 	assert.Equal(t, "LISTEN_ADDR", string(ListenAddr))
 	assert.Equal(t, "LISTEN_PORT", string(ListenPort))
-	assert.Equal(t, "PUBLIC_DIR", string(PublicDir))
 	assert.Equal(t, "MAX_REQUESTS", string(MaxSessionRequests))
 	assert.Equal(t, "SESSION_TTL", string(SessionTTL))
 	assert.Equal(t, "STORAGE_DRIVER", string(StorageDriverName))
@@ -26,7 +25,6 @@ func TestEnvVariable_Lookup(t *testing.T) {
 	}{
 		{giveEnv: ListenAddr},
 		{giveEnv: ListenPort},
-		{giveEnv: PublicDir},
 		{giveEnv: MaxSessionRequests},
 		{giveEnv: SessionTTL},
 		{giveEnv: StorageDriverName},

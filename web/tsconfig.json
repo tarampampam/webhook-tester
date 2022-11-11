@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ES2020",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "sourceMap": false,
+    "jsx": "preserve",
+    "rootDir": "src",
+    "outDir": "dist/js",
+    "noEmitOnError": false,
+    "noEmit": false,
+    "noImplicitAny": false,
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

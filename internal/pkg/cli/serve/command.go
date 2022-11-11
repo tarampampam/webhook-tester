@@ -10,13 +10,14 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/logger"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	"go.uber.org/zap"
 )
 
 // NewCommand creates `serve` command.
@@ -36,7 +37,7 @@ func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
 			return f.validate()
 		},
 		RunE: func(*cobra.Command, []string) error {
-			return run(ctx, log, f.toConfig(), f.listen.ip, f.listen.port, f.publicDir, f.redisDSN)
+			return run(ctx, log, f.toConfig(), f.listen.ip, f.listen.port, f.redisDSN)
 		},
 	}
 
@@ -54,7 +55,6 @@ func run( //nolint:funlen,gocyclo
 	cfg config.Config,
 	ip string,
 	port uint16,
-	publicDir string,
 	redisDSN string,
 ) error {
 	var (
@@ -137,7 +137,7 @@ func run( //nolint:funlen,gocyclo
 	server := appHttp.NewServer(log)
 
 	// register server routes, middlewares, etc.
-	if err := server.Register(ctx, cfg, publicDir, rdb, stor, pub, sub); err != nil {
+	if err := server.Register(ctx, cfg, rdb, stor, pub, sub); err != nil {
 		return err
 	}
 
@@ -150,7 +150,6 @@ func run( //nolint:funlen,gocyclo
 		fields := []zap.Field{
 			zap.String("addr", ip),
 			zap.Uint16("port", port),
-			zap.String("public", publicDir),
 			zap.Uint16("max requests", cfg.MaxRequests),
 			zap.Duration("session ttl", cfg.SessionTTL),
 			zap.Strings("ignore prefixes", cfg.IgnoreHeaderPrefixes),
@@ -165,10 +164,6 @@ func run( //nolint:funlen,gocyclo
 		}
 
 		log.Info("Server starting", fields...)
-
-		if publicDir == "" {
-			log.Warn("Path to the directory with public assets was not provided")
-		}
 
 		if err := server.Start(ip, port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err

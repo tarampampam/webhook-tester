@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"mime"
 	"net/http"
 	"strconv"
 	"time"
@@ -69,7 +68,6 @@ func (s *Server) Start(ip string, port uint16) error {
 func (s *Server) Register(
 	ctx context.Context,
 	cfg config.Config,
-	publicDir string,
 	rdb *redis.Client,
 	stor storage.Storage,
 	pub pubsub.Publisher,
@@ -79,11 +77,7 @@ func (s *Server) Register(
 
 	s.registerGlobalMiddlewares()
 
-	if err := s.registerHandlers(ctx, cfg, stor, pub, sub, publicDir, rdb, registry); err != nil {
-		return err
-	}
-
-	if err := s.registerCustomMimeTypes(); err != nil {
+	if err := s.registerHandlers(ctx, cfg, stor, pub, sub, rdb, registry); err != nil {
 		return err
 	}
 
@@ -104,7 +98,6 @@ func (s *Server) registerHandlers(
 	stor storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
-	publicDir string,
 	rdb *redis.Client,
 	registry *prometheus.Registry,
 ) error {
@@ -120,18 +113,11 @@ func (s *Server) registerHandlers(
 
 	s.registerServiceHandlers(ctx, rdb, registry)
 
-	if publicDir != "" {
-		if err := s.registerFileServerHandler(publicDir); err != nil {
-			return err
-		}
+	if err := s.registerFileServerHandler(); err != nil {
+		return err
 	}
 
 	return nil
-}
-
-// registerCustomMimeTypes registers custom mime types.
-func (*Server) registerCustomMimeTypes() error {
-	return mime.AddExtensionType(".vue", "text/html; charset=utf-8") // this is my whim :)
 }
 
 // Stop server.

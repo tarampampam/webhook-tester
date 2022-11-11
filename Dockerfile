@@ -1,5 +1,22 @@
 # syntax=docker/dockerfile:1.2
 
+# Image page: <https://hub.docker.com/_/node>
+FROM node:19-alpine as frontend
+
+COPY . /src
+
+WORKDIR /src/web
+
+# install node dependencies
+RUN set -x \
+    && npm config set update-notifier false \
+    && npm ci --no-audit --prefer-offline
+
+# build the frontend (built artifact can be found in /src/web/dist)
+RUN set -x \
+    && npm run generate \
+    && npm run build
+
 # Image page: <https://hub.docker.com/_/golang>
 FROM golang:1.19-alpine as builder
 
@@ -7,22 +24,17 @@ FROM golang:1.19-alpine as builder
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
 ARG APP_VERSION="undefined@docker"
 
-RUN set -x \
-    && mkdir /src \
-    # SSL ca certificates (ca-certificates is required to call HTTPS endpoints)
-    # packages mailcap and apache2 is needed for /etc/mime.types and /etc/apache2/mime.types files respectively
-    && apk add --no-cache mailcap apache2 ca-certificates \
-    && update-ca-certificates
+COPY . /src
 
 WORKDIR /src
 
-COPY . /src
+COPY --from=frontend /src/web/dist /src/web/dist
 
 # arguments to pass on each go tool link invocation
 ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
 
 RUN set -x \
-    && go version \
+    && go generate ./... \
     && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/ \
     && /tmp/webhook-tester version \
     && /tmp/webhook-tester -h
@@ -34,14 +46,8 @@ WORKDIR /tmp/rootfs
 
 RUN set -x \
     && mkdir -p \
-        ./etc/ssl \
-        ./etc/apache2 \
+        ./etc \
         ./bin \
-        ./opt/webhook-tester \
-    && cp -R /etc/ssl/certs ./etc/ssl/certs \
-    && cp /etc/mime.types ./etc/mime.types \
-    && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
-    && cp -R /src/web ./opt/webhook-tester/web \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && mv /tmp/webhook-tester ./bin/webhook-tester
@@ -73,8 +79,6 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
     "--log-json", \
     "--port", "8080" \
 ]
-
-ENV PUBLIC_DIR="/opt/webhook-tester/web"
 
 ENTRYPOINT ["/bin/webhook-tester"]
 

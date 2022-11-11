@@ -5,6 +5,8 @@ run:
   skip-dirs:
     - .github
     - .git
+    - tmp
+    - temp
   modules-download-mode: readonly
   allow-parallel-runners: true
 
@@ -28,6 +30,9 @@ linters-settings:
     locale: US
   lll:
     line-length: 120
+  forbidigo:
+    forbid:
+      - '^(fmt\.Print(|f|ln)|print(|ln))(# it looks like a forgotten debugging printing call)?$'
   prealloc:
     simple: true
     range-loops: true
@@ -40,6 +45,7 @@ linters: # All available linters list: <https://golangci-lint.run/usage/linters/
   disable-all: true
   enable:
     - asciicheck # Simple linter to check that your code does not contain non-ASCII identifiers
+    - bidichk # Checks for dangerous unicode character sequences
     - depguard # Go linter that checks if package imports are in a list of acceptable packages
     - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
     - dupl # Tool for code clone detection
@@ -62,6 +68,7 @@ linters: # All available linters list: <https://golangci-lint.run/usage/linters/
     - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - ineffassign # Detects when assignments to existing variables are not used
     - lll # Reports long lines
+    - forbidigo # Forbids identifiers
     - misspell # Finds commonly misspelled English words in comments
     - nakedret # Finds naked returns in functions greater than a specified function length
     - nestif # Reports deeply nested if statements
@@ -81,3 +88,5 @@ issues:
         - funlen
         - scopelint
         - gocognit
+        - noctx
+        - gochecknoglobals

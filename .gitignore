@@ -1,11 +1,11 @@
-# IDEs
-/nbproject
+## IDEs
 /.idea
 /.vscode
 
-# Temp dirs & trash
+## Temp dirs & trash
 /temp
 /tmp
+/gen
 *.env
 .DS_Store
 *.cache
