@@ -13,5 +13,5 @@ module.exports = {
   ],
   plugins: ["@typescript-eslint"],
   rules: {},
-  ignorePatterns: ["schema.ts"],
+  ignorePatterns: ["schema.gen.ts"],
 }

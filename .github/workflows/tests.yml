@@ -23,6 +23,16 @@ jobs:
       - name: Check for GitLeaks
         uses: gacts/gitleaks@v1 # Action page: <https://github.com/gacts/gitleaks>
 
+  validate-openapi: # TODO: use more lightweight tools for this
+    name: Validate Swagger (OpenAPI) schema
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Validate OpenAPI definitions # Tool page: <https://github.com/stoplightio/spectral>
+        run: docker run -v "$PWD:/src:ro" --workdir "/src" --rm stoplight/spectral:5.9 lint -F warn ./api/*.y*ml
+
   frontend:
     name: Check & build the frontend
     runs-on: ubuntu-latest
