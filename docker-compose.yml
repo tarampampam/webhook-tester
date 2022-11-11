@@ -10,7 +10,7 @@ volumes:
 
 services:
   app: &app # Application service (common use-case - shell)
-    image: golang:1.19-buster # Image page: <https://hub.docker.com/_/golang>
+    build: {target: builder}
     working_dir: /src
     environment: {HOME: /tmp, GOPATH: /tmp}
     volumes:
@@ -57,7 +57,7 @@ services:
     working_dir: /src
 
   node:
-    image: node:19-alpine
+    build: {target: frontend}
     environment:
       PS1: '\[\033[1;32m\]\[\033[1;36m\][\u@node] \[\033[1;34m\]\w\[\033[0;35m\] \[\033[1;36m\]# \[\033[0m\]'
       HOME: /tmp

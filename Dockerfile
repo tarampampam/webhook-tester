@@ -3,7 +3,9 @@
 # Image page: <https://hub.docker.com/_/node>
 FROM node:19-alpine as frontend
 
-COPY . /src
+RUN mkdir -p /src/web
+
+COPY ./web/package*.json /src/web/
 
 WORKDIR /src/web
 
@@ -11,6 +13,9 @@ WORKDIR /src/web
 RUN set -x \
     && npm config set update-notifier false \
     && npm ci --no-audit --prefer-offline
+
+COPY ./api /src/api
+COPY ./web /src/web
 
 # build the frontend (built artifact can be found in /src/web/dist)
 RUN set -x \
