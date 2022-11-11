@@ -265,6 +265,11 @@ components:
       enum: [true]
       example: true
 
+    FalseOnly:
+      type: boolean
+      enum: [false]
+      example: false
+
     StatusCode:
       type: integer
       description: HTTP status code
@@ -337,7 +342,7 @@ components:
       description: Request processing error (server-side error, bad request and so on)
       type: object
       properties:
-        success: {type: boolean, enum: [false]}
+        success: {$ref: '#/components/schemas/FalseOnly'}
         code: {type: integer, example: 400, minimum: 400, maximum: 599}
         message: {type: string, example: Internal error}
       required: [success, code, message]

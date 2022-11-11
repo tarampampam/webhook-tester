@@ -2,32 +2,33 @@
 package logreq
 
 import (
-	"net/http"
-	"strings"
-
-	"github.com/felixge/httpsnoop"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 
-	"github.com/tarampampam/webhook-tester/internal/api"
 	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
 )
 
-// New creates mux.MiddlewareFunc for HTTP requests logging using "zap" package.
-func New(log *zap.Logger) api.MiddlewareFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			metrics := httpsnoop.CaptureMetrics(next, w, r)
+// New creates echo.MiddlewareFunc for HTTP requests logging using "zap" package.
+func New(log *zap.Logger) echo.MiddlewareFunc {
+	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogUserAgent: true,
+		LogMethod:    true,
+		LogURI:       true,
+		LogStatus:    true,
+		LogLatency:   true,
 
-			if !strings.Contains(strings.ToLower(r.UserAgent()), "healthcheck") {
-				log.Info("HTTP request processed",
-					zap.String("remote addr", realip.FromHTTPRequest(r)),
-					zap.String("useragent", r.UserAgent()),
-					zap.String("method", r.Method),
-					zap.String("url", r.URL.String()),
-					zap.Int("status code", metrics.Code),
-					zap.Duration("duration", metrics.Duration),
-				)
-			}
-		}
-	}
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			log.Info("HTTP request processed",
+				zap.String("remote addr", realip.FromHTTPRequest(c.Request())),
+				zap.String("useragent", v.UserAgent),
+				zap.String("method", v.Method),
+				zap.String("uri", v.URI),
+				zap.Int("status code", v.Status),
+				zap.Duration("duration", v.Latency),
+			)
+
+			return nil
+		},
+	})
 }

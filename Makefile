@@ -42,7 +42,7 @@ gotest: ## Run app tests
 test: lint gotest ## Run app tests and linters
 
 shell: ## Start shell inside golang environment
-	docker-compose run $(DC_RUN_ARGS) app sh
+	docker-compose run $(DC_RUN_ARGS) app bash
 
 node-install: ## Install node dependencies
 	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'test -d ./node_modules || npm ci --no-audit --prefer-offline'

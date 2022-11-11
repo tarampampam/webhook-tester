@@ -12,9 +12,9 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	appHttp "github.com/tarampampam/webhook-tester/internal/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/breaker"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	appHttp "github.com/tarampampam/webhook-tester/internal/pkg/http"
 	"github.com/tarampampam/webhook-tester/internal/pkg/logger"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"

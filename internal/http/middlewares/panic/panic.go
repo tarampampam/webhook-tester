@@ -2,14 +2,12 @@
 package panic
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
 
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
-
-	"github.com/tarampampam/webhook-tester/internal/api"
 )
 
 type response struct {
@@ -21,9 +19,9 @@ const statusCode = http.StatusInternalServerError
 
 // New creates mux.MiddlewareFunc for panics (inside HTTP handlers) logging using "zap" package. Also it allows
 // to respond with JSON-formatted error string instead empty response.
-func New(log *zap.Logger) api.MiddlewareFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+func New(log *zap.Logger) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
 			defer func() {
 				if rec := recover(); rec != nil {
 					// convert panic reason into error
@@ -48,21 +46,16 @@ func New(log *zap.Logger) api.MiddlewareFunc {
 					// log error with logger
 					log.Error("HTTP handler panic", zap.Error(err), zap.String("stacktrace", string(stackBuf)))
 
-					resp := response{
+					if respErr := c.JSON(statusCode, response{ // and respond with JSON (not "empty response")
 						Message: fmt.Sprintf("%s: %s", http.StatusText(statusCode), err.Error()),
 						Code:    statusCode,
-					}
-
-					w.WriteHeader(statusCode)
-
-					// and respond with JSON (not "empty response")
-					if e := json.NewEncoder(w).Encode(resp); e != nil {
-						panic(e)
+					}); respErr != nil {
+						panic(respErr)
 					}
 				}
 			}()
 
-			next.ServeHTTP(w, r)
+			return next(c)
 		}
 	}
 }

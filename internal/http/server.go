@@ -2,16 +2,17 @@ package http
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/panic"
+	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
@@ -25,18 +26,23 @@ const (
 
 type Server struct {
 	log *zap.Logger
-	srv *http.Server
+	srv *echo.Echo
 }
 
 func NewServer(log *zap.Logger) *Server {
+	var srv = echo.New()
+
+	srv.StdLogger = zap.NewStdLog(log)
+	srv.Server.ReadTimeout = readTimeout
+	srv.Server.ReadHeaderTimeout = readTimeout
+	srv.Server.WriteTimeout = writeTimeout
+	srv.Server.ErrorLog = srv.StdLogger
+	srv.HideBanner = true
+	srv.HidePort = true
+
 	return &Server{
 		log: log,
-		srv: &http.Server{
-			ErrorLog:          zap.NewStdLog(log),
-			ReadHeaderTimeout: readTimeout,
-			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeTimeout,
-		},
+		srv: srv,
 	}
 }
 
@@ -47,10 +53,15 @@ func (s *Server) Register(
 	stor storage.Storage,
 	pub pubsub.Publisher,
 	sub pubsub.Subscriber,
-) {
+) error {
 	registry := metrics.NewRegistry()
 
-	s.srv.Handler = api.HandlerWithOptions(&API{
+	s.srv.Use(
+		logreq.New(s.log),
+		panic.New(s.log),
+	)
+
+	var impl = API{
 		ctx:  ctx,
 		cfg:  cfg,
 		rdb:  rdb,
@@ -58,19 +69,19 @@ func (s *Server) Register(
 		pub:  pub,
 		sub:  sub,
 		reg:  registry,
-	}, api.GorillaServerOptions{
-		Middlewares: []api.MiddlewareFunc{
-			logreq.New(s.log),
-			panic.New(s.log),
-		},
-	})
+	}
+
+	impl.liveChecker = checkers.NewLiveChecker()
+	impl.readyChecker = checkers.NewReadyChecker(ctx, rdb)
+
+	api.RegisterHandlers(s.srv, &impl)
+
+	return nil
 }
 
 // Start the server.
 func (s *Server) Start(ip string, port uint16) error {
-	s.srv.Addr = ip + ":" + strconv.Itoa(int(port))
-
-	return s.srv.ListenAndServe()
+	return s.srv.Start(ip + ":" + strconv.Itoa(int(port)))
 }
 
 // Stop the server.

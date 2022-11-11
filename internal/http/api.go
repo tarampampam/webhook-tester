@@ -2,9 +2,9 @@ package http
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
@@ -21,186 +21,174 @@ type API struct {
 	pub  pubsub.Publisher
 	sub  pubsub.Subscriber
 	reg  *prometheus.Registry
+
+	apiVersion
+	apiHealth
 }
 
 var _ api.ServerInterface = (*API)(nil) // verify that API implements interface
 
-func (*API) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
+func (*API) ApiSessionCreate(c echo.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSessionDelete(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) ApiSessionDelete(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSessionDeleteAllRequests(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) ApiSessionDeleteAllRequests(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSessionGetAllRequests(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) ApiSessionGetAllRequests(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSessionDeleteRequest(w http.ResponseWriter, r *http.Request, session api.SessionUUID, request api.RequestUUID) {
+func (*API) ApiSessionDeleteRequest(c echo.Context, session api.SessionUUID, request api.RequestUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSessionGetRequest(w http.ResponseWriter, r *http.Request, session api.SessionUUID, request api.RequestUUID) {
+func (*API) ApiSessionGetRequest(c echo.Context, session api.SessionUUID, request api.RequestUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiSettings(w http.ResponseWriter, r *http.Request) {
+func (*API) ApiSettings(c echo.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ApiAppVersion(w http.ResponseWriter, r *http.Request) {
+func (*API) AppMetrics(c echo.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) LivenessProbe(w http.ResponseWriter, r *http.Request) {
+func (*API) WebsocketSession(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) AppMetrics(w http.ResponseWriter, r *http.Request) {
+func (*API) WebhookDelete(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) ReadinessProbe(w http.ResponseWriter, r *http.Request) {
+func (*API) WebhookGet(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebsocketSession(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookHead(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookDelete(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookOptions(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookGet(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookPatch(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookHead(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookPost(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookOptions(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookPut(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookPatch(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookTrace(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookPost(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookWithAnyDelete(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookPut(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookWithAnyGet(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookTrace(w http.ResponseWriter, r *http.Request, session api.SessionUUID) {
+func (*API) WebhookWithAnyHead(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyDelete(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithAnyOptions(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyGet(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithAnyPatch(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyHead(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithAnyPost(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyOptions(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithAnyPut(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyPatch(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithAnyTrace(c echo.Context, session api.SessionUUID, any string) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyPost(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithCodeDelete(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyPut(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithCodeGet(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithAnyTrace(w http.ResponseWriter, r *http.Request, session api.SessionUUID, any string) {
+func (*API) WebhookWithCodeHead(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithCodeDelete(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
+func (*API) WebhookWithCodeOptions(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithCodeGet(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
+func (*API) WebhookWithCodePatch(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithCodeHead(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
+func (*API) WebhookWithCodePost(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithCodeOptions(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
+func (*API) WebhookWithCodePut(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (*API) WebhookWithCodePatch(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (*API) WebhookWithCodePost(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (*API) WebhookWithCodePut(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (*API) WebhookWithCodeTrace(w http.ResponseWriter, r *http.Request, session api.SessionUUID, status api.RequiredStatusCode) {
+func (*API) WebhookWithCodeTrace(c echo.Context, session api.SessionUUID, status api.RequiredStatusCode) error {
 	// TODO implement me
 	panic("implement me")
 }
