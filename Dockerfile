@@ -24,12 +24,9 @@ FROM golang:1.19-alpine as builder
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
 ARG APP_VERSION="undefined@docker"
 
-RUN set -x \
-    && mkdir /src \
-    # SSL ca certificates (ca-certificates is required to call HTTPS endpoints)
-    # packages mailcap and apache2 is needed for /etc/mime.types and /etc/apache2/mime.types files respectively
-    && apk add --no-cache mailcap apache2 ca-certificates \
-    && update-ca-certificates
+#RUN set -x \
+#    # packages mailcap and apache2 are needed for /etc/mime.types and /etc/apache2/mime.types files respectively
+#    && apk add --no-cache mailcap apache2
 
 WORKDIR /src
 
@@ -53,13 +50,11 @@ WORKDIR /tmp/rootfs
 
 RUN set -x \
     && mkdir -p \
-        ./etc/ssl \
-        ./etc/apache2 \
+        ./etc \
+#        ./etc/apache2 \
         ./bin \
-        ./opt/webhook-tester \
-    && cp -R /etc/ssl/certs ./etc/ssl/certs \
-    && cp /etc/mime.types ./etc/mime.types \
-    && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
+#    && cp /etc/mime.types ./etc/mime.types \
+#    && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && mv /tmp/webhook-tester ./bin/webhook-tester
