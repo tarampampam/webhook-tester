@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - Bootstrap updated from v4 to v5
 - All frontend dependencies are now built-in (no external network requests are needed anymore)
 
+### Removed
+
+- `--public` flag (and env variable `PUBLIC_DIR`) support for `serve` sub-command
+
 ### Fixed
 
 - A lot of small frontend issues

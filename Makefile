@@ -18,8 +18,7 @@ image: ## Build docker image with the app
 	docker build -f ./Dockerfile -t $(APP_NAME):local .
 	@printf "\n   \e[30;42m %s \033[0m\n\n" 'Now you can use image like `docker run --rm $(APP_NAME):local ...`'
 
-frontend: ## Build the frontend
-	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'test -d ./node_modules || npm ci --no-audit --prefer-offline'
+frontend: node-install ## Build the frontend
 	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'npm run gen && npm run build'
 
 gen: ## Run code-generation
@@ -44,6 +43,9 @@ test: lint gotest ## Run app tests and linters
 
 shell: ## Start shell inside golang environment
 	docker-compose run $(DC_RUN_ARGS) app bash
+
+node-install: ## Install node dependencies
+	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'test -d ./node_modules || npm ci --no-audit --prefer-offline'
 
 node-shell: ## Start shell inside node environment
 	docker-compose run $(DC_RUN_ARGS) --no-deps node sh

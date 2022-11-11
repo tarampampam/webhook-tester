@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -22,7 +21,6 @@ type flags struct {
 		port uint16
 	}
 
-	publicDir          string // can be empty
 	maxRequests        uint16
 	sessionTTL         time.Duration
 	ignoreHeaderPrefix []string
@@ -43,7 +41,7 @@ type flags struct {
 
 func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 	exe, _ := os.Executable()
-	exe = path.Dir(exe)
+	exe = path.Dir(exe) //nolint:ineffassign
 
 	flagSet.StringVarP(
 		&f.listen.ip,
@@ -58,13 +56,6 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 		"p",
 		8080, //nolint:gomnd
 		fmt.Sprintf("TCP port number [$%s]", env.ListenPort),
-	)
-	flagSet.StringVarP(
-		&f.publicDir,
-		"public",
-		"",
-		filepath.Join(exe, "web"),
-		fmt.Sprintf("path to the directory with public assets (empty value = disable) [$%s]", env.PublicDir),
 	)
 	flagSet.Uint16VarP(
 		&f.maxRequests,
@@ -131,7 +122,7 @@ func (f *flags) init(flagSet *pflag.FlagSet) { //nolint:funlen
 	)
 }
 
-func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
+func (f *flags) overrideUsingEnv() error {
 	if envVar, exists := env.ListenAddr.Lookup(); exists {
 		f.listen.ip = envVar
 	}
@@ -142,10 +133,6 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 		} else {
 			return fmt.Errorf("wrong TCP port environment variable [%s] value", envVar)
 		}
-	}
-
-	if envVar, exists := env.PublicDir.Lookup(); exists {
-		f.publicDir = envVar
 	}
 
 	if envVar, exists := env.MaxSessionRequests.Lookup(); exists {
@@ -198,12 +185,6 @@ func (f *flags) overrideUsingEnv() error { //nolint:funlen,gocyclo
 func (f *flags) validate() error {
 	if net.ParseIP(f.listen.ip) == nil {
 		return fmt.Errorf("wrong IP address [%s] for listening", f.listen.ip)
-	}
-
-	if f.publicDir != "" {
-		if info, err := os.Stat(f.publicDir); err != nil || !info.Mode().IsDir() {
-			return fmt.Errorf("wrong public assets directory [%s] path", f.publicDir)
-		}
 	}
 
 	switch f.storageDriver {

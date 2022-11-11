@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"errors"
-	"mime"
 	"net"
 	"net/http"
 	"strconv"
@@ -13,9 +12,10 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	"go.uber.org/zap"
 )
 
 func getRandomTCPPort(t *testing.T) (int, error) {
@@ -139,11 +139,6 @@ func TestServer_Register(t *testing.T) {
 
 	router := srv.router // dirty hack, yes, i know
 
-	// state *before* registration
-	types, err := mime.ExtensionsByType("text/html; charset=utf-8")
-	assert.NoError(t, err)
-	assert.NotContains(t, types, ".vue") // mime types registration can be executed only once
-
 	for _, r := range routes {
 		assert.Nil(t, router.Get(r.name))
 	}
@@ -155,11 +150,7 @@ func TestServer_Register(t *testing.T) {
 	defer func() { _ = pubSub.Close() }()
 
 	// call register fn
-	assert.NoError(t, srv.Register(context.Background(), config.Config{}, ".", nil, stor, pubSub, pubSub))
-
-	// state *after* registration
-	types, _ = mime.ExtensionsByType("text/html; charset=utf-8") // reload
-	assert.Contains(t, types, ".vue")
+	assert.NoError(t, srv.Register(context.Background(), config.Config{}, nil, stor, pubSub, pubSub))
 
 	for _, r := range routes {
 		route, _ := router.Get(r.name).GetPathTemplate()
@@ -167,22 +158,4 @@ func TestServer_Register(t *testing.T) {
 		methods, _ := router.Get(r.name).GetMethods()
 		assert.Equal(t, r.methods, methods)
 	}
-}
-
-func TestServer_RegisterWithoutResourcesDir(t *testing.T) {
-	srv := NewServer(zap.NewNop())
-	router := srv.router // dirty hack, yes, i know
-
-	stor := storage.NewInMemory(time.Second, 16)
-	defer func() { _ = stor.Close() }()
-
-	pubSub := pubsub.NewInMemory()
-	defer func() { _ = pubSub.Close() }()
-
-	assert.Nil(t, router.Get("static"))
-	assert.NoError(t, srv.Register(
-		context.Background(), config.Config{}, "", nil, stor, pubSub, pubSub,
-	)) // empty resources dir
-
-	assert.Nil(t, router.Get("static"))
 }

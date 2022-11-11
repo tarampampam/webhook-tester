@@ -8,7 +8,6 @@ type envVariable string
 const (
 	ListenAddr           envVariable = "LISTEN_ADDR"     // IP address for listening
 	ListenPort           envVariable = "LISTEN_PORT"     // port number for listening
-	PublicDir            envVariable = "PUBLIC_DIR"      // directory with public resources
 	MaxSessionRequests   envVariable = "MAX_REQUESTS"    // maximum stored requests per session
 	SessionTTL           envVariable = "SESSION_TTL"     // session lifetime
 	StorageDriverName    envVariable = "STORAGE_DRIVER"  // storage driver name

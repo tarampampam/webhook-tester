@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Error 404 - Not found</title>
+
+  <style>
+    body {
+      background-color: #222;
+      color: #aaa;
+      font-family: 'Hack', monospace;
+    }
+
+    #error_text {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      margin-top: -35px;
+      height: 30px;
+      font-size: 2em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="error_text">Error 404: Not found</div>
+
+<script>
+  'use strict';
+
+  const setCharAt = function (str, index, chr) {
+    return (index > str.length - 1)
+      ? str
+      : str.substr(0, index) + chr + str.substr(index + 1);
+  };
+
+  const $errorText = document.getElementById('error_text');
+  const text = $errorText.innerText;
+
+  let progress = 0;
+
+  const scrambleInterval = window.setInterval(() => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-=+<>,./?[{()}]!@#$%^&*~`\|'.split('');
+    let message = text;
+
+    for (let i = 0; i < text.length; i++) {
+      if (i >= progress) {
+        message = setCharAt(message, i, characters[Math.round(Math.random() * (characters.length - 1))]);
+      }
+    }
+
+    $errorText.innerText = message;
+  }, 800 / 60);
+
+  window.setTimeout(() => {
+    let revealInterval = window.setInterval(() => {
+      if (progress < text.length) {
+        progress++;
+      } else {
+        clearInterval(revealInterval);
+        clearInterval(scrambleInterval);
+      }
+    }, 70);
+  }, 500);
+</script>
+</body>
+</html>

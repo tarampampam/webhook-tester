@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/http/fileserver"
@@ -28,6 +29,7 @@ import (
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 	"github.com/tarampampam/webhook-tester/internal/pkg/version"
+	"github.com/tarampampam/webhook-tester/web"
 )
 
 const uuidPattern string = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -186,21 +188,11 @@ func (s *Server) registerServiceHandlers(ctx context.Context, rdb *redis.Client,
 		Name("live")
 }
 
-func (s *Server) registerFileServerHandler(publicDir string) error {
-	fs, err := fileserver.NewFileServer(fileserver.Settings{
-		FilesRoot:               publicDir,
-		IndexFileName:           "index.html",
-		ErrorFileName:           "__error__.html",
-		RedirectIndexFileToRoot: true,
-	})
-	if err != nil {
-		return err
-	}
-
+func (s *Server) registerFileServerHandler() error {
 	s.router.
 		PathPrefix("/").
 		Methods(http.MethodGet, http.MethodHead).
-		Handler(fs).
+		Handler(fileserver.NewHandler(http.FS(web.Content()))).
 		Name("static")
 
 	return nil

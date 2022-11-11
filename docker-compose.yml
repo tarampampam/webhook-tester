@@ -25,7 +25,7 @@ services:
     <<: *app
     ports:
       - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
-    command: >
+    command: >-
       sh -c "go build -o /tmp/webhook-tester ./cmd/webhook-tester && /tmp/webhook-tester serve
         --verbose --port=8080 --public=./web --storage-driver=redis --pubsub-driver=redis
         --redis-dsn=redis://redis:6379/0 --max-requests=12 --ignore-header-prefix=foo --ws-max-clients=20
