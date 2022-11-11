@@ -60,7 +60,6 @@ RUN set -x \
     && cp -R /etc/ssl/certs ./etc/ssl/certs \
     && cp /etc/mime.types ./etc/mime.types \
     && cp /etc/apache2/mime.types ./etc/apache2/mime.types \
-    && cp -R /src/web ./opt/webhook-tester/web \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && mv /tmp/webhook-tester ./bin/webhook-tester
@@ -92,8 +91,6 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
     "--log-json", \
     "--port", "8080" \
 ]
-
-ENV PUBLIC_DIR="/opt/webhook-tester/web"
 
 ENTRYPOINT ["/bin/webhook-tester"]
 
