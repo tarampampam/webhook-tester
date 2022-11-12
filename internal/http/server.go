@@ -73,6 +73,7 @@ func (s *Server) Register(
 
 	impl.liveChecker = checkers.NewLiveChecker()
 	impl.readyChecker = checkers.NewReadyChecker(ctx, rdb)
+	impl.apiSession.storage = stor
 
 	api.RegisterHandlers(s.srv, &impl)
 

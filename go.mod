@@ -14,6 +14,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
 	github.com/labstack/echo/v4 v4.9.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/spf13/cobra v1.6.1

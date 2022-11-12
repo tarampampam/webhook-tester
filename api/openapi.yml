@@ -307,6 +307,17 @@ components:
       enum: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, TRACE]
       example: GET
 
+    SessionResponseOptions:
+      type: object
+      description: Session response options
+      additionalProperties: false
+      properties:
+        content_base64: {$ref: '#/components/schemas/Base64Encoded'}
+        content_type: {$ref: '#/components/schemas/ContentType'}
+        code: {$ref: '#/components/schemas/StatusCode'}
+        delay_sec: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
+      required: [content_base64, content_type, code, delay_sec]
+
     SessionRequest:
       type: object
       description: Recorded request
@@ -390,15 +401,7 @@ components:
             properties:
               uuid: {$ref: '#/components/schemas/UUID'}
               created_at_unix: {$ref: '#/components/schemas/UnixTime'}
-              response:
-                type: object
-                additionalProperties: false
-                properties:
-                  content_base64: {$ref: '#/components/schemas/Base64Encoded'}
-                  content_type: {$ref: '#/components/schemas/ContentType'}
-                  code: {$ref: '#/components/schemas/StatusCode'}
-                  delay_sec: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
-                required: [content_base64, content_type, code, delay_sec]
+              response: {$ref: '#/components/schemas/SessionResponseOptions'}
             required: [uuid, response, created_at_unix]
 
     RequestsList:

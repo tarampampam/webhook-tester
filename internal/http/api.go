@@ -24,14 +24,10 @@ type API struct {
 
 	apiVersion
 	apiHealth
+	apiSession
 }
 
 var _ api.ServerInterface = (*API)(nil) // verify that API implements interface
-
-func (*API) ApiSessionCreate(c echo.Context) error {
-	// TODO implement me
-	panic("implement me")
-}
 
 func (*API) ApiSessionDelete(c echo.Context, session api.SessionUUID) error {
 	// TODO implement me
