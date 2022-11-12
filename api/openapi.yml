@@ -3,7 +3,7 @@ openapi: 3.0.1 # Docs: <https://swagger.io/docs/specification/2-0/basic-structur
 
 info:
   title: WebHook Tester
-  version: 0.0.1
+  version: 0.1.0
   contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
 
 tags:
@@ -115,6 +115,7 @@ paths:
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
         "101": {description: Switching protocols}
+        "200": {$ref: '#/components/responses/WebsocketSessionEvents'}
         "429": {$ref: '#/components/responses/TooManyConnections'}
         "404": {$ref: '#/components/responses/NotFound'}
         "5XX": {$ref: '#/components/responses/ServerError'}
@@ -148,73 +149,6 @@ paths:
       externalDocs: {url: 'https://prometheus.io/', description: Prometheus}
       responses:
         "200": {$ref: '#/components/responses/Metrics'}
-
-  /{session_uuid}:
-    get: &webhook
-      tags: [webhook]
-      summary: Webhook endpoint
-      operationId: webhookGet
-      parameters: [{$ref: '#/components/parameters/SessionUUID'}]
-      responses:
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {<<: *webhook, operationId: webhookHead}
-    post: {<<: *webhook, operationId: webhookPost}
-    put: {<<: *webhook, operationId: webhookPut}
-    patch: {<<: *webhook, operationId: webhookPatch}
-    delete: {<<: *webhook, operationId: webhookDelete}
-    options: {<<: *webhook, operationId: webhookOptions}
-    trace: {<<: *webhook, operationId: webhookTrace}
-
-  /{session_uuid}/{status_code}:
-    get: &webhookWithCode
-      tags: [webhook]
-      summary: Webhook endpoint with a status code
-      operationId: webhookWithCodeGet
-      parameters:
-        - {$ref: '#/components/parameters/SessionUUID'}
-        - {$ref: '#/components/parameters/RequiredStatusCode'}
-      responses:
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {<<: *webhookWithCode, operationId: webhookWithCodeHead}
-    post: {<<: *webhookWithCode, operationId: webhookWithCodePost}
-    put: {<<: *webhookWithCode, operationId: webhookWithCodePut}
-    patch: {<<: *webhookWithCode, operationId: webhookWithCodePatch}
-    delete: {<<: *webhookWithCode, operationId: webhookWithCodeDelete}
-    options: {<<: *webhookWithCode, operationId: webhookWithCodeOptions}
-    trace: {<<: *webhookWithCode, operationId: webhookWithCodeTrace}
-
-  /{session_uuid}/{any}:
-    get: &webhookAny
-      tags: [webhook]
-      summary: Webhook endpoint with any postfix
-      operationId: webhookWithAnyGet
-      parameters:
-        - {$ref: '#/components/parameters/SessionUUID'}
-        - name: any
-          in: path
-          description: Any string
-          required: true
-          schema:
-            type: string
-            example: foobar
-      responses:
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {<<: *webhookAny, operationId: webhookWithAnyHead}
-    post: {<<: *webhookAny, operationId: webhookWithAnyPost}
-    put: {<<: *webhookAny, operationId: webhookWithAnyPut}
-    patch: {<<: *webhookAny, operationId: webhookWithAnyPatch}
-    delete: {<<: *webhookAny, operationId: webhookWithAnyDelete}
-    options: {<<: *webhookAny, operationId: webhookWithAnyOptions}
-    trace: {<<: *webhookAny, operationId: webhookWithAnyTrace}
 
 x-uuid-schema: &uuid-schema
   type: string
@@ -307,6 +241,50 @@ components:
       enum: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, TRACE]
       example: GET
 
+    HttpHeader:
+      type: object
+      description: HTTP header
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: X-Header-Name
+          minLength: 1
+        value:
+          type: string
+          example: X-Header-Value
+      required: [name, value]
+
+    WebsocketPayload:
+      type: object
+      description: Websocket response payload
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: request-deleted
+          enum: [request-registered, request-deleted, requests-deleted]
+        data:
+          type: string
+          example: 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7
+          minLength: 1
+      required: [name, data]
+
+    AppSettingsLimits:
+      type: object
+      description: Application limit settings
+      additionalProperties: false
+      properties:
+        max_requests: {type: integer, maximum: 65535, minimum: 0, example: 128}
+        max_webhook_body_size:
+          type: integer
+          description: Maximal webhook request body size (in bytes), zero means unlimited
+          maximum: 4294967295
+          minimum: 0
+          example: 1024
+        session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
+      required: [max_requests, max_webhook_body_size, session_lifetime_sec]
+
     SessionResponseOptions:
       type: object
       description: Session response options
@@ -332,17 +310,7 @@ components:
         content_base64: {$ref: '#/components/schemas/Base64Encoded'} # request content
         headers:
           type: array
-          items:
-            type: object
-            additionalProperties: false
-            properties:
-              name:
-                type: string
-                example: 'X-Header-Name'
-              value:
-                type: string
-                example: 'X-Header-Value'
-            required: [name, value]
+          items: {$ref: '#/components/schemas/HttpHeader'}
         url:
           type: string
           example: 'https://example.com/path?query=string'
@@ -377,18 +345,7 @@ components:
             type: object
             additionalProperties: false
             properties:
-              limits:
-                type: object
-                additionalProperties: false
-                properties:
-                  max_requests: {type: number, maximum: 65535, example: 128}
-                  max_webhook_body_size:
-                    type: number
-                    description: Maximal webhook request body size (in bytes), zero means unlimited
-                    maximum: 4294967295
-                    example: 1024
-                  session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
-                required: [max_requests, max_webhook_body_size, session_lifetime_sec]
+              limits: {$ref: '#/components/schemas/AppSettingsLimits'}
             required: [limits]
 
     SessionOptions:
@@ -412,6 +369,13 @@ components:
             type: array
             items: {$ref: '#/components/schemas/SessionRequest'}
 
+    WebsocketSessionEvents:
+      description: Websocket session events stream
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WebsocketPayload'
+
     SuccessfulOperation:
       description: Successful operation
       content:
@@ -422,22 +386,6 @@ components:
             properties:
               success: {$ref: '#/components/schemas/TrueOnly'}
             required: [success]
-
-    WebHook:
-      description: Webhook response
-      content:
-        application/json:
-          example: {message: 'Example response'}
-        text/html:
-          example: |
-            <!doctype html>
-            <html lang="en">
-            <body>
-              <h1>Example response</h1>
-            </body>
-            </html>
-        text/plain:
-          example: Example response
 
     NotFound:
       description: Not found

@@ -101,7 +101,7 @@ export default defineComponent({
         now: Math.floor(Date.now() / 1000),
       }
 
-      fetch(new Request(this.currentWebHookUrl, {
+      fetch(new Request(this.currentWebHookUrl, { // TODO use API client function for this
         method: xhrMethods[Math.floor(Math.random() * xhrMethods.length)].toUpperCase(),
         body: JSON.stringify(payload),
       }))

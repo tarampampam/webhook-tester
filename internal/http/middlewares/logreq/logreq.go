@@ -20,7 +20,7 @@ func New(log *zap.Logger) echo.MiddlewareFunc {
 
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			log.Info("HTTP request processed",
-				zap.String("remote addr", realip.FromHTTPRequest(c.Request())),
+				zap.String("remote addr", realip.FromHTTPRequest(c.Request())), // TODO use `Echo#IPExtractor`
 				zap.String("useragent", v.UserAgent),
 				zap.String("method", v.Method),
 				zap.String("uri", v.URI),

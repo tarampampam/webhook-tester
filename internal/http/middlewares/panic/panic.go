@@ -31,6 +31,7 @@ func New(log *zap.Logger) echo.MiddlewareFunc {
 					}
 
 					stackBuf := make([]byte, 1024) //nolint:gomnd
+
 					// do NOT use `debug.Stack()` here for skipping one unimportant call trace in stacktrace
 					for {
 						n := runtime.Stack(stackBuf, false)

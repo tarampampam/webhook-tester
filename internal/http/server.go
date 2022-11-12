@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -10,13 +11,17 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
+	"github.com/tarampampam/webhook-tester/internal/http/fileserver"
+	apiHandlers "github.com/tarampampam/webhook-tester/internal/http/handlers"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/panic"
-	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
+	"github.com/tarampampam/webhook-tester/internal/http/middlewares/webhook"
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/pkg/version"
+	"github.com/tarampampam/webhook-tester/web"
 )
 
 const (
@@ -61,21 +66,31 @@ func (s *Server) Register(
 		panic.New(s.log),
 	)
 
-	var impl = API{
-		ctx:  ctx,
-		cfg:  cfg,
-		rdb:  rdb,
-		stor: stor,
-		pub:  pub,
-		sub:  sub,
-		reg:  registry,
+	websocketMetrics := metrics.NewWebsockets()
+	if err := websocketMetrics.Register(registry); err != nil {
+		return err
 	}
 
-	impl.liveChecker = checkers.NewLiveChecker()
-	impl.readyChecker = checkers.NewReadyChecker(ctx, rdb)
-	impl.apiSession.storage = stor
+	api.RegisterHandlers(s.srv, apiHandlers.NewAPI(
+		ctx,
+		cfg,
+		rdb,
+		stor,
+		pub,
+		sub,
+		registry,
+		version.Version(),
+		&websocketMetrics,
+	))
 
-	api.RegisterHandlers(s.srv, &impl)
+	webhookMetrics := metrics.NewWebhooks()
+	if err := webhookMetrics.Register(registry); err != nil {
+		return err
+	}
+
+	s.srv.Use(webhook.New(ctx, cfg, stor, pub, &webhookMetrics))
+
+	s.srv.GET("/*", fileserver.NewHandler(http.FS(web.Content())))
 
 	return nil
 }

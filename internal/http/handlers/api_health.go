@@ -1,4 +1,4 @@
-package http
+package handlers
 
 import (
 	"net/http"
@@ -22,10 +22,12 @@ func (s *apiHealth) makeCheck(c echo.Context, chk checker) error {
 	return c.NoContent(http.StatusOK)
 }
 
+// LivenessProbe returns code 200 if the application is alive.
 func (s *apiHealth) LivenessProbe(c echo.Context) error {
 	return s.makeCheck(c, s.liveChecker)
 }
 
+// ReadinessProbe returns code 200 if the application is ready to serve traffic.
 func (s *apiHealth) ReadinessProbe(c echo.Context) error {
 	return s.makeCheck(c, s.readyChecker)
 }
