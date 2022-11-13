@@ -214,10 +214,8 @@ jobs:
       - name: Start HTTP server
         run: ./app serve --port 8081 --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
 
-      - name: Run Newman
-        uses: ./.github/actions/newman
-        with:
-          baseurl: 'http://127.0.0.1:8081'
+      - uses: matt-ball/newman-action@v1.0.4
+        with: {envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'}
 
   docker-image:
     name: Build docker image
@@ -312,7 +310,5 @@ jobs:
             -e "LISTEN_PORT=8081" \
               webhook-tester:local
 
-      - name: Run Newman
-        uses: ./.github/actions/newman
-        with:
-          baseurl: 'http://127.0.0.1:8081'
+      - uses: matt-ball/newman-action@v1.0.4
+        with: {envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'}
