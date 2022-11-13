@@ -67,7 +67,7 @@
     </p>
     <hr>
     <p>
-      Bookmark this page to go back to the requests at any time. For more info, click<strong>Help</strong>.
+      Bookmark this page to go back to the requests at any time. For more info, click <strong>Help</strong>.
     </p>
     <p>
       Click <strong>New URL</strong> to create a new url with the ability to customize status
