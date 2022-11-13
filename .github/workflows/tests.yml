@@ -32,7 +32,7 @@ jobs:
       - run: spectral lint --verbose --fail-severity warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
 
   build-frontend:
-    name: 🧪 Build and lint the frontend
+    name: 🧪 Lint and build the frontend
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true'}
     defaults: {run: {working-directory: ./web}}
@@ -201,7 +201,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports: ['6379:6379/tcp']
-        options: --health-cmd 'redis-cli ping' --health-interval 3s --health-timeout 2s --health-retries 3
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
     needs: [build-app]
     steps:
       - uses: actions/checkout@v3
@@ -220,37 +220,39 @@ jobs:
 
       - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
 
-#  e2e-docker-image:
-#    name: 🧪 Docker image End-to-End tests
-#    runs-on: ubuntu-latest
-#    services:
-#      redis:
-#        image: redis:7-alpine
-#        ports: ['6379:6379/tcp']
-#        options: --health-cmd 'redis-cli ping' --health-interval 3s --health-timeout 2s --health-retries 3
-#    needs: [build-docker-image]
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - run: docker network create "app-network"
-#
-#      - uses: actions/download-artifact@v3
-#        with: {name: docker-image}
-#
-#      - name: Load the image with the app
-#        run: docker load < docker-image.tar
-#
-#      - name: Run docker image with app
-#        run: |
-#          docker run --rm -d \
-#            --network "app-network" \
-#            -p "8081:8081/tcp" \
-#            -e "STORAGE_DRIVER=${{ matrix.storage-driver }}" \
-#            -e "PUBSUB_DRIVER=${{ matrix.pubsub-driver }}" \
-#            -e "REDIS_DSN=redis://redis:6379/0" \
-#            -e "LISTEN_PORT=8081" \
-#              app:local
-#
-#      - uses: gacts/install-hurl@v1
-#
-#      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
+  e2e-docker-image:
+    name: 🧪 Docker image End-to-End tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379/tcp']
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
+    needs: [build-docker-image]
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with: {name: docker-image}
+
+      - name: Load the image with the app
+        run: docker load < docker-image.tar
+
+      - name: Run docker image with app
+        run: |
+          docker run --rm -d \
+            --network host \
+            --name app \
+            -p "8081:8081/tcp" \
+            -e "STORAGE_DRIVER=redis" \
+            -e "PUBSUB_DRIVER=redis" \
+            -e "REDIS_DSN=redis://127.0.0.1:6379/0" \
+            -e "LISTEN_PORT=8081" \
+              app:local
+
+      - uses: gacts/install-hurl@v1
+
+      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
+
+      - if: always()
+        run: docker kill app
