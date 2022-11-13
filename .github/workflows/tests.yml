@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   gitleaks:
-    name: Check for GitLeaks
+    name: 🔐 Check for GitLeaks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -23,7 +23,7 @@ jobs:
       - uses: gacts/gitleaks@v1 # Action page: <https://github.com/gacts/gitleaks>
 
   validate-openapi:
-    name: Validate OpenAPI schemas
+    name: 🎯 Validate OpenAPI schemas
     runs-on: ubuntu-latest
     container: stoplight/spectral:5.9
     steps:
@@ -32,7 +32,7 @@ jobs:
       - run: spectral lint --verbose --fail-severity warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
 
   build-frontend:
-    name: Build and lint the frontend
+    name: 🦜 Build and lint the frontend
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true'}
     defaults: {run: {working-directory: ./web}}
@@ -61,7 +61,7 @@ jobs:
         with: {path: ./web/dist, name: frontend-dist, if-no-files-found: error, retention-days: 1}
 
   golangci-lint:
-    name: Run GolangCI-lint
+    name: 🕵 Run GolangCI-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -78,7 +78,7 @@ jobs:
         with: {skip-pkg-cache: true, skip-build-cache: true}
 
   go-test:
-    name: Run unit-tests (Go)
+    name: 🌀 Run unit-tests (Go)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -101,7 +101,7 @@ jobs:
           file: /tmp/coverage.txt
 
   build-app:
-    name: Build the app (${{ matrix.os }} / ${{ matrix.arch }})
+    name: 🚜 Build the app (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -189,38 +189,39 @@ jobs:
         continue-on-error: true
         with: {sarif_file: trivy-results.sarif}
 
-#  e2e:
-#    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        storage-driver: [memory, redis]
-#        pubsub-driver: [memory, redis]
-#    needs: [build]
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Start redis server
-#        if: matrix.storage-driver == 'redis' || matrix.pubsub-driver == 'redis'
-#        run: docker run --rm -d -p "6379:6379/tcp" redis:7-alpine
-#
-#      - name: Download compiled binary file
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: webhook-tester-linux-amd64
-#          path: .artifact
-#
-#      - name: Prepare binary file to run
-#        working-directory: .artifact
-#        run: mv ./webhook-tester ./../app && chmod +x ./../app
-#
-#      - name: Start HTTP server
-#        run: ./app serve --port 8081 --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
-#
-#      - uses: gacts/install-hurl@v1
-#
-#      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
+  e2e-test-app:
+    name: 💂 End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
+        pubsub-driver: [memory, redis]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
+    needs: [build-app]
+    steps:
+      - uses: actions/download-artifact@v3
+        with: {path: .artifact, name: webhook-tester-linux-amd64}
+
+      - name: Prepare the app file to run
+        working-directory: .artifact
+        run: mv ./webhook-tester ./../app && chmod +x ./../app
+
+      - run: |
+          ./app serve --port 8081 \
+            --storage-driver "${{ matrix.storage-driver }}" \
+            --pubsub-driver "${{ matrix.pubsub-driver }}" \
+            --redis-dsn "redis://127.0.0.1:6379/0" &
+
+      - uses: gacts/install-hurl@v1
+
+      - uses: actions/checkout@v3
+
+      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
 
 #  docker-image-e2e:
 #    name: Docker image End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
