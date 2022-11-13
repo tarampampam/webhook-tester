@@ -58,7 +58,7 @@ jobs:
       - run: npm run build
 
       - uses: actions/upload-artifact@v3
-        with: {name: &frontend-artifact frontend-dist, path: dist, retention-days: 1}
+        with: {name: frontend-dist, path: dist, retention-days: 1}
 
   golangci-lint:
     name: Run GolangCI-lint
@@ -69,7 +69,7 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version: 1.19}
 
-      - run: &go-generate |
+      - run: |
           mkdir ./web/dist && touch ./web/dist/index.html # is needed for go:embed
           go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
           go generate ./...
@@ -87,7 +87,10 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version: 1.19}
 
-      - run: *go-generate
+      - run: |
+          mkdir ./web/dist && touch ./web/dist/index.html # is needed for go:embed
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
+          go generate ./...
 
       - run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
 
@@ -112,12 +115,14 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version: 1.19}
 
-      - run: *go-generate
-
       - uses: actions/download-artifact@v3
-        with: {name: *frontend-artifact, path: web}
+        with: {name: frontend-dist, path: web}
 
       - run: ls -la ./web ./web/dist
+
+      - run: |
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
+          go generate ./...
 
 #      - {uses: gacts/github-slug@v1, id: slug}
 #
