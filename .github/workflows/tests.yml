@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - run: lint -F warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
+      - run: spectral lint -F warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
 
   frontend:
     name: Check & build the frontend
