@@ -24,11 +24,10 @@ jobs:
         uses: gacts/gitleaks@v1 # Action page: <https://github.com/gacts/gitleaks>
 
   validate-openapi: # TODO: use more lightweight tools for this
-    name: Validate Swagger (OpenAPI) schema
+    name: Validate OpenAPI schema
     runs-on: ubuntu-20.04
     steps:
-      - name: Check out code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - name: Validate OpenAPI definitions # Tool page: <https://github.com/stoplightio/spectral>
         run: docker run -v "$PWD:/src:ro" --workdir "/src" --rm stoplight/spectral:5.9 lint -F warn ./api/*.y*ml
@@ -216,11 +215,7 @@ jobs:
 
       - uses: gacts/install-hurl@v1
 
-      - run: |
-          hurl --color --test --fail-at-end --verbose --summary \
-            --variable host=127.0.0.1 \
-            --variable port=8081 \
-              ./test/hurl/*/*.hurl
+      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
 
   docker-image:
     name: Build docker image
@@ -317,8 +312,4 @@ jobs:
 
       - uses: gacts/install-hurl@v1
 
-      - run: |
-          hurl --color --test --fail-at-end --verbose --summary \
-            --variable host=127.0.0.1 \
-            --variable port=8081 \
-              ./test/hurl/*/*.hurl
+      - run: hurl --color --test --fail-at-end --variable host=127.0.0.1 --variable port=8081 ./test/hurl/*/*.hurl
