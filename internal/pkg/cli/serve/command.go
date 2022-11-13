@@ -163,7 +163,7 @@ func run( //nolint:funlen,gocyclo
 			fields = append(fields, zap.String("redis dsn", redisDSN))
 		}
 
-		log.Info("API starting", fields...)
+		log.Info("Server starting", fields...)
 
 		if err := server.Start(ip, port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
@@ -176,7 +176,7 @@ func run( //nolint:funlen,gocyclo
 		return err
 
 	case <-ctx.Done(): // ..or context cancellation
-		log.Debug("API stopping")
+		log.Debug("Server stopping")
 
 		// create context for server graceful shutdown
 		ctxShutdown, ctxCancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)

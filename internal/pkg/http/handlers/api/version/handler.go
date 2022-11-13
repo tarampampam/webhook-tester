@@ -1,4 +1,4 @@
-// Package version contains version API handler.
+// Package version contains version handler.
 package version
 
 import (

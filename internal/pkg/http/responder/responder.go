@@ -1,4 +1,4 @@
-// Package responder contains different HTTP responders ("sugared" functions for easy working with API responses).
+// Package responder contains different HTTP responders ("sugared" functions for easy working with server responses).
 package responder
 
 import (

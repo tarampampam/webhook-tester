@@ -3,6 +3,7 @@ openapi: 3.0.1 # Docs: <https://swagger.io/docs/specification/2-0/basic-structur
 
 info:
   title: WebHook Tester
+  description: A simple web app to test webhooks
   version: 0.1.0
   contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
 
@@ -22,6 +23,7 @@ paths:
     get:
       tags: [api]
       summary: Get application version
+      description: Returns the application version
       operationId: apiAppVersion
       responses:
         "200": {$ref: '#/components/responses/AppVersion'}
@@ -31,6 +33,7 @@ paths:
     get:
       tags: [api]
       summary: Get application settings
+      description: Returns the application settings
       operationId: apiSettings
       responses:
         "200": {$ref: '#/components/responses/AppSettings'}
@@ -40,6 +43,7 @@ paths:
     post:
       tags: [api]
       summary: Create new session
+      description: Creates new session
       operationId: apiSessionCreate
       requestBody: {$ref: '#/components/requestBodies/NewSession'}
       responses:
@@ -51,6 +55,7 @@ paths:
     delete:
       tags: [api]
       summary: Delete session with passed UUID
+      description: Deletes session with passed UUID
       operationId: apiSessionDelete
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
@@ -62,6 +67,7 @@ paths:
     get:
       tags: [api]
       summary: Get requests list for session with passed UUID (sorted from newest to oldest)
+      description: Returns requests list for session with passed UUID
       operationId: apiSessionGetAllRequests
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
@@ -72,6 +78,7 @@ paths:
     delete:
       tags: [api]
       summary: Delete all requests for session with passed UUID
+      description: Deletes all requests for session with passed UUID
       operationId: apiSessionDeleteAllRequests
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
@@ -83,6 +90,7 @@ paths:
     get:
       tags: [api]
       summary: Get request details by UUID for session with passed UUID
+      description: Returns request details by UUID for session with passed UUID
       operationId: apiSessionGetRequest
       parameters: [{$ref: '#/components/parameters/SessionUUID'}, {$ref: '#/components/parameters/RequestUUID'}]
       responses:
@@ -98,6 +106,7 @@ paths:
     delete:
       tags: [api]
       summary: Delete request by UUID for session with passed UUID
+      description: Deletes request by UUID for session with passed UUID
       operationId: apiSessionDeleteRequest
       parameters:
         - {$ref: '#/components/parameters/SessionUUID'}
@@ -111,6 +120,7 @@ paths:
     get:
       tags: [websocket]
       summary: Websocket endpoint
+      description: Websocket endpoint
       operationId: websocketSession
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:

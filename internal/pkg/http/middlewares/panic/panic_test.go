@@ -42,7 +42,7 @@ func TestMiddleware(t *testing.T) {
 					Message string `json:"message"`
 					Code    int    `json:"code"`
 				}{
-					Message: "Internal API Error: foo error",
+					Message: "Internal Server Error: foo error",
 					Code:    http.StatusInternalServerError,
 				})
 				assert.NoError(t, err)

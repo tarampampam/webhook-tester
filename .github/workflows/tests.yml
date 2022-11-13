@@ -77,9 +77,11 @@ jobs:
       - run: mkdir ./dist && touch ./dist/index.html
         working-directory: web
 
+      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
+
       - run: go generate ./...
 
-      - uses: golangci/golangci-lint-action@v3 # Action page: <https://github.com/golangci/golangci-lint-action>
+      - uses: golangci/golangci-lint-action@v3
 
   go-test:
     name: Unit tests
@@ -101,6 +103,8 @@ jobs:
 
       - run: mkdir ./dist && touch ./dist/index.html
         working-directory: web
+
+      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
 
       - run: go mod download
 
@@ -153,6 +157,8 @@ jobs:
             ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
+
+      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
 
       - run: go generate ./...
 
