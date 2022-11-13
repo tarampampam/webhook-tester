@@ -57,6 +57,9 @@ jobs:
 
       - run: npm run build
 
+      - uses: actions/upload-artifact@v3
+        with: {name: &frontend-artifact frontend-dist, path: dist, retention-days: 1}
+
   golangci-lint:
     name: Run GolangCI-lint
     runs-on: ubuntu-latest
@@ -66,11 +69,9 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version: 1.19}
 
-      - name: Create a dummy index.html file to satisfy the build (go:embed)
-        run: mkdir ./web/dist && touch ./web/dist/index.html
-
-      - run: |
-          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
+      - run: &go-generate |
+          mkdir ./web/dist && touch ./web/dist/index.html # is needed for go:embed
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
           go generate ./...
 
       - uses: golangci/golangci-lint-action@v3
@@ -86,12 +87,7 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version: 1.19}
 
-      - name: Create a dummy index.html file to satisfy the build (go:embed)
-        run: mkdir ./web/dist && touch ./web/dist/index.html
-
-      - run: |
-          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
-          go generate ./...
+      - run: *go-generate
 
       - run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
 
@@ -101,52 +97,28 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: /tmp/coverage.txt
 
-#  build:
-#    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os: [linux, windows, darwin] # linux, freebsd, darwin, windows
-#        arch: [amd64]                # amd64, 386
-#    needs: [golangci-lint, go-test, frontend]
-#    steps:
-#      - uses: actions/setup-go@v3
-#        with: {go-version: 1.19}
-#
-#      - uses: actions/setup-node@v3
-#        with: {node-version: 19}
-#
-#      - uses: actions/checkout@v3
-#
-#      - id: npm-cache-dir
-#        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
-#
-#      - uses: actions/cache@v3
-#        id: npm-cache
-#        with:
-#          path: ${{ steps.npm-cache-dir.outputs.dir }}
-#          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-#          restore-keys: ${{ runner.os }}-node-
-#
-#      - run: npm ci
-#        working-directory: web
-#
-#      - run: npm run generate && npm run build
-#        working-directory: web
-#
-#      - uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.cache/go-build
-#            ~/go/pkg/mod
-#          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#          restore-keys: ${{ runner.os }}-go-
-#
-#      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
-#
-#      - run: go generate ./...
-#
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, windows, darwin] # linux, freebsd, darwin, windows
+        arch: [amd64]                # amd64, 386
+    needs: [golangci-lint, go-test, build-frontend]
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: gacts/setup-go-with-cache@v1
+        with: {go-version: 1.19}
+
+      - run: *go-generate
+
+      - uses: actions/download-artifact@v3
+        with: {name: *frontend-artifact, path: web}
+
+      - run: ls -la ./web ./web/dist
+
 #      - {uses: gacts/github-slug@v1, id: slug}
 #
 #      - name: Build application
@@ -167,7 +139,7 @@ jobs:
 #          path: /tmp/webhook-tester
 #          if-no-files-found: error
 #          retention-days: 3
-#
+
 #  e2e:
 #    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
 #    runs-on: ubuntu-latest
