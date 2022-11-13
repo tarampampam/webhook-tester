@@ -39,16 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
-        with: {node-version: 19}
-
-      - {run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT, id: npm-cache-dir}
-
-      - uses: actions/cache@v3
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-node-
+      - uses: gacts/setup-node-with-cache@v1
+        with: {node-version: 1.19}
 
       - run: npm ci --no-audit --prefer-offline && npm run generate
         env: {NPM_CONFIG_UPDATE_NOTIFIER: false}

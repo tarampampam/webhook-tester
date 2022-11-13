@@ -19,8 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
-        with: {node-version: 19}
+      - uses: gacts/setup-node-with-cache@v1
+        with: {node-version: 1.19}
 
       - run: npm ci --no-audit
 
