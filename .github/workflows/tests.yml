@@ -73,6 +73,7 @@ jobs:
       - run: go generate ./...
 
       - uses: golangci/golangci-lint-action@v3
+        with: {skip-pkg-cache: true, skip-build-cache: true}
 
 #  go-test:
 #    name: Unit tests
