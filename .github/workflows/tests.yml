@@ -104,9 +104,11 @@ jobs:
       - run: mkdir ./dist && touch ./dist/index.html
         working-directory: web
 
+      - run: go mod download
+
       - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
 
-      - run: go mod download
+      - run: go generate ./...
 
       - run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
 
