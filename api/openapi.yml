@@ -92,12 +92,7 @@ paths:
       operationId: apiSessionGetRequest
       parameters: [{$ref: '#/components/parameters/SessionUUID'}, {$ref: '#/components/parameters/RequestUUID'}]
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionRequest'
+        "200": {$ref: '#/components/responses/Request'}
         "404": {$ref: '#/components/responses/NotFound'}
         "5XX": {$ref: '#/components/responses/ServerError'}
 
@@ -129,7 +124,7 @@ paths:
         "5XX": {$ref: '#/components/responses/ServerError'}
 
   /ready:
-    get: # TODO + head?
+    get:
       tags: [health]
       summary: Readiness probe
       description: Is the app ready to serve traffic?
@@ -139,7 +134,7 @@ paths:
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}
 
   /live:
-    get: # TODO + head?
+    get:
       tags: [health]
       summary: Liveness probe
       description: Is the app alive or dead?
@@ -368,6 +363,13 @@ components:
               created_at_unix: {$ref: '#/components/schemas/UnixTime'}
               response: {$ref: '#/components/schemas/SessionResponseOptions'}
             required: [uuid, response, created_at_unix]
+
+    Request:
+      description: Recorded request details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SessionRequest'
 
     RequestsList:
       description: Requests list
