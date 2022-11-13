@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: gacts/setup-node-with-cache@v1
-        with: {node-version: 1.19}
+        with: {node-version: 19}
 
       - run: npm ci --no-audit --prefer-offline && npm run generate
         env: {NPM_CONFIG_UPDATE_NOTIFIER: false}
