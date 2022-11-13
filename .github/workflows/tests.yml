@@ -22,14 +22,14 @@ jobs:
 
       - uses: gacts/gitleaks@v1 # Action page: <https://github.com/gacts/gitleaks>
 
-  validate-openapi: # TODO: use more lightweight tools for this
+  validate-openapi:
     name: Validate OpenAPI schema
     runs-on: ubuntu-latest
     container: stoplight/spectral:5.9
     steps:
       - uses: actions/checkout@v2
 
-      - run: spectral lint -F warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
+      - run: spectral lint --verbose --fail-severity warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
 
   frontend:
     name: Check & build the frontend
