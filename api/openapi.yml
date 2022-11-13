@@ -27,7 +27,6 @@ paths:
       operationId: apiAppVersion
       responses:
         "200": {$ref: '#/components/responses/AppVersion'}
-        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /api/settings:
     get:
@@ -37,7 +36,6 @@ paths:
       operationId: apiSettings
       responses:
         "200": {$ref: '#/components/responses/AppSettings'}
-        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /api/session:
     post:
