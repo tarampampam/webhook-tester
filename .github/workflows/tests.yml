@@ -27,12 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     container: stoplight/spectral:5.9
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - run: spectral lint --verbose --fail-severity warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
 
-  frontend:
-    name: Lint and build the frontend
+  build-frontend:
+    name: Build and lint the frontend
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true'}
     defaults: {run: {working-directory: ./web}}
@@ -51,29 +51,29 @@ jobs:
           restore-keys: ${{ runner.os }}-node-
 
       - run: npm ci --no-audit --prefer-offline && npm run generate
+        env: {NPM_CONFIG_UPDATE_NOTIFIER: false}
 
       - run: npm run lint
 
       - run: npm run build
 
-#  golangci-lint:
-#    name: Golang-CI (lint)
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - uses: actions/setup-go@v3
-#        with: {go-version: 1.19}
-#
-#      - run: mkdir ./dist && touch ./dist/index.html
-#        working-directory: web
-#
-#      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
-#
-#      - run: go generate ./...
-#
-#      - uses: golangci/golangci-lint-action@v3
-#
+  golangci-lint:
+    name: Golang-CI (lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: gacts/setup-go-with-cache@v1
+        with: {go-version: 1.19}
+
+      - run: mkdir ./web/dist && touch ./web/dist/index.html
+
+      - run: go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest"
+
+      - run: go generate ./...
+
+      - uses: golangci/golangci-lint-action@v3
+
 #  go-test:
 #    name: Unit tests
 #    runs-on: ubuntu-latest
