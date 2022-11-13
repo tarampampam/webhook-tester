@@ -34,7 +34,7 @@ type apiWebsocket struct {
 	connCounter atomic.Int32
 }
 
-var upgrader = websocket.Upgrader{
+var upgrader = websocket.Upgrader{ //nolint:gochecknoglobals
 	ReadBufferSize:  512, //nolint:gomnd
 	WriteBufferSize: 512, //nolint:gomnd
 }
@@ -45,7 +45,7 @@ const (
 )
 
 // WebsocketSession returns websocket session.
-func (s *apiWebsocket) WebsocketSession(c echo.Context, sessionUuid api.SessionUUID) error {
+func (s *apiWebsocket) WebsocketSession(c echo.Context, sessionUuid api.SessionUUID) error { //nolint:funlen
 	// is the limit exceeded?
 	if limit := s.cfg.WebSockets.MaxClients; limit != 0 {
 		if s.connCounter.Load() > int32(limit) {

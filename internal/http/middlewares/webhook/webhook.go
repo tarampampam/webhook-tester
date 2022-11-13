@@ -22,7 +22,7 @@ type webhookMetrics interface {
 	IncrementProcessedWebHooks()
 }
 
-func New(
+func New( //nolint:funlen,gocognit,gocyclo
 	ctx context.Context,
 	cfg config.Config,
 	storage storage.Storage,
@@ -37,8 +37,9 @@ func New(
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if parts := strings.Split(c.Path(), "/"); len(parts) > 1 { // extract the first URL segment
-				if sessionUuidStruct, uuidErr := uuid.Parse(parts[1]); uuidErr == nil { // and check it's a valid UUID
+			// extract the first URL segment
+			if parts := strings.Split(strings.TrimLeft(c.Request().RequestURI, "/"), "/"); len(parts) > 0 { //nolint:nestif
+				if sessionUuidStruct, uuidErr := uuid.Parse(parts[0]); uuidErr == nil { // and check it's a valid UUID
 					var (
 						sessionUuid = sessionUuidStruct.String()
 						statusCode  = http.StatusOK // default status code
@@ -46,8 +47,8 @@ func New(
 
 					c.Response().Header().Set("Access-Control-Allow-Origin", "*") // allow cross-original requests
 
-					if len(parts) > 2 && len(parts[2]) == 3 { // try to extract second URL segment as status code
-						if code, err := strconv.Atoi(parts[2]); err == nil && code >= 100 && code <= 599 { // and verify it too
+					if len(parts) > 1 && len(parts[1]) == 3 { // try to extract second URL segment as status code
+						if code, err := strconv.Atoi(parts[1]); err == nil && code >= 100 && code <= 599 { // and verify it too
 							statusCode = code
 						}
 					}
@@ -130,7 +131,7 @@ func New(
 func respondWithError(c echo.Context, code int, msg string) error {
 	var s strings.Builder
 
-	s.Grow(1024)
+	s.Grow(1024) //nolint:gomnd
 
 	s.WriteString(`<!doctype html>
 <html lang="en">

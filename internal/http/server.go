@@ -88,9 +88,20 @@ func (s *Server) Register(
 		return err
 	}
 
-	s.srv.Use(webhook.New(ctx, cfg, stor, pub, &webhookMetrics))
+	var (
+		wh     = webhook.New(ctx, cfg, stor, pub, &webhookMetrics)
+		static = fileserver.NewHandler(http.FS(web.Content()))
+	)
 
-	s.srv.GET("/*", fileserver.NewHandler(http.FS(web.Content())))
+	s.srv.Any("/*", wh(func(c echo.Context) error { // wrap file server into webhook middleware
+		if method := c.Request().Method; method == http.MethodGet || method == http.MethodHead {
+			return static(c)
+		}
+
+		s.srv.HTTPErrorHandler(echo.ErrNotFound, c)
+
+		return nil
+	}))
 
 	return nil
 }
