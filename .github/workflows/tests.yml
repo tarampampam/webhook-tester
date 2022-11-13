@@ -101,7 +101,7 @@ jobs:
           file: /tmp/coverage.txt
 
   build:
-    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    name: Build the app (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -116,34 +116,31 @@ jobs:
         with: {go-version: 1.19}
 
       - uses: actions/download-artifact@v3
-        with: {path: web, name: frontend-dist}
-
-      - run: ls -la ./web ./web/dist
+        with: {path: web/dist, name: frontend-dist}
 
       - run: |
           go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
           go generate ./...
 
-#      - {uses: gacts/github-slug@v1, id: slug}
-#
-#      - name: Build application
-#        env:
-#          GOOS: ${{ matrix.os }}
-#          GOARCH: ${{ matrix.arch }}
-#          CGO_ENABLED: 0
-#          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.branch-name-slug }}@${{ steps.slug.outputs.commit-hash-short }}
-#        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
-#
-#      - name: Try to execute
-#        if: matrix.os == 'linux'
-#        run: /tmp/webhook-tester version && /tmp/webhook-tester -h
-#
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
-#          path: /tmp/webhook-tester
-#          if-no-files-found: error
-#          retention-days: 3
+      - {uses: gacts/github-slug@v1, id: slug}
+
+      - env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.commit-hash-short }}
+        run: go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/
+
+      - name: Try to execute
+        if: matrix.os == 'linux'
+        run: /tmp/webhook-tester version && /tmp/webhook-tester -h
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/webhook-tester
+          if-no-files-found: error
+          retention-days: 3
 
 #  e2e:
 #    name: End-to-End tests (${{ matrix.storage-driver }} storage, ${{ matrix.pubsub-driver }} pubsub)
