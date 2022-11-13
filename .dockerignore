@@ -1,7 +1,10 @@
 ## Git & tools
 .git
 .github
+.gitattributes
+.gitignore
 /Makefile
+/docker-compose.yml
 
 ## IDEs
 .idea
@@ -9,6 +12,8 @@
 
 ## Configs
 .editorconfig
+/.codecov.yml
+/.golangci.yml
 
 ## Assets
 /assets

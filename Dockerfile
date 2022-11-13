@@ -65,7 +65,7 @@ RUN set -x \
     && mv /tmp/webhook-tester ./bin/webhook-tester
 
 # use empty filesystem
-FROM scratch
+FROM scratch as runtime
 
 ARG APP_VERSION="undefined@docker"
 
