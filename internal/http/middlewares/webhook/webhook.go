@@ -42,12 +42,12 @@ func New( //nolint:funlen,gocognit,gocyclo
 				if sessionUuidStruct, uuidErr := uuid.Parse(parts[0]); uuidErr == nil { // and check it's a valid UUID
 					var (
 						sessionUuid = sessionUuidStruct.String()
-						statusCode  = http.StatusOK // default status code
+						statusCode  int
 					)
 
 					c.Response().Header().Set("Access-Control-Allow-Origin", "*") // allow cross-original requests
 
-					if len(parts) > 1 && len(parts[1]) == 3 { // try to extract second URL segment as status code
+					if len(parts) == 2 && len(parts[1]) == 3 { // try to extract second URL segment as status code
 						if code, err := strconv.Atoi(parts[1]); err == nil && code >= 100 && code <= 599 { // and verify it too
 							statusCode = code
 						}
@@ -66,6 +66,10 @@ func New( //nolint:funlen,gocognit,gocyclo
 							http.StatusNotFound,
 							fmt.Sprintf("The session with UUID %s was not found", sessionUuid),
 						)
+					}
+
+					if statusCode == 0 {
+						statusCode = int(session.Code())
 					}
 
 					var body []byte // for request body

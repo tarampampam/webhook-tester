@@ -2,7 +2,8 @@
 	"info": {
 		"_postman_id": "ab33f9e7-8c46-45c9-831d-1b1cb267545f",
 		"name": "default",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "14196028"
 	},
 	"item": [
 		{
@@ -130,8 +131,8 @@
 									"    pm.response.to.have.status(200)\r",
 									"});\r",
 									"\r",
-									"pm.test('Content-Type header is contains xml', () => {\r",
-									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('xml')\r",
+									"pm.test('Content-Type header is text/xml', () => {\r",
+									"  pm.expect(pm.response.headers.get('Content-Type')).to.contains('text/xml')\r",
 									"});"
 								],
 								"type": "text/javascript"
@@ -282,6 +283,9 @@
 													"pm.sendRequest({",
 													"    url: baseUrl + '/api/session',",
 													"    method: 'POST',",
+													"    header: {",
+													"        'Content-Type': 'application/json',",
+													"    },",
 													"    body: {",
 													"        mode: 'raw',",
 													"        raw: '{\"status_code\": 203}',",
@@ -408,6 +412,9 @@
 													"pm.sendRequest({",
 													"    url: baseUrl + '/api/session',",
 													"    method: 'POST',",
+													"    header: {",
+													"        'Content-Type': 'application/json',",
+													"    },",
 													"    body: {",
 													"        mode: 'raw',",
 													"        raw: '{}',",
@@ -505,6 +512,9 @@
 													"pm.sendRequest({",
 													"    url: baseUrl + '/api/session',",
 													"    method: 'POST',",
+													"    header: {",
+													"        'Content-Type': 'application/json',",
+													"    },",
 													"    body: {",
 													"        mode: 'raw',",
 													"        raw: '{}',",
@@ -589,6 +599,9 @@
 													"pm.sendRequest({",
 													"    url: baseUrl + '/api/session',",
 													"    method: 'POST',",
+													"    header: {",
+													"        'Content-Type': 'application/json',",
+													"    },",
 													"    body: {",
 													"        mode: 'raw',",
 													"        raw: '{}',",
@@ -735,6 +748,9 @@
 											"pm.sendRequest({",
 											"    url: pm.environment.get('base_url') + '/api/session',",
 											"    method: 'POST',",
+											"    header: {",
+											"        'Content-Type': 'application/json',",
+											"    },",
 											"    body: {",
 											"        mode: 'raw',",
 											"        raw: '{}',",
@@ -892,14 +908,14 @@
 						"type": "text/javascript",
 						"exec": [
 							"pm.test('Content-Type header is application/json', () => {",
-							"    pm.expect(pm.response.headers.get('Content-Type')).to.be.eql('application/json')",
+							"    pm.expect(pm.response.headers.get('Content-Type')).to.contains('application/json')",
 							"})",
 							"",
-							"pm.test('Caching control headers is valid', () => {",
-							"    pm.expect(pm.response.headers.get('Cache-Control')).to.be.eql('no-cache, no-store, must-revalidate')",
-							"    pm.expect(pm.response.headers.get('Expires')).to.be.eql('0')",
-							"    pm.expect(pm.response.headers.get('Pragma')).to.be.eql('no-cache')",
-							"})"
+							"// pm.test('Caching control headers is valid', () => {",
+							"//     pm.expect(pm.response.headers.get('Cache-Control')).to.be.eql('no-cache, no-store, must-revalidate')",
+							"//     pm.expect(pm.response.headers.get('Expires')).to.be.eql('0')",
+							"//     pm.expect(pm.response.headers.get('Pragma')).to.be.eql('no-cache')",
+							"// })"
 						]
 					}
 				}
@@ -1945,6 +1961,9 @@
 							"    pm.sendRequest({",
 							"        url: pm.environment.get('base_url') + '/api/session',",
 							"        method: 'POST',",
+							"        header: {",
+							"            'Content-Type': 'application/json',",
+							"        },",
 							"        body: {",
 							"            mode: 'raw',",
 							"            raw: JSON.stringify({",
@@ -1996,6 +2015,12 @@
 					""
 				]
 			}
+		}
+	],
+	"variable": [
+		{
+			"key": "webhooksSessionUUID",
+			"value": ""
 		}
 	]
 }
