@@ -215,7 +215,10 @@ jobs:
         run: ./app serve --port 8081 --storage-driver "${{ matrix.storage-driver }}" --pubsub-driver "${{ matrix.pubsub-driver }}" --redis-dsn "redis://127.0.0.1:6379/0" &
 
       - uses: matt-ball/newman-action@v1.0.4
-        with: {envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'}
+        with:
+          collection: test/postman/default.postman_collection.json
+          environment: test/postman/default.postman_environment.json
+          envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'
 
   docker-image:
     name: Build docker image
@@ -311,4 +314,7 @@ jobs:
               webhook-tester:local
 
       - uses: matt-ball/newman-action@v1.0.4
-        with: {envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'}
+        with:
+          collection: test/postman/default.postman_collection.json
+          environment: test/postman/default.postman_environment.json
+          envVar: '[{ "key": "base_url", "value": "http://127.0.0.1:8081" }]'
