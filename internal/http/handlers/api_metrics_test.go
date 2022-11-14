@@ -1,19 +1,21 @@
-package metrics_test
+package handlers_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
-	"github.com/tarampampam/webhook-tester/internal/pkg/http/handlers/metrics"
+
+	"github.com/tarampampam/webhook-tester/internal/http/handlers"
+	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 )
 
-func TestNewHandlerError(t *testing.T) {
+func TestApiMetrics_AppMetrics(t *testing.T) {
 	var (
-		req, _     = http.NewRequest(http.MethodGet, "http://testing?foo=bar", http.NoBody)
-		rr         = httptest.NewRecorder()
 		registry   = prometheus.NewRegistry()
 		testMetric = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -29,7 +31,16 @@ func TestNewHandlerError(t *testing.T) {
 	registry.MustRegister(testMetric)
 	testMetric.WithLabelValues("bar").Set(1)
 
-	metrics.NewHandler(registry)(rr, req)
+	var (
+		api = handlers.NewAPI(
+			context.Background(), config.Config{}, nil, nil, nil, nil, registry, "", nil,
+		)
+
+		req, _ = http.NewRequest(http.MethodGet, "http://test/", http.NoBody)
+		rr     = httptest.NewRecorder()
+	)
+
+	assert.NoError(t, api.AppMetrics(echo.New().NewContext(req, rr)))
 
 	assert.Equal(t, rr.Code, http.StatusOK)
 	assert.Equal(t, 200, rr.Code)
