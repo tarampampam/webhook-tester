@@ -45,7 +45,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=${{ steps.slug.outputs.version }}
+          LDFLAGS: -s -w -X github.com/tarampampam/webhook-tester/internal/version.version=${{ steps.slug.outputs.version }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.binary-name }}" ./cmd/webhook-tester/
 
       - name: Upload binary file to the release

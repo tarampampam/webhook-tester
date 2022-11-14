@@ -11,16 +11,16 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
+	"github.com/tarampampam/webhook-tester/internal/config"
 	"github.com/tarampampam/webhook-tester/internal/http/fileserver"
-	apiHandlers "github.com/tarampampam/webhook-tester/internal/http/handlers"
+	"github.com/tarampampam/webhook-tester/internal/http/handlers"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/logreq"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/panic"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/webhook"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/metrics"
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
-	"github.com/tarampampam/webhook-tester/internal/pkg/version"
+	"github.com/tarampampam/webhook-tester/internal/metrics"
+	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/storage"
+	"github.com/tarampampam/webhook-tester/internal/version"
 	"github.com/tarampampam/webhook-tester/web"
 )
 
@@ -72,7 +72,7 @@ func (s *Server) Register(
 		return err
 	}
 
-	api.RegisterHandlers(s.echo, apiHandlers.NewAPI(
+	api.RegisterHandlers(s.echo, handlers.NewAPI(
 		ctx,
 		cfg,
 		rdb,

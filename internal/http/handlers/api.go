@@ -7,10 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/checkers"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/checkers"
+	"github.com/tarampampam/webhook-tester/internal/config"
+	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/storage"
 )
 
 type API struct {

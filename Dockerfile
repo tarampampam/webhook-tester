@@ -43,7 +43,7 @@ WORKDIR /src
 COPY --from=frontend /src/web/dist /src/web/dist
 
 # arguments to pass on each go tool link invocation
-ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
+ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/version.version=$APP_VERSION"
 
 RUN set -x \
     && go generate ./... \

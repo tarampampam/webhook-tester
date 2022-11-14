@@ -6,7 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
+	"github.com/tarampampam/webhook-tester/internal/config"
 )
 
 type apiSettings struct {

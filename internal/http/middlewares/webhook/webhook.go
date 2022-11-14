@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/config"
+	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/storage"
 )
 
 type webhookMetrics interface {

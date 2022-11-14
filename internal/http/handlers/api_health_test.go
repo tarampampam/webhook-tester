@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tarampampam/webhook-tester/internal/config"
 	"github.com/tarampampam/webhook-tester/internal/http/handlers"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 )
 
 func TestApiHealth_LivenessProbe(t *testing.T) {

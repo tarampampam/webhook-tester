@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tarampampam/webhook-tester/internal/config"
 	appHttp "github.com/tarampampam/webhook-tester/internal/http"
 	"github.com/tarampampam/webhook-tester/internal/http/middlewares/webhook"
-	"github.com/tarampampam/webhook-tester/internal/pkg/config"
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/storage"
 )
 
 type fakeMetrics struct {

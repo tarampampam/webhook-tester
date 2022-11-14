@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/tarampampam/webhook-tester/internal/api"
-	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
+	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"github.com/tarampampam/webhook-tester/internal/storage"
 )
 
 type apiSession struct {
