@@ -67,7 +67,7 @@
     </p>
     <hr>
     <p>
-      Bookmark this page to go back to the requests at any time. For more info, click<strong>Help</strong>.
+      Bookmark this page to go back to the requests at any time. For more info, click <strong>Help</strong>.
     </p>
     <p>
       Click <strong>New URL</strong> to create a new url with the ability to customize status
@@ -101,7 +101,7 @@ export default defineComponent({
         now: Math.floor(Date.now() / 1000),
       }
 
-      fetch(new Request(this.currentWebHookUrl, {
+      fetch(new Request(this.currentWebHookUrl, { // TODO use API client function for this
         method: xhrMethods[Math.floor(Math.random() * xhrMethods.length)].toUpperCase(),
         body: JSON.stringify(payload),
       }))

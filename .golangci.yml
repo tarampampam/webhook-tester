@@ -90,3 +90,7 @@ issues:
         - gocognit
         - noctx
         - gochecknoglobals
+
+    - path: api\.go
+      linters:
+        - lll

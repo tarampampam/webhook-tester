@@ -1,5 +1,5 @@
 import {Fetcher} from 'openapi-typescript-fetch'
-import {paths, components} from './schema'
+import {paths, components} from './schema.gen'
 import {Base64} from 'js-base64'
 
 const fetcher = Fetcher.for<paths>()

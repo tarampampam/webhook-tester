@@ -3,7 +3,8 @@ openapi: 3.0.1 # Docs: <https://swagger.io/docs/specification/2-0/basic-structur
 
 info:
   title: WebHook Tester
-  version: 0.0.1
+  description: A simple web app to test webhooks
+  version: 0.1.0
   contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
 
 tags:
@@ -22,238 +23,121 @@ paths:
     get:
       tags: [api]
       summary: Get application version
+      description: Returns the application version
       operationId: apiAppVersion
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties: {version: {type: string, example: ['0.0.1', '1.2.3@undefined']}}
-                required: [version]
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/AppVersion'}
 
   /api/settings:
     get:
       tags: [api]
       summary: Get application settings
+      description: Returns the application settings
       operationId: apiSettings
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  limits:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      max_requests: {type: number, maximum: 65535, example: 128}
-                      max_webhook_body_size:
-                        type: number
-                        description: Maximal webhook request body size (in bytes), zero means unlimited
-                        maximum: 4294967295
-                        example: 1024
-                      session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
-                    required: [max_requests, max_webhook_body_size, session_lifetime_sec]
-                required: [limits]
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/AppSettings'}
 
   /api/session:
     post:
       tags: [api]
       summary: Create new session
+      description: Creates new session
       operationId: apiSessionCreate
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                status_code: {$ref: '#/components/schemas/StatusCode'}
-                content_type: {$ref: '#/components/schemas/ContentType'}
-                response_delay: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
-                response_content_base64: {$ref: '#/components/schemas/Base64Encoded'}
+      requestBody: {$ref: '#/components/requestBodies/NewSession'}
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  uuid: {$ref: '#/components/schemas/UUID'}
-                  created_at_unix: {$ref: '#/components/schemas/UnixTime'}
-                  response:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      content_base64: {$ref: '#/components/schemas/Base64Encoded'}
-                      content_type: {$ref: '#/components/schemas/ContentType'}
-                      code: {$ref: '#/components/schemas/StatusCode'}
-                      delay_sec: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
-                    required: [content_base64, content_type, code, delay_sec]
-                required: [uuid, response, created_at_unix]
-        "400":
-          description: Bad request
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/SessionOptions'}
+        "400": {$ref: '#/components/responses/BadRequest'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /api/session/{session_uuid}:
     delete:
       tags: [api]
       summary: Delete session with passed UUID
+      description: Deletes session with passed UUID
       operationId: apiSessionDelete
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties: {success: {type: boolean, enum: [true]}}
-                required: [success]
-        "404":
-          description: Not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/SuccessfulOperation'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /api/session/{session_uuid}/requests:
     get:
       tags: [api]
       summary: Get requests list for session with passed UUID (sorted from newest to oldest)
+      description: Returns requests list for session with passed UUID
       operationId: apiSessionGetAllRequests
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: '#/components/schemas/SessionRequest'}
-        "404":
-          description: Session was not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/RequestsList'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
     delete:
       tags: [api]
       summary: Delete all requests for session with passed UUID
+      description: Deletes all requests for session with passed UUID
       operationId: apiSessionDeleteAllRequests
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties: {success: {type: boolean, enum: [true]}}
-                required: [success]
-        "404":
-          description: Requests for session was not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/SuccessfulOperation'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /api/session/{session_uuid}/requests/{request_uuid}:
     get:
       tags: [api]
       summary: Get request details by UUID for session with passed UUID
+      description: Returns request details by UUID for session with passed UUID
       operationId: apiSessionGetRequest
       parameters: [{$ref: '#/components/parameters/SessionUUID'}, {$ref: '#/components/parameters/RequestUUID'}]
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionRequest'
-        "404":
-          description: Session or request was not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/Request'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
     delete:
       tags: [api]
       summary: Delete request by UUID for session with passed UUID
+      description: Deletes request by UUID for session with passed UUID
       operationId: apiSessionDeleteRequest
-      parameters: [{$ref: '#/components/parameters/SessionUUID'}, {$ref: '#/components/parameters/RequestUUID'}]
+      parameters:
+        - {$ref: '#/components/parameters/SessionUUID'}
+        - {$ref: '#/components/parameters/RequestUUID'}
       responses:
-        "200":
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties: {success: {type: boolean, enum: [true]}}
-                required: [success]
-        "404":
-          description: Session or request was not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "200": {$ref: '#/components/responses/SuccessfulOperation'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /ws/session/{session_uuid}:
     get:
       tags: [websocket]
       summary: Websocket endpoint
+      description: Websocket endpoint
       operationId: websocketSession
       parameters: [{$ref: '#/components/parameters/SessionUUID'}]
       responses:
-        "101":
-          description: Switching protocols
-        "429":
-          description: Too many active connections
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "404":
-          description: Session was not found
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
-        "5XX":
-          description: Internal error
-          content: {application/json: {schema: {$ref: '#/components/schemas/RequestFailed'}}}
+        "101": {description: Switching protocols}
+        "200": {$ref: '#/components/responses/WebsocketSessionEvents'}
+        "429": {$ref: '#/components/responses/TooManyConnections'}
+        "404": {$ref: '#/components/responses/NotFound'}
+        "5XX": {$ref: '#/components/responses/ServerError'}
 
   /ready:
-    get: # + head?
+    get:
       tags: [health]
       summary: Readiness probe
-      description: App is ready to serve traffic?
+      description: Is the app ready to serve traffic?
       operationId: readinessProbe
       responses:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}
 
   /live:
-    get: # + head?
+    get:
       tags: [health]
       summary: Liveness probe
-      description: App is alive or dead?
+      description: Is the app alive or dead?
       operationId: livenessProbe
       responses:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
@@ -267,85 +151,7 @@ paths:
       operationId: appMetrics
       externalDocs: {url: 'https://prometheus.io/', description: Prometheus}
       responses:
-        "200":
-          description: Ок
-          content:
-            text/plain:
-              example: |
-                # HELP go_goroutines Number of goroutines that currently exist.
-                # TYPE go_goroutines gauge
-                go_goroutines 92
-
-  /{session_uuid}:
-    get:
-      tags: &wh-tag [webhook]
-      summary: &wh-sum Webhook endpoint
-      operationId: webhookGet
-      parameters: &wh-params [{$ref: '#/components/parameters/SessionUUID'}]
-      responses: &wh-resp
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {operationId: webhookHead, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    post: {operationId: webhookPost, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    put: {operationId: webhookPut, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    patch: {operationId: webhookPatch, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    delete: {operationId: webhookDelete, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    options: {operationId: webhookOptions, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-    trace: {operationId: webhookTrace, tags: *wh-tag, summary: *wh-sum, parameters: *wh-params, responses: *wh-resp}
-
-  /{session_uuid}/{status_code}:
-    get:
-      tags: &wh-code-tag [webhook]
-      summary: &wh-code-sum Webhook endpoint with a status code
-      operationId: webhookWithCode
-      parameters: &wh-code-params
-        - {$ref: '#/components/parameters/SessionUUID'}
-        - name: status_code
-          in: path
-          description: Required HTTP response code
-          required: true
-          schema: {type: integer, minimum: 100, maximum: 599, example: 200}
-      responses: &wh-code-resp
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {operationId: webhookWithCodeHead, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    post: {operationId: webhookWithCodePost, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    put: {operationId: webhookWithCodePut, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    patch: {operationId: webhookWithCodePatch, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    delete: {operationId: webhookWithCodeDelete, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    options: {operationId: webhookWithCodeOptions, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-    trace: {operationId: webhookWithCodeTrace, tags: *wh-code-tag, summary: *wh-code-sum, parameters: *wh-code-params, responses: *wh-code-resp}
-
-  /{session_uuid}/{any}:
-    get:
-      tags: &wh-any-tag [webhook]
-      summary: &wh-any-sum Webhook endpoint with any postfix
-      operationId: webhookWithAny
-      parameters: &wh-any-params
-        - {$ref: '#/components/parameters/SessionUUID'}
-        - name: any
-          in: path
-          description: Any string
-          required: true
-          schema:
-            type: string
-            example: foobar
-      responses: &wh-any-resp
-        "2XX": {$ref: '#/components/responses/WebHook'}
-        "3XX": {$ref: '#/components/responses/WebHook'}
-        "4XX": {$ref: '#/components/responses/WebHook'}
-        "5XX": {$ref: '#/components/responses/WebHook'}
-    head: {operationId: webhookWithAnyHead, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    post: {operationId: webhookWithAnyPost, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    put: {operationId: webhookWithAnyPut, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    patch: {operationId: webhookWithAnyPatch, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    delete: {operationId: webhookWithAnyDelete, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    options: {operationId: webhookWithAnyOptions, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
-    trace: {operationId: webhookWithAnyTrace, tags: *wh-any-tag, summary: *wh-any-sum, parameters: *wh-any-params, responses: *wh-any-resp}
+        "200": {$ref: '#/components/responses/Metrics'}
 
 x-uuid-schema: &uuid-schema
   type: string
@@ -369,7 +175,38 @@ components:
       required: true
       schema: *uuid-schema
 
+    RequiredStatusCode:
+      name: status_code
+      in: path
+      description: Required HTTP response code
+      required: true
+      schema: {type: integer, minimum: 100, maximum: 599, example: 200}
+
+  requestBodies:
+    NewSession:
+      description: New session options
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              status_code: {$ref: '#/components/schemas/StatusCode'}
+              content_type: {$ref: '#/components/schemas/ContentType'}
+              response_delay: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
+              response_content_base64: {$ref: '#/components/schemas/Base64Encoded'}
+
   schemas:
+    TrueOnly:
+      type: boolean
+      enum: [true]
+      example: true
+
+    FalseOnly:
+      type: boolean
+      enum: [false]
+      example: false
+
     StatusCode:
       type: integer
       description: HTTP status code
@@ -407,6 +244,61 @@ components:
       enum: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, TRACE]
       example: GET
 
+    HttpHeader:
+      type: object
+      description: HTTP header
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: X-Header-Name
+          minLength: 1
+        value:
+          type: string
+          example: X-Header-Value
+      required: [name, value]
+
+    WebsocketPayload:
+      type: object
+      description: Websocket response payload
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: request-deleted
+          enum: [request-registered, request-deleted, requests-deleted]
+        data:
+          type: string
+          example: 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7
+          minLength: 1
+      required: [name, data]
+
+    AppSettingsLimits:
+      type: object
+      description: Application limit settings
+      additionalProperties: false
+      properties:
+        max_requests: {type: integer, maximum: 65535, minimum: 0, example: 128}
+        max_webhook_body_size:
+          type: integer
+          description: Maximal webhook request body size (in bytes), zero means unlimited
+          maximum: 4294967295
+          minimum: 0
+          example: 1024
+        session_lifetime_sec: {type: integer, maximum: 4294967295, example: 5}
+      required: [max_requests, max_webhook_body_size, session_lifetime_sec]
+
+    SessionResponseOptions:
+      type: object
+      description: Session response options
+      additionalProperties: false
+      properties:
+        content_base64: {$ref: '#/components/schemas/Base64Encoded'}
+        content_type: {$ref: '#/components/schemas/ContentType'}
+        code: {$ref: '#/components/schemas/StatusCode'}
+        delay_sec: {$ref: '#/components/schemas/ResponseDelayInSeconds'}
+      required: [content_base64, content_type, code, delay_sec]
+
     SessionRequest:
       type: object
       description: Recorded request
@@ -421,48 +313,117 @@ components:
         content_base64: {$ref: '#/components/schemas/Base64Encoded'} # request content
         headers:
           type: array
-          items:
-            type: object
-            additionalProperties: false
-            properties:
-              name:
-                type: string
-                example: 'X-Header-Name'
-              value:
-                type: string
-                example: 'X-Header-Value'
-            required: [name, value]
+          items: {$ref: '#/components/schemas/HttpHeader'}
         url:
           type: string
           example: 'https://example.com/path?query=string'
         created_at_unix: {$ref: '#/components/schemas/UnixTime'}
       required: [uuid, client_address, method, content_base64, headers, url, created_at_unix]
 
-    RequestFailed:
+    Failure:
       description: Request processing error (server-side error, bad request and so on)
       type: object
       properties:
-        success: {type: boolean, enum: [false]}
+        success: {$ref: '#/components/schemas/FalseOnly'}
         code: {type: integer, example: 400, minimum: 400, maximum: 599}
         message: {type: string, example: Internal error}
       required: [success, code, message]
 
   responses:
-    WebHook:
-      description: Webhook response
+    AppVersion:
+      description: Application version information
       content:
         application/json:
-          example: {message: 'Example response'}
-        text/html:
-          example: |
-            <!doctype html>
-            <html lang="en">
-            <body>
-              <h1>Example response</h1>
-            </body>
-            </html>
-        text/plain:
-          example: Example response
+          schema:
+            type: object
+            additionalProperties: false
+            properties: {version: {type: string, example: '0.0.1'}}
+            required: [version]
+
+    AppSettings:
+      description: Application settings
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              limits: {$ref: '#/components/schemas/AppSettingsLimits'}
+            required: [limits]
+
+    SessionOptions:
+      description: Created session options
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              uuid: {$ref: '#/components/schemas/UUID'}
+              created_at_unix: {$ref: '#/components/schemas/UnixTime'}
+              response: {$ref: '#/components/schemas/SessionResponseOptions'}
+            required: [uuid, response, created_at_unix]
+
+    Request:
+      description: Recorded request details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SessionRequest'
+
+    RequestsList:
+      description: Requests list
+      content:
+        application/json:
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/SessionRequest'}
+
+    WebsocketSessionEvents:
+      description: Websocket session events stream
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WebsocketPayload'
+
+    SuccessfulOperation:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              success: {$ref: '#/components/schemas/TrueOnly'}
+            required: [success]
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Failure'
+
+    TooManyConnections:
+      description: Too many connections
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Failure'
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Failure'
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Failure'
 
     ServiceHealthy:
       description: Ok
@@ -476,3 +437,12 @@ components:
         text/plain:
           example: |
             application error: some important service is unavailable: host "10.0.0.10" unreachable
+
+    Metrics:
+      description: App metrics
+      content:
+        text/plain:
+          example: |
+            # HELP go_goroutines Number of goroutines that currently exist.
+            # TYPE go_goroutines gauge
+            go_goroutines 92

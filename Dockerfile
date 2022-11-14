@@ -3,7 +3,9 @@
 # Image page: <https://hub.docker.com/_/node>
 FROM node:19-alpine as frontend
 
-COPY . /src
+RUN mkdir -p /src/web
+
+COPY ./web/package*.json /src/web/
 
 WORKDIR /src/web
 
@@ -12,17 +14,27 @@ RUN set -x \
     && npm config set update-notifier false \
     && npm ci --no-audit --prefer-offline
 
+COPY ./api /src/api
+COPY ./web /src/web
+
 # build the frontend (built artifact can be found in /src/web/dist)
 RUN set -x \
     && npm run generate \
     && npm run build
 
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.19-alpine as builder
+FROM golang:1.19-buster as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
 ARG APP_VERSION="undefined@docker"
+
+# renovate: source=github-releases name=deepmap/oapi-codegen
+ENV OAPI_CODEGEN_VERSION="1.12.2"
+
+RUN set -x \
+    # Install `oapi-codegen`: <https://github.com/deepmap/oapi-codegen>
+    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}"
 
 COPY . /src
 
@@ -31,7 +43,7 @@ WORKDIR /src
 COPY --from=frontend /src/web/dist /src/web/dist
 
 # arguments to pass on each go tool link invocation
-ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/pkg/version.version=$APP_VERSION"
+ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/version.version=$APP_VERSION"
 
 RUN set -x \
     && go generate ./... \
@@ -53,7 +65,7 @@ RUN set -x \
     && mv /tmp/webhook-tester ./bin/webhook-tester
 
 # use empty filesystem
-FROM scratch
+FROM scratch as runtime
 
 ARG APP_VERSION="undefined@docker"
 
