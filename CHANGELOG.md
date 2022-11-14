@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - VueJS updated from v2 to v3
 - Bootstrap updated from v4 to v5
 - All frontend dependencies are now built-in (no external network requests are needed anymore)
+- OpenAPI specification now is used for the code generation on the frontend and backend sides
+- E2E tests now use the hurl instead of postman/newman
 
 ### Removed
 
