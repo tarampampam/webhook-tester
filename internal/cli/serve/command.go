@@ -4,16 +4,21 @@ package serve
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
 	"github.com/tarampampam/webhook-tester/internal/breaker"
+	"github.com/tarampampam/webhook-tester/internal/cli/shared"
 	"github.com/tarampampam/webhook-tester/internal/config"
+	"github.com/tarampampam/webhook-tester/internal/env"
 	appHttp "github.com/tarampampam/webhook-tester/internal/http"
 	"github.com/tarampampam/webhook-tester/internal/logger"
 	"github.com/tarampampam/webhook-tester/internal/pubsub"
@@ -21,29 +26,178 @@ import (
 )
 
 // NewCommand creates `serve` command.
-func NewCommand(ctx context.Context, log *zap.Logger) *cobra.Command {
-	var f flags
+func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
+	const (
+		listenFlagName             = "listen"
+		maxRequestsFlagName        = "max-requests"
+		sessionTtlFlagName         = "session-ttl"
+		ignoreHeaderPrefixFlagName = "ignore-header-prefix"
+		maxRequestBodySizeFlagName = "max-request-body-size"
+		redisDsnFlagName           = "redis-dsn"
+		storageDriverFlagName      = "storage-driver"
+		pubSubDriverFlagName       = "pubsub-driver"
+		wsMaxClientsFlagName       = "ws-max-clients"
+		wsMaxLifetimeFlagName      = "ws-max-lifetime"
+	)
 
-	cmd := &cobra.Command{
-		Use:     "serve",
+	return &cli.Command{
+		Name:    "serve",
 		Aliases: []string{"s", "server"},
-		Short:   "Start HTTP server",
-		Long:    "Environment variables have higher priority than flags",
-		PreRunE: func(*cobra.Command, []string) error {
-			if err := f.overrideUsingEnv(); err != nil {
-				return err
+		Usage:   "Start HTTP server",
+		Action: func(c *cli.Context) error {
+			var (
+				port               = c.Uint(shared.PortNumberFlag.Name)
+				listen             = c.String(listenFlagName)
+				maxRequests        = c.Uint(maxRequestsFlagName)
+				sessionTtl         = c.Duration(sessionTtlFlagName)
+				ignoreHeaderPrefix = c.StringSlice(ignoreHeaderPrefixFlagName)
+				maxRequestBodySize = c.Uint(maxRequestBodySizeFlagName)
+				redisDsn           = c.String(redisDsnFlagName)
+				storageDriver      = c.String(storageDriverFlagName)
+				pubSubDriver       = c.String(pubSubDriverFlagName)
+				wsMaxClients       = c.Uint(wsMaxClientsFlagName)
+				wsMaxLifetime      = c.Duration(wsMaxLifetimeFlagName)
+			)
+
+			{
+				if port > math.MaxUint16 {
+					return errors.New("wrong TCP port number")
+				}
+
+				if net.ParseIP(listen) == nil {
+					return fmt.Errorf("wrong IP address [%s] for listening", listen)
+				}
+
+				if maxRequests > math.MaxUint16 {
+					return errors.New("wrong max requests value")
+				}
+
+				_, redisDsnErr := redis.ParseURL(redisDsn)
+
+				switch storageDriver {
+				case config.StorageDriverMemory.String():
+					// do nothing
+
+				case config.StorageDriverRedis.String():
+					if redisDsnErr != nil {
+						return fmt.Errorf("wrong redis DSN [%s]: %w", redisDsn, redisDsnErr)
+					}
+
+				default:
+					return fmt.Errorf("unsupported storage driver: %s", storageDriver)
+				}
+
+				switch pubSubDriver {
+				case config.PubSubDriverMemory.String():
+					// do nothing
+
+				case config.PubSubDriverRedis.String():
+					if redisDsnErr != nil {
+						return fmt.Errorf("wrong redis DSN [%s]: %w", redisDsn, redisDsnErr)
+					}
+
+				default:
+					return fmt.Errorf("unsupported pub/sub driver: %s", pubSubDriver)
+				}
 			}
 
-			return f.validate()
+			var cfg = config.Config{}
+
+			{
+				cfg.MaxRequests = uint16(maxRequests)
+				cfg.IgnoreHeaderPrefixes = ignoreHeaderPrefix
+				cfg.MaxRequestBodySize = uint32(maxRequestBodySize)
+				cfg.SessionTTL = sessionTtl
+
+				switch storageDriver {
+				case config.StorageDriverMemory.String():
+					cfg.StorageDriver = config.StorageDriverMemory
+
+				case config.StorageDriverRedis.String():
+					cfg.StorageDriver = config.StorageDriverRedis
+				}
+
+				switch pubSubDriver {
+				case config.PubSubDriverMemory.String():
+					cfg.PubSubDriver = config.PubSubDriverMemory
+
+				case config.PubSubDriverRedis.String():
+					cfg.PubSubDriver = config.PubSubDriverRedis
+				}
+
+				cfg.WebSockets.MaxClients = uint32(wsMaxClients)
+				cfg.WebSockets.MaxLifetime = wsMaxLifetime
+			}
+
+			return run(c.Context, log, cfg, listen, uint16(port), redisDsn)
 		},
-		RunE: func(*cobra.Command, []string) error {
-			return run(ctx, log, f.toConfig(), f.listen.ip, f.listen.port, f.redisDSN)
+		Flags: []cli.Flag{
+			shared.PortNumberFlag,
+			&cli.StringFlag{
+				Name:    listenFlagName,
+				Aliases: []string{"l"},
+				Usage:   "IP address to listen on",
+				Value:   "0.0.0.0",
+				EnvVars: []string{env.ListenAddr.String()},
+			},
+			&cli.UintFlag{
+				Name:    maxRequestsFlagName,
+				Usage:   "maximum stored requests per session (max 65535)",
+				Value:   128, //nolint:gomnd
+				EnvVars: []string{env.MaxSessionRequests.String()},
+			},
+			&cli.DurationFlag{
+				Name:    sessionTtlFlagName,
+				Usage:   "session lifetime (examples: 48h, 1h30m)",
+				Value:   time.Hour * 168, //nolint:gomnd
+				EnvVars: []string{env.SessionTTL.String()},
+			},
+			&cli.StringSliceFlag{
+				Name:  ignoreHeaderPrefixFlagName,
+				Usage: "ignore headers with the following prefixes for webhooks, case insensitive (example: 'X-Forwarded-')",
+				// EnvVars: []string{}, // TODO add env var
+			},
+			&cli.UintFlag{
+				Name:  maxRequestBodySizeFlagName,
+				Usage: "maximal webhook request body size (in bytes; 0 = unlimited)",
+				Value: 64 * 1024, //nolint:gomnd // 64 KiB
+				// EnvVars: []string{}, // TODO add env var
+			},
+			&cli.StringFlag{
+				// redisDSN allows to setup redis server using single string. Examples:
+				//	redis://<user>:<password>@<host>:<port>/<db_number>
+				//	unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>
+				Name:    redisDsnFlagName,
+				Usage:   "redis server DSN (format: \"redis://<user>:<password>@<host>:<port>/<db_number>\")",
+				Value:   "redis://127.0.0.1:6379/0",
+				EnvVars: []string{env.RedisDSN.String()},
+			},
+			&cli.StringFlag{
+				Name:    storageDriverFlagName,
+				Usage:   fmt.Sprintf("storage driver (%s|%s)", config.StorageDriverMemory, config.StorageDriverRedis),
+				Value:   config.StorageDriverMemory.String(),
+				EnvVars: []string{env.StorageDriverName.String()},
+			},
+			&cli.StringFlag{
+				Name:    pubSubDriverFlagName,
+				Usage:   fmt.Sprintf("pub/sub driver (%s|%s)", config.PubSubDriverMemory, config.PubSubDriverRedis),
+				Value:   config.PubSubDriverMemory.String(),
+				EnvVars: []string{env.PubSubDriver.String()},
+			},
+			&cli.UintFlag{
+				Name:    wsMaxClientsFlagName,
+				Usage:   "maximal websocket clients count (0 = unlimited)",
+				Value:   0,
+				EnvVars: []string{env.WebsocketMaxClients.String()},
+			},
+			&cli.DurationFlag{
+				Name:    wsMaxLifetimeFlagName,
+				Usage:   "maximal single websocket lifetime (examples: 3h, 1h30m; 0 = unlimited)",
+				Value:   time.Duration(0),
+				EnvVars: []string{env.WebsocketMaxLifetime.String()},
+			},
 		},
 	}
-
-	f.init(cmd.Flags())
-
-	return cmd
 }
 
 const serverShutdownTimeout = 5 * time.Second

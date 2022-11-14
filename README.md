@@ -62,15 +62,15 @@ This application supports the next sub-commands:
 |---------------|-------------------------------------------------------------------------------------------|
 | `serve`       | Start HTTP server                                                                         |
 | `healthcheck` | Health checker for the HTTP server (use case - docker healthcheck) _(hidden in CLI help)_ |
-| `version`     | Display application version                                                               |
 
 And global flags:
 
-| Flag              | Description         |
-|-------------------|---------------------|
-| `--verbose`, `-v` | Verbose output      |
-| `--debug`         | Debug output        |
-| `--log-json`      | Logs in JSON format |
+| Flag              | Description                 |
+|-------------------|-----------------------------|
+| `--version`       | Display application version |
+| `--verbose`, `-v` | Verbose output              |
+| `--debug`         | Debug output                |
+| `--log-json`      | Logs in JSON format         |
 
 ### HTTP server starting
 

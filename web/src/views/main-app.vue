@@ -230,7 +230,7 @@ export default defineComponent({
         ? this.sessionUUID
         : '________-____-____-____-____________'
 
-      return `${window.location.origin}/${uuid}` // TODO take care about base url suffix
+      return `${window.location.origin}${window.location.pathname}${uuid}`
     },
   },
 

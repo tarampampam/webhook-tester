@@ -2,12 +2,12 @@
 package healthcheck
 
 import (
-	"fmt"
-	"strconv"
+	"errors"
+	"math"
 
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v2"
 
-	"github.com/tarampampam/webhook-tester/internal/env"
+	"github.com/tarampampam/webhook-tester/internal/cli/shared"
 )
 
 type checker interface {
@@ -15,37 +15,22 @@ type checker interface {
 }
 
 // NewCommand creates `healthcheck` command.
-func NewCommand(checker checker) *cobra.Command {
-	var port uint16
-
-	cmd := &cobra.Command{
-		Use:     "healthcheck",
+func NewCommand(checker checker) *cli.Command {
+	return &cli.Command{
+		Name:    "healthcheck",
 		Aliases: []string{"chk", "health", "check"},
-		Short:   "Health checker for the HTTP server. Use case - docker healthcheck.",
-		Hidden:  true,
-		PreRunE: func(*cobra.Command, []string) error {
-			if envPort, exists := env.ListenPort.Lookup(); exists && envPort != "" {
-				if p, err := strconv.ParseUint(envPort, 10, 16); err == nil {
-					port = uint16(p)
-				} else {
-					return fmt.Errorf("wrong TCP port environment variable [%s] value", envPort)
-				}
+		Usage:   "Health checker for the HTTP server. Use case - docker healthcheck",
+		Action: func(c *cli.Context) error {
+			var port = c.Uint(shared.PortNumberFlag.Name)
+
+			if port > math.MaxUint16 {
+				return errors.New("wrong TCP port number")
 			}
 
-			return nil
+			return checker.Check(uint16(port))
 		},
-		RunE: func(*cobra.Command, []string) error {
-			return checker.Check(port)
+		Flags: []cli.Flag{
+			shared.PortNumberFlag,
 		},
 	}
-
-	cmd.Flags().Uint16VarP(
-		&port,
-		"port",
-		"p",
-		8080, //nolint:gomnd
-		fmt.Sprintf("TCP port number [$%s]", env.ListenPort),
-	)
-
-	return cmd
 }

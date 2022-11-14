@@ -48,7 +48,7 @@ ENV LDFLAGS="-s -w -X github.com/tarampampam/webhook-tester/internal/version.ver
 RUN set -x \
     && go generate ./... \
     && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/ \
-    && /tmp/webhook-tester version \
+    && /tmp/webhook-tester --version \
     && /tmp/webhook-tester -h
 
 # prepare rootfs for runtime
@@ -85,13 +85,13 @@ COPY --from=builder /tmp/rootfs /
 # Use an unprivileged user
 USER appuser:appuser
 
+ENV LISTEN_PORT=8080
+
 # Docs: <https://docs.docker.com/engine/reference/builder/#healthcheck>
 HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
-    "/bin/webhook-tester", "healthcheck", \
-    "--log-json", \
-    "--port", "8080" \
+    "/bin/webhook-tester", "--log-json", "healthcheck" \
 ]
 
 ENTRYPOINT ["/bin/webhook-tester"]
 
-CMD ["serve", "--log-json"]
+CMD ["--log-json", "serve"]
