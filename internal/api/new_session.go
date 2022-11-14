@@ -22,7 +22,7 @@ func (data NewSession) Validate() error {
 	}
 
 	if data.ContentType != nil && utf8.RuneCountInString(*data.ContentType) > maxContentTypeLength {
-		return fmt.Errorf("content-type value is too large (max length is %d)", maxContentTypeLength)
+		return fmt.Errorf("content-type value is too long (max length is %d)", maxContentTypeLength)
 	}
 
 	if data.ResponseDelay != nil && *data.ResponseDelay > maxResponseDelaySeconds {

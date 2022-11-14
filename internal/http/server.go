@@ -30,8 +30,8 @@ const (
 )
 
 type Server struct {
-	log *zap.Logger
-	srv *echo.Echo
+	log  *zap.Logger
+	echo *echo.Echo
 }
 
 func NewServer(log *zap.Logger) *Server {
@@ -42,12 +42,13 @@ func NewServer(log *zap.Logger) *Server {
 	srv.Server.ReadHeaderTimeout = readTimeout
 	srv.Server.WriteTimeout = writeTimeout
 	srv.Server.ErrorLog = srv.StdLogger
+	srv.IPExtractor = NewIPExtractor()
 	srv.HideBanner = true
 	srv.HidePort = true
 
 	return &Server{
-		log: log,
-		srv: srv,
+		log:  log,
+		echo: srv,
 	}
 }
 
@@ -61,8 +62,8 @@ func (s *Server) Register(
 ) error {
 	registry := metrics.NewRegistry()
 
-	s.srv.Use(
-		logreq.New(s.log),
+	s.echo.Use(
+		logreq.New(s.log, []string{"/ready", "/health"}),
 		panic.New(s.log),
 	)
 
@@ -71,7 +72,7 @@ func (s *Server) Register(
 		return err
 	}
 
-	api.RegisterHandlers(s.srv, apiHandlers.NewAPI(
+	api.RegisterHandlers(s.echo, apiHandlers.NewAPI(
 		ctx,
 		cfg,
 		rdb,
@@ -93,12 +94,12 @@ func (s *Server) Register(
 		static = fileserver.NewHandler(http.FS(web.Content()))
 	)
 
-	s.srv.Any("/*", wh(func(c echo.Context) error { // wrap file server into webhook middleware
+	s.echo.Any("/*", wh(func(c echo.Context) error { // wrap file server into webhook middleware
 		if method := c.Request().Method; method == http.MethodGet || method == http.MethodHead {
 			return static(c)
 		}
 
-		s.srv.HTTPErrorHandler(echo.ErrNotFound, c)
+		s.echo.HTTPErrorHandler(echo.ErrNotFound, c)
 
 		return nil
 	}))
@@ -108,8 +109,8 @@ func (s *Server) Register(
 
 // Start the server.
 func (s *Server) Start(ip string, port uint16) error {
-	return s.srv.Start(ip + ":" + strconv.Itoa(int(port)))
+	return s.echo.Start(ip + ":" + strconv.Itoa(int(port)))
 }
 
 // Stop the server.
-func (s *Server) Stop(ctx context.Context) error { return s.srv.Shutdown(ctx) }
+func (s *Server) Stop(ctx context.Context) error { return s.echo.Shutdown(ctx) }

@@ -35,7 +35,7 @@ func NewHandler(root http.FileSystem) func(c echo.Context) error {
 			return c.HTMLBlob(http.StatusNotFound, fallback404)
 		}
 
-		if err != nil {
+		if err != nil { // looks like unneeded, but so looks better
 			_ = f.Close()
 		}
 

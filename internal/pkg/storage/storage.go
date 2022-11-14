@@ -24,7 +24,7 @@ type Storage interface {
 
 	// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
 	// stored requests for the session.
-	// Session with passed UUID must exists.
+	// Session with passed UUID must exist.
 	// Request UUID without error will be returned on success.
 	CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error)
 

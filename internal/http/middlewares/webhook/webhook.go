@@ -14,7 +14,6 @@ import (
 
 	"github.com/tarampampam/webhook-tester/internal/pkg/config"
 	"github.com/tarampampam/webhook-tester/internal/pkg/pubsub"
-	"github.com/tarampampam/webhook-tester/internal/pkg/realip"
 	"github.com/tarampampam/webhook-tester/internal/pkg/storage"
 )
 
@@ -38,7 +37,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// extract the first URL segment
-			if parts := strings.Split(strings.TrimLeft(c.Request().RequestURI, "/"), "/"); len(parts) > 0 { //nolint:nestif
+			if parts := strings.Split(strings.TrimLeft(c.Request().URL.RequestURI(), "/"), "/"); len(parts) > 0 { //nolint:nestif
 				if sessionUuidStruct, uuidErr := uuid.Parse(parts[0]); uuidErr == nil { // and check it's a valid UUID
 					var (
 						sessionUuid = sessionUuidStruct.String()
@@ -91,9 +90,9 @@ func New( //nolint:funlen,gocognit,gocyclo
 
 					if requestUuid, err = storage.CreateRequest( // store request in a storage
 						sessionUuid,
-						realip.FromHTTPRequest(c.Request()), // TODO use `Echo#IPExtractor`
+						c.RealIP(),
 						c.Request().Method,
-						c.Request().RequestURI,
+						c.Request().URL.RequestURI(),
 						body,
 						headersToStringsMap(c.Request().Header, ignoreHeaderPrefixes),
 					); err != nil {

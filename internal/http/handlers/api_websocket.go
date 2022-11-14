@@ -120,7 +120,7 @@ func (s *apiWebsocket) WebsocketSession(c echo.Context, sessionUuid api.SessionU
 	pingTicker := time.NewTicker(pingInterval)
 	defer pingTicker.Stop()
 
-	for {
+	for { // TODO run in a goroutine?
 		select {
 		case <-ctx.Done():
 			return c.NoContent(http.StatusGone)
