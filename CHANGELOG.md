@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ## UNRELEASED
 
+### Added
+
+- Dotenv (`.env`) file support
+
 ### Changed
 
 - Frontend building using WebPack
@@ -14,6 +18,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - All frontend dependencies are now built-in (no external network requests are needed anymore)
 - OpenAPI specification now is used for the code generation on the frontend and backend sides
 - E2E tests now use the hurl instead of postman/newman
+- CLI global flags now should be defined before the sub-command (`./app serve --log-json ...` &rarr; `./app --log-json serve ...`)
 
 ### Removed
 

@@ -148,7 +148,7 @@ export default defineComponent({
         ? this.request.url.replace(/^\/+/g, '')
         : '...'
 
-      return `${window.location.origin}/${uri}`
+      return `${window.location.origin}${window.location.pathname}${uri}`
     },
 
     methodClass(): string {
