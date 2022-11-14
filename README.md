@@ -133,8 +133,8 @@ volumes:
 
 services:
   app:
-    image: tarampampam/webhook-tester:X.X.X
-    command: serve --port 8080 --log-json --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
+    image: tarampampam/webhook-tester
+    command: --log-json serve --port 8080 --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
     ports: ['8080:8080/tcp'] # Open <http://127.0.0.1:8080>
     depends_on:
       redis: {condition: service_healthy}
