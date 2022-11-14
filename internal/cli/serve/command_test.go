@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"syscall"
 	"testing"
@@ -342,6 +343,7 @@ func startAndStopServer(t *testing.T, port int, args []string) string {
 				return
 			}
 
+			runtime.Gosched()
 			<-time.After(time.Millisecond * 2)
 		}
 

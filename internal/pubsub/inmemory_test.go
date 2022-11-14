@@ -2,6 +2,7 @@ package pubsub_test
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -65,6 +66,7 @@ func TestInMemory_PublishAndReceive(t *testing.T) {
 		}()
 	}
 
+	runtime.Gosched()
 	<-time.After(time.Millisecond) // make sure that all subscribes was subscribed successfully
 
 	assert.NoError(t, ps.Publish("foo", event1))
@@ -106,6 +108,7 @@ func TestInMemory_Unsubscribe(t *testing.T) {
 
 	assert.NoError(t, ps.Publish("foo", pubsub.NewRequestRegisteredEvent("bar")))
 
+	runtime.Gosched()
 	<-time.After(time.Millisecond)
 
 	assert.Len(t, ch1, 1)

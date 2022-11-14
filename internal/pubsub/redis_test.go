@@ -3,6 +3,7 @@ package pubsub_test
 import (
 	"bytes"
 	"context"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -95,6 +96,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 		}()
 	}
 
+	runtime.Gosched()
 	<-time.After(time.Millisecond * 50) // make sure that all subscribes was subscribed successfully
 
 	assert.NoError(t, ps.Publish("foo", event1))
@@ -139,6 +141,7 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Subscribe("foo", ch1))
 
+			runtime.Gosched()
 			<-time.After(time.Millisecond * 5)
 
 			assert.NoError(t, ps.Subscribe("foo", ch2)) // will be not unsubscribed for a test
@@ -150,12 +153,13 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Publish("foo", pubsub.NewRequestRegisteredEvent("bar")))
 
+			runtime.Gosched()
 			<-time.After(time.Millisecond * 15)
 
 			assert.Len(t, ch1, 0)
 			assert.Len(t, ch2, 1)
 
-			// close(ch1); close(ch2) // <- do not do thue due race reasons
+			// close(ch1); close(ch2) // <- do not do this due race reasons
 
 			assert.NoError(t, ps.Unsubscribe("foo", ch2))
 		})

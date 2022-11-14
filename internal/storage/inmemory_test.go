@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -178,6 +179,7 @@ func TestInMemoryWebSockets_CreateRequestExpired(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, session)
 
+	runtime.Gosched()
 	<-time.After(time.Millisecond * 11)
 
 	session, err = s.GetSession(sessionUUID)
@@ -199,6 +201,7 @@ func TestInMemoryWebSockets_GetRequestExpired(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, request)
 
+	runtime.Gosched()
 	<-time.After(time.Millisecond * 11)
 
 	request, err = s.GetRequest(sessionUUID, requestUUID)
