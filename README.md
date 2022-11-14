@@ -18,14 +18,14 @@ This application allows you to test and debug Webhooks and HTTP requests using u
   <img src="/assets/app-animated.png?raw=true" alt="screenshot" width="925" />
 </p>
 
-This application is written in GoLang and works very fast. It comes with a tiny UI (written in `Vue.js`), which you can customize however you want. Websockets are also used for incoming webhook notifications in UI - you don't need any 3rd party solutions (like `pusher.com`) for this!
+This application is written in GoLang and works very fast. It comes with a tiny UI (written in `Vue.js`), which is built in the binary file, so you don't need any additional assets for the application using. Websockets are also used for incoming webhook notifications in the UI - you don't need any 3rd party solutions (like `pusher.com`) for this!
 
 ### :fire: Features list
 
-- Customizable front-end, based on `vue.js` (without the need for a builder/bundler)
 - Liveness/readiness probes (routes `/live` and `/ready` respectively)
 - Can be started without any 3rd party dependencies
 - Metrics in prometheus format (route `/metrics`)
+- Built-in tiny and fast UI, based on `vue.js`
 - Multi-arch docker image, based on `scratch`
 - Unprivileged user in docker image is used
 - Well-tested and documented source code
@@ -52,23 +52,23 @@ For multiple app instances redis driver must be used.
 
 ## Installing
 
-Download the latest binary file for your os/arch from the [releases page][link_releases] or use our [docker image][link_docker_hub] ([ghcr.io][link_ghcr]). Also, you may need in [`./web`](web) directory content for web UI access.
+Download the latest binary file for your os/arch from the [releases page][link_releases] or use our [docker image][link_ghcr] ([hub.docker.com][link_docker_hub]).
 
 ## Usage
 
-This application supports the next sub-commands:
+This application supports the following sub-commands:
 
-| Sub-command   | Description                                                                               |
-|---------------|-------------------------------------------------------------------------------------------|
-| `serve`       | Start HTTP server                                                                         |
-| `healthcheck` | Health checker for the HTTP server (use case - docker healthcheck) _(hidden in CLI help)_ |
+| Sub-command   | Description                                                        |
+|---------------|--------------------------------------------------------------------|
+| `serve`       | Start HTTP server                                                  |
+| `healthcheck` | Health checker for the HTTP server (use case - docker healthcheck) |
 
 And global flags:
 
 | Flag              | Description                 |
 |-------------------|-----------------------------|
-| `--version`       | Display application version |
-| `--verbose`, `-v` | Verbose output              |
+| `--version`, `-v` | Display application version |
+| `--verbose`       | Verbose output              |
 | `--debug`         | Debug output                |
 | `--log-json`      | Logs in JSON format         |
 
@@ -90,7 +90,7 @@ And global flags:
 | `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited)                                       | `0`                        | `WS_MAX_CLIENTS`     |
 | `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited)      | `0`                        | `WS_MAX_LIFETIME`    |
 
-> Environment variables have higher priority than flag values. Redis DSN format: `redis://<user>:<password>@<host>:<port>/<db_number>`
+> Redis DSN format: `redis://<user>:<password>@<host>:<port>/<db_number>`
 
 Server starting command example:
 
@@ -113,12 +113,12 @@ After that you can navigate your browser to `http://127.0.0.1:8080/` try to send
 
 [![image stats](https://dockeri.co/image/tarampampam/webhook-tester)][link_docker_tags]
 
-> All supported image tags [can be found here][link_docker_hub] and [here][link_ghcr].
+> All supported image tags [can be found here][link_ghcr] and [here][link_docker_hub].
 
 Just execute in your terminal:
 
 ```shell
-$ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X serve
+$ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester serve
 ```
 
 > Important notice: do **not** use the `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
@@ -126,24 +126,26 @@ $ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester:X.X.X serve
 Where `X.X.X` is image tag _(application version)_. Simple `docker-compose` file below:
 
 ```yaml
-version: '3.4'
+version: '3.8'
 
 volumes:
-  redis-data:
+  redis-data: {}
 
 services:
   app:
     image: tarampampam/webhook-tester:X.X.X
     command: serve --port 8080 --log-json --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
-    ports:
-      - '8080:8080/tcp' # Open <http://127.0.0.1:8080>
+    ports: ['8080:8080/tcp'] # Open <http://127.0.0.1:8080>
+    depends_on:
+      redis: {condition: service_healthy}
 
   redis:
-    image: redis:6.0.9-alpine
-    volumes:
-      - redis-data:/data:cached
-    ports:
-      - 6379
+    image: redis:7-alpine
+    volumes: [redis-data:/data:rw]
+    ports: ['6379/tcp']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 1s
 ```
 
 ## Changes log
