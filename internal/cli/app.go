@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 
 	"github.com/urfave/cli/v2"
 
@@ -46,7 +48,7 @@ func NewApp() *cli.App {
 			healthcheck.NewCommand(checkers.NewHealthChecker(context.Background())),
 			serve.NewCommand(log),
 		},
-		Version: version.Version(),
+		Version: fmt.Sprintf("%s (%s)", version.Version(), runtime.Version()),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:     verboseFlagName,

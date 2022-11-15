@@ -76,19 +76,20 @@ And global flags:
 
 `serve` sub-command allows to use next flags:
 
-| Flag                      | Description                                                                       | Default value              | Environment variable |
-|---------------------------|-----------------------------------------------------------------------------------|----------------------------|----------------------|
-| `--listen`, `-l`          | IP address to listen on                                                           | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`        |
-| `--port`, `-p`            | TCP port number                                                                   | `8080`                     | `LISTEN_PORT`        |
-| `--storage-driver`        | Storage engine (`memory` or `redis`)                                              | `memory`                   | `STORAGE_DRIVER`     |
-| `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)                                              | `memory`                   | `PUBSUB_DRIVER`      |
-| `--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`)               | `redis://127.0.0.1:6379/0` | `REDIS_DSN`          |
-| `--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`) | `[]`                       |                      |
-| `--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited)                     | `65536`                    |                      |
-| `--max-requests`          | Maximum stored requests per session (max `65535`)                                 | `128`                      | `MAX_REQUESTS`       |
-| `--session-ttl`           | Session lifetime (examples: `48h`, `1h30m`)                                       | `168h`                     | `SESSION_TTL`        |
-| `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited)                                       | `0`                        | `WS_MAX_CLIENTS`     |
-| `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited)      | `0`                        | `WS_MAX_LIFETIME`    |
+| Flag                      | Description                                                                                        | Default value              | Environment variable |
+|---------------------------|----------------------------------------------------------------------------------------------------|----------------------------|----------------------|
+| `--listen`, `-l`          | IP address to listen on                                                                            | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`        |
+| `--port`, `-p`            | TCP port number                                                                                    | `8080`                     | `LISTEN_PORT`        |
+| `--create-session`        | Crete a session on server startup with this UUID (example: `00000000-0000-0000-0000-000000000000`) |                            | `CREATE_SESSION`     |
+| `--storage-driver`        | Storage engine (`memory` or `redis`)                                                               | `memory`                   | `STORAGE_DRIVER`     |
+| `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)                                                               | `memory`                   | `PUBSUB_DRIVER`      |
+| `--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`)                                | `redis://127.0.0.1:6379/0` | `REDIS_DSN`          |
+| `--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`)                  | `[]`                       |                      |
+| `--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited)                                      | `65536`                    |                      |
+| `--max-requests`          | Maximum stored requests per session (max `65535`)                                                  | `128`                      | `MAX_REQUESTS`       |
+| `--session-ttl`           | Session lifetime (examples: `48h`, `1h30m`)                                                        | `168h`                     | `SESSION_TTL`        |
+| `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited)                                                        | `0`                        | `WS_MAX_CLIENTS`     |
+| `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited)                       | `0`                        | `WS_MAX_LIFETIME`    |
 
 > Redis DSN format: `redis://<user>:<password>@<host>:<port>/<db_number>`
 
@@ -111,9 +112,12 @@ After that you can navigate your browser to `http://127.0.0.1:8080/` try to send
 
 ### Using docker
 
-[![image stats](https://dockeri.co/image/tarampampam/webhook-tester)][link_docker_tags]
+| Registry                               | Image                                |
+|----------------------------------------|--------------------------------------|
+| [GitHub Container Registry][link_ghcr] | `ghcr.io/tarampampam/webhook-tester` |
+| [Docker Hub][link_docker_hub]          | `tarampampam/webhook-tester`         |
 
-> All supported image tags [can be found here][link_ghcr] and [here][link_docker_hub].
+> Using the `latest` tag for the docker image is highly discouraged because of possible backward-incompatible changes during **major** upgrades. Please, use tags in `X.Y.Z` format
 
 Just execute in your terminal:
 
@@ -121,9 +125,11 @@ Just execute in your terminal:
 $ docker run --rm -p 8080:8080/tcp tarampampam/webhook-tester serve
 ```
 
-> Important notice: do **not** use the `latest` application tag _(this is bad practice)_. Use versioned tag (like `1.2.3`) instead.
+Where `X.X.X` is image tag _(application version)_.
 
-Where `X.X.X` is image tag _(application version)_. Simple `docker-compose` file below:
+#### Docker-compose
+
+For running this app using docker-compose and if you want to keep the data after restarts, you can use the following example with a Redis server as a backend for the data:
 
 ```yaml
 version: '3.8'
@@ -132,7 +138,7 @@ volumes:
   redis-data: {}
 
 services:
-  app:
+  webhook-tester:
     image: tarampampam/webhook-tester
     command: --log-json serve --port 8080 --storage-driver redis --pubsub-driver redis --redis-dsn redis://redis:6379/0
     ports: ['8080:8080/tcp'] # Open <http://127.0.0.1:8080>
@@ -146,6 +152,18 @@ services:
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 1s
+```
+
+Or you can use in-memory data storage only:
+
+```yaml
+version: '3.8'
+
+services:
+  webhook-tester:
+    image: tarampampam/webhook-tester
+    command: serve --port 8080 --create-session 00000000-0000-0000-0000-000000000000
+    ports: ['8080:8080/tcp'] # Open <http://127.0.0.1:8080/#/00000000-0000-0000-0000-000000000000>
 ```
 
 ## Changes log

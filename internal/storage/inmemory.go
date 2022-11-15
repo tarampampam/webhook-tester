@@ -5,8 +5,6 @@ import (
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type inmemorySession struct {
@@ -140,8 +138,6 @@ func (s *InMemory) Close() error {
 	return nil
 }
 
-func (s *InMemory) newUUID() string { return uuid.New().String() }
-
 // GetSession returns session data.
 func (s *InMemory) GetSession(uuid string) (Session, error) {
 	if s.isClosed() {
@@ -169,12 +165,19 @@ func (s *InMemory) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *InMemory) CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *InMemory) CreateSession(content []byte, code uint16, contentType string, delay time.Duration, sessionUUID ...string) (string, error) { //nolint:lll
 	if s.isClosed() {
 		return "", ErrClosed
 	}
 
-	id := s.newUUID()
+	var id string
+
+	if len(sessionUUID) == 1 && IsValidUUID(sessionUUID[0]) {
+		id = sessionUUID[0]
+	} else {
+		id = NewUUID()
+	}
+
 	now := time.Now()
 
 	s.storageMu.Lock()
@@ -249,7 +252,7 @@ func (s *InMemory) CreateRequest(sessionUUID, clientAddr, method, uri string, co
 		defer s.storageMu.Unlock()
 
 		now := time.Now()
-		id := s.newUUID()
+		id := NewUUID()
 
 		// append new request
 		s.storage[sessionUUID].requests[id] = &inmemoryRequest{

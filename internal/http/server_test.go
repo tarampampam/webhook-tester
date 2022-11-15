@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ func getRandomTCPPort(t *testing.T) uint16 {
 	}
 
 	_ = l.Close()
+	runtime.Gosched()
 
 	return uint16(l.Addr().(*net.TCPAddr).Port)
 }
@@ -38,6 +40,7 @@ func checkTCPPortIsBusy(t *testing.T, port uint16) bool {
 	}
 
 	_ = l.Close()
+	runtime.Gosched()
 
 	return false
 }

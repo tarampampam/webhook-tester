@@ -14,7 +14,7 @@ type Storage interface {
 
 	// CreateSession creates new session in storage using passed data.
 	// Session UUID without error will be returned on success.
-	CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error)
+	CreateSession(content []byte, code uint16, contentType string, delay time.Duration, id ...string) (string, error)
 
 	// DeleteSession deletes session with passed UUID.
 	DeleteSession(uuid string) (bool, error)
@@ -63,3 +63,10 @@ type Request interface {
 
 // NewUUID generates new UUID v4.
 func NewUUID() string { return uuid.New().String() }
+
+// IsValidUUID checks if passed string is valid UUID v4.
+func IsValidUUID(id string) bool {
+	_, err := uuid.Parse(id)
+
+	return err == nil
+}

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Dotenv (`.env`) file support
 - Code snippets for requests for different programming languages [#149]
+- Persistent Webhook URL [#160]
 
 ### Changed
 
@@ -22,6 +23,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - CLI global flags now should be defined before the sub-command (`./app serve --log-json ...` &rarr; `./app --log-json serve ...`)
 
 [#149]:https://github.com/tarampampam/webhook-tester/issues/149
+[#160]:https://github.com/tarampampam/webhook-tester/issues/160
 
 ### Removed
 

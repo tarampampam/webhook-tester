@@ -52,7 +52,7 @@ func (s *Redis) GetSession(uuid string) (Session, error) {
 }
 
 // CreateSession creates new session in storage using passed data.
-func (s *Redis) CreateSession(content []byte, code uint16, contentType string, delay time.Duration) (string, error) { //nolint:lll
+func (s *Redis) CreateSession(content []byte, code uint16, contentType string, delay time.Duration, sessionUUID ...string) (string, error) { //nolint:lll
 	sData := redisSession{
 		RespContent:     content,
 		RespCode:        code,
@@ -66,7 +66,13 @@ func (s *Redis) CreateSession(content []byte, code uint16, contentType string, d
 		return "", msgpackErr
 	}
 
-	id := NewUUID()
+	var id string
+
+	if len(sessionUUID) == 1 && IsValidUUID(sessionUUID[0]) {
+		id = sessionUUID[0]
+	} else {
+		id = NewUUID()
+	}
 
 	if err := s.rdb.Set(s.ctx, redisKey(id).session(), packed, s.ttl).Err(); err != nil {
 		return "", err

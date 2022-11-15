@@ -17,6 +17,7 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, "WS_MAX_CLIENTS", string(WebsocketMaxClients))
 	assert.Equal(t, "WS_MAX_LIFETIME", string(WebsocketMaxLifetime))
 	assert.Equal(t, "REDIS_DSN", string(RedisDSN))
+	assert.Equal(t, "CREATE_SESSION", string(CreateSessionUUID))
 }
 
 func TestEnvVariable_Lookup(t *testing.T) {
@@ -32,6 +33,7 @@ func TestEnvVariable_Lookup(t *testing.T) {
 		{giveEnv: WebsocketMaxClients},
 		{giveEnv: WebsocketMaxLifetime},
 		{giveEnv: RedisDSN},
+		{giveEnv: CreateSessionUUID},
 	}
 
 	for _, tt := range cases {
