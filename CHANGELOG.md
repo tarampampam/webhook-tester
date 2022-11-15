@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
-## UNRELEASED
+## v1.0.0
 
 ### Added
 
@@ -22,9 +22,6 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - E2E tests now use the hurl instead of postman/newman
 - CLI global flags now should be defined before the sub-command (`./app serve --log-json ...` &rarr; `./app --log-json serve ...`)
 
-[#149]:https://github.com/tarampampam/webhook-tester/issues/149
-[#160]:https://github.com/tarampampam/webhook-tester/issues/160
-
 ### Removed
 
 - `--public` flag (and env variable `PUBLIC_DIR`) support for `serve` sub-command
@@ -32,6 +29,9 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Fixed
 
 - A lot of small frontend issues
+
+[#149]:https://github.com/tarampampam/webhook-tester/issues/149
+[#160]:https://github.com/tarampampam/webhook-tester/issues/160
 
 ## v0.4.3
 

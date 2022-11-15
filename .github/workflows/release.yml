@@ -13,23 +13,20 @@ jobs:
       matrix:
         os: [linux, windows, darwin]
         arch: [amd64]
-        include:
-          - {os: linux, arch: 386}
-          - {os: windows, arch: 386}
     steps:
       - uses: actions/checkout@v3
 
       - uses: gacts/setup-node-with-cache@v1
-        with: {node-version: 1.19}
+        with: {node-version: 19}
 
-      - run: npm ci --no-audit
-
-      - run: npm run generate
+      - run: npm ci --no-audit && npm run generate
+        working-directory: ./web
 
       - run: npm run build
+        working-directory: ./web
 
       - uses: gacts/setup-go-with-cache@v1
-        with: {go-version: 19}
+        with: {go-version: 1.19}
 
       - run: |
           go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
@@ -83,7 +80,7 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v6,linux/arm/v7
+          platforms: linux/amd64,linux/arm64
           build-args: "APP_VERSION=${{ steps.slug.outputs.version }}"
           tags: |
             tarampampam/webhook-tester:${{ steps.slug.outputs.version }}

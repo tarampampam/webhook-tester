@@ -23,7 +23,7 @@ RUN set -x \
     && npm run build
 
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.19-buster as builder
+FROM golang:1.19-alpine as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
@@ -34,7 +34,8 @@ ENV OAPI_CODEGEN_VERSION="1.12.2"
 
 RUN set -x \
     # Install `oapi-codegen`: <https://github.com/deepmap/oapi-codegen>
-    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}"
+    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}" \
+    && apk add --no-cache gcc musl-dev
 
 COPY . /src
 
