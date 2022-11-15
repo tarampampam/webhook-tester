@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Dotenv (`.env`) file support
 - Code snippets for requests for different programming languages [#149]
-- Persistent Webhook URL [#160]
+- Persistent Webhook URL (`--create-session %VALUD_UUID%` flag for the `serve` sub-command) [#160]
 
 ### Changed
 
