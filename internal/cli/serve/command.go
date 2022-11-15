@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
@@ -26,7 +27,7 @@ import (
 )
 
 // NewCommand creates `serve` command.
-func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
+func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen,gocyclo
 	const (
 		listenFlagName             = "listen"
 		maxRequestsFlagName        = "max-requests"
@@ -38,6 +39,7 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 		pubSubDriverFlagName       = "pubsub-driver"
 		wsMaxClientsFlagName       = "ws-max-clients"
 		wsMaxLifetimeFlagName      = "ws-max-lifetime"
+		createSessionFlagName      = "create-session"
 	)
 
 	return &cli.Command{
@@ -57,6 +59,7 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 				pubSubDriver       = c.String(pubSubDriverFlagName)
 				wsMaxClients       = c.Uint(wsMaxClientsFlagName)
 				wsMaxLifetime      = c.Duration(wsMaxLifetimeFlagName)
+				createSession      = c.String(createSessionFlagName)
 			)
 
 			{
@@ -99,6 +102,12 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 				default:
 					return fmt.Errorf("unsupported pub/sub driver: %s", pubSubDriver)
 				}
+
+				if createSession != "" {
+					if _, err := uuid.Parse(createSession); err != nil {
+						return fmt.Errorf("wrong session UUID: %s", createSession)
+					}
+				}
 			}
 
 			var cfg = config.Config{}
@@ -129,7 +138,7 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 				cfg.WebSockets.MaxLifetime = wsMaxLifetime
 			}
 
-			return run(c.Context, log, cfg, listen, uint16(port), redisDsn)
+			return run(c.Context, log, cfg, listen, uint16(port), redisDsn, createSession)
 		},
 		Flags: []cli.Flag{
 			shared.PortNumberFlag,
@@ -196,6 +205,11 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 				Value:   time.Duration(0),
 				EnvVars: []string{env.WebsocketMaxLifetime.String()},
 			},
+			&cli.StringFlag{
+				Name:    createSessionFlagName,
+				Usage:   "crete a session on server startup with this UUID (for the persistent URL, example: 00000000-0000-0000-0000-000000000000)", //nolint:lll
+				EnvVars: []string{env.CreateSessionUUID.String()},
+			},
 		},
 	}
 }
@@ -210,6 +224,7 @@ func run( //nolint:funlen,gocyclo
 	ip string,
 	port uint16,
 	redisDSN string,
+	createSessionUUID string,
 ) error {
 	var (
 		ctx, cancel = context.WithCancel(parentCtx) // serve context creation
@@ -262,6 +277,20 @@ func run( //nolint:funlen,gocyclo
 
 	default:
 		return errors.New("unsupported storage driver") // cannot be covered by tests
+	}
+
+	if createSessionUUID != "" { // create a persistent session
+		if _, err := stor.CreateSession( // persistent session defaults
+			[]byte{},
+			http.StatusOK,
+			"text/plain; charset=utf-8",
+			time.Duration(0),
+			createSessionUUID,
+		); err != nil {
+			log.Error("cannot create persistent session", zap.Error(err))
+		} else {
+			log.Info("persistent session created", zap.String("uuid", createSessionUUID))
+		}
 	}
 
 	var (
