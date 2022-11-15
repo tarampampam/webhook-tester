@@ -155,20 +155,26 @@ export default defineComponent({
     snippetCode(): string {
       switch (this.snippetLang) {
         case 'javascript':
-          return `const options = {method: 'GET'};
-
-fetch('${this.currentWebHookUrl}', options)
-\t.then(response => response.json())
-\t.then(response => console.log(response))
+          return `fetch('${this.currentWebHookUrl}', { // https://mzl.la/3O4rbaE
+\tmethod: 'POST',
+\tbody: JSON.stringify({key: 'value'}),
+\theaders: {'X-Foo': 'Bar'},
+})
+\t.then(response => response.text())
+\t.then(text => console.log(text))
 \t.catch(err => console.error(err));`
 
         case 'node':
-          return `const fetch = require('node-fetch');
+          return `const fetch = require('node-fetch'); // https://www.npmjs.com/package/node-fetch
 
-fetch('${this.currentWebHookUrl}', {method: 'GET'})
-\t.then(res => res.json())
-\t.then(json => console.log(json))
-\t.catch(err => console.error('error:' + err));`
+fetch('${this.currentWebHookUrl}', {
+\tmethod: 'POST',
+\tbody: JSON.stringify({key: 'value'}),
+\theaders: {'X-Foo': 'Bar'},
+})
+\t.then(response => response.text())
+\t.then(text => console.log(text))
+\t.catch(err => console.error(err));`
 
         case 'java':
           return `HttpRequest request = HttpRequest.newBuilder()
@@ -198,20 +204,28 @@ echo $response->getBody();`
           return `package main
 
 import (
+\t"bytes"
 \t"fmt"
+\t"io"
 \t"net/http"
-\t"io/ioutil"
 )
 
 func main() {
-\treq, _ := http.NewRequest(http.MethodGet, "${this.currentWebHookUrl}", http.NoBody)
-\tres, _ := http.DefaultClient.Do(req) // handle the error
+\tresp, err := http.Post( // https://pkg.go.dev/net/http#Post
+\t\t"${this.currentWebHookUrl}",
+\t\t"application/json",
+\t\tbytes.NewBuffer([]byte(\`{"key":"value"}\`)),
+\t)
+\tif err != nil {
+\t\tpanic(err)
+\t}
 
-\tdefer res.Body.Close()
+\tbody, err := io.ReadAll(resp.Body)
+\tif err != nil {
+\t\tpanic(err)
+\t}
 
-\tbody, _ := ioutil.ReadAll(res.Body) // handle the error
-
-\tfmt.Println(string(body))
+\tfmt.Printf(string(body))
 }`
       }
 
