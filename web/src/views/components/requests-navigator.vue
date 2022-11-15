@@ -14,7 +14,7 @@
           icon="fa-solid fa-angles-left"
           class="pe-1"
         />
-        First request
+        Newest
       </button>
       <button
         type="button"
@@ -26,7 +26,7 @@
           icon="fa-solid fa-angle-left"
           class="pe-1"
         />
-        Previous
+        Forward
       </button>
     </div>
     <div
@@ -39,7 +39,7 @@
         @click="navigateNextRequest"
         :class="{disabled: requests.length <= 1 || !requestUUID || isLastRequest}"
       >
-        Next
+        Back
         <font-awesome-icon
           icon="fa-solid fa-angle-right"
           class="ps-1"
@@ -51,7 +51,7 @@
         @click="navigateLastRequest"
         :class="{disabled: requests.length <= 1 || isLastRequest}"
       >
-        Last request
+        Oldest
         <font-awesome-icon
           icon="fa-solid fa-angles-right"
           class="ps-1"
