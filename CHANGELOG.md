@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Added
 
 - Dotenv (`.env`) file support
+- Code snippets for requests for different programming languages [#149]
 
 ### Changed
 
@@ -19,6 +20,8 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 - OpenAPI specification now is used for the code generation on the frontend and backend sides
 - E2E tests now use the hurl instead of postman/newman
 - CLI global flags now should be defined before the sub-command (`./app serve --log-json ...` &rarr; `./app --log-json serve ...`)
+
+[#149]:https://github.com/tarampampam/webhook-tester/issues/149
 
 ### Removed
 
