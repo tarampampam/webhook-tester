@@ -27,7 +27,7 @@ import (
 )
 
 // NewCommand creates `serve` command.
-func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
+func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen,gocyclo
 	const (
 		listenFlagName             = "listen"
 		maxRequestsFlagName        = "max-requests"
@@ -207,7 +207,7 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen
 			},
 			&cli.StringFlag{
 				Name:    createSessionFlagName,
-				Usage:   "crete a session on server startup with this UUID (for the persistent URL, example: 00000000-0000-0000-0000-000000000000)",
+				Usage:   "crete a session on server startup with this UUID (for the persistent URL, example: 00000000-0000-0000-0000-000000000000)", //nolint:lll
 				EnvVars: []string{env.CreateSessionUUID.String()},
 			},
 		},
