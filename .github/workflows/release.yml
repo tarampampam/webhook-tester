@@ -87,3 +87,13 @@ jobs:
             tarampampam/webhook-tester:latest
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version }}
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest
+
+  deploy-on-render:
+    name: 🚀 Update the demo stand on render.com
+    runs-on: ubuntu-latest
+    steps:
+      - uses: JorgeLNJunior/render-deploy@v1.2.2
+        with:
+          service_id: ${{ secrets.RENDER_SERVICE_ID }}
+          api_key: ${{ secrets.RENDER_API_KEY }}
+          clear_cache: false
