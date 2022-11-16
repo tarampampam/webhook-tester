@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Added
+
+- Environment variable `PORT` support (is an alias for `LISTEN_PORT`)
+
 ## v1.0.0
 
 ### Added

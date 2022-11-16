@@ -11,5 +11,5 @@ var PortNumberFlag = &cli.UintFlag{ //nolint:gochecknoglobals
 	Aliases: []string{"p"},
 	Usage:   "Server TCP port number",
 	Value:   8080, //nolint:gomnd
-	EnvVars: []string{env.ListenPort.String()},
+	EnvVars: []string{env.ListenPort.String(), env.Port.String()},
 }
