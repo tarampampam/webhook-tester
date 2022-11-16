@@ -2,7 +2,7 @@
   <img src="https://hsto.org/webt/mn/fz/q-/mnfzq-lgdnbmv-3xv-1qm6gn82e.png" alt="Logo" width=128" />
 </p>
 
-# WebHook Tester | [Demo](https://webhook-tester.is-an.app/)
+# WebHook Tester
 
 [![Release version][badge_release_version]][link_releases]
 ![Project language][badge_language]
