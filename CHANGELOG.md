@@ -9,10 +9,13 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Added
 
 - Environment variable `PORT` support (is an alias for `LISTEN_PORT`)
+- Requests navigation hotkeys (up/left and down/right) [#203]
 
 ### Fixed
 
 - HEX view improved
+
+[#203]:https://github.com/tarampampam/webhook-tester/issues/203
 
 ## v1.0.0
 

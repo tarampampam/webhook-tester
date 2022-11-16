@@ -82,6 +82,14 @@ export default defineComponent({
     },
   },
 
+  mounted() {
+    window.addEventListener('keydown', this.arrowKeysHandler)
+  },
+
+  unmounted() {
+    window.removeEventListener('keydown', this.arrowKeysHandler)
+  },
+
   computed: {
     isFirstRequest(): boolean {
       return this.requests.length > 0 && this.requests[0].UUID === this.requestUUID
@@ -103,6 +111,14 @@ export default defineComponent({
       }
 
       return undefined
+    },
+
+    arrowKeysHandler(e: KeyboardEvent): void {
+      if (e.code === 'ArrowDown' || e.code === 'ArrowRight') {
+        this.navigateNextRequest()
+      } else if (e.code === 'ArrowUp' || e.code === 'ArrowLeft') {
+        this.navigatePreviousRequest()
+      }
     },
 
     navigateFirstRequest(): void {
