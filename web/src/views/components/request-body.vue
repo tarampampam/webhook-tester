@@ -38,6 +38,7 @@
       >
         <highlightjs
           autodetect
+          class="highlightjs"
           :code="content(true)"
         />
       </div>
@@ -120,8 +121,11 @@ export default defineComponent({
 })
 </script>
 
-<style lang="scss">
-.hljs {
-  background-color: transparent !important;
+<style lang="scss" scoped>
+.highlightjs {
+  tab-size: 2;
+  margin-bottom: 0;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 </style>

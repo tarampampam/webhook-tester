@@ -97,9 +97,7 @@
       </li>
     </ul>
     <div class="tab-content pt-2 pb-2">
-      <div
-        class="tab-pane active"
-      >
+      <div class="tab-pane active">
         <highlightjs
           class="highlightjs"
           :code="snippetCode"

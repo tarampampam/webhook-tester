@@ -499,6 +499,10 @@ $web-font-path: false; // disable external font named "Lato"
   flex: 0 0 300px;
 }
 
+.hljs {
+  background-color: transparent !important;
+}
+
 @media (max-width: 690px) {
   .sidebar {
     flex: 0 0 100%;

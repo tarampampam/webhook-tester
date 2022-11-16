@@ -3,46 +3,33 @@
     class="container-fluid"
     v-if="content"
   >
-    <div
-      v-if="content && content.length > 256"
-      class="alert alert-secondary"
-    >
-      <p class="mb-0">
-        HEX viewer may have performance problems with large request payloads. Please, make a
-        <a
-          href="https://github.com/tarampampam/webhook-tester/pulls"
-          target="_blank"
-        >PR in the project
-          repository</a> if you know how to solve this.
-      </p>
-    </div>
-
     <div class="row">
-      <div class="col-xl-1 col-lg-2 d-none d-xl-block d-lg-block" />
-      <div class="col-xl-5 col-lg-7 text-muted font-monospace text-nowrap">
+      <div class="d-none d-xl-block d-lg-block row-number" />
+      <div class="text-muted font-monospace text-nowrap row-bytes">
         <span
           v-for="(colIdx, colNum) in bytesPerRow"
           :key="colIdx"
-          :class="{ 'text-info': selectedCol === colNum }"
+          :class="{ 'text-info': selectedCol === colNum, 'pe-2': colNum % 2 === 1 }"
           class="me-2"
         >{{ numToHex(colNum, 2) }}</span>
       </div>
-      <div class="col-xl-6 col-lg-3 d-none d-xl-block d-lg-block text-muted font-monospace">
-        <span class="ps-5">ASCII</span>
+      <div class="d-none d-xl-block d-lg-block text-muted text-center font-monospace row-ascii">
+        ASCII
       </div>
     </div>
     <div
-      v-for="(bytesRow, rowNum) in lines()"
+      v-for="(bytesRow, rowNum) in lines"
       :key="rowNum"
       class="row"
     >
-      <div class="col-xl-1 col-lg-2 d-none d-xl-block d-lg-block font-monospace text-muted">
-        <span :class="{ 'text-info': selectedRow === rowNum }">{{ numToHex(rowNum, 7) }}0</span>
+      <div class="d-none d-xl-block d-lg-block font-monospace text-muted row-number">
+        <span :class="{ 'text-info': selectedRow === rowNum }">{{ numToHex(rowNum, 7) }}0:</span>
       </div>
-      <div class="col-xl-5 col-lg-7 font-monospace">
+      <div class="font-monospace row-bytes">
         <span
           v-for="(byte, byteNum) in bytesRow"
           :key="byteNum"
+          :class="{ 'pe-2': byteNum % 2 === 1 }"
           class="me-2"
         >
           <span
@@ -51,7 +38,7 @@
           >{{ numToHex(byte, 2) }}</span>
         </span>
       </div>
-      <div class="col-xl-6 col-lg-3 d-none d-xl-block d-lg-block font-monospace">
+      <div class="d-none d-xl-block d-lg-block font-monospace row-ascii">
         <span
           v-for="(byte, byteNum) in bytesRow"
           :key="byteNum"
@@ -66,6 +53,39 @@
 <script lang="ts">
 import {defineComponent} from 'vue'
 
+const extendedAsciiCodes = [
+  128, // €
+  130, // ‚
+  131, // ƒ
+  132, // „
+  133, // …
+  134, // †
+  135, // ‡
+  136, // ˆ
+  137, // ‰
+  139, // ‹
+  145, // ‘
+  146, // ’
+  147, // “
+  148, // ”
+  149, // •
+  150, // –
+  151, // —
+  152, // ˜
+  153, // ™
+  155, // ›
+  156, // œ
+  160, //
+  162, // ¢
+  163, // £
+  165, // ¥
+  167, // §
+  169, // ©
+  171, // «
+  174, // ®
+  187, // »
+]
+
 export default defineComponent({
   props: {
     content: { // note: do not forget to change watcher name!
@@ -75,38 +95,48 @@ export default defineComponent({
   },
 
   data(): {
+    lines: Uint8Array[]
+
     bytesPerRow: number
     selectedRow: number
     selectedCol: number
   } {
     return {
+      lines: [],
+
       bytesPerRow: 8 * 2,
       selectedRow: -1,
       selectedCol: -1,
     }
   },
 
+  mounted() {
+    this.lines = this.content
+      ? this.splitToLines(this.content)
+      : []
+  },
+
   watch: {
-    content(): void {
+    content(): void{
       // reset own state
       this.selectedRow = -1
       this.selectedCol = -1
+
+      this.lines = this.content
+        ? this.splitToLines(this.content)
+        : []
     },
   },
 
   methods: {
-    lines(): Uint8Array[] {
-      if (this.content) {
-        const result: Uint8Array[] = []
+    splitToLines(src: Uint8Array): Uint8Array[] {
+      const result: Uint8Array[] = []
 
-        for (let i = 0; i < this.content.length; i += this.bytesPerRow) {
-          result.push(this.content.slice(i, i + this.bytesPerRow))
-        }
-
-        return result
+      for (let i = 0; i < src.length; i += this.bytesPerRow) {
+        result.push(src.slice(i, i + this.bytesPerRow))
       }
 
-      return []
+      return result
     },
 
     numToHex(n: number, zerosCount: number): string {
@@ -116,7 +146,7 @@ export default defineComponent({
     },
 
     byteToASCII(n: number): string {
-      if (n >= 20 && n <= 126) { // is printable char?
+      if ((n >= 32 && n <= 126) || extendedAsciiCodes.includes(n)) { // is printable char?
         return String.fromCharCode(n)
       }
 
@@ -132,4 +162,19 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.row-number {
+  width: 110px;
+}
+
+.row-bytes {
+  width: 515px;
+}
+
+.row-ascii {
+  width: 190px;
+}
+
+.row-bytes, .row-ascii {
+  cursor: default;
+}
 </style>

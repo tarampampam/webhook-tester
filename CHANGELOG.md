@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Environment variable `PORT` support (is an alias for `LISTEN_PORT`)
 
+### Fixed
+
+- HEX view improved
+
 ## v1.0.0
 
 ### Added
