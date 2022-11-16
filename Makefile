@@ -21,6 +21,7 @@ image: ## Build docker image with the app
 frontend: node-install ## Build the frontend
 	docker-compose run $(DC_RUN_ARGS) --no-deps node sh -c 'npm run generate && npm run build'
 
+.PHONY: gen
 gen: ## Run code-generation
 	docker-compose run $(DC_RUN_ARGS) --no-deps app go generate ./...
 

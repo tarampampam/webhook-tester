@@ -133,12 +133,28 @@ paths:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}
 
+    head:
+      tags: [health]
+      summary: Readiness probe (HEAD)
+      operationId: readinessProbeHead
+      responses:
+        "200": {$ref: '#/components/responses/ServiceHealthy'}
+        "503": {$ref: '#/components/responses/ServiceUnhealthy'}
+
   /live:
     get:
       tags: [health]
       summary: Liveness probe
       description: Is the app alive or dead?
       operationId: livenessProbe
+      responses:
+        "200": {$ref: '#/components/responses/ServiceHealthy'}
+        "503": {$ref: '#/components/responses/ServiceUnhealthy'}
+
+    head:
+      tags: [health]
+      summary: Liveness probe (HEAD)
+      operationId: livenessProbeHead
       responses:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}

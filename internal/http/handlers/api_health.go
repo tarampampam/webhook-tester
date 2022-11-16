@@ -27,7 +27,13 @@ func (s *apiHealth) LivenessProbe(c echo.Context) error {
 	return s.makeCheck(c, s.liveChecker)
 }
 
+// LivenessProbeHead is an alias for the LivenessProbe.
+func (s *apiHealth) LivenessProbeHead(c echo.Context) error { return s.LivenessProbe(c) }
+
 // ReadinessProbe returns code 200 if the application is ready to serve traffic.
 func (s *apiHealth) ReadinessProbe(c echo.Context) error {
 	return s.makeCheck(c, s.readyChecker)
 }
+
+// ReadinessProbeHead is an alias for the ReadinessProbe.
+func (s *apiHealth) ReadinessProbeHead(c echo.Context) error { return s.ReadinessProbe(c) }
