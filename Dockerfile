@@ -34,8 +34,19 @@ ENV OAPI_CODEGEN_VERSION="1.12.2"
 
 RUN set -x \
     # Install `oapi-codegen`: <https://github.com/deepmap/oapi-codegen>
-    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}" \
-    && apk add --no-cache gcc musl-dev
+    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}"
+
+# This argument allows to install additional software for local development using docker and avoid it \
+# in the production build
+ARG DEV_MODE="false"
+
+RUN set -x \
+    && if [ "${DEV_MODE}" = "true" ]; then \
+      # The following dependencies are needed for `go test` to work
+      apk add --no-cache gcc musl-dev \
+      # The following tool is used to format the imports in the source code
+      && GOBIN=/bin go install golang.org/x/tools/cmd/goimports@latest \
+    ;fi
 
 COPY . /src
 
