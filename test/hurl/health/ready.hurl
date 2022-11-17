@@ -5,8 +5,11 @@ HTTP/* 200
 [Asserts]
 bytes count == 0
 
-# --- Head request should fails
+# --- Head request
 
 HEAD http://{{ host }}:{{ port }}/ready
 
-HTTP/* 404
+HTTP/* 200
+
+[Asserts]
+bytes count == 0

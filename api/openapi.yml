@@ -133,12 +133,30 @@ paths:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}
 
+    head:
+      tags: [health]
+      summary: Readiness probe (HEAD)
+      description: Is an alias for the GET method, but without content in the response body
+      operationId: readinessProbeHead
+      responses:
+        "200": {$ref: '#/components/responses/ServiceHealthy'}
+        "503": {$ref: '#/components/responses/ServiceUnhealthy'}
+
   /live:
     get:
       tags: [health]
       summary: Liveness probe
       description: Is the app alive or dead?
       operationId: livenessProbe
+      responses:
+        "200": {$ref: '#/components/responses/ServiceHealthy'}
+        "503": {$ref: '#/components/responses/ServiceUnhealthy'}
+
+    head:
+      tags: [health]
+      summary: Liveness probe (HEAD)
+      description: Is an alias for the GET method, but without content in the response body
+      operationId: livenessProbeHead
       responses:
         "200": {$ref: '#/components/responses/ServiceHealthy'}
         "503": {$ref: '#/components/responses/ServiceUnhealthy'}

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
+## UNRELEASED
+
+### Added
+
+- `HEAD` method support for the health check endpoints (`/ready`, `/live`) [#204]
+
+[#204]:https://github.com/tarampampam/webhook-tester/issues/204
+
 ## v1.0.1
 
 ### Added

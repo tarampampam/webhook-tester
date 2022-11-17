@@ -141,8 +141,8 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Subscribe("foo", ch1))
 
-			runtime.Gosched()
 			<-time.After(time.Millisecond * 5)
+			runtime.Gosched()
 
 			assert.NoError(t, ps.Subscribe("foo", ch2)) // will be not unsubscribed for a test
 			assert.EqualError(t, ps.Unsubscribe("", ch1), "empty channel name is not allowed")
@@ -153,8 +153,8 @@ func TestRedis_Unsubscribe(t *testing.T) {
 
 			assert.NoError(t, ps.Publish("foo", pubsub.NewRequestRegisteredEvent("bar")))
 
+			<-time.After(time.Millisecond * 50)
 			runtime.Gosched()
-			<-time.After(time.Millisecond * 15)
 
 			assert.Len(t, ch1, 0)
 			assert.Len(t, ch2, 1)
