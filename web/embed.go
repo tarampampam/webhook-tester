@@ -1,3 +1,5 @@
+//go:build !watch
+
 package web
 
 import (

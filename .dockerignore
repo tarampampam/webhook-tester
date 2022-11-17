@@ -16,13 +16,13 @@
 /.golangci.yml
 
 ## Assets
-/assets
+/internal/api/openapi.gen.go
+/web/src/api/schema.gen.ts
 /web/dist
 /webhook-tester
 
 ## Vendor
 /web/node_modules
-/web/src/api/schema.ts
 
 ## Temp
 /test
