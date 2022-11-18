@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 ### Added
 
 - `HEAD` method support for the health check endpoints (`/ready`, `/live`) [#204]
+- Webpack serve ability for local development
 
 [#204]:https://github.com/tarampampam/webhook-tester/issues/204
 

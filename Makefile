@@ -40,6 +40,9 @@ node-lint: node-generate ## Lint the frontend
 node-shell: ## Start shell inside node environment
 	docker-compose run $(DC_RUN_ARGS) node sh
 
+node-serve: ## Start development server
+	docker-compose up node-serve
+
 # Backend stuff
 
 go-generate: ## Generate backend assets

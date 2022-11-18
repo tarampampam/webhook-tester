@@ -8,5 +8,18 @@ module.exports = merge(common, {
   mode: 'development',
   optimization: {
     minimize: false,
-  }
+  },
+  devServer: {
+    proxy:
+      {
+        "/api": {
+          target: 'http://web:8080',
+        },
+        "/ws/session": {
+          target: 'http://web:8080',
+          ws: true,
+        },
+      },
+    port: 8081,
+  },
 })
