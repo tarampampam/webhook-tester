@@ -64,16 +64,6 @@ services:
       start_period: 5s
       retries: 20
 
-  node-serve:
-      <<: *node
-      ports: ['8081:8081/tcp'] # Open <http://127.0.0.1:8081>
-      command: npm run serve
-      healthcheck:
-        test: ['CMD-SHELL', 'test -d ./dist']
-        interval: 3s
-        start_period: 5s
-        retries: 20
-
   redis:
     image: redis:7-alpine
     volumes: [redis-data:/data:rw]
