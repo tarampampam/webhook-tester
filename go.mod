@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/client_model v0.3.0
 	github.com/urfave/cli/v2 v2.23.5
 	github.com/vmihailenco/msgpack/v5 v5.3.5
-	go.uber.org/zap v1.23.0
+	go.uber.org/zap v1.24.0
 )
 
 require ( // testing
