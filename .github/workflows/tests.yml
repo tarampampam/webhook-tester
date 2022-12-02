@@ -63,7 +63,7 @@ jobs:
 
       - run: |
           mkdir ./web/dist && touch ./web/dist/index.html # is needed for go:embed
-          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4"
           go generate ./...
 
       - uses: golangci/golangci-lint-action@v3
@@ -81,7 +81,7 @@ jobs:
 
       - run: |
           mkdir ./web/dist && touch ./web/dist/index.html # is needed for go:embed
-          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4"
           go generate ./...
 
       - run: go test -race -covermode=atomic -coverprofile /tmp/coverage.txt ./...
@@ -111,7 +111,7 @@ jobs:
         with: {path: web/dist, name: frontend-dist}
 
       - run: |
-          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2"
+          go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4"
           go generate ./...
 
       - {uses: gacts/github-slug@v1, id: slug}
