@@ -13,7 +13,7 @@
     "@fortawesome/vue-fontawesome": "^3.0.1",
     "@highlightjs/vue-plugin": "^2.1.0",
     "@popperjs/core": "^2.11.6",
-    "bootstrap": "^5.2.2",
+    "bootstrap": "^5.2.3",
     "bootswatch": "^5.2.2",
     "clipboard": "^2.0.11",
     "izitoast": "^1.4.0",
