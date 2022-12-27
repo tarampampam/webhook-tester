@@ -7,6 +7,7 @@
 [![Release version][badge_release_version]][link_releases]
 ![Project language][badge_language]
 [![Build Status][badge_build]][link_build]
+[![Release Status][badge_release]][link_build]
 [![Coverage][badge_coverage]][link_coverage]
 [![Image size][badge_size_latest]][link_docker_hub]
 [![License][badge_license]][link_license]
@@ -205,7 +206,8 @@ If you find any package errors, please, [make an issue][link_create_issue] in cu
 
 This is open-sourced software licensed under the [MIT License][link_license].
 
-[badge_build]:https://img.shields.io/github/actions/workflow/status/tarampampam/webhook-tester/tests.yml?branch=master&maxAge=30&logo=github
+[badge_build]:https://img.shields.io/github/actions/workflow/status/tarampampam/webhook-tester/tests.yml?branch=master&maxAge=30&label=tests&logo=github
+[badge_release]:https://img.shields.io/github/actions/workflow/status/tarampampam/webhook-tester/release.yml?maxAge=30&label=release&logo=github
 [badge_coverage]:https://img.shields.io/codecov/c/github/tarampampam/webhook-tester/master.svg?maxAge=30
 [badge_release_version]:https://img.shields.io/github/release/tarampampam/webhook-tester.svg?maxAge=30
 [badge_size_latest]:https://img.shields.io/docker/image-size/tarampampam/webhook-tester/latest?maxAge=30
