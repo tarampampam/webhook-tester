@@ -19,7 +19,7 @@ require (
 )
 
 require ( // testing
-	github.com/alicebob/miniredis/v2 v2.23.1
+	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
 	github.com/stretchr/testify v1.8.1
 )
