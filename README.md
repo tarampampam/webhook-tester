@@ -110,7 +110,7 @@ And global flags:
 |---------------------------|----------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
 | `--listen`, `-l`          | IP address to listen on                                                                            | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`           |
 | `--port`, `-p`            | TCP port number                                                                                    | `8080`                     | `LISTEN_PORT` or `PORT` |
-| `--create-session`        | Crete a session on server startup with this UUID (example: `00000000-0000-0000-0000-000000000000`) |                            | `CREATE_SESSION`        |
+| `--create-session`        | Create a session on server startup with this UUID (example: `00000000-0000-0000-0000-000000000000`) |                            | `CREATE_SESSION`        |
 | `--storage-driver`        | Storage engine (`memory` or `redis`)                                                               | `memory`                   | `STORAGE_DRIVER`        |
 | `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)                                                               | `memory`                   | `PUBSUB_DRIVER`         |
 | `--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`)                                | `redis://127.0.0.1:6379/0` | `REDIS_DSN`             |
