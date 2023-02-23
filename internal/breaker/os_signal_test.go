@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/breaker"
+	"gh.tarampamp.am/webhook-tester/internal/breaker"
 )
 
 func TestNewOSSignals(t *testing.T) {

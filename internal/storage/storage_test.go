@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/internal/storage"
 )
 
 func TestNewUUID(t *testing.T) {

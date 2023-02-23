@@ -22,7 +22,7 @@ func NewOSSignals(ctx context.Context) OSSignals {
 	}
 }
 
-// Subscribe for some of system signals (call Stop for stopping).
+// Subscribe for some system signals (call Stop for stopping).
 func (oss *OSSignals) Subscribe(onSignal func(os.Signal), signals ...os.Signal) {
 	if len(signals) == 0 {
 		signals = []os.Signal{os.Interrupt, syscall.SIGINT, syscall.SIGTERM} // default signals

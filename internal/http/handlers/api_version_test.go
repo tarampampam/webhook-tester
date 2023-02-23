@@ -9,8 +9,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/config"
-	"github.com/tarampampam/webhook-tester/internal/http/handlers"
+	"gh.tarampamp.am/webhook-tester/internal/config"
+	"gh.tarampamp.am/webhook-tester/internal/http/handlers"
 )
 
 func TestApiVersion_ApiAppVersion(t *testing.T) {

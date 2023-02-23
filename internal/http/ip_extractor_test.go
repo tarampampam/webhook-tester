@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appHttp "github.com/tarampampam/webhook-tester/internal/http"
+	appHttp "gh.tarampamp.am/webhook-tester/internal/http"
 )
 
 func TestNewIPExtractor(t *testing.T) {

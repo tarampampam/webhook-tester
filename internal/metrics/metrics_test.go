@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/metrics"
+	"gh.tarampamp.am/webhook-tester/internal/metrics"
 )
 
 func TestNewRegistry(t *testing.T) {

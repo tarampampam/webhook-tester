@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/internal/storage"
 )
 
 func TestInMemoryWebSockets_SessionCreateReadDelete(t *testing.T) {

@@ -1,4 +1,5 @@
 # Docker-compose file is used only for local development. This is not production-ready example
+
 version: '3.8'
 
 volumes:
@@ -25,6 +26,7 @@ services:
       - .:/src:rw
     depends_on: &go-deps
       redis: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
 
   node: &node
     build: {target: frontend}
@@ -38,6 +40,7 @@ services:
       - node-data:/tmp:rw
       - .:/src:rw
     working_dir: /src/web
+    security_opt: [no-new-privileges:true]
 
   web:
     <<: *go
@@ -49,8 +52,9 @@ services:
         --ws-max-lifetime=1m
     healthcheck:
       test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:8080/ready']
+      start_period: 5s
       interval: 5s
-      timeout: 2s
+      retries: 5
     depends_on:
       <<: *go-deps
       node-watch: {condition: service_healthy}
@@ -72,6 +76,7 @@ services:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 500ms
       timeout: 1s
+    security_opt: [no-new-privileges:true]
 
   golint:
     image: golangci/golangci-lint:v1.51-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
@@ -82,6 +87,7 @@ services:
       - golint-cache:/tmp/golint:rw
       - .:/src:ro
     working_dir: /src
+    security_opt: [no-new-privileges:true]
 
   hurl:
     image: orangeopensource/hurl:1.8.0
@@ -91,3 +97,4 @@ services:
     working_dir: /src
     depends_on:
       web: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]

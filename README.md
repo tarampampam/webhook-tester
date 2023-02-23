@@ -106,20 +106,20 @@ And global flags:
 
 `serve` sub-command allows to use next flags:
 
-| Flag                      | Description                                                                                        | Default value              | Environment variable    |
-|---------------------------|----------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
-| `--listen`, `-l`          | IP address to listen on                                                                            | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`           |
-| `--port`, `-p`            | TCP port number                                                                                    | `8080`                     | `LISTEN_PORT` or `PORT` |
+| Flag                      | Description                                                                                         | Default value              | Environment variable    |
+|---------------------------|-----------------------------------------------------------------------------------------------------|----------------------------|-------------------------|
+| `--listen`, `-l`          | IP address to listen on                                                                             | `0.0.0.0` (all interfaces) | `LISTEN_ADDR`           |
+| `--port`, `-p`            | TCP port number                                                                                     | `8080`                     | `LISTEN_PORT` or `PORT` |
 | `--create-session`        | Create a session on server startup with this UUID (example: `00000000-0000-0000-0000-000000000000`) |                            | `CREATE_SESSION`        |
-| `--storage-driver`        | Storage engine (`memory` or `redis`)                                                               | `memory`                   | `STORAGE_DRIVER`        |
-| `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)                                                               | `memory`                   | `PUBSUB_DRIVER`         |
-| `--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`)                                | `redis://127.0.0.1:6379/0` | `REDIS_DSN`             |
-| `--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`)                  | `[]`                       |                         |
-| `--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited)                                      | `65536`                    |                         |
-| `--max-requests`          | Maximum stored requests per session (max `65535`)                                                  | `128`                      | `MAX_REQUESTS`          |
-| `--session-ttl`           | Session lifetime (examples: `48h`, `1h30m`)                                                        | `168h`                     | `SESSION_TTL`           |
-| `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited)                                                        | `0`                        | `WS_MAX_CLIENTS`        |
-| `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited)                       | `0`                        | `WS_MAX_LIFETIME`       |
+| `--storage-driver`        | Storage engine (`memory` or `redis`)                                                                | `memory`                   | `STORAGE_DRIVER`        |
+| `--pubsub-driver`         | Pub/Sub engine (`memory` or `redis`)                                                                | `memory`                   | `PUBSUB_DRIVER`         |
+| `--redis-dsn`             | Redis server DSN (required if storage or pub/sub driver is `redis`)                                 | `redis://127.0.0.1:6379/0` | `REDIS_DSN`             |
+| `--ignore-header-prefix`  | Ignore incoming webhook header prefix (case insensitive; example: `X-Forwarded-`)                   | `[]`                       |                         |
+| `--max-request-body-size` | Maximal webhook request body size (in bytes; `0` = unlimited)                                       | `65536`                    |                         |
+| `--max-requests`          | Maximum stored requests per session (max `65535`)                                                   | `128`                      | `MAX_REQUESTS`          |
+| `--session-ttl`           | Session lifetime (examples: `48h`, `1h30m`)                                                         | `168h`                     | `SESSION_TTL`           |
+| `--ws-max-clients`        | Maximal websocket clients (`0` = unlimited)                                                         | `0`                        | `WS_MAX_CLIENTS`        |
+| `--ws-max-lifetime`       | Maximal single websocket lifetime (examples: `3h`, `1h30m`; `0` = unlimited)                        | `0`                        | `WS_MAX_LIFETIME`       |
 
 > Redis DSN format: `redis://<user>:<password>@<host>:<port>/<db_number>`
 

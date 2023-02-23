@@ -3,7 +3,7 @@ package shared
 import (
 	"github.com/urfave/cli/v2"
 
-	"github.com/tarampampam/webhook-tester/internal/env"
+	"gh.tarampamp.am/webhook-tester/internal/env"
 )
 
 var PortNumberFlag = &cli.UintFlag{ //nolint:gochecknoglobals

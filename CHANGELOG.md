@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog][keepachangelog] and this project adheres to [Semantic Versioning][semver].
 
-## UNRELEASED
+## v1.1.0
+
+### Changed
+
+- Go dependencies updated
+- Go version updated from `1.19` up to `1.20`
+- Module name changed from `github.com/tarampampam/webhook-tester` to `gh.tarampamp.am/webhook-tester`
 
 ### Added
 

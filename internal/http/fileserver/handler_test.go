@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/http/fileserver"
+	"gh.tarampamp.am/webhook-tester/internal/http/fileserver"
 )
 
 func TestHandler(t *testing.T) {

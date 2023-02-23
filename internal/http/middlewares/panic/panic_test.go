@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
-	panicMiddlewares "github.com/tarampampam/webhook-tester/internal/http/middlewares/panic"
+	panicMiddlewares "gh.tarampamp.am/webhook-tester/internal/http/middlewares/panic"
 )
 
 func TestMiddleware(t *testing.T) {

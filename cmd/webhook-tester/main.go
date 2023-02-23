@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 
-	"github.com/tarampampam/webhook-tester/internal/cli"
+	"gh.tarampamp.am/webhook-tester/internal/cli"
 )
 
 // exitFn is a function for application exiting.

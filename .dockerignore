@@ -1,38 +1,9 @@
-## Git & tools
-.git
-.github
-.gitattributes
-.gitignore
-/Makefile
-/docker-compose.yml
+## Ignore everything
+*
 
-## IDEs
-.idea
-.vscode
-
-## Configs
-.editorconfig
-/.codecov.yml
-/.golangci.yml
-
-## Assets
-/internal/api/openapi.gen.go
-/web/src/api/schema.gen.ts
-/web/dist
-/webhook-tester
-
-## Vendor
-/web/node_modules
-
-## Temp
-/test
-/temp
-/tmp
-
-## etc
-/*.md
-/*.env
-/web/*.log
-.DS_Store
-*.cache
-*.out
+## Except the following files and directories
+!/api
+!/cmd
+!/internal
+!/web
+!/go.*

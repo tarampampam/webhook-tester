@@ -13,7 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarampampam/webhook-tester/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/internal/pubsub"
 )
 
 func TestRedis_PublishErrors(t *testing.T) {

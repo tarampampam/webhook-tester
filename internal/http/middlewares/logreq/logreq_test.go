@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/tarampampam/webhook-tester/internal/http/middlewares/logreq"
+	"gh.tarampamp.am/webhook-tester/internal/http/middlewares/logreq"
 )
 
 func TestNew(t *testing.T) {
