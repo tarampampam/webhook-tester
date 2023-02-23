@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ### Changed
 
-- Go dependencies updated
+- Go&Node dependencies updated
 - Go version updated from `1.19` up to `1.20`
 - Module name changed from `github.com/tarampampam/webhook-tester` to `gh.tarampamp.am/webhook-tester`
 
