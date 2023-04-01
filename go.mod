@@ -3,7 +3,7 @@ module gh.tarampamp.am/webhook-tester
 go 1.20
 
 require (
-	github.com/alicebob/miniredis/v2 v2.30.0
+	github.com/alicebob/miniredis/v2 v2.30.1
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/fatih/color v1.15.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -47,7 +47,7 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	github.com/yuin/gopher-lua v0.0.0-20220504180219-658193537a64 // indirect
+	github.com/yuin/gopher-lua v1.1.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
