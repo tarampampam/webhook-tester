@@ -3,7 +3,7 @@ module gh.tarampamp.am/webhook-tester
 go 1.20
 
 require (
-	github.com/alicebob/miniredis/v2 v2.30.1
+	github.com/alicebob/miniredis/v2 v2.30.2
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/fatih/color v1.15.0
 	github.com/go-redis/redis/v8 v8.11.5
