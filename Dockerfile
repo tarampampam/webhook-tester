@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.2
 
 # Image page: <https://hub.docker.com/_/node>
-FROM node:19-alpine as frontend
+FROM node:20-alpine as frontend
 
 RUN mkdir -p /src/web
 
