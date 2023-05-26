@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 ### Added
 
-- Slow request content loading (due to performance reasons)
+- Slow request content loading (due to performance reasons) [#306]
+
+[#306]:https://github.com/tarampampam/webhook-tester/issues/306
 
 ## v1.1.0
 
