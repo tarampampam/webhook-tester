@@ -33,8 +33,22 @@
     </ul>
     <div class="tab-content pt-2 pb-2">
       <div
+        class="alert alert-secondary"
+        v-if="request?.content.byteLength > 2048 && !displayLargeContent"
+      >
+        <p>
+          The request body is large and is not displayed by default due to performance reasons.
+        </p>
+        <p class="mb-0">
+          <span
+            class="btn btn-primary btn-sm px-4"
+            @click="displayLargeContent = true"
+          >Click here to display it</span>
+        </p>
+      </div>
+      <div
         class="tab-pane active"
-        v-if="mode === 'text'"
+        v-else-if="mode === 'text'"
       >
         <highlightjs
           autodetect
@@ -44,9 +58,9 @@
       </div>
       <div
         class="tab-pane active pt-2"
-        v-if="mode === 'binary'"
+        v-else-if="mode === 'binary'"
       >
-        <hex-view :content="request.content" />
+        <hex-view :content="request?.content" />
       </div>
     </div>
   </div>
@@ -77,9 +91,11 @@ export default defineComponent({
 
   data(): {
     mode: 'text' | 'binary'
+    displayLargeContent: boolean
   } {
     return {
-      mode: 'text'
+      mode: 'text',
+      displayLargeContent: false,
     }
   },
 
@@ -116,6 +132,11 @@ export default defineComponent({
         $a.click()
         $body.removeChild($a)
       }
+    }
+  },
+  watch: {
+    request(): void {
+      this.displayLargeContent = false
     }
   },
 })
