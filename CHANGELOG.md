@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 - Slow request content loading (due to performance reasons) [#306]
 
+### Changed
+
+- Requests list now is scrollable [#308]
+
+[#308]:https://github.com/tarampampam/webhook-tester/issues/308
 [#306]:https://github.com/tarampampam/webhook-tester/issues/306
 
 ## v1.1.0
