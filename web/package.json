@@ -42,7 +42,7 @@
     "sass-loader": "^13.3.1",
     "terser-webpack-plugin": "^5.3.9",
     "ts-loader": "^9.4.2",
-    "type-fest": "^3.9.0",
+    "type-fest": "^3.11.1",
     "typescript": "^5.0.4",
     "vue-eslint-parser": "^9.1.1",
     "vue-loader": "^17.1.0",
