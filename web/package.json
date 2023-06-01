@@ -36,7 +36,7 @@
     "filemanager-webpack-plugin": "^8.0.0",
     "html-webpack-plugin": "^5.5.1",
     "json-minimizer-webpack-plugin": "^4.0.0",
-    "mini-css-extract-plugin": "^2.7.5",
+    "mini-css-extract-plugin": "^2.7.6",
     "openapi-typescript": "^5.4.1",
     "sass": "^1.62.1",
     "sass-loader": "^13.3.1",
