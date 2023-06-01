@@ -39,7 +39,7 @@
     "mini-css-extract-plugin": "^2.7.5",
     "openapi-typescript": "^5.4.1",
     "sass": "^1.62.1",
-    "sass-loader": "^13.2.2",
+    "sass-loader": "^13.3.1",
     "terser-webpack-plugin": "^5.3.7",
     "ts-loader": "^9.4.2",
     "type-fest": "^3.9.0",
