@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/stretchr/testify v1.8.2
-	github.com/urfave/cli/v2 v2.25.2
+	github.com/urfave/cli/v2 v2.25.5
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	go.uber.org/zap v1.24.0
 )
