@@ -79,7 +79,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   golint:
-    image: golangci/golangci-lint:v1.52-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
+    image: golangci/golangci-lint:v1.53-alpine # Image page: <https://hub.docker.com/r/golangci/golangci-lint>
     environment:
       GOLANGCI_LINT_CACHE: /tmp/golint # <https://github.com/golangci/golangci-lint/blob/v1.33.0/internal/cache/default.go#L68>
     volumes:
