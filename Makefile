@@ -48,10 +48,10 @@ go-generate: ## Generate backend assets
 go-build: node-build go-generate ## Build app binary file
 	docker-compose run $(DC_RUN_ARGS) -e "CGO_ENABLED=0" --no-deps go go build -trimpath -ldflags $(LDFLAGS) ./cmd/webhook-tester/
 
-go-test: fake-web-dist ## Run backend tests
+go-test: fake-web-dist go-generate ## Run backend tests
 	docker-compose run $(DC_RUN_ARGS) --no-deps go go test -v -race -timeout 10s ./...
 
-go-lint: fake-web-dist ## Link the backend
+go-lint: fake-web-dist go-generate ## Link the backend
 	docker-compose run --rm golint golangci-lint run
 
 go-fmt: fake-web-dist ## Run source code formatting tools
