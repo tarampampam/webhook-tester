@@ -31,7 +31,7 @@
     "@vue/eslint-config-typescript": "^11.0.3",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.8.1",
-    "eslint": "^8.41.0",
+    "eslint": "^8.44.0",
     "eslint-plugin-vue": "^9.15.1",
     "filemanager-webpack-plugin": "^8.0.0",
     "html-webpack-plugin": "^5.5.3",
