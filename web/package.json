@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@types/bootstrap": "^5.2.5",
-    "@typescript-eslint/eslint-plugin": "^5.60.1",
+    "@typescript-eslint/eslint-plugin": "^6.2.1",
     "@typescript-eslint/parser": "^5.62.0",
     "@vue/eslint-config-typescript": "^11.0.3",
     "copy-webpack-plugin": "^11.0.0",
