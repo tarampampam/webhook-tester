@@ -23,7 +23,7 @@ RUN set -x \
     && npm run build
 
 # Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.20-alpine as builder
+FROM golang:1.21-alpine as builder
 
 # can be passed with any prefix (like `v1.2.3@GITHASH`)
 # e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
