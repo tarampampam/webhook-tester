@@ -1,8 +1,8 @@
 package api
 
 import (
-	_ "github.com/deepmap/oapi-codegen/pkg/runtime"
-	_ "github.com/deepmap/oapi-codegen/pkg/types"
+	_ "github.com/oapi-codegen/runtime"
+	_ "github.com/oapi-codegen/runtime/types"
 )
 
 // Generate openapi stubs (`oapi-codegen` is required for this):
