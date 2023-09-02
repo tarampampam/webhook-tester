@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog][keepachangelog] and this project adher
 
 [#306]:https://github.com/tarampampam/webhook-tester/issues/306
 
+## UNRELEASED
+
+### Changed
+
+- Go version updated from `1.20` up to `1.21`
+
 ## v1.1.0
 
 ### Changed
