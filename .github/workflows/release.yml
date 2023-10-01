@@ -61,7 +61,7 @@ jobs:
 
       - {uses: gacts/github-slug@v1, id: slug}
 
-      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v2
 
