@@ -143,7 +143,7 @@ jobs:
 
       - {uses: gacts/github-slug@v1, id: slug}
 
-      - uses: docker/build-push-action@v4
+      - uses: docker/build-push-action@v5
         with:
           context: .
           push: false
