@@ -14,7 +14,7 @@ jobs:
         os: [linux, windows, darwin]
         arch: [amd64]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: gacts/setup-node-with-cache@v1
         with: {node-version: 19}
@@ -57,7 +57,7 @@ jobs:
     name: 🏗️ Build the docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - {uses: gacts/github-slug@v1, id: slug}
 
