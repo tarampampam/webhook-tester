@@ -6,24 +6,20 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule: {interval: monthly}
-    reviewers: [tarampampam]
     assignees: [tarampampam]
 
   - package-ecosystem: npm
     directory: /web
     open-pull-requests-limit: 15
     schedule: {interval: monthly}
-    reviewers: [tarampampam]
     assignees: [tarampampam]
 
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: monthly}
-    reviewers: [tarampampam]
     assignees: [tarampampam]
 
   - package-ecosystem: docker
     directory: /
     schedule: {interval: monthly}
-    reviewers: [tarampampam]
     assignees: [tarampampam]
