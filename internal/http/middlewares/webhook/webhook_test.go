@@ -28,6 +28,8 @@ type fakeMetrics struct {
 
 func (f *fakeMetrics) IncrementProcessedWebHooks() { f.c++ }
 
+const testBaseUri = "http://test/"
+
 func BenchmarkHandler(b *testing.B) {
 	b.ReportAllocs()
 
@@ -40,7 +42,7 @@ func BenchmarkHandler(b *testing.B) {
 	var (
 		e              = echo.New()
 		sessionUUID, _ = s.CreateSession([]byte("foo"), 202, "foo/bar", 0)
-		req, _         = http.NewRequest(http.MethodPut, "http://test/"+sessionUUID+"/222?foo=bar#anchor", http.NoBody)
+		req, _         = http.NewRequest(http.MethodPut, testBaseUri+sessionUUID+"/222?foo=bar#anchor", http.NoBody)
 		rr             = httptest.NewRecorder()
 		c              = e.NewContext(req, rr)
 
@@ -85,7 +87,7 @@ func TestHandler_RequestErrors(t *testing.T) {
 			wantSubstring:  []string{"session with UUID 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7 was not found"},
 		},
 		"too large body request": {
-			giveUrl:        "http://test/" + sessionUUID + "/222?foo=bar#anchor",
+			giveUrl:        testBaseUri + sessionUUID + "/222?foo=bar#anchor",
 			giveBody:       bytes.NewBuffer([]byte(strings.Repeat("x", 65))),
 			wantStatusCode: http.StatusInternalServerError,
 			wantSubstring:  []string{"Request body is too large"},
@@ -132,7 +134,7 @@ func TestHandler_Success(t *testing.T) {
 	e.IPExtractor = appHttp.NewIPExtractor() // just as an additional "feature" test
 
 	var (
-		req, _ = http.NewRequest(http.MethodPost, "http://test/"+sessionUUID, bytes.NewBuffer([]byte("foo=bar")))
+		req, _ = http.NewRequest(http.MethodPost, testBaseUri+sessionUUID, bytes.NewBuffer([]byte("foo=bar")))
 		rr     = httptest.NewRecorder()
 		m      = fakeMetrics{}
 		c      = e.NewContext(req, rr)
@@ -195,7 +197,7 @@ func TestHandler_SuccessCustomCode(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		req, _ = http.NewRequest(http.MethodPut, "http://test/"+sessionUUID+"/222", http.NoBody)
+		req, _ = http.NewRequest(http.MethodPut, testBaseUri+sessionUUID+"/222", http.NoBody)
 		rr     = httptest.NewRecorder()
 		e      = echo.New()
 		c      = e.NewContext(req, rr)
@@ -230,7 +232,7 @@ func TestHandler_SuccessWrongCustomCode(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		req, _ = http.NewRequest(http.MethodPut, "http://test/"+sessionUUID+"/999", http.NoBody)
+		req, _ = http.NewRequest(http.MethodPut, testBaseUri+sessionUUID+"/999", http.NoBody)
 		rr     = httptest.NewRecorder()
 		e      = echo.New()
 		c      = e.NewContext(req, rr)
@@ -265,7 +267,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		req, _ = http.NewRequest(http.MethodPut, "http://test/"+sessionUUID, http.NoBody)
+		req, _ = http.NewRequest(http.MethodPut, testBaseUri+sessionUUID, http.NoBody)
 		rr     = httptest.NewRecorder()
 		e      = echo.New()
 		c      = e.NewContext(req, rr)
