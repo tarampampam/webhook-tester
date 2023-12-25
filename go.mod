@@ -10,8 +10,8 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
-	github.com/labstack/echo/v4 v4.11.2
-	github.com/oapi-codegen/runtime v1.0.0
+	github.com/labstack/echo/v4 v4.11.3
+	github.com/oapi-codegen/runtime v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/client_model v0.5.0
