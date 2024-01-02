@@ -107,7 +107,7 @@ jobs:
       - uses: gacts/setup-go-with-cache@v1
         with: {go-version-file: go.mod}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with: {path: web/dist, name: frontend-dist}
 
       - run: |
@@ -165,7 +165,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4 # is needed for `upload-sarif` action
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with: {name: docker-image}
 
       - uses: aquasecurity/trivy-action@0.14.0
@@ -198,7 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with: {name: webhook-tester-linux-amd64}
 
       - run: |
@@ -224,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with: {name: docker-image}
 
       - name: Load the image with the app
