@@ -38,7 +38,7 @@
     "json-minimizer-webpack-plugin": "^4.0.0",
     "mini-css-extract-plugin": "^2.7.6",
     "openapi-typescript": "^5.4.1",
-    "sass": "^1.69.6",
+    "sass": "^1.70.0",
     "sass-loader": "^13.3.3",
     "terser-webpack-plugin": "^5.3.10",
     "ts-loader": "^9.5.1",
