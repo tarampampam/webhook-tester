@@ -168,7 +168,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with: {name: docker-image}
 
-      - uses: aquasecurity/trivy-action@0.16.1
+      - uses: aquasecurity/trivy-action@0.18.0
         with:
           input: docker-image.tar
           format: sarif
