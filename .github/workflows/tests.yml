@@ -66,7 +66,7 @@ jobs:
           go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.14.0"
           go generate ./...
 
-      - uses: golangci/golangci-lint-action@v3
+      - uses: golangci/golangci-lint-action@v4
         with: {skip-pkg-cache: true, skip-build-cache: true}
 
   go-test:
