@@ -10,7 +10,7 @@ Content-Type: application/json
   "response_content_base64": "Zm9vIGJhcg=="
 }
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -20,7 +20,7 @@ session_uuid: jsonpath "$.uuid"
 GET http://{{ host }}:{{ port }}/{{ session_uuid }}
 Foo-Header: BarValue
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -31,7 +31,7 @@ body == "foo bar"
 HEAD http://{{ host }}:{{ port }}/{{ session_uuid }}
 Foo-Header: BarValue
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -46,7 +46,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -61,7 +61,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -76,7 +76,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -91,7 +91,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -106,7 +106,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -121,7 +121,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -131,7 +131,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -145,4 +145,4 @@ jsonpath "$[0].url" == "/{{ session_uuid }}"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200

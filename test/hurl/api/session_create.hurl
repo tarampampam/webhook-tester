@@ -1,6 +1,6 @@
 POST http://{{ host }}:{{ port }}/api/session # create a session with all default values
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -18,7 +18,7 @@ jsonpath "$.uuid" matches "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200
 
 # --- Create a session with customized values
 
@@ -32,7 +32,7 @@ Content-Type: application/json
   "response_content_base64": "Zm9vIGJhcg=="
 }
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -50,7 +50,7 @@ jsonpath "$.uuid" matches "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200
 
 # --- Wrong status code (too small)
 
@@ -61,7 +61,7 @@ Content-Type: application/json
   "status_code": 99
 }
 
-HTTP/* 400
+HTTP 400
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -77,7 +77,7 @@ Content-Type: application/json
   "status_code": 531
 }
 
-HTTP/* 400
+HTTP 400
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -93,7 +93,7 @@ Content-Type: application/json
   "response_delay": 31
 }
 
-HTTP/* 400
+HTTP 400
 
 [Asserts]
 header "Content-Type" contains "application/json"

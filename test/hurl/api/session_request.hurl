@@ -7,7 +7,7 @@ Content-Type: application/json
   "response_content_base64": "Zm9vIGJhcg=="
 }
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -21,7 +21,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 529
+HTTP 529
 
 [Asserts]
 header "Content-Type" contains "application2/json1"
@@ -31,7 +31,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 request_uuid: jsonpath "$[0].uuid"
@@ -40,7 +40,7 @@ request_uuid: jsonpath "$[0].uuid"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests/{{ request_uuid }}
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -56,7 +56,7 @@ jsonpath "$.url" == "/{{ session_uuid }}/foo/bar.js?bla=1&bla2=baz"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests/{{ request_uuid }}
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -66,7 +66,7 @@ jsonpath "$.success" == true
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests/{{ request_uuid }}
 
-HTTP/* 404
+HTTP 404
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -77,4 +77,4 @@ jsonpath "$.message" contains "not found"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200

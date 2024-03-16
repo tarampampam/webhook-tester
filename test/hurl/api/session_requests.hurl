@@ -7,7 +7,7 @@ Content-Type: application/json
   "response_content_base64": "Zm9vIGJhcg=="
 }
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -16,7 +16,7 @@ session_uuid: jsonpath "$.uuid"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -31,7 +31,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 201
+HTTP 201
 
 [Asserts]
 header "Content-Type" contains "application1/json2"
@@ -41,7 +41,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -58,7 +58,7 @@ jsonpath "$[0].url" == "/{{ session_uuid }}/foobar"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -68,7 +68,7 @@ jsonpath "$.success" == true
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -78,10 +78,10 @@ jsonpath "$" count == 0
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200
 
 # -- After the session removal, the request should fail
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 404
+HTTP 404

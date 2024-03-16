@@ -10,7 +10,7 @@ Content-Type: application/json
   "response_content_base64": "Zm9vIGJhcg=="
 }
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -20,7 +20,7 @@ session_uuid: jsonpath "$.uuid"
 GET http://{{ host }}:{{ port }}/{{ session_uuid }}/210
 Foo-Header: BarValue
 
-HTTP/* 210
+HTTP 210
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -31,7 +31,7 @@ body == "foo bar"
 HEAD http://{{ host }}:{{ port }}/{{ session_uuid }}/211
 Foo-Header: BarValue
 
-HTTP/* 211
+HTTP 211
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -46,7 +46,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 212
+HTTP 212
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -61,7 +61,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 213
+HTTP 213
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -76,7 +76,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 214
+HTTP 214
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -91,7 +91,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 215
+HTTP 215
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -106,7 +106,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 216
+HTTP 216
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -121,7 +121,7 @@ Foo-Header: BarValue
 bar baz
 ```
 
-HTTP/* 217
+HTTP 217
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -131,7 +131,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/{{ session_uuid }}/210/ # <-- final slash
 
-HTTP/* 201 # <-- 201 instead of 210
+HTTP 201 # <-- 201 instead of 210
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -141,7 +141,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/{{ session_uuid }}/210/foobar
 
-HTTP/* 201 # <-- 201 instead of 210
+HTTP 201 # <-- 201 instead of 210
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -151,7 +151,7 @@ body == "foo bar"
 
 GET http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}/requests
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "application/json"
@@ -164,4 +164,4 @@ jsonpath "$[*].headers[*].value" includes "BarValue"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200

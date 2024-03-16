@@ -1,6 +1,6 @@
 GET http://{{ host }}:{{ port }}/ready
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 bytes count == 0
@@ -9,7 +9,7 @@ bytes count == 0
 
 HEAD http://{{ host }}:{{ port }}/ready
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 bytes count == 0

@@ -5,7 +5,7 @@ Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate, br
 Connection: keep-alive
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "text/html"
@@ -17,7 +17,7 @@ xpath "//*[@id='app']" count == 1 # App mounting point exist
 HEAD http://{{ host }}:{{ port }}/
 Accept: */*
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 bytes count == 0

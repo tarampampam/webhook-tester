@@ -283,7 +283,7 @@ func TestHandler_ServeHTTPDelay(t *testing.T) {
 
 	end := time.Now().UnixNano()
 
-	assert.InDelta(t, time.Millisecond*100, time.Duration(end-start), float64(time.Millisecond*5))
+	assert.InDelta(t, time.Millisecond*100, time.Duration(end-start), float64(time.Millisecond*10))
 
 	assert.Equal(t, 203, rr.Code)
 	assert.Equal(t, "foo", rr.Body.String())

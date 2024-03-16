@@ -1,7 +1,7 @@
 GET http://{{ host }}:{{ port }}/favicon.ico
 Accept: */*
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "image"
@@ -12,7 +12,7 @@ bytes startsWith hex,00000100030030;
 HEAD http://{{ host }}:{{ port }}/favicon.ico
 Accept: */*
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 bytes count == 0
