@@ -1,6 +1,6 @@
 GET http://{{ host }}:{{ port }}/sitemap.xml
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 header "Content-Type" contains "text/xml"
@@ -10,7 +10,7 @@ header "Content-Type" contains "text/xml"
 HEAD http://{{ host }}:{{ port }}/sitemap.xml
 Accept: */*
 
-HTTP/* 200
+HTTP 200
 
 [Asserts]
 bytes count == 0

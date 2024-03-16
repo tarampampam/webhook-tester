@@ -1,6 +1,6 @@
 POST http://{{ host }}:{{ port }}/api/session # create a session with all default values
 
-HTTP/* 200
+HTTP 200
 
 [Captures]
 session_uuid: jsonpath "$.uuid"
@@ -12,7 +12,7 @@ Connection: Upgrade
 Upgrade: websocket
 Sec-WebSocket-Version: 13
 
-HTTP/* 400
+HTTP 400
 
 [Asserts]
 header "Content-Type" contains "text/plain"
@@ -22,4 +22,4 @@ body contains "'Sec-WebSocket-Key' header is missing"
 
 DELETE http://{{ host }}:{{ port }}/api/session/{{ session_uuid }}
 
-HTTP/* 200
+HTTP 200
