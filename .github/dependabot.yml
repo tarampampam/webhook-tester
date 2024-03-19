@@ -5,7 +5,7 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
-    groups: {any: {exclude-patterns: ['github.com/gorilla/websocket']}}
+    groups: {any: {patterns: ['*'], exclude-patterns: ['github.com/gorilla/websocket']}}
     schedule: {interval: monthly}
     assignees: [tarampampam]
 
