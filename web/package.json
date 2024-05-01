@@ -21,7 +21,7 @@
     "moment": "^2.30.1",
     "openapi-typescript-fetch": "^2.0.0",
     "reconnecting-websocket": "^4.4.0",
-    "vue": "^3.4.25",
+    "vue": "^3.4.26",
     "vue-router": "^4.3.2"
   },
   "devDependencies": {
