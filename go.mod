@@ -3,8 +3,8 @@ module gh.tarampamp.am/webhook-tester
 go 1.21
 
 require (
-	github.com/alicebob/miniredis/v2 v2.32.1
-	github.com/fatih/color v1.16.0
+	github.com/alicebob/miniredis/v2 v2.33.0
+	github.com/fatih/color v1.17.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.0
@@ -13,7 +13,7 @@ require (
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
