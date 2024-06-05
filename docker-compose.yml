@@ -48,7 +48,7 @@ services:
     command: >-
       go run -tags watch ./cmd/webhook-tester/ serve
         --port=8080 --storage-driver=redis --pubsub-driver=redis
-        --redis-dsn=redis://redis:6379/0 --max-requests=12 --ignore-header-prefix=x-test-foo --ws-max-clients=20
+        --redis-dsn=redis://redis:6379/0 --max-requests=112 --ignore-header-prefix=x-test-foo --ws-max-clients=20
         --ws-max-lifetime=1m
     healthcheck:
       test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:8080/ready']
