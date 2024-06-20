@@ -39,8 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: gacts/setup-node-with-cache@v1
-        with: {node-version: 19}
+      - {uses: actions/setup-node@v4, with: {node-version: 19, cache: 'npm'}}
 
       - run: npm ci --no-audit --prefer-offline && npm run generate
         env: {NPM_CONFIG_UPDATE_NOTIFIER: false}
