@@ -141,7 +141,7 @@ jobs:
 
       - {uses: gacts/github-slug@v1, id: slug}
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -166,7 +166,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with: {name: docker-image}
 
-      - uses: aquasecurity/trivy-action@0.21.0
+      - uses: aquasecurity/trivy-action@0.23.0
         with:
           input: docker-image.tar
           format: sarif
