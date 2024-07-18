@@ -1,5 +1,5 @@
 <template>
-  <main>
+  <main class="d-flex flex-column h-100">
     <main-header
       :current-web-hook-url="currentWebHookUrl"
       :session-lifetime-sec="sessionLifetimeSec"
@@ -8,11 +8,10 @@
       @createNewUrl="startNewSession"
     />
 
-    <div class="container-fluid mb-2">
-      <div class="row flex-xl-nowrap">
+    <div class="container-fluid d-flex h-100">
+      <div class="row flex-xl-nowrap h-100">
         <div
-          class="sidebar px-2 py-0"
-          @click.self="switchToRequest(undefined)"
+          class="sidebar d-flex flex-column px-2 py-0"
         >
           <div class="ps-3 pt-4 pe-3 pb-3">
             <div class="d-flex w-100 justify-content-between">
@@ -32,17 +31,24 @@
           </div>
 
           <div
-            class="list-group"
+            class="list-group d-flex overflow-auto position-relative mb-2"
+            style="flex: 1"
             v-if="requests.length > 0"
+            @click.self="switchToRequest(undefined)"
           >
-            <request-plate
-              v-for="r in requests"
-              :key="r.UUID"
-              :request="r"
-              :class="{ active: requestUUID === r.UUID }"
-              @click="switchToRequest(r.UUID)"
-              @onDelete="(uuid: string) => deleteRequest(uuid, true)"
-            />
+            <div
+              class="requests-plate-wrapper d-flex flex-column top-0 bottom-0 w-100"
+              style="min-height: min-content"
+            >
+              <request-plate
+                v-for="r in requests"
+                :key="r.UUID"
+                :request="r"
+                :class="{ active: requestUUID === r.UUID }"
+                @click="switchToRequest(r.UUID)"
+                @onDelete="(uuid: string) => deleteRequest(uuid, true)"
+              />
+            </div>
           </div>
           <div
             v-else
@@ -503,10 +509,18 @@ $web-font-path: false; // disable external font named "Lato"
   background-color: transparent !important;
 }
 
+.requests-plate-wrapper {
+  position: absolute;
+}
+
 @media (max-width: 690px) {
   .sidebar {
     flex: 0 0 100%;
     width: 100%;
+  }
+
+  .requests-plate-wrapper {
+    position: inherit;
   }
 }
 
