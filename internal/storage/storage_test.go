@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewUUID(t *testing.T) {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		s := storage.NewUUID()
 		_, err := uuid.Parse(s)
 		assert.Nil(t, err)

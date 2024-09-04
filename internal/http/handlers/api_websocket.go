@@ -35,8 +35,8 @@ type apiWebsocket struct {
 }
 
 var upgrader = websocket.Upgrader{ //nolint:gochecknoglobals
-	ReadBufferSize:  512, //nolint:gomnd
-	WriteBufferSize: 512, //nolint:gomnd
+	ReadBufferSize:  512, //nolint:mnd
+	WriteBufferSize: 512, //nolint:mnd
 }
 
 const (
@@ -126,7 +126,7 @@ func (s *apiWebsocket) WebsocketSession(c echo.Context, sessionUuid api.SessionU
 			return c.NoContent(http.StatusGone)
 
 		case event := <-eventsCh:
-			j, _ := json.Marshal(api.WebsocketPayload{
+			j, _ := json.Marshal(api.WebsocketPayload{ //nolint:errchkjson
 				Name: api.WebsocketPayloadName(event.Name()),
 				Data: string(event.Data()),
 			})

@@ -25,59 +25,59 @@ fake-web-dist: # Is needed for the backend (embedding)
 # Frontend stuff
 
 node-install: ## Install node dependencies
-	docker-compose run $(DC_RUN_ARGS) node sh -c 'test -d ./node_modules || npm ci --no-audit --prefer-offline'
+	docker compose run $(DC_RUN_ARGS) node sh -c 'test -d ./node_modules || npm ci --no-audit --prefer-offline'
 
 node-generate: node-install ## Generate frontend assets
-	docker-compose run $(DC_RUN_ARGS) node npm run generate
+	docker compose run $(DC_RUN_ARGS) node npm run generate
 
 node-build: node-generate ## Build the frontend
 	-rm -R ./web/dist
-	docker-compose run $(DC_RUN_ARGS) node npm run build
+	docker compose run $(DC_RUN_ARGS) node npm run build
 
 node-lint: node-generate ## Lint the frontend
-	docker-compose run $(DC_RUN_ARGS) node npm run lint
+	docker compose run $(DC_RUN_ARGS) node npm run lint
 
 node-shell: ## Start shell inside node environment
-	docker-compose run $(DC_RUN_ARGS) node sh
+	docker compose run $(DC_RUN_ARGS) node sh
 
 # Backend stuff
 
 go-generate: ## Generate backend assets
-	docker-compose run $(DC_RUN_ARGS) --no-deps go go generate ./...
+	docker compose run $(DC_RUN_ARGS) --no-deps go go generate ./...
 
 go-build: node-build go-generate ## Build app binary file
-	docker-compose run $(DC_RUN_ARGS) -e "CGO_ENABLED=0" --no-deps go go build -trimpath -ldflags $(LDFLAGS) ./cmd/webhook-tester/
+	docker compose run $(DC_RUN_ARGS) -e "CGO_ENABLED=0" --no-deps go go build -trimpath -ldflags $(LDFLAGS) ./cmd/webhook-tester/
 
 go-test: fake-web-dist go-generate ## Run backend tests
-	docker-compose run $(DC_RUN_ARGS) --no-deps go go test -v -race -timeout 10s ./...
+	docker compose run $(DC_RUN_ARGS) --no-deps go go test -v -race -timeout 10s ./...
 
 go-lint: fake-web-dist go-generate ## Link the backend
-	docker-compose run --rm golint golangci-lint run
+	docker compose run --rm golint golangci-lint run
 
 go-fmt: fake-web-dist ## Run source code formatting tools
-	docker-compose run $(DC_RUN_ARGS) --no-deps go gofmt -s -w -d .
-	docker-compose run $(DC_RUN_ARGS) --no-deps go goimports -d -w .
-	docker-compose run $(DC_RUN_ARGS) --no-deps go go mod tidy
+	docker compose run $(DC_RUN_ARGS) --no-deps go gofmt -s -w -d .
+	docker compose run $(DC_RUN_ARGS) --no-deps go goimports -d -w .
+	docker compose run $(DC_RUN_ARGS) --no-deps go go mod tidy
 
 go-shell: ## Start shell inside go environment
-	docker-compose run $(DC_RUN_ARGS) go sh
+	docker compose run $(DC_RUN_ARGS) go sh
 
 # Overall stuff
 
 e2e-test: ## Run integration (E2E) tests
-	docker-compose run --rm hurl
+	docker compose run --rm hurl
 
 test: go-lint go-test node-lint ## Run all tests
 
 up: node-generate go-generate ## Start the app in the development mode
-	docker-compose up --detach node-watch web
+	docker compose up --detach node-watch web
 
 down: ## Stop the app
-	docker-compose down --remove-orphans
+	docker compose down --remove-orphans
 
 restart: down up ## Restart all containers
 
 clean: ## Make clean
-	docker-compose down -v -t 1
+	docker compose down -v -t 1
 	-docker rmi $(APP_NAME):local -f
 	-rm -R ./webhook-tester ./web/node_modules ./web/dist
