@@ -81,7 +81,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   hurl:
-    image: ghcr.io/orange-opensource/hurl:4.3.0
+    image: ghcr.io/orange-opensource/hurl:5.0.1
     entrypoint: ""
     command: sh -c "hurl --color --test --variable host=web --variable port=8080 ./test/hurl/*/*.hurl"
     volumes: [.:/src:ro]
