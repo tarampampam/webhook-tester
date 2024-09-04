@@ -9,7 +9,7 @@ type WebSockets struct {
 // NewWebsockets creates new WebSockets metrics collector.
 func NewWebsockets() WebSockets {
 	return WebSockets{
-		clientsCounter: prometheus.NewGauge(prometheus.GaugeOpts{
+		clientsCounter: prometheus.NewGauge(prometheus.GaugeOpts{ //nolint:promlinter
 			Namespace: "websockets",
 			Subsystem: "active_clients",
 			Name:      "count",

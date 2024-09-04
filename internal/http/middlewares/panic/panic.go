@@ -30,7 +30,7 @@ func New(log *zap.Logger) echo.MiddlewareFunc {
 						err = fmt.Errorf("%v", rec)
 					}
 
-					stackBuf := make([]byte, 1024) //nolint:gomnd
+					stackBuf := make([]byte, 1024) //nolint:mnd
 
 					// do NOT use `debug.Stack()` here for skipping one unimportant call trace in stacktrace
 					for {
@@ -41,7 +41,7 @@ func New(log *zap.Logger) echo.MiddlewareFunc {
 							break
 						}
 
-						stackBuf = make([]byte, 2*len(stackBuf)) //nolint:gomnd
+						stackBuf = make([]byte, 2*len(stackBuf)) //nolint:mnd
 					}
 
 					// log error with logger

@@ -59,8 +59,6 @@ func TestNewIPExtractor(t *testing.T) {
 			wantIP: "10.0.0.1",
 		},
 	} {
-		tt := tt
-
 		t.Run(name, func(t *testing.T) { assert.EqualValues(t, tt.wantIP, extractor(tt.giveRequest())) })
 	}
 }

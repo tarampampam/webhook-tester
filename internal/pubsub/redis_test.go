@@ -59,7 +59,8 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+
+	for range 50 {
 		wg.Add(1)
 
 		go func() { // each of subscriber must receive a copy of published event
@@ -74,7 +75,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 
 			receivedEvents := make([]pubsub.Event, 0, 2)
 
-			for j := 0; j < cap(receivedEvents); j++ {
+			for range cap(receivedEvents) {
 				select {
 				case <-ctx.Done():
 					t.Error(ctx.Err())
@@ -88,7 +89,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 
 			assert.Len(t, receivedEvents, 2)
 
-			for j := 0; j < len(receivedEvents); j++ {
+			for j := range len(receivedEvents) {
 				if e := receivedEvents[j]; !eventsAreEquals(t, e, event1) && !eventsAreEquals(t, e, event2) {
 					t.Errorf("received events must be one of expected, but got: %+v", e)
 				}
@@ -135,7 +136,7 @@ func TestRedis_Unsubscribe(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		t.Run("attempt #"+strconv.Itoa(i), func(t *testing.T) {
 			ch1, ch2 := make(chan pubsub.Event, 1), make(chan pubsub.Event, 1)
 
@@ -196,7 +197,7 @@ func TestRedis_UnsubscribeWithChannelClosingWithoutReading(t *testing.T) {
 	ps := pubsub.NewRedis(context.Background(), redis.NewClient(&redis.Options{Addr: mini.Addr()}))
 	defer func() { _ = ps.Close() }()
 
-	for i := 0; i < 1_000; i++ {
+	for range 1_000 {
 		ch := make(chan pubsub.Event)
 
 		assert.NoError(t, ps.Subscribe("foo", ch))
@@ -206,7 +207,7 @@ func TestRedis_UnsubscribeWithChannelClosingWithoutReading(t *testing.T) {
 		assert.NoError(t, ps.Unsubscribe("foo", ch))
 	}
 
-	for i := 0; i < 1_000; i++ {
+	for range 1_000 {
 		ps2 := pubsub.NewInMemory()
 		ch := make(chan pubsub.Event)
 

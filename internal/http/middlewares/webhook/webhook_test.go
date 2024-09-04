@@ -93,8 +93,6 @@ func TestHandler_RequestErrors(t *testing.T) {
 			wantSubstring:  []string{"Request body is too large"},
 		},
 	} {
-		tt := tt
-
 		t.Run(name, func(t *testing.T) {
 			var (
 				e      = echo.New()
@@ -113,7 +111,7 @@ func TestHandler_RequestErrors(t *testing.T) {
 
 			assert.Equal(t, tt.wantStatusCode, rr.Code)
 
-			for i := 0; i < len(tt.wantSubstring); i++ {
+			for i := range len(tt.wantSubstring) {
 				assert.Contains(t, rr.Body.String(), tt.wantSubstring[i])
 			}
 		})

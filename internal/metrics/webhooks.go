@@ -9,7 +9,7 @@ type WebHooks struct {
 // NewWebhooks creates new WebHooks metrics collector.
 func NewWebhooks() WebHooks {
 	return WebHooks{
-		processedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+		processedCounter: prometheus.NewCounter(prometheus.CounterOpts{ //nolint:promlinter
 			Namespace: "webhooks",
 			Subsystem: "processed",
 			Name:      "count",

@@ -24,7 +24,7 @@ func TestNew(t *testing.T) {
 		giveHandler           echo.HandlerFunc
 		giveDbgRoutesPrefixes []string
 		wantOutput            bool
-		checkOutputFields     func(t *testing.T, in map[string]interface{})
+		checkOutputFields     func(t *testing.T, in map[string]any)
 	}{
 		"basic usage": {
 			giveHandler: func(c echo.Context) error {
@@ -40,7 +40,7 @@ func TestNew(t *testing.T) {
 				return
 			},
 			wantOutput: true,
-			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
+			checkOutputFields: func(t *testing.T, in map[string]any) {
 				assert.Equal(t, http.MethodGet, in["method"])
 				assert.NotZero(t, in["duration"])
 				assert.Equal(t, "info", in["level"])
@@ -63,7 +63,7 @@ func TestNew(t *testing.T) {
 				return
 			},
 			wantOutput: true,
-			checkOutputFields: func(t *testing.T, in map[string]interface{}) {
+			checkOutputFields: func(t *testing.T, in map[string]any) {
 				assert.Equal(t, "10.0.0.1", in["remote addr"])
 			},
 		},
@@ -81,8 +81,6 @@ func TestNew(t *testing.T) {
 			wantOutput: false,
 		},
 	} {
-		tt := tt
-
 		t.Run(name, func(t *testing.T) {
 			var (
 				rr = httptest.NewRecorder()
@@ -98,7 +96,7 @@ func TestNew(t *testing.T) {
 			})
 
 			if tt.wantOutput {
-				var asJSON map[string]interface{}
+				var asJSON map[string]any
 
 				assert.NoError(t, json.Unmarshal([]byte(output), &asJSON), "logger output must be valid JSON")
 

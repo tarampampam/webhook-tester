@@ -29,7 +29,8 @@ func TestInMemory_PublishAndReceive(t *testing.T) {
 	var event1, event2 = pubsub.NewRequestRegisteredEvent("bar"), pubsub.NewRequestRegisteredEvent("baz")
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+
+	for range 10 {
 		wg.Add(1)
 
 		go func() { // each of subscriber must receive a copy of published event
@@ -44,7 +45,7 @@ func TestInMemory_PublishAndReceive(t *testing.T) {
 
 			receivedEvents := make([]pubsub.Event, 0, 2)
 
-			for j := 0; j < cap(receivedEvents); j++ {
+			for range cap(receivedEvents) {
 				select {
 				case <-ctx.Done():
 					t.Error(ctx.Err())
@@ -58,7 +59,7 @@ func TestInMemory_PublishAndReceive(t *testing.T) {
 
 			assert.Len(t, receivedEvents, 2)
 
-			for j := 0; j < len(receivedEvents); j++ {
+			for j := range len(receivedEvents) {
 				if event := receivedEvents[j]; event != event1 && event != event2 {
 					t.Error("received events must be one of expected")
 				}
@@ -135,7 +136,7 @@ func TestInMemory_UnsubscribeWithChannelClosingWithoutReading(t *testing.T) {
 	ps := pubsub.NewInMemory()
 	defer func() { _ = ps.Close() }()
 
-	for i := 0; i < 1_000; i++ {
+	for range 1_000 {
 		ch := make(chan pubsub.Event)
 
 		assert.NoError(t, ps.Subscribe("foo", ch))
@@ -145,7 +146,7 @@ func TestInMemory_UnsubscribeWithChannelClosingWithoutReading(t *testing.T) {
 		assert.NoError(t, ps.Unsubscribe("foo", ch))
 	}
 
-	for i := 0; i < 1_000; i++ {
+	for range 1_000 {
 		ps2 := pubsub.NewInMemory()
 		ch := make(chan pubsub.Event)
 

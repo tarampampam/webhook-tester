@@ -54,8 +54,6 @@ func TestNewSession_Validate(t *testing.T) {
 			wantErrSubstr: "response content is too large",
 		},
 	} {
-		tt := tt
-
 		t.Run(name, func(t *testing.T) {
 			err := tt.give.Validate()
 

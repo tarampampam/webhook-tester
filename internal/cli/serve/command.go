@@ -152,13 +152,13 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen,gocyclo
 			&cli.UintFlag{
 				Name:    maxRequestsFlagName,
 				Usage:   "maximum stored requests per session (max 65535)",
-				Value:   128, //nolint:gomnd
+				Value:   128, //nolint:mnd
 				EnvVars: []string{env.MaxSessionRequests.String()},
 			},
 			&cli.DurationFlag{
 				Name:    sessionTtlFlagName,
 				Usage:   "session lifetime (examples: 48h, 1h30m)",
-				Value:   time.Hour * 168, //nolint:gomnd
+				Value:   time.Hour * 168, //nolint:mnd
 				EnvVars: []string{env.SessionTTL.String()},
 			},
 			&cli.StringSliceFlag{
@@ -169,7 +169,7 @@ func NewCommand(log *zap.Logger) *cli.Command { //nolint:funlen,gocyclo
 			&cli.UintFlag{
 				Name:  maxRequestBodySizeFlagName,
 				Usage: "maximal webhook request body size (in bytes; 0 = unlimited)",
-				Value: 64 * 1024, //nolint:gomnd // 64 KiB
+				Value: 64 * 1024, //nolint:mnd // 64 KiB
 				// EnvVars: []string{}, // TODO add env var
 			},
 			&cli.StringFlag{
@@ -366,7 +366,7 @@ func run( //nolint:funlen,gocyclo
 		defer ctxCancelShutdown()
 
 		// stop the server using created context above
-		if err := server.Stop(ctxShutdown); err != nil {
+		if err := server.Stop(ctxShutdown); err != nil { //nolint:contextcheck
 			return err
 		}
 

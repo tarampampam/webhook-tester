@@ -1,13 +1,4 @@
-# Docker-compose file is used only for local development. This is not production-ready example
-
-version: '3.8'
-
-volumes:
-  tmp-data: {}
-  redis-data: {}
-  golint-go: {}
-  golint-cache: {}
-  node-data: {}
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/gh/compose-spec/compose-spec@master/schema/compose-spec.json
 
 services:
   go: &go
@@ -98,3 +89,10 @@ services:
     depends_on:
       web: {condition: service_healthy}
     security_opt: [no-new-privileges:true]
+
+volumes:
+  tmp-data: {}
+  redis-data: {}
+  golint-go: {}
+  golint-cache: {}
+  node-data: {}

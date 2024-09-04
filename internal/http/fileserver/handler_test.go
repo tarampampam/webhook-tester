@@ -64,8 +64,6 @@ func TestHandler(t *testing.T) {
 			wantEmptyResponseBody: true,
 		},
 	} {
-		tt := tt
-
 		t.Run(name, func(t *testing.T) {
 			var (
 				req = httptest.NewRequest(tt.giveMethod, tt.giveUrl, http.NoBody)

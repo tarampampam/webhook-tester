@@ -168,7 +168,7 @@ func (s *apiSession) ApiSessionGetAllRequests(c echo.Context, sessionUuid api.Se
 
 	var result = make([]api.SessionRequest, 0, len(requests))
 
-	for i := 0; i < len(requests); i++ {
+	for i := range len(requests) {
 		result = append(result, s.convertStoredRequestToApiStruct(requests[i]))
 	}
 
