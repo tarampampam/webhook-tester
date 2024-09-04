@@ -19,4 +19,4 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_LOGIN }}
           password: ${{ secrets.DOCKER_USER_PASSWORD }}
-          repository: tarampampam/error-pages
+          repository: tarampampam/webhook-tester

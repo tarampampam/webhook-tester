@@ -89,7 +89,7 @@ func TestRedis_PublishAndReceive(t *testing.T) {
 
 			assert.Len(t, receivedEvents, 2)
 
-			for j := range receivedEvents {
+			for j := range len(receivedEvents) {
 				if e := receivedEvents[j]; !eventsAreEquals(t, e, event1) && !eventsAreEquals(t, e, event2) {
 					t.Errorf("received events must be one of expected, but got: %+v", e)
 				}

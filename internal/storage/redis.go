@@ -118,7 +118,7 @@ func (s *Redis) DeleteRequests(sessionUUID string) (bool, error) {
 	// removing plan
 	var keys = []string{key.requests()}
 
-	for i := range requestUUIDs {
+	for i := range len(requestUUIDs) {
 		keys = append(keys, key.request(requestUUIDs[i]))
 	}
 
@@ -194,7 +194,7 @@ func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, uri string, conte
 				forUpdate = append(forUpdate, requestUUIDs...)
 			}
 
-			for i := range forUpdate {
+			for i := range len(forUpdate) {
 				pipe.Expire(s.ctx, key.request(forUpdate[i]), s.ttl)
 			}
 		}
@@ -256,7 +256,7 @@ func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
 		// convert request UUIDs into storage keys
 		keys := make([]string, len(UUIDs))
 
-		for i := range UUIDs {
+		for i := range len(UUIDs) {
 			keys[i] = key.request(UUIDs[i])
 		}
 
@@ -266,7 +266,7 @@ func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
 			return nil, gettingErr
 		}
 
-		for i := range UUIDs {
+		for i := range len(UUIDs) {
 			if packed, ok := rawRequests[i].(string); ok {
 				rData := redisRequest{}
 

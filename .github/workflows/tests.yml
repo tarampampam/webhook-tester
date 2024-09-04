@@ -26,7 +26,7 @@ jobs:
   validate-openapi:
     name: Validate OpenAPI schemas
     runs-on: ubuntu-latest
-    container: stoplight/spectral:6
+    container: stoplight/spectral:5.9
     steps:
       - uses: actions/checkout@v4
       - run: spectral lint --verbose --fail-severity warn ./api/*.y*ml # Tool page: <https://github.com/stoplightio/spectral>
@@ -38,7 +38,7 @@ jobs:
     defaults: {run: {working-directory: ./web}}
     steps:
       - uses: actions/checkout@v4
-      - {uses: actions/setup-node@v4, with: {node-version: 22, cache: 'npm'}}
+      - {uses: actions/setup-node@v4, with: {node-version: 22, cache: 'npm', cache-dependency-path: web/package-lock.json}}
       - run: npm ci --no-audit --prefer-offline && npm run generate
       - run: npm run lint
       - run: npm run build

@@ -111,7 +111,7 @@ func TestHandler_RequestErrors(t *testing.T) {
 
 			assert.Equal(t, tt.wantStatusCode, rr.Code)
 
-			for i := range tt.wantSubstring {
+			for i := range len(tt.wantSubstring) {
 				assert.Contains(t, rr.Body.String(), tt.wantSubstring[i])
 			}
 		})

@@ -59,7 +59,7 @@ func TestInMemory_PublishAndReceive(t *testing.T) {
 
 			assert.Len(t, receivedEvents, 2)
 
-			for j := range receivedEvents {
+			for j := range len(receivedEvents) {
 				if event := receivedEvents[j]; event != event1 && event != event2 {
 					t.Error("received events must be one of expected")
 				}
