@@ -30,7 +30,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 ) echo.MiddlewareFunc {
 	var ignoreHeaderPrefixes = make([]string, len(cfg.IgnoreHeaderPrefixes))
 
-	for i := range len(cfg.IgnoreHeaderPrefixes) {
+	for i := range cfg.IgnoreHeaderPrefixes {
 		ignoreHeaderPrefixes[i] = strings.ToUpper(strings.TrimSpace(cfg.IgnoreHeaderPrefixes[i])) // normalize each
 	}
 
@@ -174,7 +174,7 @@ loop:
 		if len(ignorePrefixes) > 0 {
 			upperName := strings.ToUpper(name)
 
-			for i := range len(ignorePrefixes) {
+			for i := range ignorePrefixes {
 				if strings.HasPrefix(upperName, ignorePrefixes[i]) {
 					continue loop
 				}
