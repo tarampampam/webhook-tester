@@ -18,9 +18,7 @@ linters-settings:
   gofmt:
     simplify: false
     rewrite-rules:
-      - {pattern: 'interface{}', replacement: 'any'}
-  gosec:
-    excludes: [G115] # TODO: Remove this exclusion after fixing the issue
+      - { pattern: 'interface{}', replacement: 'any' }
   govet:
     enable:
       - shadow
@@ -52,9 +50,6 @@ linters-settings:
     # Make an issue if func has more lines of code than this setting, and it has naked returns.
     # Default: 30
     max-func-lines: 100
-  mnd:
-    ignored-functions:
-      - Grow
 
 linters: # All available linters list: <https://golangci-lint.run/usage/linters/>
   disable-all: true
@@ -107,16 +102,15 @@ linters: # All available linters list: <https://golangci-lint.run/usage/linters/
     - durationcheck # Check for two durations multiplied together
     - errchkjson # Checks types passed to the json encoding functions
     - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
-    - intrange # Find places where for loops could make use of an integer range.
-    - copyloopvar # Detects places where loop variables are copied.
 
 issues:
   exclude-dirs:
     - .github
     - .git
     - tmp
-    - ^temp
+    - temp
     - testdata
+    - __old__
   exclude-rules:
     - {path: flags\.go, linters: [gochecknoglobals, lll, mnd, dupl]}
     - path: _test\.go

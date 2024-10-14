@@ -1,44 +1,32 @@
-// Main CLI application entrypoint.
 package main
 
 import (
+	"context"
+	"fmt"
 	"os"
-
-	"github.com/fatih/color"
-	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
+	"os/signal"
+	"runtime"
+	"syscall"
 
 	"gh.tarampamp.am/webhook-tester/internal/cli"
 )
 
-// exitFn is a function for application exiting.
-var exitFn = os.Exit //nolint:gochecknoglobals
-
 // main CLI application entrypoint.
 func main() {
-	code, err := run()
-	if err != nil {
-		_, _ = color.New(color.FgHiRed, color.Bold).Fprintln(os.Stderr, err.Error())
-	}
+	if err := run(); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err.Error())
 
-	exitFn(code)
+		os.Exit(1)
+	}
 }
 
-// run this CLI application.
-// Exit codes documentation: <https://tldp.org/LDP/abs/html/exitcodes.html>
-func run() (int, error) {
-	const dotenvFileName = ".env" // dotenv (.env) file name
+// run is the entry point of the program. The code is in separate function to allow executing deferred functions
+// before exiting (os.Exit does not execute deferred functions).
+func run() error {
+	defer runtime.Gosched() // increase the chance of running deferred functions before exiting
 
-	// load .env file (if file exists; useful for the local app development)
-	if stat, dotenvErr := os.Stat(dotenvFileName); dotenvErr == nil && !stat.IsDir() {
-		if err := godotenv.Load(dotenvFileName); err != nil {
-			return 1, errors.Wrap(err, dotenvFileName+" file error")
-		}
-	}
+	var ctx, cancel = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	if err := (cli.NewApp()).Run(os.Args); err != nil {
-		return 1, err
-	}
-
-	return 0, nil
+	return cli.NewApp().Run(ctx, os.Args)
 }

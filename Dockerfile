@@ -1,83 +1,93 @@
-# syntax=docker/dockerfile:1.2
+# syntax=docker/dockerfile:1
 
-# Image page: <https://hub.docker.com/_/node>
-FROM node:22-alpine as frontend
+# -✂- this stage is used to develop and build the application locally -------------------------------------------------
+FROM docker.io/library/node:22-bookworm AS develop
 
-RUN mkdir -p /src/web
+# install Go using the official image
+COPY --from=docker.io/library/golang:1.23-bookworm /usr/local/go /usr/local/go
 
-COPY ./web/package*.json /src/web/
+ENV \
+  # add Go and Node.js "binaries" to the PATH
+  PATH="$PATH:/src/web/node_modules/.bin:/go/bin:/usr/local/go/bin" \
+  # use the /var/tmp/go as the GOPATH to reuse the modules cache
+  GOPATH="/var/tmp/go" \
+  # set path to the Go cache (think about this as a "object files cache")
+  GOCACHE="/var/tmp/go/cache" \
+  # disable npm update notifier
+  NPM_CONFIG_UPDATE_NOTIFIER=false
 
-WORKDIR /src/web
-
-# install node dependencies
+# install development tools and dependencies
 RUN set -x \
-    && npm config set update-notifier false \
-    && npm ci --no-audit --prefer-offline
-
-COPY ./api /src/api
-COPY ./web /src/web
-
-# build the frontend (built artifact can be found in /src/web/dist)
-RUN set -x \
-    && npm run generate \
-    && npm run build
-
-# Image page: <https://hub.docker.com/_/golang>
-FROM golang:1.23-alpine as builder
-
-# can be passed with any prefix (like `v1.2.3@GITHASH`)
-# e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@GITHASH" .`
-ARG APP_VERSION="undefined@docker"
-
-# renovate: source=github-releases name=deepmap/oapi-codegen
-ENV OAPI_CODEGEN_VERSION="2.2.0"
-
-RUN set -x \
-    # Install `oapi-codegen`: <https://github.com/deepmap/oapi-codegen>
-    && GOBIN=/bin go install "github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}"
-
-# This argument allows to install additional software for local development using docker and avoid it \
-# in the production build
-ARG DEV_MODE="false"
-
-RUN set -x \
-    && if [ "${DEV_MODE}" = "true" ]; then \
-      # The following dependencies are needed for `go test` to work
-      apk add --no-cache gcc musl-dev \
-      # The following tool is used to format the imports in the source code
-      && GOBIN=/bin go install golang.org/x/tools/cmd/goimports@latest \
-    ;fi
-
-COPY . /src
+    # renovate: source=github-releases name=oapi-codegen/oapi-codegen
+    && OAPI_CODEGEN_VERSION="2.4.1" \
+    && GOBIN=/bin go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}" \
+    && go clean -cache -modcache \
+    # renovate: source=github-releases name=golangci/golangci-lint
+    && GOLANGCI_LINT_VERSION="1.61.0" \
+    && wget -O- -nv "https://cdn.jsdelivr.net/gh/golangci/golangci-lint@v${GOLANGCI_LINT_VERSION}/install.sh" \
+      | sh -s -- -b /bin "v${GOLANGCI_LINT_VERSION}" \
+    # customize the shell prompt (for the bash)
+    && echo "PS1='\[\033[1;36m\][develop] \[\033[1;34m\]\w\[\033[0;35m\] \[\033[1;36m\]# \[\033[0m\]'" >> /etc/bash.bashrc
 
 WORKDIR /src
 
-COPY --from=frontend /src/web/dist /src/web/dist
+RUN \
+    --mount=type=bind,source=web/package.json,target=/src/web/package.json \
+    --mount=type=bind,source=web/package-lock.json,target=/src/web/package-lock.json \
+    --mount=type=bind,source=go.mod,target=/src/go.mod \
+    --mount=type=bind,source=go.sum,target=/src/go.sum \
+    set -x \
+    # install node dependencies
+    && npm --prefix /src/web ci -dd --no-audit --prefer-offline \
+    # burn the Go modules cache
+    && go mod download -x \
+    # allow anyone to read/write the Go cache
+    && find /var/tmp/go -type d -exec chmod 0777 {} + \
+    && find /var/tmp/go -type f -exec chmod 0666 {} +
 
-# arguments to pass on each go tool link invocation
-ENV LDFLAGS="-s -w -X gh.tarampamp.am/webhook-tester/internal/version.version=$APP_VERSION"
+# -✂- this stage is used to build the application frontend ------------------------------------------------------------
+FROM develop AS frontend
 
-RUN set -x \
-    && go generate ./... \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o /tmp/webhook-tester ./cmd/webhook-tester/ \
-    && /tmp/webhook-tester --version \
-    && /tmp/webhook-tester -h
+# copy the frontend source code
+COPY ./web /src/web
 
-# prepare rootfs for runtime
-RUN mkdir -p /tmp/rootfs
+# build the frontend (built artifact can be found in /src/web/dist)
+RUN --mount=type=bind,source=api/openapi.yml,target=/src/api/openapi.yml \
+    set -x \
+    && npm --prefix /src/web run generate \
+    && npm --prefix /src/web run build
 
-WORKDIR /tmp/rootfs
+# -✂- this stage is used to compile the application -------------------------------------------------------------------
+FROM develop AS compile
 
-RUN set -x \
-    && mkdir -p \
-        ./etc \
-        ./bin \
+# can be passed with any prefix (like `v1.2.3@FOO`), e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@FOO" .`
+ARG APP_VERSION="undefined@docker"
+
+# copy the source code
+COPY . /src
+
+RUN --mount=type=bind,from=frontend,source=/src/web/dist,target=/src/web/dist \
+    set -x \
+    # build the app itself
+    && go generate -skip readme ./... \
+    && CGO_ENABLED=0 go build \
+      -trimpath \
+      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/internal/version.version=${APP_VERSION}" \
+      -o ./app \
+      ./cmd/app/ \
+    && ./app --version \
+    # prepare rootfs for runtime
+    && mkdir -p /tmp/rootfs \
+    && cd /tmp/rootfs \
+    && mkdir -p ./etc/ssl/certs ./bin ./tmp \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
-    && mv /tmp/webhook-tester ./bin/webhook-tester
+    && chmod 777 ./tmp \
+    && cp /etc/ssl/certs/ca-certificates.crt ./etc/ssl/certs/ \
+    && mv /src/app ./bin/app
 
-# use empty filesystem
-FROM scratch as runtime
+# -✂- and this is the final stage -------------------------------------------------------------------------------------
+FROM scratch AS runtime
 
 ARG APP_VERSION="undefined@docker"
 
@@ -91,19 +101,20 @@ LABEL \
     org.opencontainers.version="$APP_VERSION" \
     org.opencontainers.image.licenses="MIT"
 
-# Import from builder
-COPY --from=builder /tmp/rootfs /
+# import compiled application
+COPY --from=compile /tmp/rootfs /
 
-# Use an unprivileged user
+# use an unprivileged user
 USER 10001:10001
 
-ENV LISTEN_PORT=8080
+ENV \
+  # logging format
+  LOG_FORMAT=json \
+  # logging level
+  LOG_LEVEL=info
 
-# Docs: <https://docs.docker.com/engine/reference/builder/#healthcheck>
-HEALTHCHECK --interval=15s --timeout=3s --start-period=1s CMD [ \
-    "/bin/webhook-tester", "--log-json", "healthcheck" \
-]
+#EXPOSE "80/tcp" "443/tcp"
 
-ENTRYPOINT ["/bin/webhook-tester"]
-
-CMD ["--log-json", "serve"]
+HEALTHCHECK --interval=10s --start-interval=1s --start-period=5s --timeout=1s CMD ["/bin/app", "http-server", "healthcheck"]
+ENTRYPOINT ["/bin/app"]
+CMD ["start"]

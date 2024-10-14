@@ -1,72 +1,74 @@
 package storage
 
 import (
+	"errors"
+	"fmt"
+	"net/url"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// Storage is a Session's and Request's storage.
+var (
+	ErrNotFound        = errors.New("not found")
+	ErrSessionNotFound = fmt.Errorf("session %w", ErrNotFound)
+	ErrRequestNotFound = fmt.Errorf("request %w", ErrNotFound)
+
+	ErrClosed = errors.New("closed")
+)
+
+// Storage manages Session and Request data.
 type Storage interface {
-	// GetSession returns session data.
-	// If session was not found - `nil, nil` will be returned.
-	GetSession(uuid string) (Session, error)
+	// NewSession creates a new session and returns a session UUID on success.
+	// The Session.CreatedAt field will be set to the current time.
+	NewSession(Session) (sID string, _ error)
 
-	// CreateSession creates new session in storage using passed data.
-	// Session UUID without error will be returned on success.
-	CreateSession(content []byte, code uint16, contentType string, delay time.Duration, id ...string) (string, error)
+	// GetSession retrieves session data.
+	// If the session is not found, ErrSessionNotFound will be returned.
+	GetSession(sID string) (*Session, error)
 
-	// DeleteSession deletes session with passed UUID.
-	DeleteSession(uuid string) (bool, error)
+	// DeleteSession removes the session with the specified UUID.
+	// If the session is not found, ErrSessionNotFound will be returned.
+	DeleteSession(sID string) error
 
-	// DeleteRequests deletes stored requests for session with passed UUID.
-	DeleteRequests(uuid string) (bool, error)
+	// NewRequest creates a new request for the session with the specified UUID and returns a request UUID on success.
+	// The session with the specified UUID must exist. The Request.CreatedAt field will be set to the current time.
+	// If the session is not found, ErrSessionNotFound will be returned.
+	NewRequest(sID string, _ Request) (rID string, _ error)
 
-	// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
-	// stored requests for the session.
-	// Session with passed UUID must exist.
-	// Request UUID without error will be returned on success.
-	CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error)
+	// GetRequest retrieves request data.
+	// If the request or session is not found, ErrNotFound (ErrSessionNotFound or ErrRequestNotFound) will be returned.
+	GetRequest(sID, rID string) (*Request, error)
 
-	// GetRequest returns request data.
-	// If request was not found - `nil, nil` will be returned.
-	GetRequest(sessionUUID, requestUUID string) (Request, error)
+	// GetAllRequests returns all requests for the session with the specified UUID.
+	// If the session is not found, ErrSessionNotFound will be returned. If there are no requests, an empty map
+	// will be returned.
+	GetAllRequests(sID string) (map[string]Request, error)
 
-	// GetAllRequests returns all request as a slice of structures.
-	// If requests was not found - `nil, nil` will be returned.
-	GetAllRequests(sessionUUID string) ([]Request, error)
+	// DeleteRequest removes the request with the specified UUID.
+	// If the request or session is not found, ErrNotFound (ErrSessionNotFound or ErrRequestNotFound) will be returned.
+	DeleteRequest(sID, rID string) error
 
-	// DeleteRequest deletes stored request with passed session and request UUIDs.
-	DeleteRequest(sessionUUID, requestUUID string) (bool, error)
+	// DeleteAllRequests removes all requests for the session with the specified UUID.
+	// If the session is not found, ErrSessionNotFound will be returned.
+	DeleteAllRequests(sID string) error
 }
 
-// Session describes session settings (like response data and any additional information).
-type Session interface {
-	UUID() string         // UUID returns unique session identifier.
-	Content() []byte      // Content returns session server response content.
-	Code() uint16         // Code returns default server response code.
-	ContentType() string  // ContentType returns response content type.
-	Delay() time.Duration // Delay returns delay before response sending.
-	CreatedAt() time.Time // CreatedAt returns creation time (accuracy to seconds).
-}
+type (
+	// Session describes session settings (like response data and any additional information).
+	Session struct {
+		Code        uint16        `msgpack:"code" json:"code"`                 // default server response code
+		Content     []byte        `msgpack:"content" json:"content"`           // session server response content
+		ContentType string        `msgpack:"content_type" json:"content_type"` // response content type
+		Delay       time.Duration `msgpack:"delay" json:"delay"`               // delay before response sending
+		CreatedAt   time.Time     `msgpack:"created_at" json:"created_at"`     // creation time (accuracy to milliseconds)
+	}
 
-// Request describes recorded request and additional meta-data.
-type Request interface {
-	UUID() string               // UUID returns unique request identifier.
-	ClientAddr() string         // ClientAddr returns client hostname or IP address (who sent this request).
-	Method() string             // Method returns HTTP method name (eg.: 'GET', 'POST').
-	Content() []byte            // Content returns request body (payload).
-	Headers() map[string]string // Headers returns HTTP request headers.
-	URI() string                // URI returns Uniform Resource Identifier.
-	CreatedAt() time.Time       // CreatedAt returns creation time (accuracy to seconds).
-}
-
-// NewUUID generates new UUID v4.
-func NewUUID() string { return uuid.New().String() }
-
-// IsValidUUID checks if passed string is valid UUID v4.
-func IsValidUUID(id string) bool {
-	_, err := uuid.Parse(id)
-
-	return err == nil
-}
+	// Request describes recorded request and additional meta-data.
+	Request struct {
+		ClientAddr string            `msgpack:"client_addr" json:"client_addr"` // client hostname or IP address
+		Method     string            `msgpack:"method" json:"method"`           // HTTP method name (i.e., 'GET', 'POST')
+		Body       []byte            `msgpack:"body" json:"body"`               // request body (payload)
+		Headers    map[string]string `msgpack:"headers" json:"headers"`         // HTTP request headers
+		URL        url.URL           `msgpack:"url" json:"url"`                 // Uniform Resource Identifier
+		CreatedAt  time.Time         `msgpack:"created_at" json:"created_at"`   // creation time (accuracy to milliseconds)
+	}
+)
