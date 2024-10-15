@@ -40,6 +40,9 @@ func WithInMemoryCleanupInterval(v time.Duration) InMemoryOption {
 	return func(s *InMemory) { s.cleanupInterval = v }
 }
 
+// NewInMemory creates a new in-memory storage with the given session TTL and the maximum number of stored requests.
+// Note that the cleanup goroutine is started automatically if the cleanup interval is greater than zero.
+// To stop the cleanup goroutine and close the storage, call the InMemory.Close method.
 func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryOption) *InMemory {
 	var s = InMemory{
 		sessionTTL:      sessionTTL,
@@ -96,8 +99,10 @@ func (s *InMemory) cleanup() {
 	}
 }
 
-func (s *InMemory) NewSession(_ context.Context, session Session) (sID string, _ error) {
-	if s.closed.Load() {
+func (s *InMemory) NewSession(ctx context.Context, session Session) (sID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	} else if s.closed.Load() {
 		return "", ErrClosed // storage is closed
 	}
 
@@ -108,8 +113,10 @@ func (s *InMemory) NewSession(_ context.Context, session Session) (sID string, _
 	return
 }
 
-func (s *InMemory) GetSession(_ context.Context, sID string) (*Session, error) {
-	if s.closed.Load() {
+func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
 
@@ -127,8 +134,10 @@ func (s *InMemory) GetSession(_ context.Context, sID string) (*Session, error) {
 	return &data.session, nil
 }
 
-func (s *InMemory) DeleteSession(_ context.Context, sID string) error {
-	if s.closed.Load() {
+func (s *InMemory) DeleteSession(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
 
@@ -145,8 +154,10 @@ func (s *InMemory) DeleteSession(_ context.Context, sID string) error {
 	return nil
 }
 
-func (s *InMemory) NewRequest(_ context.Context, sID string, r Request) (rID string, _ error) {
-	if s.closed.Load() {
+func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	} else if s.closed.Load() {
 		return "", ErrClosed // storage is closed
 	}
 
@@ -185,8 +196,10 @@ func (s *InMemory) NewRequest(_ context.Context, sID string, r Request) (rID str
 	return
 }
 
-func (s *InMemory) GetRequest(_ context.Context, sID, rID string) (*Request, error) {
-	if s.closed.Load() {
+func (s *InMemory) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
 
@@ -202,8 +215,10 @@ func (s *InMemory) GetRequest(_ context.Context, sID, rID string) (*Request, err
 	return nil, ErrRequestNotFound // request not found
 }
 
-func (s *InMemory) GetAllRequests(_ context.Context, sID string) (map[string]Request, error) {
-	if s.closed.Load() {
+func (s *InMemory) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
 
@@ -223,8 +238,10 @@ func (s *InMemory) GetAllRequests(_ context.Context, sID string) (map[string]Req
 	return all, nil
 }
 
-func (s *InMemory) DeleteRequest(_ context.Context, sID, rID string) error {
-	if s.closed.Load() {
+func (s *InMemory) DeleteRequest(ctx context.Context, sID, rID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
 
@@ -240,8 +257,10 @@ func (s *InMemory) DeleteRequest(_ context.Context, sID, rID string) error {
 	return ErrRequestNotFound // request not found
 }
 
-func (s *InMemory) DeleteAllRequests(_ context.Context, sID string) error {
-	if s.closed.Load() {
+func (s *InMemory) DeleteAllRequests(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
 
