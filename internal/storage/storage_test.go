@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gh.tarampamp.am/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
 func TestTime_JSON_Marshal_Unmarshal(t *testing.T) {

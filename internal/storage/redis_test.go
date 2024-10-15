@@ -1,14 +1,13 @@
 package storage_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
 
-	"gh.tarampamp.am/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
 func TestRedis_Session_CreateReadDelete(t *testing.T) {
@@ -19,7 +18,6 @@ func TestRedis_Session_CreateReadDelete(t *testing.T) {
 	testSessionCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			return storage.NewRedis(
-				context.Background(),
 				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
 				sTTL,
 				maxReq,
@@ -36,7 +34,6 @@ func TestRedis_Request_CreateReadDelete(t *testing.T) {
 
 	testRequestCreateReadDelete(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
 		return storage.NewRedis(
-			context.Background(),
 			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
 			sTTL,
 			maxReq,

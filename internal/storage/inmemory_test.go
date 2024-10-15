@@ -1,12 +1,13 @@
 package storage_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"gh.tarampamp.am/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
 func TestInMemory_Session_CreateReadDelete(t *testing.T) {
@@ -29,32 +30,34 @@ func TestInMemory_Request_CreateReadDelete(t *testing.T) {
 func TestInMemory_Close(t *testing.T) {
 	t.Parallel()
 
+	var ctx = context.Background()
+
 	impl := storage.NewInMemory(time.Minute, 1)
 	require.NoError(t, impl.Close())
 	require.ErrorIs(t, impl.Close(), storage.ErrClosed) // second close
 
-	_, err := impl.NewSession(storage.Session{})
+	_, err := impl.NewSession(ctx, storage.Session{})
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = impl.GetSession("foo")
+	_, err = impl.GetSession(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	err = impl.DeleteSession("foo")
+	err = impl.DeleteSession(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = impl.NewRequest("foo", storage.Request{})
+	_, err = impl.NewRequest(ctx, "foo", storage.Request{})
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = impl.GetRequest("foo", "bar")
+	_, err = impl.GetRequest(ctx, "foo", "bar")
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	_, err = impl.GetAllRequests("foo")
+	_, err = impl.GetAllRequests(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	err = impl.DeleteRequest("foo", "bar")
+	err = impl.DeleteRequest(ctx, "foo", "bar")
 	require.ErrorIs(t, err, storage.ErrClosed)
 
-	err = impl.DeleteAllRequests("foo")
+	err = impl.DeleteAllRequests(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
 }
 
@@ -73,15 +76,17 @@ func BenchmarkInMemory(b *testing.B) {
 	s := storage.NewInMemory(time.Second, 10)
 	defer s.Close()
 
+	var ctx = context.Background()
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		sID, _ := s.NewSession(storage.Session{})
-		_, _ = s.GetSession(sID)
+		sID, _ := s.NewSession(ctx, storage.Session{})
+		_, _ = s.GetSession(ctx, sID)
 
-		rID, _ := s.NewRequest(sID, storage.Request{})
-		_, _ = s.GetRequest(sID, rID)
+		rID, _ := s.NewRequest(ctx, sID, storage.Request{})
+		_, _ = s.GetRequest(ctx, sID, rID)
 
-		_ = s.DeleteRequest(sID, rID)
+		_ = s.DeleteRequest(ctx, sID, rID)
 	}
 }

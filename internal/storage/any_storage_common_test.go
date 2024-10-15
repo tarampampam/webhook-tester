@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"sync"
@@ -10,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gh.tarampamp.am/webhook-tester/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
 func toCloser(s storage.Storage) io.Closer {
@@ -28,6 +29,8 @@ func testSessionCreateReadDelete(
 ) {
 	t.Helper()
 
+	var ctx = context.Background()
+
 	t.Run("create, read, delete", func(t *testing.T) {
 		t.Parallel()
 
@@ -42,7 +45,7 @@ func testSessionCreateReadDelete(
 		)
 
 		// create
-		var sID, newErr = impl.NewSession(storage.Session{
+		var sID, newErr = impl.NewSession(ctx, storage.Session{
 			Code:        code,
 			Content:     []byte(content),
 			ContentType: contentType,
@@ -53,7 +56,7 @@ func testSessionCreateReadDelete(
 		require.NotEmpty(t, sID)
 
 		// read
-		got, getErr := impl.GetSession(sID)
+		got, getErr := impl.GetSession(ctx, sID)
 		require.NoError(t, getErr)
 		require.Equal(t, code, got.Code)
 		require.Equal(t, []byte(content), got.Content)
@@ -62,12 +65,12 @@ func testSessionCreateReadDelete(
 		assert.NotZero(t, got.CreatedAt)
 
 		// delete
-		require.NoError(t, impl.DeleteSession(sID))                      // success
-		require.ErrorIs(t, impl.DeleteSession(sID), storage.ErrNotFound) // already deleted
-		require.ErrorIs(t, impl.DeleteSession(sID), storage.ErrSessionNotFound)
+		require.NoError(t, impl.DeleteSession(ctx, sID))                      // success
+		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrNotFound) // already deleted
+		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrSessionNotFound)
 
 		// read again
-		got, getErr = impl.GetSession(sID)
+		got, getErr = impl.GetSession(ctx, sID)
 		require.Nil(t, got)
 		require.ErrorIs(t, getErr, storage.ErrNotFound)
 		require.ErrorIs(t, getErr, storage.ErrSessionNotFound)
@@ -79,7 +82,7 @@ func testSessionCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		got, err := impl.GetSession("foo")
+		got, err := impl.GetSession(ctx, "foo")
 		require.Nil(t, got)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
@@ -90,7 +93,7 @@ func testSessionCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		require.ErrorIs(t, impl.DeleteSession("foo"), storage.ErrSessionNotFound)
+		require.ErrorIs(t, impl.DeleteSession(ctx, "foo"), storage.ErrSessionNotFound)
 	})
 
 	t.Run("expired", func(t *testing.T) {
@@ -101,13 +104,13 @@ func testSessionCreateReadDelete(
 		var impl = new(sessionTTL, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		sID, err := impl.NewSession(storage.Session{})
+		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
 		sleep(sessionTTL * 2) // wait for expiration
 
-		_, err = impl.GetSession(sID)
+		_, err = impl.GetSession(ctx, sID)
 
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
@@ -118,6 +121,8 @@ func testRequestCreateReadDelete(
 	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
 ) {
 	t.Helper()
+
+	var ctx = context.Background()
 
 	var (
 		u, _    = url.Parse("https://example.com/foo/bar")
@@ -131,7 +136,7 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, newErr := impl.NewSession(storage.Session{
+		sID, newErr := impl.NewSession(ctx, storage.Session{
 			Code:        201,
 			Content:     []byte("foo bar"),
 			ContentType: "text/javascript",
@@ -149,7 +154,7 @@ func testRequestCreateReadDelete(
 		var headers = map[string]string{"foo": "bar", "bar": "baz"}
 
 		// create
-		rID, newReqErr := impl.NewRequest(sID, storage.Request{
+		rID, newReqErr := impl.NewRequest(ctx, sID, storage.Request{
 			ClientAddr: clientAddr,
 			Method:     method,
 			Body:       []byte(body),
@@ -160,7 +165,7 @@ func testRequestCreateReadDelete(
 		require.NotEmpty(t, rID)
 
 		// read
-		got, getErr := impl.GetRequest(sID, rID)
+		got, getErr := impl.GetRequest(ctx, sID, rID)
 		require.NoError(t, getErr)
 		require.Equal(t, clientAddr, got.ClientAddr)
 		require.Equal(t, method, got.Method)
@@ -170,19 +175,19 @@ func testRequestCreateReadDelete(
 		assert.NotZero(t, got.CreatedAt)
 
 		{ // read all
-			all, err := impl.GetAllRequests(sID)
+			all, err := impl.GetAllRequests(ctx, sID)
 			require.NoError(t, err)
 			require.Len(t, all, 1)
 			require.Equal(t, all, map[string]storage.Request{rID: *got})
 		}
 
 		// delete
-		require.NoError(t, impl.DeleteRequest(sID, rID))                      // success
-		require.ErrorIs(t, impl.DeleteRequest(sID, rID), storage.ErrNotFound) // already deleted
-		require.ErrorIs(t, impl.DeleteRequest(sID, rID), storage.ErrRequestNotFound)
+		require.NoError(t, impl.DeleteRequest(ctx, sID, rID))                      // success
+		require.ErrorIs(t, impl.DeleteRequest(ctx, sID, rID), storage.ErrNotFound) // already deleted
+		require.ErrorIs(t, impl.DeleteRequest(ctx, sID, rID), storage.ErrRequestNotFound)
 
 		// read again
-		got, getErr = impl.GetRequest(sID, rID)
+		got, getErr = impl.GetRequest(ctx, sID, rID)
 		require.Nil(t, got)
 		require.ErrorIs(t, getErr, storage.ErrNotFound)
 		require.ErrorIs(t, getErr, storage.ErrRequestNotFound)
@@ -195,35 +200,35 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, err := impl.NewSession(storage.Session{})
+		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
 		// create request #1
-		rID1, err := impl.NewRequest(sID, storage.Request{})
+		rID1, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID1)
 
 		// create request #2
-		rID2, err := impl.NewRequest(sID, storage.Request{})
+		rID2, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID2)
 
 		// now, the session has 2 requests and the limit is reached
 
 		{ // check made requests
-			requests, _ := impl.GetAllRequests(sID)
+			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2)
 
-			req, _ := impl.GetRequest(sID, rID1)
+			req, _ := impl.GetRequest(ctx, sID, rID1)
 			require.NotNil(t, req)
 
-			req, _ = impl.GetRequest(sID, rID2)
+			req, _ = impl.GetRequest(ctx, sID, rID2)
 			require.NotNil(t, req)
 		}
 
 		// create request #3
-		rID3, err := impl.NewRequest(sID, storage.Request{})
+		rID3, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID3)
 
@@ -231,17 +236,17 @@ func testRequestCreateReadDelete(
 		// with numbers 2 and 3)
 
 		{ // check made requests again
-			requests, _ := impl.GetAllRequests(sID)
+			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2) // still 2
 
-			req, reqErr := impl.GetRequest(sID, rID1) // not found
+			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
 			require.Nil(t, req)
 			require.Error(t, reqErr)
 
-			req, _ = impl.GetRequest(sID, rID2) // ok
+			req, _ = impl.GetRequest(ctx, sID, rID2) // ok
 			require.NotNil(t, req)
 
-			req, _ = impl.GetRequest(sID, rID3) // ok
+			req, _ = impl.GetRequest(ctx, sID, rID3) // ok
 			require.NotNil(t, req)
 		}
 
@@ -249,39 +254,39 @@ func testRequestCreateReadDelete(
 		// requests with numbers 3 and 4)
 
 		// create request #4
-		rID4, err := impl.NewRequest(sID, storage.Request{})
+		rID4, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID4)
 
 		{ // check made requests again
-			requests, _ := impl.GetAllRequests(sID)
+			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2) // still 2
 
-			req, reqErr := impl.GetRequest(sID, rID1) // not found
+			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
 			require.Nil(t, req)
 			require.Error(t, reqErr)
 
-			req, reqErr = impl.GetRequest(sID, rID2) // not found
+			req, reqErr = impl.GetRequest(ctx, sID, rID2) // not found
 			require.Nil(t, req)
 			require.Error(t, reqErr)
 
-			req, _ = impl.GetRequest(sID, rID3) // ok
+			req, _ = impl.GetRequest(ctx, sID, rID3) // ok
 			require.NotNil(t, req)
 
-			req, _ = impl.GetRequest(sID, rID4) // ok
+			req, _ = impl.GetRequest(ctx, sID, rID4) // ok
 			require.NotNil(t, req)
 		}
 
 		// and now delete all the requests
-		require.NoError(t, impl.DeleteAllRequests(sID))
+		require.NoError(t, impl.DeleteAllRequests(ctx, sID))
 
-		_, err = impl.GetAllRequests(sID)
+		_, err = impl.GetAllRequests(ctx, sID)
 		require.NoError(t, err)
 
 		// and the session
-		require.NoError(t, impl.DeleteSession(sID))
+		require.NoError(t, impl.DeleteSession(ctx, sID))
 
-		_, err = impl.GetAllRequests(sID)
+		_, err = impl.GetAllRequests(ctx, sID)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
 
@@ -292,20 +297,20 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, err := impl.NewSession(storage.Session{})
+		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
 		// create request
-		rID, err := impl.NewRequest(sID, storage.Request{})
+		rID, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID)
 
 		// delete all
-		require.NoError(t, impl.DeleteAllRequests(sID))
+		require.NoError(t, impl.DeleteAllRequests(ctx, sID))
 
 		// check
-		all, err := impl.GetAllRequests(sID)
+		all, err := impl.GetAllRequests(ctx, sID)
 		require.NoError(t, err)
 		require.Empty(t, all)
 	})
@@ -316,7 +321,7 @@ func testRequestCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		err := impl.DeleteAllRequests("foo")
+		err := impl.DeleteAllRequests(ctx, "foo")
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
@@ -328,11 +333,11 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, err := impl.NewSession(storage.Session{})
+		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
-		all, err := impl.GetAllRequests(sID)
+		all, err := impl.GetAllRequests(ctx, sID)
 		require.NoError(t, err)
 		require.Empty(t, all)
 	})
@@ -343,7 +348,7 @@ func testRequestCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		all, err := impl.GetAllRequests("foo")
+		all, err := impl.GetAllRequests(ctx, "foo")
 		require.Nil(t, all)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
@@ -355,7 +360,7 @@ func testRequestCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		_, err := impl.NewRequest("foo", storage.Request{})
+		_, err := impl.NewRequest(ctx, "foo", storage.Request{})
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
@@ -366,7 +371,7 @@ func testRequestCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		got, err := impl.GetRequest("foo", "bar")
+		got, err := impl.GetRequest(ctx, "foo", "bar")
 		require.Nil(t, got)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
@@ -379,11 +384,11 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, newErr := impl.NewSession(storage.Session{})
+		sID, newErr := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, newErr)
 		require.NotEmpty(t, sID)
 
-		got, err := impl.GetRequest(sID, "foo")
+		got, err := impl.GetRequest(ctx, sID, "foo")
 		require.Nil(t, got)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrRequestNotFound)
@@ -395,7 +400,7 @@ func testRequestCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		err := impl.DeleteRequest("foo", "bar")
+		err := impl.DeleteRequest(ctx, "foo", "bar")
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
@@ -407,11 +412,11 @@ func testRequestCreateReadDelete(
 		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
-		sID, newErr := impl.NewSession(storage.Session{})
+		sID, newErr := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, newErr)
 		require.NotEmpty(t, sID)
 
-		err := impl.DeleteRequest(sID, "foo")
+		err := impl.DeleteRequest(ctx, sID, "foo")
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrRequestNotFound)
 	})
@@ -422,6 +427,8 @@ func testRaceProvocation(
 	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
 ) {
 	t.Helper()
+
+	var ctx = context.Background()
 
 	var impl = new(time.Minute, 1000)
 	defer func() { _ = toCloser(impl).Close() }()
@@ -434,29 +441,29 @@ func testRaceProvocation(
 		go func() {
 			defer wg.Done()
 
-			sID, err := impl.NewSession(storage.Session{})
+			sID, err := impl.NewSession(ctx, storage.Session{})
 			require.NoError(t, err)
 
-			_, err = impl.GetSession(sID)
+			_, err = impl.GetSession(ctx, sID)
 			require.NoError(t, err)
 
 			var rID string
 
 			for range 50 {
-				rID, err = impl.NewRequest(sID, storage.Request{})
+				rID, err = impl.NewRequest(ctx, sID, storage.Request{})
 				require.NoError(t, err)
 
-				_, err = impl.GetRequest(sID, rID)
+				_, err = impl.GetRequest(ctx, sID, rID)
 				require.NoError(t, err)
 
-				all, aErr := impl.GetAllRequests(sID)
+				all, aErr := impl.GetAllRequests(ctx, sID)
 				require.NoError(t, aErr)
 				require.NotEmpty(t, all)
 			}
 
-			require.NoError(t, impl.DeleteRequest(sID, rID))
+			require.NoError(t, impl.DeleteRequest(ctx, sID, rID))
 
-			require.NoError(t, impl.DeleteAllRequests(sID))
+			require.NoError(t, impl.DeleteAllRequests(ctx, sID))
 		}()
 	}
 

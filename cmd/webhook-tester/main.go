@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"syscall"
 
-	"gh.tarampamp.am/webhook-tester/internal/cli"
+	"gh.tarampamp.am/webhook-tester/v2/internal/cli"
 )
 
 // main CLI application entrypoint.

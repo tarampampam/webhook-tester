@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"io"
 	"sort"
 	"sync"
@@ -51,7 +52,9 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 		opt(&s)
 	}
 
-	go s.cleanup() // start cleanup goroutine
+	if s.cleanupInterval > time.Duration(0) {
+		go s.cleanup() // start cleanup goroutine
+	}
 
 	return &s
 }
@@ -63,9 +66,11 @@ func (s *InMemory) cleanup() {
 	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
 
+	var ctx = context.Background()
+
 	defer func() { // cleanup on exit
 		s.sessions.Range(func(sID string, _ *sessionData) bool {
-			_ = s.DeleteSession(sID)
+			_ = s.DeleteSession(ctx, sID)
 
 			return true
 		})
@@ -80,7 +85,7 @@ func (s *InMemory) cleanup() {
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
 				if data.session.CreatedAt.Add(s.sessionTTL).Before(now) {
-					_ = s.DeleteSession(sID)
+					_ = s.DeleteSession(ctx, sID)
 				}
 
 				return true
@@ -91,7 +96,7 @@ func (s *InMemory) cleanup() {
 	}
 }
 
-func (s *InMemory) NewSession(session Session) (sID string, _ error) {
+func (s *InMemory) NewSession(_ context.Context, session Session) (sID string, _ error) {
 	if s.closed.Load() {
 		return "", ErrClosed // storage is closed
 	}
@@ -103,7 +108,7 @@ func (s *InMemory) NewSession(session Session) (sID string, _ error) {
 	return
 }
 
-func (s *InMemory) GetSession(sID string) (*Session, error) {
+func (s *InMemory) GetSession(_ context.Context, sID string) (*Session, error) {
 	if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
@@ -122,7 +127,7 @@ func (s *InMemory) GetSession(sID string) (*Session, error) {
 	return &data.session, nil
 }
 
-func (s *InMemory) DeleteSession(sID string) error {
+func (s *InMemory) DeleteSession(_ context.Context, sID string) error {
 	if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
@@ -140,7 +145,7 @@ func (s *InMemory) DeleteSession(sID string) error {
 	return nil
 }
 
-func (s *InMemory) NewRequest(sID string, r Request) (rID string, _ error) {
+func (s *InMemory) NewRequest(_ context.Context, sID string, r Request) (rID string, _ error) {
 	if s.closed.Load() {
 		return "", ErrClosed // storage is closed
 	}
@@ -180,7 +185,7 @@ func (s *InMemory) NewRequest(sID string, r Request) (rID string, _ error) {
 	return
 }
 
-func (s *InMemory) GetRequest(sID, rID string) (*Request, error) {
+func (s *InMemory) GetRequest(_ context.Context, sID, rID string) (*Request, error) {
 	if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
@@ -197,7 +202,7 @@ func (s *InMemory) GetRequest(sID, rID string) (*Request, error) {
 	return nil, ErrRequestNotFound // request not found
 }
 
-func (s *InMemory) GetAllRequests(sID string) (map[string]Request, error) {
+func (s *InMemory) GetAllRequests(_ context.Context, sID string) (map[string]Request, error) {
 	if s.closed.Load() {
 		return nil, ErrClosed // storage is closed
 	}
@@ -218,7 +223,7 @@ func (s *InMemory) GetAllRequests(sID string) (map[string]Request, error) {
 	return all, nil
 }
 
-func (s *InMemory) DeleteRequest(sID, rID string) error {
+func (s *InMemory) DeleteRequest(_ context.Context, sID, rID string) error {
 	if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
@@ -235,7 +240,7 @@ func (s *InMemory) DeleteRequest(sID, rID string) error {
 	return ErrRequestNotFound // request not found
 }
 
-func (s *InMemory) DeleteAllRequests(sID string) error {
+func (s *InMemory) DeleteAllRequests(_ context.Context, sID string) error {
 	if s.closed.Load() {
 		return ErrClosed // storage is closed
 	}
