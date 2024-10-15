@@ -13,14 +13,18 @@ import (
 	"gh.tarampamp.am/webhook-tester/internal/storage"
 )
 
-type storageToTest interface {
-	storage.Storage
-	io.Closer
+func toCloser(s storage.Storage) io.Closer {
+	if c, ok := s.(io.Closer); ok {
+		return c
+	}
+
+	return io.NopCloser(nil)
 }
 
 func testSessionCreateReadDelete(
 	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storageToTest,
+	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
+	sleep func(time.Duration),
 ) {
 	t.Helper()
 
@@ -28,7 +32,7 @@ func testSessionCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		const (
 			code        uint16 = 201
@@ -73,7 +77,7 @@ func testSessionCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		got, err := impl.GetSession("foo")
 		require.Nil(t, got)
@@ -84,7 +88,7 @@ func testSessionCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		require.ErrorIs(t, impl.DeleteSession("foo"), storage.ErrSessionNotFound)
 	})
@@ -95,50 +99,36 @@ func testSessionCreateReadDelete(
 		const sessionTTL = time.Millisecond
 
 		var impl = new(sessionTTL, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		sID, err := impl.NewSession(storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
-		<-time.After(sessionTTL * 2) // wait for expiration
+		sleep(sessionTTL * 2) // wait for expiration
 
 		_, err = impl.GetSession(sID)
 
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
-
-	t.Run("closed", func(t *testing.T) {
-		t.Parallel()
-
-		impl := new(time.Minute, 1)
-		require.NoError(t, impl.Close())
-		require.ErrorIs(t, impl.Close(), storage.ErrClosed) // second close
-
-		_, err := impl.NewSession(storage.Session{})
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		_, err = impl.GetSession("foo")
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		err = impl.DeleteSession("foo")
-		require.ErrorIs(t, err, storage.ErrClosed)
-	})
 }
 
 func testRequestCreateReadDelete(
 	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storageToTest,
+	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
 ) {
 	t.Helper()
 
-	someUrl, _ := url.Parse("https://example.com/foo/bar")
+	var (
+		u, _    = url.Parse("https://example.com/foo/bar")
+		someUrl = &storage.URL{URL: *u}
+	)
 
 	t.Run("create, read, delete", func(t *testing.T) {
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, newErr := impl.NewSession(storage.Session{
@@ -156,9 +146,7 @@ func testRequestCreateReadDelete(
 			body       = " \nfoo bar\n\t \nbaz"
 		)
 
-		var (
-			headers = map[string]string{"foo": "bar", "bar": "baz"}
-		)
+		var headers = map[string]string{"foo": "bar", "bar": "baz"}
 
 		// create
 		rID, newReqErr := impl.NewRequest(sID, storage.Request{
@@ -204,7 +192,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 2) // limit is 2
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, err := impl.NewSession(storage.Session{})
@@ -220,6 +208,8 @@ func testRequestCreateReadDelete(
 		rID2, err := impl.NewRequest(sID, storage.Request{})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID2)
+
+		// now, the session has 2 requests and the limit is reached
 
 		{ // check made requests
 			requests, _ := impl.GetAllRequests(sID)
@@ -237,6 +227,9 @@ func testRequestCreateReadDelete(
 		require.NoError(t, err)
 		require.NotEmpty(t, rID3)
 
+		// now, the request #1 should be deleted because the limit is reached (the storage should keep the requests
+		// with numbers 2 and 3)
+
 		{ // check made requests again
 			requests, _ := impl.GetAllRequests(sID)
 			require.Len(t, requests, 2) // still 2
@@ -252,6 +245,9 @@ func testRequestCreateReadDelete(
 			require.NotNil(t, req)
 		}
 
+		// and now add one more request - after that, the request #2 should be deleted (the storage should keep the
+		// requests with numbers 3 and 4)
+
 		// create request #4
 		rID4, err := impl.NewRequest(sID, storage.Request{})
 		require.NoError(t, err)
@@ -261,7 +257,11 @@ func testRequestCreateReadDelete(
 			requests, _ := impl.GetAllRequests(sID)
 			require.Len(t, requests, 2) // still 2
 
-			req, reqErr := impl.GetRequest(sID, rID2) // not found
+			req, reqErr := impl.GetRequest(sID, rID1) // not found
+			require.Nil(t, req)
+			require.Error(t, reqErr)
+
+			req, reqErr = impl.GetRequest(sID, rID2) // not found
 			require.Nil(t, req)
 			require.Error(t, reqErr)
 
@@ -289,7 +289,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, err := impl.NewSession(storage.Session{})
@@ -314,7 +314,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		err := impl.DeleteAllRequests("foo")
 		require.ErrorIs(t, err, storage.ErrNotFound)
@@ -325,7 +325,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, err := impl.NewSession(storage.Session{})
@@ -341,7 +341,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		all, err := impl.GetAllRequests("foo")
 		require.Nil(t, all)
@@ -353,7 +353,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		_, err := impl.NewRequest("foo", storage.Request{})
 		require.ErrorIs(t, err, storage.ErrNotFound)
@@ -364,7 +364,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		got, err := impl.GetRequest("foo", "bar")
 		require.Nil(t, got)
@@ -376,7 +376,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, newErr := impl.NewSession(storage.Session{})
@@ -393,7 +393,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		err := impl.DeleteRequest("foo", "bar")
 		require.ErrorIs(t, err, storage.ErrNotFound)
@@ -404,7 +404,7 @@ func testRequestCreateReadDelete(
 		t.Parallel()
 
 		var impl = new(time.Minute, 1)
-		defer func() { _ = impl.Close() }()
+		defer func() { _ = toCloser(impl).Close() }()
 
 		// create session
 		sID, newErr := impl.NewSession(storage.Session{})
@@ -415,39 +415,16 @@ func testRequestCreateReadDelete(
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.ErrorIs(t, err, storage.ErrRequestNotFound)
 	})
-
-	t.Run("closed", func(t *testing.T) {
-		t.Parallel()
-
-		impl := new(time.Minute, 1)
-		require.NoError(t, impl.Close())
-		require.ErrorIs(t, impl.Close(), storage.ErrClosed) // second close
-
-		_, err := impl.NewRequest("foo", storage.Request{})
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		_, err = impl.GetRequest("foo", "bar")
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		_, err = impl.GetAllRequests("foo")
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		err = impl.DeleteRequest("foo", "bar")
-		require.ErrorIs(t, err, storage.ErrClosed)
-
-		err = impl.DeleteAllRequests("foo")
-		require.ErrorIs(t, err, storage.ErrClosed)
-	})
 }
 
 func testRaceProvocation(
 	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storageToTest,
+	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
 ) {
 	t.Helper()
 
 	var impl = new(time.Minute, 1000)
-	defer func() { _ = impl.Close() }()
+	defer func() { _ = toCloser(impl).Close() }()
 
 	var wg sync.WaitGroup
 

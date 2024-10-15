@@ -10,17 +10,22 @@ import (
 	"github.com/google/uuid"
 )
 
-type InMemory struct {
-	sessionTTL  time.Duration
-	maxRequests uint32
-	sessions    syncMap[string /* sID */, Session]
-	requests    syncMap[string /* sID */, *syncMap[string /* rID */, Request]]
+type (
+	InMemory struct {
+		sessionTTL      time.Duration
+		maxRequests     uint32
+		sessions        syncMap[ /* sID */ string, *sessionData]
+		cleanupInterval time.Duration
 
-	cleanupInterval time.Duration
+		close  chan struct{}
+		closed atomic.Bool
+	}
 
-	close  chan struct{}
-	closed atomic.Bool
-}
+	sessionData struct {
+		session  Session
+		requests syncMap[ /* rID */ string, Request]
+	}
+)
 
 var ( // ensure interface implementation
 	_ Storage   = (*InMemory)(nil)
@@ -46,17 +51,20 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 		opt(&s)
 	}
 
-	defer func() { go s.cleanup() }() // start cleanup goroutine
+	go s.cleanup() // start cleanup goroutine
 
 	return &s
 }
+
+// newID generates a new (unique) ID.
+func (s *InMemory) newID() string { return uuid.New().String() }
 
 func (s *InMemory) cleanup() {
 	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
 
 	defer func() { // cleanup on exit
-		s.sessions.Range(func(sID string, _ Session) bool {
+		s.sessions.Range(func(sID string, _ *sessionData) bool {
 			_ = s.DeleteSession(sID)
 
 			return true
@@ -70,8 +78,8 @@ func (s *InMemory) cleanup() {
 		case <-timer.C:
 			var now = time.Now()
 
-			s.sessions.Range(func(sID string, session Session) bool {
-				if session.CreatedAt.Add(s.sessionTTL).Before(now) {
+			s.sessions.Range(func(sID string, data *sessionData) bool {
+				if data.session.CreatedAt.Add(s.sessionTTL).Before(now) {
 					_ = s.DeleteSession(sID)
 				}
 
@@ -88,9 +96,9 @@ func (s *InMemory) NewSession(session Session) (sID string, _ error) {
 		return "", ErrClosed // storage is closed
 	}
 
-	sID, session.CreatedAt = uuid.New().String(), time.Now()
+	sID, session.CreatedAt.Time = s.newID(), time.Now()
 
-	s.sessions.Store(sID, session)
+	s.sessions.Store(sID, &sessionData{session: session})
 
 	return
 }
@@ -100,18 +108,18 @@ func (s *InMemory) GetSession(sID string) (*Session, error) {
 		return nil, ErrClosed // storage is closed
 	}
 
-	session, ok := s.sessions.Load(sID)
+	data, ok := s.sessions.Load(sID)
 	if !ok {
 		return nil, ErrSessionNotFound // not found
 	}
 
-	if session.CreatedAt.Add(s.sessionTTL).Before(time.Now()) {
+	if data.session.CreatedAt.Add(s.sessionTTL).Before(time.Now()) {
 		s.sessions.Delete(sID)
 
 		return nil, ErrSessionNotFound // session has been expired
 	}
 
-	return &session, nil
+	return &data.session, nil
 }
 
 func (s *InMemory) DeleteSession(sID string) error {
@@ -119,14 +127,11 @@ func (s *InMemory) DeleteSession(sID string) error {
 		return ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.LoadAndDelete(sID); !ok {
+	if data, ok := s.sessions.LoadAndDelete(sID); !ok {
 		return ErrSessionNotFound // session not found
-	}
-
-	// delete all session requests
-	if requests, hasRequests := s.requests.LoadAndDelete(sID); hasRequests {
-		requests.Range(func(rID string, _ Request) bool {
-			requests.Delete(rID)
+	} else {
+		data.requests.Range(func(rID string, _ Request) bool { // delete all session requests
+			data.requests.Delete(rID)
 
 			return true
 		})
@@ -140,43 +145,36 @@ func (s *InMemory) NewRequest(sID string, r Request) (rID string, _ error) {
 		return "", ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.Load(sID); !ok {
+	data, ok := s.sessions.Load(sID)
+	if !ok {
 		return "", ErrSessionNotFound // session not found
 	}
 
-	rID, r.CreatedAt = uuid.New().String(), time.Now()
+	rID, r.CreatedAt.Time = s.newID(), time.Now()
 
-	if requests, hasRequests := s.requests.Load(sID); hasRequests {
-		requests.Store(rID, r)
+	data.requests.Store(rID, r)
 
-		{ // limit stored requests count
-			type rq struct { // a runtime representation of the request, used for sorting
-				id string
-				ts int64
-			}
+	{ // limit stored requests count
+		type rq struct { // a runtime representation of the request, used for sorting
+			id string
+			ts int64
+		}
 
-			var all = make([]rq, 0) // a slice for all session requests
+		var all = make([]rq, 0) // a slice for all session requests
 
-			requests.Range(func(id string, req Request) bool { // iterate over all session requests and fill the slice
-				all = append(all, rq{id, req.CreatedAt.UnixNano()})
+		data.requests.Range(func(id string, req Request) bool { // iterate over all session requests and fill the slice
+			all = append(all, rq{id, req.CreatedAt.UnixNano()})
 
-				return true
-			})
+			return true
+		})
 
-			if len(all) > int(s.maxRequests) { // if the number of requests exceeds the limit
-				sort.Slice(all, func(i, j int) bool { return all[i].ts > all[j].ts }) // sort requests by creation time
+		if len(all) > int(s.maxRequests) { // if the number of requests exceeds the limit
+			sort.Slice(all, func(i, j int) bool { return all[i].ts > all[j].ts }) // sort requests by creation time
 
-				for i := int(s.maxRequests); i < len(all); i++ { // delete the oldest requests
-					requests.Delete(all[i].id)
-				}
+			for i := int(s.maxRequests); i < len(all); i++ { // delete the oldest requests
+				data.requests.Delete(all[i].id)
 			}
 		}
-	} else {
-		var pool = new(syncMap[string, Request])
-
-		pool.Store(rID, r)
-
-		s.requests.Store(sID, pool)
 	}
 
 	return
@@ -187,14 +185,13 @@ func (s *InMemory) GetRequest(sID, rID string) (*Request, error) {
 		return nil, ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.Load(sID); !ok {
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
 		return nil, ErrSessionNotFound // session not found
 	}
 
-	if requests, hasRequests := s.requests.Load(sID); hasRequests {
-		if request, ok := requests.Load(rID); ok {
-			return &request, nil
-		}
+	if request, ok := session.requests.Load(rID); ok {
+		return &request, nil
 	}
 
 	return nil, ErrRequestNotFound // request not found
@@ -205,23 +202,20 @@ func (s *InMemory) GetAllRequests(sID string) (map[string]Request, error) {
 		return nil, ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.Load(sID); !ok {
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
 		return nil, ErrSessionNotFound // session not found
 	}
 
-	if requests, hasRequests := s.requests.Load(sID); hasRequests {
-		var all = make(map[string]Request)
+	var all = make(map[string]Request)
 
-		requests.Range(func(id string, req Request) bool {
-			all[id] = req
+	session.requests.Range(func(id string, req Request) bool {
+		all[id] = req
 
-			return true
-		})
+		return true
+	})
 
-		return all, nil
-	}
-
-	return nil, nil // no requests
+	return all, nil
 }
 
 func (s *InMemory) DeleteRequest(sID, rID string) error {
@@ -229,14 +223,13 @@ func (s *InMemory) DeleteRequest(sID, rID string) error {
 		return ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.Load(sID); !ok {
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
 		return ErrSessionNotFound // session not found
 	}
 
-	if requests, hasRequests := s.requests.Load(sID); hasRequests {
-		if _, ok := requests.LoadAndDelete(rID); ok {
-			return nil
-		}
+	if _, ok := session.requests.LoadAndDelete(rID); ok {
+		return nil
 	}
 
 	return ErrRequestNotFound // request not found
@@ -247,18 +240,17 @@ func (s *InMemory) DeleteAllRequests(sID string) error {
 		return ErrClosed // storage is closed
 	}
 
-	if _, ok := s.sessions.Load(sID); !ok {
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
 		return ErrSessionNotFound // session not found
 	}
 
 	// delete all session requests
-	if requests, hasRequests := s.requests.LoadAndDelete(sID); hasRequests {
-		requests.Range(func(rID string, _ Request) bool {
-			requests.Delete(rID)
+	session.requests.Range(func(rID string, _ Request) bool {
+		session.requests.Delete(rID)
 
-			return true
-		})
-	}
+		return true
+	})
 
 	return nil // no requests
 }
