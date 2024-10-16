@@ -19,8 +19,8 @@ func testPublishAndReceive(t *testing.T, new func() pubSub[any]) {
 	t.Helper()
 
 	const (
-		channel1name, channel2name = "foo", "bar"
-		event1data, event2data     = "event1", "event2"
+		topic1name, topic2name = "foo", "bar"
+		event1data, event2data = "event1", "event2"
 	)
 
 	var (
@@ -29,8 +29,8 @@ func testPublishAndReceive(t *testing.T, new func() pubSub[any]) {
 	)
 
 	var (
-		sub1, close1, sub1err = ps.Subscribe(ctx, channel1name)
-		sub2, close2, sub2err = ps.Subscribe(ctx, channel2name)
+		sub1, close1, sub1err = ps.Subscribe(ctx, topic1name)
+		sub2, close2, sub2err = ps.Subscribe(ctx, topic2name)
 	)
 
 	require.NotNil(t, sub1)
@@ -42,8 +42,8 @@ func testPublishAndReceive(t *testing.T, new func() pubSub[any]) {
 	require.NoError(t, sub2err)
 
 	t.Run("publish", func(t *testing.T) {
-		require.NoError(t, ps.Publish(ctx, channel1name, event1data))
-		require.NoError(t, ps.Publish(ctx, channel2name, event2data))
+		require.NoError(t, ps.Publish(ctx, topic1name, event1data))
+		require.NoError(t, ps.Publish(ctx, topic2name, event2data))
 
 		var (
 			event1, isSub1open = <-sub1
@@ -57,14 +57,14 @@ func testPublishAndReceive(t *testing.T, new func() pubSub[any]) {
 		require.True(t, isSub2open)
 	})
 
-	require.NoError(t, ps.Publish(ctx, channel1name, event1data)) // will not be delivered
-	require.NoError(t, ps.Publish(ctx, channel2name, event2data)) // will not be delivered
+	require.NoError(t, ps.Publish(ctx, topic1name, event1data)) // will not be delivered
+	require.NoError(t, ps.Publish(ctx, topic2name, event2data)) // will not be delivered
 
 	close1()
 	close2()
 
-	require.NoError(t, ps.Publish(ctx, channel1name, event1data)) // will not be delivered
-	require.NoError(t, ps.Publish(ctx, channel2name, event2data)) // will not be delivered
+	require.NoError(t, ps.Publish(ctx, topic1name, event1data)) // will not be delivered
+	require.NoError(t, ps.Publish(ctx, topic2name, event2data)) // will not be delivered
 
 	t.Run("read from closed", func(t *testing.T) {
 		var (
@@ -93,10 +93,10 @@ func testRaceProvocation(t *testing.T, new func() pubSub[any]) {
 		wg  sync.WaitGroup
 	)
 
-	const channelName, eventData = "foo", "event"
+	const topicName, eventData = "foo", "event"
 
 	for range 1_000 {
-		sub, unsubscribe, err := ps.Subscribe(ctx, channelName) // subscribe
+		sub, unsubscribe, err := ps.Subscribe(ctx, topicName) // subscribe
 		require.NoError(t, err)
 
 		wg.Add(1)
@@ -114,7 +114,7 @@ func testRaceProvocation(t *testing.T, new func() pubSub[any]) {
 		go func() {
 			defer wg.Done()
 
-			require.NoError(t, ps.Publish(ctx, channelName, eventData)) // publish
+			require.NoError(t, ps.Publish(ctx, topicName, eventData)) // publish
 		}()
 	}
 

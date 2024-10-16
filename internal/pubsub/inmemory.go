@@ -7,7 +7,7 @@ import (
 
 type InMemory[T any] struct {
 	subsMu sync.Mutex
-	subs   map[string]map[chan<- T]chan struct{} // map[channel_name]map[subscribed_channel]stop_channel
+	subs   map[string]map[chan<- T]chan struct{} // map[topic]map[subscription]stop
 }
 
 var ( // ensure interface implementation
@@ -19,7 +19,7 @@ func NewInMemory[T any]() *InMemory[T] {
 	return &InMemory[T]{subs: make(map[string]map[chan<- T]chan struct{})}
 }
 
-func (ps *InMemory[T]) Publish(ctx context.Context, channel string, event T) error {
+func (ps *InMemory[T]) Publish(ctx context.Context, topic string, event T) error {
 	if err := ctx.Err(); err != nil {
 		return err // context is done
 	}
@@ -27,12 +27,12 @@ func (ps *InMemory[T]) Publish(ctx context.Context, channel string, event T) err
 	ps.subsMu.Lock()
 	defer ps.subsMu.Unlock()
 
-	if _, exists := ps.subs[channel]; !exists { // if there are no subscribers - do not publish
+	if _, exists := ps.subs[topic]; !exists { // if there are no subscribers - do not publish
 		return nil
 	}
 
-	for target, stop := range ps.subs[channel] {
-		go func(target chan<- T, stop <-chan struct{}) {
+	for sub, stop := range ps.subs[topic] {
+		go func(sub chan<- T, stop <-chan struct{}) {
 			select { // first, check if we need to stop to avoid blocking on probably already closed channel
 			case <-stop:
 			case <-ctx.Done():
@@ -40,16 +40,16 @@ func (ps *InMemory[T]) Publish(ctx context.Context, channel string, event T) err
 				select { // then, try to send an event
 				case <-stop:
 				case <-ctx.Done():
-				case target <- event:
+				case sub <- event:
 				}
 			}
-		}(target, stop)
+		}(sub, stop)
 	}
 
 	return nil
 }
 
-func (ps *InMemory[T]) Subscribe(ctx context.Context, channel string) (<-chan T, func(), error) {
+func (ps *InMemory[T]) Subscribe(ctx context.Context, topic string) (<-chan T, func(), error) {
 	if err := ctx.Err(); err != nil {
 		return nil, func() { /* noop */ }, err // context is done
 	}
@@ -57,26 +57,32 @@ func (ps *InMemory[T]) Subscribe(ctx context.Context, channel string) (<-chan T,
 	ps.subsMu.Lock()
 	defer ps.subsMu.Unlock()
 
-	if _, exists := ps.subs[channel]; !exists { // create a subscription if needed
-		ps.subs[channel] = make(map[chan<- T]chan struct{})
+	if _, exists := ps.subs[topic]; !exists { // create a subscription if needed
+		ps.subs[topic] = make(map[chan<- T]chan struct{})
 	}
 
-	var sub, stop = make(chan T), make(chan struct{})
+	var sub, stop = make(chan T, 1), make(chan struct{})
 
-	ps.subs[channel][sub] = stop
+	ps.subs[topic][sub] = stop
 
 	return sub, sync.OnceFunc(func() {
 		close(stop) // notify to stop
 
 		ps.subsMu.Lock()
-		defer ps.subsMu.Unlock()
 
 		// remove subscription
-		delete(ps.subs[channel], sub)
+		delete(ps.subs[topic], sub)
 
 		// remove channel if there are no subscribers
-		if len(ps.subs[channel]) == 0 {
-			delete(ps.subs, channel)
+		if len(ps.subs[topic]) == 0 {
+			delete(ps.subs, topic)
+		}
+
+		ps.subsMu.Unlock()
+
+		// empty the sub channel
+		for len(sub) > 0 {
+			<-sub
 		}
 
 		close(sub) // close channel
