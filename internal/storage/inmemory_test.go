@@ -68,25 +68,3 @@ func TestInMemory_RaceProvocation(t *testing.T) {
 		return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryCleanupInterval(10*time.Nanosecond))
 	})
 }
-
-// cpu: 12th Gen Intel(R) Core(TM) i7-1260P
-// BenchmarkInMemory
-// BenchmarkInMemory-16    	  400557	      3742 ns/op
-func BenchmarkInMemory(b *testing.B) {
-	s := storage.NewInMemory(time.Second, 10)
-	defer s.Close()
-
-	var ctx = context.Background()
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		sID, _ := s.NewSession(ctx, storage.Session{})
-		_, _ = s.GetSession(ctx, sID)
-
-		rID, _ := s.NewRequest(ctx, sID, storage.Request{})
-		_, _ = s.GetRequest(ctx, sID, rID)
-
-		_ = s.DeleteRequest(ctx, sID, rID)
-	}
-}

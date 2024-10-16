@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type (
@@ -39,7 +39,7 @@ func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisO
 }
 
 // sessionKey returns the key for the session data.
-func (s *Redis) sessionKey(sID string) string { return "webhook-tester-v2:session:" + sID }
+func (*Redis) sessionKey(sID string) string { return "webhook-tester-v2:session:" + sID }
 
 // requestsKey returns the key for the requests list.
 func (s *Redis) requestsKey(sID string) string { return s.sessionKey(sID) + ":requests" }
@@ -48,10 +48,10 @@ func (s *Redis) requestsKey(sID string) string { return s.sessionKey(sID) + ":re
 func (s *Redis) requestKey(sID, rID string) string { return s.sessionKey(sID) + ":requests:" + rID }
 
 // newID generates a new (unique) ID.
-func (s *Redis) newID() string { return uuid.New().String() }
+func (*Redis) newID() string { return uuid.New().String() }
 
-func (s *Redis) unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
-func (s *Redis) marshal(v any) ([]byte, error)      { return json.Marshal(v) }
+func (*Redis) unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
+func (*Redis) marshal(v any) ([]byte, error)      { return json.Marshal(v) }
 
 func (s *Redis) NewSession(ctx context.Context, session Session) (sID string, _ error) {
 	sID, session.CreatedAt.Time = s.newID(), time.Now()
@@ -113,7 +113,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 	// save the request data
 	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.ZAdd(ctx, s.requestsKey(sID), &redis.Z{Score: float64(r.CreatedAt.UnixNano()), Member: rID})
+		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(r.CreatedAt.UnixNano()), Member: rID})
 		pipe.Set(ctx, s.requestKey(sID, rID), data, s.sessionTTL)
 
 		return nil

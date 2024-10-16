@@ -5,10 +5,17 @@ import (
 	"sync"
 )
 
-type InMemory[T any] struct {
-	subsMu sync.Mutex
-	subs   map[string]map[chan<- T]chan struct{} // map[topic]map[subscription]stop
-}
+type (
+	InMemory[T any] struct {
+		subsMu sync.Mutex
+		subs   map[ /* topic */ string]map[ /* subscription */ chan<- T]*inMemorySubState
+	}
+
+	inMemorySubState struct {
+		wg   sync.WaitGroup
+		stop chan struct{}
+	}
+)
 
 var ( // ensure interface implementation
 	_ Publisher[any]  = (*InMemory[any])(nil)
@@ -16,7 +23,7 @@ var ( // ensure interface implementation
 )
 
 func NewInMemory[T any]() *InMemory[T] {
-	return &InMemory[T]{subs: make(map[string]map[chan<- T]chan struct{})}
+	return &InMemory[T]{subs: make(map[string]map[chan<- T]*inMemorySubState)}
 }
 
 func (ps *InMemory[T]) Publish(ctx context.Context, topic string, event T) error {
@@ -31,19 +38,18 @@ func (ps *InMemory[T]) Publish(ctx context.Context, topic string, event T) error
 		return nil
 	}
 
-	for sub, stop := range ps.subs[topic] {
-		go func(sub chan<- T, stop <-chan struct{}) {
-			select { // first, check if we need to stop to avoid blocking on probably already closed channel
-			case <-stop:
-			case <-ctx.Done():
-			default:
-				select { // then, try to send an event
-				case <-stop:
-				case <-ctx.Done():
-				case sub <- event:
-				}
+	for sub, state := range ps.subs[topic] {
+		state.wg.Add(1) // tell the subscriber that we are about to send an event
+
+		go func(sub chan<- T, stop <-chan struct{}, wg *sync.WaitGroup) {
+			defer wg.Done() // notify the subscriber that we are done
+
+			select {
+			case <-ctx.Done(): // check the context
+			case <-stop: // stopping notification
+			case sub <- event: // and in the same time try to send the event
 			}
-		}(sub, stop)
+		}(sub, state.stop, &state.wg)
 	}
 
 	return nil
@@ -58,33 +64,32 @@ func (ps *InMemory[T]) Subscribe(ctx context.Context, topic string) (<-chan T, f
 	defer ps.subsMu.Unlock()
 
 	if _, exists := ps.subs[topic]; !exists { // create a subscription if needed
-		ps.subs[topic] = make(map[chan<- T]chan struct{})
+		ps.subs[topic] = make(map[chan<- T]*inMemorySubState)
 	}
 
-	var sub, stop = make(chan T, 1), make(chan struct{})
+	var sub, state = make(chan T), &inMemorySubState{stop: make(chan struct{})}
 
-	ps.subs[topic][sub] = stop
+	ps.subs[topic][sub] = state
 
 	return sub, sync.OnceFunc(func() {
-		close(stop) // notify to stop
+		close(state.stop) // notify all the publishers to stop
 
 		ps.subsMu.Lock()
 
-		// remove subscription
-		delete(ps.subs[topic], sub)
+		delete(ps.subs[topic], sub) // remove subscription
 
-		// remove channel if there are no subscribers
-		if len(ps.subs[topic]) == 0 {
+		if len(ps.subs[topic]) == 0 { // remove channel if there are no subscribers (cleanup)
 			delete(ps.subs, topic)
 		}
 
 		ps.subsMu.Unlock()
 
-		// empty the sub channel
 		for len(sub) > 0 {
 			<-sub
 		}
 
-		close(sub) // close channel
+		state.wg.Wait() // wait until all the publishers are done
+
+		close(sub) // and close the subscription channel
 	}), nil
 }

@@ -63,7 +63,7 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 }
 
 // newID generates a new (unique) ID.
-func (s *InMemory) newID() string { return uuid.New().String() }
+func (*InMemory) newID() string { return uuid.New().String() }
 
 func (s *InMemory) cleanup() {
 	var timer = time.NewTimer(s.cleanupInterval)
