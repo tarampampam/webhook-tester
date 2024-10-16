@@ -2,6 +2,7 @@ package pubsub_test
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 
@@ -9,6 +10,13 @@ import (
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
 )
+
+type jsonSerializer struct{}
+
+func (jsonSerializer) Encode(v any) ([]byte, error)    { return json.Marshal(v) }
+func (jsonSerializer) Decode(data []byte, v any) error { return json.Unmarshal(data, v) }
+
+var encDec = new(jsonSerializer)
 
 type pubSub[T any] interface {
 	pubsub.Publisher[T]

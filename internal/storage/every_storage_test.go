@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/url"
 	"sync"
@@ -13,6 +14,13 @@ import (
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
+
+type jsonSerializer struct{}
+
+func (jsonSerializer) Encode(v any) ([]byte, error)    { return json.Marshal(v) }
+func (jsonSerializer) Decode(data []byte, v any) error { return json.Unmarshal(data, v) }
+
+var encDec = new(jsonSerializer)
 
 func toCloser(s storage.Storage) io.Closer {
 	if c, ok := s.(io.Closer); ok {

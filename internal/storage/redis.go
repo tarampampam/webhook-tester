@@ -2,12 +2,13 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
 type (
@@ -15,20 +16,26 @@ type (
 		sessionTTL  time.Duration
 		maxRequests uint32
 		client      redis.Cmdable
+		encDec      encoding.EncoderDecoder
 	}
 )
 
-var ( // ensure interface implementation
-	_ Storage = (*Redis)(nil)
-)
+var _ Storage = (*Redis)(nil) // ensure interface implementation
 
 type RedisOption func(*Redis)
 
-func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisOption) *Redis {
+func NewRedis(
+	c redis.Cmdable,
+	encDec encoding.EncoderDecoder,
+	sTTL time.Duration,
+	maxReq uint32,
+	opts ...RedisOption,
+) *Redis {
 	var s = Redis{
 		sessionTTL:  sTTL,
 		maxRequests: maxReq,
 		client:      c,
+		encDec:      encDec,
 	}
 
 	for _, opt := range opts {
@@ -50,13 +57,10 @@ func (s *Redis) requestKey(sID, rID string) string { return s.sessionKey(sID) + 
 // newID generates a new (unique) ID.
 func (*Redis) newID() string { return uuid.New().String() }
 
-func (*Redis) unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
-func (*Redis) marshal(v any) ([]byte, error)      { return json.Marshal(v) }
-
 func (s *Redis) NewSession(ctx context.Context, session Session) (sID string, _ error) {
 	sID, session.CreatedAt.Time = s.newID(), time.Now()
 
-	data, mErr := s.marshal(session)
+	data, mErr := s.encDec.Encode(session)
 	if mErr != nil {
 		return "", mErr
 	}
@@ -79,7 +83,7 @@ func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
 	}
 
 	var session Session
-	if uErr := s.unmarshal(data, &session); uErr != nil {
+	if uErr := s.encDec.Decode(data, &session); uErr != nil {
 		return nil, uErr
 	}
 
@@ -106,7 +110,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 	rID, r.CreatedAt.Time = s.newID(), time.Now()
 
-	data, mErr := s.marshal(r)
+	data, mErr := s.encDec.Encode(r)
 	if mErr != nil {
 		return "", mErr
 	}
@@ -184,7 +188,7 @@ func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, erro
 	}
 
 	var request Request
-	if uErr := s.unmarshal(data, &request); uErr != nil {
+	if uErr := s.encDec.Decode(data, &request); uErr != nil {
 		return nil, uErr
 	}
 
@@ -229,7 +233,7 @@ func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Requ
 		}
 
 		var request Request
-		if uErr := s.unmarshal([]byte(d.(string)), &request); uErr != nil {
+		if uErr := s.encDec.Decode([]byte(d.(string)), &request); uErr != nil {
 			return nil, uErr
 		}
 

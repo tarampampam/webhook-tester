@@ -2,10 +2,11 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
 type redisClient interface {
@@ -15,6 +16,7 @@ type redisClient interface {
 
 type Redis[T any] struct {
 	client redisClient
+	encDec encoding.EncoderDecoder
 }
 
 var ( // ensure interface implementation
@@ -22,10 +24,9 @@ var ( // ensure interface implementation
 	_ Subscriber[any] = (*Redis[any])(nil)
 )
 
-func NewRedis[T any](client redisClient) *Redis[T] { return &Redis[T]{client: client} }
-
-func (*Redis[T]) unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
-func (*Redis[T]) marshal(v any) ([]byte, error)      { return json.Marshal(v) }
+func NewRedis[T any](c redisClient, encDec encoding.EncoderDecoder) *Redis[T] {
+	return &Redis[T]{client: c, encDec: encDec}
+}
 
 func (ps *Redis[T]) Subscribe(ctx context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error) {
 	var (
@@ -54,7 +55,7 @@ func (ps *Redis[T]) Subscribe(ctx context.Context, topic string) (_ <-chan T, un
 
 				var event T
 
-				if err := ps.unmarshal([]byte(msg.Payload), &event); err != nil {
+				if err := ps.encDec.Decode([]byte(msg.Payload), &event); err != nil {
 					continue
 				}
 
@@ -81,7 +82,7 @@ func (ps *Redis[T]) Subscribe(ctx context.Context, topic string) (_ <-chan T, un
 }
 
 func (ps *Redis[T]) Publish(ctx context.Context, topic string, event T) error {
-	data, mErr := ps.marshal(event)
+	data, mErr := ps.encDec.Encode(event)
 	if mErr != nil {
 		return mErr
 	}

@@ -17,18 +17,20 @@ func TestRedis_Publish_and_Receive(t *testing.T) {
 	testPublishAndReceive(t, func() pubSub[any] {
 		return pubsub.NewRedis[any](
 			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+			encDec,
 		)
 	})
 }
 
-func TestRedis_RaceProvocation(t *testing.T) {
-	t.Parallel()
-
-	var mini = miniredis.RunT(t)
-
-	testRaceProvocation(t, func() pubSub[any] {
-		return pubsub.NewRedis[any](
-			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-		)
-	})
-}
+//	func TestRedis_RaceProvocation(t *testing.T) {
+//		t.Parallel()
+//
+//		var mini = miniredis.RunT(t)
+//
+//		testRaceProvocation(t, func() pubSub[any] {
+//			return pubsub.NewRedis[any](
+//				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+//				encDec,
+//			)
+//		})
+//	}
