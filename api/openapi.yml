@@ -35,6 +35,16 @@ paths:
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
   /api/session/{session_uuid}:
+    get:
+      summary: Get session options by UUID
+      tags: [api]
+      operationId: apiSessionGet
+      parameters: [{$ref: '#/components/parameters/SessionUUIDInPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/SessionOptionsResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
     delete:
       summary: Delete a session by UUID
       tags: [api]
