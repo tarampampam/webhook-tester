@@ -28,7 +28,7 @@ import (
 type ( // type aliases for better readability
 	sID  = openapi.SessionUUIDInPath
 	rID  = openapi.RequestUUIDInPath
-	skip = openapi.ApiSessionRequestsSubscribeParams
+	skip = openapi.ApiSessionRequestsSubscribeParams // it doesn't matter
 )
 
 type OpenAPI struct {
@@ -82,7 +82,19 @@ func (o *OpenAPI) ApiSettings(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
-	panic("implement me")
+	var payload openapi.CreateSessionRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&r.Body); err != nil {
+		o.errorToJson(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	if resp, err := o.handlers.sessionCreate(payload); err != nil {
+		o.errorToJson(w, err, http.StatusInternalServerError)
+	} else {
+		o.respToJson(w, resp)
+	}
 }
 
 func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, _ *http.Request, sID sID) {

@@ -347,14 +347,16 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 
 	_, _ = stor, pubSub // FIXME
 
+	var httpLog = log.Named("http")
+
 	// create HTTP server
-	var server = appHttp.NewServer(ctx, log,
+	var server = appHttp.NewServer(ctx, httpLog,
 		appHttp.WithReadTimeout(cmd.options.timeouts.httpRead),
 		appHttp.WithWriteTimeout(cmd.options.timeouts.httpWrite),
 		appHttp.WithIDLETimeout(cmd.options.timeouts.httpIdle),
 	).Register(
 		ctx,
-		log,
+		httpLog,
 		cmd.options.frontend.useLive,
 	)
 
