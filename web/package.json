@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate": "node --no-deprecation ./node_modules/.bin/openapi-typescript ./../api/openapi.yml --immutable --enum --array-length --additional-properties=false --output ./src/api/schema.gen.ts",
+    "generate": "node --no-deprecation ./generate.js ./../api/openapi.yml ./src/api/schema.gen.ts",
     "fmt": "prettier --write ./*.{js,ts} ./src && npm run lint:es -- --fix",
     "lint": "npm run lint:ts && npm run lint:es",
     "lint:ts": "tsc --noEmit",

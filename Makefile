@@ -11,8 +11,9 @@ shell: ## Start shell
 	docker compose run $(DC_RUN_ARGS) app bash
 
 generate: ## Run code generation
-	docker compose run $(DC_RUN_ARGS) app go generate ./...
+	docker compose run $(DC_RUN_ARGS) app go generate -skip readme ./...
 	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run generate
+	docker compose run $(DC_RUN_ARGS) app go generate -run readme ./...
 
 node-build: ## Build the frontend
 	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run build

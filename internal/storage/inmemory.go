@@ -23,6 +23,7 @@ type (
 	}
 
 	sessionData struct {
+		sync.Mutex
 		session  Session
 		requests syncMap[ /* rID */ string, Request]
 	}
@@ -87,6 +88,9 @@ func (s *InMemory) cleanup() {
 			var now = time.Now()
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
+				data.Lock()
+				defer data.Unlock()
+
 				if data.session.ExpiresAt.Before(now) {
 					_ = s.DeleteSession(ctx, sID)
 				}
@@ -148,9 +152,10 @@ func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.D
 		return ErrSessionNotFound // session not found
 	}
 
-	data.session.ExpiresAt = data.session.ExpiresAt.Add(howMuch)
+	data.Lock()
+	defer data.Unlock()
 
-	s.sessions.Store(sID, data)
+	data.session.ExpiresAt = data.session.ExpiresAt.Add(howMuch)
 
 	return nil
 }

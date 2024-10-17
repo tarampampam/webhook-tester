@@ -14,3 +14,8 @@ type (
 		Subscribe(_ context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error)
 	}
 )
+
+type PubSub[T any] interface {
+	Publisher[T]
+	Subscriber[T]
+}
