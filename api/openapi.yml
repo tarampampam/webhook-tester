@@ -1,3 +1,392 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
 
-openapi: '3.0.3'
+openapi: 3.0.3
+info:
+  title: WebHook Tester
+  description: The powerful tool to test webhooks and not only
+  version: 0.2.0
+  contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
+
+servers:
+  - {url: '/', description: Current server}
+
+tags:
+  - name: api
+  - name: service
+
+paths:
+  /api/settings:
+    get:
+      summary: Get app settings
+      tags: [api]
+      operationId: apiSettings
+      responses:
+        '200': {$ref: '#/components/responses/SettingsResponse'}
+
+  /api/session:
+    post:
+      summary: Create a new session
+      tags: [api]
+      operationId: apiSessionCreate
+      requestBody: {$ref: '#/components/requestBodies/CreateSessionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/SessionOptionsResponse'}
+        '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /api/session/{session_uuid}:
+    delete:
+      summary: Delete a session by UUID
+      tags: [api]
+      operationId: apiSessionDelete
+      parameters: [{$ref: '#/components/parameters/SessionUUIDInPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/SuccessfulOperationResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /api/session/{session_uuid}/requests:
+    get:
+      summary: Get the list of requests for a session by UUID
+      tags: [api]
+      operationId: apiSessionListRequests
+      parameters: [{$ref: '#/components/parameters/SessionUUIDInPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/CapturedRequestsListResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+    delete:
+      summary: Delete all requests for a session by UUID
+      tags: [api]
+      operationId: apiSessionDeleteAllRequests
+      parameters: [{$ref: '#/components/parameters/SessionUUIDInPath'}]
+      responses:
+        '200': {$ref: '#/components/responses/SuccessfulOperationResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /api/session/{session_uuid}/requests/subscribe:
+    get:
+      summary: Subscribe to new requests for a session by UUID using WebSocket
+      tags: [api]
+      operationId: apiSessionRequestsSubscribe
+      parameters:
+        - {$ref: '#/components/parameters/SessionUUIDInPath'}
+        - {$ref: '#/components/parameters/WebSocketRequestConnectionInHeader'}
+        - {$ref: '#/components/parameters/WebSocketRequestUpgradeInHeader'}
+        - {$ref: '#/components/parameters/WebSocketRequestSecKeyInHeader'}
+        - {$ref: '#/components/parameters/WebSocketRequestSecVersionInHeader'}
+      responses:
+        '101':
+          description: Switching Protocols
+          headers:
+            Connection: {$ref: '#/components/headers/WebSocketResponseConnection'}
+            Upgrade: {$ref: '#/components/headers/WebSocketResponseUpgrade'}
+            Sec-Websocket-Accept: {$ref: '#/components/headers/WebSocketResponseSecWebsocketAccept'}
+        '200':
+          description: WebSocket connection established
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CapturedRequest'}
+        '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /api/session/{session_uuid}/requests/{request_uuid}:
+    get:
+      summary: Get captured request details by UUID for a session by UUID
+      tags: [api]
+      operationId: apiSessionGetRequest
+      parameters:
+        - {$ref: '#/components/parameters/SessionUUIDInPath'}
+        - {$ref: '#/components/parameters/RequestUUIDInPath'}
+      responses:
+        '200': {$ref: '#/components/responses/CapturedRequestsResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+    delete:
+      summary: Delete a request by UUID for a session by UUID
+      tags: [api]
+      operationId: apiSessionDeleteRequest
+      parameters:
+        - {$ref: '#/components/parameters/SessionUUIDInPath'}
+        - {$ref: '#/components/parameters/RequestUUIDInPath'}
+      responses:
+        '200': {$ref: '#/components/responses/SuccessfulOperationResponse'}
+        '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /api/version:
+    get:
+      summary: Get app version
+      tags: [api]
+      operationId: apiAppVersion
+      responses:
+        '200': {$ref: '#/components/responses/VersionResponse'}
+
+  /api/version/latest:
+    get:
+      summary: Get the latest app version
+      tags: [api]
+      operationId: apiAppVersionLatest
+      responses:
+        '200': {$ref: '#/components/responses/VersionResponse'}
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
+  /ready:
+    get:
+      summary: Readiness probe (checks if the app is ready to serve traffic)
+      tags: [service]
+      operationId: readinessProbe
+      responses:
+        '200': {$ref: '#/components/responses/ServiceHealthy'}
+        '503': {$ref: '#/components/responses/ServiceUnhealthy'}
+
+    head:
+      summary: Readiness probe (HEAD)
+      description: Alias for the GET method, but without response body content
+      tags: [service]
+      operationId: readinessProbeHead
+      responses:
+        '200': {$ref: '#/components/responses/ServiceHealthy'}
+        '503': {$ref: '#/components/responses/ServiceUnhealthy'}
+
+  /healthz:
+    get:
+      summary: Liveness probe (checks if the app is running or down)
+      tags: [service]
+      operationId: livenessProbe
+      responses:
+        '200': {$ref: '#/components/responses/ServiceHealthy'}
+        '503': {$ref: '#/components/responses/ServiceUnhealthy'}
+
+    head:
+      summary: Liveness probe (HEAD)
+      description: Alias for the GET method, but without response body content
+      tags: [service]
+      operationId: livenessProbeHead
+      responses:
+        '200': {$ref: '#/components/responses/ServiceHealthy'}
+        '503': {$ref: '#/components/responses/ServiceUnhealthy'}
+
+components:
+  schemas: # ------------------------------------------------ SCHEMAS -------------------------------------------------
+    StatusCode:
+      type: integer
+      description: HTTP status code
+      example: 301
+      minimum: 100
+      maximum: 530
+
+    Base64Encoded:
+      type: string
+      description: Base64-encoded content
+      maxLength: 10240
+      example: aGVsbG8gd29ybGQ=
+
+    UnixTime:
+      type: integer
+      description: Unix timestamp
+      example: 1667845578
+      minimum: 1600000000
+
+    UUID:
+      type: string
+      format: uuid
+      pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+      example: 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7
+
+    HttpMethod:
+      type: string
+      enum: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, TRACE]
+      example: GET
+
+    HttpHeaders:
+      description: HTTP headers list
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string, example: User-Agent}
+          value: {type: string, example: curl/7.68.0}
+        required: [name, value]
+        additionalProperties: false
+
+    SessionResponseOptions:
+      description: Session response options
+      type: object
+      properties:
+        statusCode: {$ref: '#/components/schemas/StatusCode'}
+        headers: {$ref: '#/components/schemas/HttpHeaders'}
+        delay: {type: integer, description: Delay in seconds, maximum: 30, example: 5, x-go-type: uint16}
+        responseBodyBase64: {$ref: '#/components/schemas/Base64Encoded'}
+      required: [statusCode, headers, delay, responseBodyBase64]
+      additionalProperties: false
+
+    AppSettings:
+      description: Configuration settings of the app
+      type: object
+      properties:
+        limits:
+          type: object
+          description: App limit settings
+          properties:
+            maxRequests: {type: integer, x-go-type: uint16, example: 128}
+            maxRequestBodySize: {type: integer, x-go-type: uint32, example: 1024}
+            sessionTTL: {type: integer, x-go-type: uint32, example: 5}
+          required: [maxRequests, maxRequestBodySize, sessionTTL]
+          additionalProperties: false
+      required: [limits]
+      additionalProperties: false
+
+    CapturedRequest:
+      type: object
+      description: Recorded request
+      properties:
+        uuid: {$ref: '#/components/schemas/UUID'}
+        clientAddress: {type: string, format: IPv4, example: '214.184.32.7'}
+        method: {$ref: '#/components/schemas/HttpMethod'}
+        requestPayloadBase64: {$ref: '#/components/schemas/Base64Encoded'}
+        headers: {$ref: '#/components/schemas/HttpHeaders'}
+        url: {description: URL, type: string, example: 'https://example.com/path?query=string'}
+        capturedAt: {$ref: '#/components/schemas/UnixTime'}
+      required: [uuid, clientAddress, method, requestPayloadBase64, headers, url, capturedAt]
+      additionalProperties: false
+
+  headers: # ------------------------------------------------ HEADERS -------------------------------------------------
+    WebSocketResponseConnection:
+      description: WebSocket connection header
+      schema: {type: string, example: Upgrade, externalDocs: {url: 'https://mzl.la/3WWJi8w'}}
+
+    WebSocketResponseUpgrade:
+      description: WebSocket upgrade header
+      schema: {type: string, example: websocket, externalDocs: {url: 'https://mzl.la/46XxkyZ'}}
+
+    WebSocketResponseSecWebsocketAccept:
+      description: WebSocket Sec-WebSocket-Accept header
+      schema: {type: string, example: 'nESCeAuSsDkp9fVKF/BQ9Nfev+U=', externalDocs: {url: 'https://mzl.la/4duaxwC'}}
+
+  parameters: # --------------------------------------------- PARAMETERS ----------------------------------------------
+    SessionUUIDInPath:
+      description: Session UUID (version 4)
+      name: session_uuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        example: 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7
+
+    RequestUUIDInPath:
+      description: Request UUID (version 4)
+      name: request_uuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        example: d74a7998-dcbc-4d77-82ba-27945e56a25d
+
+    WebSocketRequestConnectionInHeader:
+      name: Connection
+      in: header
+      required: true
+      schema: {type: string, example: Upgrade, externalDocs: {url: 'https://mzl.la/3WWJi8w'}}
+
+    WebSocketRequestUpgradeInHeader:
+      name: Upgrade
+      in: header
+      required: true
+      schema: {type: string, example: websocket, externalDocs: {url: 'https://mzl.la/46XxkyZ'}}
+
+    WebSocketRequestSecKeyInHeader:
+      name: Sec-WebSocket-Key
+      in: header
+      required: true
+      schema: {type: string, example: 'K/TxmSsnVc71pFVjGIYy3w=='}
+
+    WebSocketRequestSecVersionInHeader:
+      name: Sec-WebSocket-Version
+      in: header
+      required: true
+      schema: {type: string, example: '13'}
+
+  requestBodies: # --------------------------------------------- REQUESTS ---------------------------------------------
+    CreateSessionRequest:
+      description: Options for creating a new session
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SessionResponseOptions'}
+
+  responses: # ---------------------------------------------- RESPONSES -----------------------------------------------
+    VersionResponse:
+      description: Information about the version
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: {version: {type: string, example: '0.0.1'}}
+            required: [version]
+            additionalProperties: false
+
+    SettingsResponse:
+      description: Configuration settings of the app
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/AppSettings'}
+
+    SessionOptionsResponse:
+      description: Options of the session
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              uuid: {$ref: '#/components/schemas/UUID'}
+              response: {$ref: '#/components/schemas/SessionResponseOptions'}
+              createdAt: {$ref: '#/components/schemas/UnixTime'}
+            required: [uuid, response, createdAt]
+            additionalProperties: false
+
+    CapturedRequestsListResponse:
+      description: List of captured requests, sorted from newest to oldest
+      content:
+        application/json:
+          schema: {type: array, items: {$ref: '#/components/schemas/CapturedRequest'}}
+
+    CapturedRequestsResponse:
+      description: Captured request
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CapturedRequest'}
+
+    SuccessfulOperationResponse:
+      description: Operation completed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: {success: {type: boolean, example: true}}
+            required: [success]
+            additionalProperties: false
+
+    ServiceHealthy:
+      description: Service is operational
+      content: {text/plain: {example: OK}}
+
+    ServiceUnhealthy:
+      description: Service unavailable
+      content: {text/plain: {example: 'application error: some service is unavailable: host "10.0.0.10" unreachable'}}
+
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: {error: {type: string, example: 'Internal server error'}}
+            required: [error]
+            additionalProperties: false

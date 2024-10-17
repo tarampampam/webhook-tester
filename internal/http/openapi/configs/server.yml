@@ -1,0 +1,6 @@
+# The config struct: https://github.com/deepmap/oapi-codegen/blob/master/pkg/codegen/configuration.go#L14-L23
+
+generate:
+  std-http-server: true
+  #echo-server: true
+  #strict-server: true

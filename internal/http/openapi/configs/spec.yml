@@ -1,0 +1,62 @@
+# The config struct: https://github.com/deepmap/oapi-codegen/blob/master/pkg/codegen/configuration.go#L14-L23
+
+generate:
+  embedded-spec: true
+
+output-options:
+  # Important note - since we are overriding the default templates, we need to update them manually when the
+  # openapi-generator version changes. Keep in mind - templates are patched, so you probably need to re-patch them
+  # after updating.
+  # See the template sources here: https://github.com/deepmap/oapi-codegen/tree/master/pkg/codegen/templates
+  #
+  # Keywords: oapi-codegen, openapi-generator, openapi, swagger
+  user-templates:
+    inline.tmpl: |
+      // swaggerSpec is base64 encoded, gzipped, json marshaled Swagger object.
+      var swaggerSpec = []string{
+          {{range .SpecParts}}"{{.}}",
+      {{end}}
+      }
+
+      // decodeSpec returns the content of the embedded swagger specification file
+      // or error if failed to decode.
+      func decodeSpec() ([]byte, error) {
+          zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+          if err != nil {
+              return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+          }
+
+          zr, err := gzip.NewReader(bytes.NewReader(zipped))
+          if err != nil {
+              return nil, fmt.Errorf("error decompressing spec: %w", err)
+          }
+
+          var buf bytes.Buffer
+
+          _, err = buf.ReadFrom(zr)
+          if err != nil {
+              return nil, fmt.Errorf("error decompressing spec: %w", err)
+          }
+
+          return buf.Bytes(), nil
+      }
+
+      {{/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM CODE BEGIN !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */}}
+      var specCache struct {
+          data []byte
+          once sync.Once
+      }
+
+      // Spec returns the OpenAPI specification in JSON format.
+      func Spec() []byte {
+          specCache.once.Do(func() {
+              if data, err := decodeSpec(); err != nil {
+                  panic(err) // will never happen
+              } else {
+                  specCache.data = data
+              }
+          })
+
+          return specCache.data
+      }
+      {{/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  CUSTOM CODE END  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */}}
