@@ -19,7 +19,6 @@ func TestRedis_Session_CreateReadDelete(t *testing.T) {
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			return storage.NewRedis(
 				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-				encDec,
 				sTTL,
 				maxReq,
 			)
@@ -36,7 +35,6 @@ func TestRedis_Request_CreateReadDelete(t *testing.T) {
 	testRequestCreateReadDelete(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
 		return storage.NewRedis(
 			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-			encDec,
 			sTTL,
 			maxReq,
 		)

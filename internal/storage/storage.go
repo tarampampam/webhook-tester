@@ -69,7 +69,7 @@ type (
 		ClientAddr string            `json:"client_addr"` // client hostname or IP address
 		Method     string            `json:"method"`      // HTTP method name (i.e., 'GET', 'POST')
 		Body       []byte            `json:"body"`        // request body (payload)
-		Headers    map[string]string `mjson:"headers"`    // HTTP request headers
+		Headers    map[string]string `json:"headers"`     // HTTP request headers
 		URL        URL               `json:"url"`         // Uniform Resource Identifier
 		CreatedAt  Time              `json:"created_at"`  // creation time
 	}

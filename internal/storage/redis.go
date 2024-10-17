@@ -24,18 +24,12 @@ var _ Storage = (*Redis)(nil) // ensure interface implementation
 
 type RedisOption func(*Redis)
 
-func NewRedis(
-	c redis.Cmdable,
-	encDec encoding.EncoderDecoder,
-	sTTL time.Duration,
-	maxReq uint32,
-	opts ...RedisOption,
-) *Redis {
+func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisOption) *Redis {
 	var s = Redis{
 		sessionTTL:  sTTL,
 		maxRequests: maxReq,
 		client:      c,
-		encDec:      encDec,
+		encDec:      encoding.JSON{},
 	}
 
 	for _, opt := range opts {
@@ -56,6 +50,15 @@ func (s *Redis) requestKey(sID, rID string) string { return s.sessionKey(sID) + 
 
 // newID generates a new (unique) ID.
 func (*Redis) newID() string { return uuid.New().String() }
+
+func (s *Redis) isSessionExists(ctx context.Context, sID string) (bool, error) {
+	count, err := s.client.Exists(ctx, s.sessionKey(sID)).Result()
+	if err != nil {
+		return false, err
+	}
+
+	return count == 1, nil
+}
 
 func (s *Redis) NewSession(ctx context.Context, session Session) (sID string, _ error) {
 	sID, session.CreatedAt.Time = s.newID(), time.Now()
@@ -104,8 +107,10 @@ func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
 
 func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen
 	// check the session existence
-	if _, err := s.GetSession(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return "", err
+	} else if !exists {
+		return "", ErrSessionNotFound
 	}
 
 	rID, r.CreatedAt.Time = s.newID(), time.Now()
@@ -174,8 +179,10 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
 	// check the session existence
-	if _, err := s.GetSession(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
 	}
 
 	data, rErr := s.client.Get(ctx, s.requestKey(sID, rID)).Bytes()
@@ -197,8 +204,10 @@ func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, erro
 
 func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
 	// check the session existence
-	if _, err := s.GetSession(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
 	}
 
 	// read all stored request IDs
@@ -245,8 +254,10 @@ func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Requ
 
 func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
 	// check the session existence
-	if _, err := s.GetSession(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return err
+	} else if !exists {
+		return ErrSessionNotFound
 	}
 
 	var deleted *redis.IntCmd
@@ -270,8 +281,10 @@ func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
 
 func (s *Redis) DeleteAllRequests(ctx context.Context, sID string) error {
 	// check the session existence
-	if _, err := s.GetSession(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return err
+	} else if !exists {
+		return ErrSessionNotFound
 	}
 
 	// read all stored request IDs
