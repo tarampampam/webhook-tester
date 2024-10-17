@@ -114,6 +114,62 @@ func testSessionCreateReadDelete(
 
 		require.ErrorIs(t, err, storage.ErrSessionNotFound)
 	})
+
+	t.Run("add session TTL", func(t *testing.T) {
+		t.Parallel()
+
+		const sessionTTL = time.Millisecond * 10
+
+		var impl = new(sessionTTL, 2)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		// create session
+		sID, err := impl.NewSession(ctx, storage.Session{})
+		require.NoError(t, err)
+		require.NotEmpty(t, sID)
+
+		// get it
+		sess, err := impl.GetSession(ctx, sID)
+		require.NoError(t, err)
+
+		{ // check the created and expiration time
+			var now = time.Now()
+
+			require.InDelta(t, now.UnixMilli(), sess.CreatedAt.UnixMilli(), 50)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+		}
+
+		var ( // store the original values
+			originalCreatedAt = sess.CreatedAt.Time
+			originalTTL       = sess.ExpiresAt
+		)
+
+		// reload the session
+		sess, err = impl.GetSession(ctx, sID)
+		require.NoError(t, err)
+		require.Equal(t, originalCreatedAt, sess.CreatedAt.Time) // should be the same
+		require.InDelta(t, originalTTL.UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+
+		// add TTL
+		require.NoError(t, impl.AddSessionTTL(ctx, sID, sessionTTL*2)) // current ttl = x + 2x = 3x
+
+		// wait for expiration (2x)
+		sleep(sessionTTL * 2)
+
+		// the session should be still alive
+		sess, err = impl.GetSession(ctx, sID)
+		require.NoError(t, err)
+		require.Equal(t, originalCreatedAt, sess.CreatedAt.Time)
+		require.NotEqual(t, originalTTL, sess.ExpiresAt) // changed
+
+		// wait for expiration (2x)
+		sleep(sessionTTL * 2)
+
+		// check again
+		sess, err = impl.GetSession(ctx, sID)
+		require.ErrorIs(t, err, storage.ErrSessionNotFound)
+		require.Nil(t, sess)
+	})
 }
 
 func testRequestCreateReadDelete(
@@ -460,6 +516,8 @@ func testRaceProvocation(
 				require.NoError(t, aErr)
 				require.NotEmpty(t, all)
 			}
+
+			require.NoError(t, impl.AddSessionTTL(ctx, sID, time.Minute))
 
 			require.NoError(t, impl.DeleteRequest(ctx, sID, rID))
 

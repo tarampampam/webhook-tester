@@ -23,7 +23,7 @@ func TestRedis_Session_CreateReadDelete(t *testing.T) {
 				maxReq,
 			)
 		},
-		func(t time.Duration) { mini.FastForward(t); <-time.After(t) },
+		func(t time.Duration) { mini.FastForward(t) },
 	)
 }
 

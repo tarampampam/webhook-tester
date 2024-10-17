@@ -87,7 +87,7 @@ func (s *InMemory) cleanup() {
 			var now = time.Now()
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
-				if data.session.CreatedAt.Add(s.sessionTTL).Before(now) {
+				if data.session.ExpiresAt.Before(now) {
 					_ = s.DeleteSession(ctx, sID)
 				}
 
@@ -106,7 +106,9 @@ func (s *InMemory) NewSession(ctx context.Context, session Session) (sID string,
 		return "", ErrClosed // storage is closed
 	}
 
-	sID, session.CreatedAt.Time = s.newID(), time.Now()
+	var now = time.Now()
+
+	sID, session.CreatedAt.Time, session.ExpiresAt = s.newID(), now, now.Add(s.sessionTTL)
 
 	s.sessions.Store(sID, &sessionData{session: session})
 
@@ -125,13 +127,32 @@ func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error)
 		return nil, ErrSessionNotFound // not found
 	}
 
-	if data.session.CreatedAt.Add(s.sessionTTL).Before(time.Now()) {
+	if data.session.ExpiresAt.Before(time.Now()) {
 		s.sessions.Delete(sID)
 
 		return nil, ErrSessionNotFound // session has been expired
 	}
 
 	return &data.session, nil
+}
+
+func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
+	}
+
+	data, ok := s.sessions.Load(sID)
+	if !ok {
+		return ErrSessionNotFound // session not found
+	}
+
+	data.session.ExpiresAt = data.session.ExpiresAt.Add(howMuch)
+
+	s.sessions.Store(sID, data)
+
+	return nil
 }
 
 func (s *InMemory) DeleteSession(ctx context.Context, sID string) error {

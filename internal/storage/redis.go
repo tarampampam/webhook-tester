@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,10 @@ var _ Storage = (*Redis)(nil) // ensure interface implementation
 
 type RedisOption func(*Redis)
 
+// NewRedis creates a new Redis storage.
+// Notes:
+//   - sTTL is the session TTL (redis accuracy is in milliseconds)
+//   - maxReq is the maximum number of requests to store for the session
 func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisOption) *Redis {
 	var s = Redis{
 		sessionTTL:  sTTL,
@@ -85,12 +90,61 @@ func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, rErr
 	}
 
+	expire, err := s.client.PTTL(ctx, s.sessionKey(sID)).Result()
+	if err != nil {
+		return nil, err
+	}
+
 	var session Session
 	if uErr := s.encDec.Decode(data, &session); uErr != nil {
 		return nil, uErr
 	}
 
+	session.ExpiresAt = time.Now().Add(expire)
+
 	return &session, nil
+}
+
+func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
+	currentTTL, tErr := s.client.PTTL(ctx, s.sessionKey(sID)).Result()
+	if tErr != nil {
+		return tErr
+	}
+
+	if currentTTL < 0 {
+		switch { // https://redis.io/docs/latest/commands/ttl/
+		case currentTTL == -2:
+			return ErrSessionNotFound
+		case currentTTL == -1:
+			return fmt.Errorf("no associated expire: %w", ErrSessionNotFound)
+		}
+
+		return errors.New("unexpected TTL value")
+	}
+
+	// read all stored request UUIDs
+	rIDs, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
+	if rErr != nil {
+		return rErr
+	}
+
+	// update the expiration date for the session and all requests
+	// https://redis.io/docs/latest/commands/expire/
+	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		var newTTL = currentTTL + howMuch
+		for _, rID := range rIDs {
+			pipe.PExpire(ctx, s.requestKey(sID, rID), newTTL)
+		}
+
+		pipe.PExpire(ctx, s.requestsKey(sID), newTTL)
+		pipe.PExpire(ctx, s.sessionKey(sID), newTTL)
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
@@ -162,12 +216,12 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 			}
 
 			for i := range forUpdate {
-				pipe.Expire(ctx, s.requestKey(sID, forUpdate[i]), s.sessionTTL)
+				pipe.PExpire(ctx, s.requestKey(sID, forUpdate[i]), s.sessionTTL)
 			}
 		}
 
-		pipe.Expire(ctx, s.requestsKey(sID), s.sessionTTL)
-		pipe.Expire(ctx, s.sessionKey(sID), s.sessionTTL)
+		pipe.PExpire(ctx, s.requestsKey(sID), s.sessionTTL)
+		pipe.PExpire(ctx, s.sessionKey(sID), s.sessionTTL)
 
 		return nil
 	}); err != nil {
