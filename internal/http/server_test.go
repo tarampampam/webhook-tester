@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"gh.tarampamp.am/webhook-tester/v2/internal/config"
 	appHttp "gh.tarampamp.am/webhook-tester/v2/internal/http"
 	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
@@ -33,6 +34,7 @@ func TestServer_StartHTTP(t *testing.T) {
 		log,
 		func(context.Context) error { return nil },
 		func(context.Context) (string, error) { return "v1.0.0", nil },
+		config.AppSettings{},
 		storage.NewInMemory(time.Minute, 8),
 		pubsub.NewInMemory[any](),
 		false,

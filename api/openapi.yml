@@ -218,8 +218,8 @@ components:
       items:
         type: object
         properties:
-          name: {type: string, example: User-Agent}
-          value: {type: string, example: curl/7.68.0}
+          name: {type: string, minLength: 1, maxLength: 40, example: User-Agent}
+          value: {type: string, minLength: 0, maxLength: 2048, example: curl/7.68.0}
         required: [name, value]
         additionalProperties: false
 
@@ -244,7 +244,7 @@ components:
           properties:
             maxRequests: {type: integer, x-go-type: uint16, example: 128}
             maxRequestBodySize: {type: integer, x-go-type: uint32, example: 1024}
-            sessionTTL: {type: integer, x-go-type: uint32, example: 5}
+            sessionTTL: {type: integer, x-go-type: uint32, example: 5, description: In seconds}
           required: [maxRequests, maxRequestBodySize, sessionTTL]
           additionalProperties: false
       required: [limits]

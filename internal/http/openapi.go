@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"gh.tarampamp.am/webhook-tester/v2/internal/config"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/live"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/ready"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/request_delete"
@@ -60,14 +61,15 @@ func NewOpenAPI(
 	log *zap.Logger,
 	rdyChecker func(context.Context) error,
 	lastAppVer func(context.Context) (string, error),
+	cfg config.AppSettings,
 	db storage.Storage,
 	pubSub pubsub.PubSub[any],
 ) *OpenAPI {
 	var si = &OpenAPI{log: log}
 
-	si.handlers.settingsGet = settings_get.New().Handle
-	si.handlers.sessionCreate = session_create.New().Handle
-	si.handlers.sessionGet = session_get.New().Handle
+	si.handlers.settingsGet = settings_get.New(cfg).Handle
+	si.handlers.sessionCreate = session_create.New(db).Handle
+	si.handlers.sessionGet = session_get.New(db).Handle
 	si.handlers.sessionDelete = session_delete.New().Handle
 	si.handlers.requestsList = requests_list.New().Handle
 	si.handlers.requestsDelete = requests_delete_all.New().Handle
@@ -89,7 +91,13 @@ func (o *OpenAPI) ApiSettings(w http.ResponseWriter, _ *http.Request) {
 func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
 	var payload openapi.CreateSessionRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&r.Body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		o.errorToJson(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	if err := payload.Validate(); err != nil {
 		o.errorToJson(w, err, http.StatusBadRequest)
 
 		return

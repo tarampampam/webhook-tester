@@ -60,11 +60,12 @@ type Storage interface {
 type (
 	// Session describes session settings (like response data and any additional information).
 	Session struct {
-		Code      uint16        `json:"code"`       // default server response code
-		Headers   []HttpHeader  `json:"headers"`    // server response headers
-		Delay     time.Duration `json:"delay"`      // delay before response sending
-		CreatedAt Time          `json:"created_at"` // creation time
-		ExpiresAt time.Time     `json:"-"`          // expiration time
+		Code         uint16        `json:"code"`       // default server response code
+		Headers      []HttpHeader  `json:"headers"`    // server response headers
+		ResponseBody []byte        `json:"body"`       // server response body (payload)
+		Delay        time.Duration `json:"delay"`      // delay before response sending
+		CreatedAt    Time          `json:"created_at"` // creation time
+		ExpiresAt    time.Time     `json:"-"`          // expiration time
 	}
 
 	// Request describes recorded request and additional meta-data.

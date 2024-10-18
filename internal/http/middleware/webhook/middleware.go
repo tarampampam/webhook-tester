@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
 )
 
 func New(log *zap.Logger) func(http.Handler) http.Handler {
@@ -27,28 +28,17 @@ func New(log *zap.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-const uuidLength = 36
-
 // shouldCaptureRequest checks if the request should be captured (the path starts with a valid UUID).
 func shouldCaptureRequest(r *http.Request) bool {
 	if r.URL == nil {
 		return false
 	}
 
-	if clean := strings.TrimLeft(r.URL.Path, "/"); len(clean) >= uuidLength && isValidUUID(clean[:uuidLength]) {
+	var clean = strings.TrimLeft(r.URL.Path, "/")
+
+	if len(clean) >= openapi.UUIDLength && openapi.IsValidUUID(clean[:openapi.UUIDLength]) {
 		return true
 	}
 
 	return false
-}
-
-// isValidUUID checks if passed string is valid UUID v4.
-func isValidUUID(id string) bool {
-	if len(id) != uuidLength {
-		return false
-	}
-
-	_, err := uuid.Parse(id)
-
-	return err == nil
 }

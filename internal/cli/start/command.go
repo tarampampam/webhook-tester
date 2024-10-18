@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/cli/start/healthcheck"
+	"gh.tarampamp.am/webhook-tester/v2/internal/config"
 	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 	appHttp "gh.tarampamp.am/webhook-tester/v2/internal/http"
 	"gh.tarampamp.am/webhook-tester/v2/internal/logger"
@@ -358,6 +359,11 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		httpLog,
 		cmd.readinessChecker(rdc),
 		cmd.latestAppVersionGetter(),
+		config.AppSettings{
+			MaxRequests:        cmd.options.storage.maxRequests,
+			MaxRequestBodySize: cmd.options.maxRequestPayloadSize,
+			SessionTTL:         cmd.options.storage.sessionTTL,
+		},
 		db,
 		pubSub,
 		cmd.options.frontend.useLive,
