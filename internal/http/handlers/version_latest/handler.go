@@ -1,6 +1,7 @@
 package version_latest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -10,7 +11,7 @@ import (
 )
 
 type (
-	versionFetcher func() (string, error)
+	versionFetcher func(context.Context) (string, error)
 
 	Handler struct {
 		mu        sync.Mutex // protects the fields below
@@ -23,7 +24,7 @@ type (
 
 func New(fetcher versionFetcher) *Handler { return &Handler{fetcher: fetcher} }
 
-func (h *Handler) Handle(w http.ResponseWriter) (*openapi.VersionResponse, error) {
+func (h *Handler) Handle(ctx context.Context, w http.ResponseWriter) (*openapi.VersionResponse, error) {
 	const cacheTTL, cacheHitHeader = 5 * time.Minute, "X-Cache"
 
 	h.mu.Lock()
@@ -40,7 +41,7 @@ func (h *Handler) Handle(w http.ResponseWriter) (*openapi.VersionResponse, error
 	w.Header().Set(cacheHitHeader, "MISS")
 
 	// fetch the latest version
-	version, fetchErr := h.fetcher()
+	version, fetchErr := h.fetcher(ctx)
 	if fetchErr != nil {
 		return nil, fmt.Errorf("failed to fetch the latest version: %w", fetchErr)
 	}

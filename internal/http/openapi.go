@@ -36,18 +36,18 @@ type OpenAPI struct {
 
 	handlers struct {
 		settingsGet        func() openapi.SettingsResponse
-		sessionCreate      func(openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
-		sessionGet         func(sID) (*openapi.SessionOptionsResponse, error)
-		sessionDelete      func(sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsList       func(sID) (*openapi.CapturedRequestsListResponse, error)
-		requestsDelete     func(sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsSubscribe  func(http.ResponseWriter, *http.Request, sID) error
-		requestGet         func(sID, rID) (*openapi.CapturedRequestsResponse, error)
-		requestDelete      func(sID, rID) (*openapi.SuccessfulOperationResponse, error)
+		sessionCreate      func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
+		sessionGet         func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
+		sessionDelete      func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsList       func(context.Context, sID) (*openapi.CapturedRequestsListResponse, error)
+		requestsDelete     func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsSubscribe  func(context.Context, http.ResponseWriter, *http.Request, sID) error
+		requestGet         func(context.Context, sID, rID) (*openapi.CapturedRequestsResponse, error)
+		requestDelete      func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
 		appVersion         func() openapi.VersionResponse
-		appVersionLatest   func(http.ResponseWriter) (*openapi.VersionResponse, error)
-		readinessProbe     func(http.ResponseWriter)
-		readinessProbeHead func(http.ResponseWriter)
+		appVersionLatest   func(context.Context, http.ResponseWriter) (*openapi.VersionResponse, error)
+		readinessProbe     func(context.Context, http.ResponseWriter)
+		readinessProbeHead func(context.Context, http.ResponseWriter)
 		livenessProbe      func(http.ResponseWriter)
 		livenessProbeHead  func(http.ResponseWriter)
 	}
@@ -56,7 +56,10 @@ type OpenAPI struct {
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // verify interface implementation
 
 func NewOpenAPI(ctx context.Context, log *zap.Logger) *OpenAPI {
-	var si = &OpenAPI{log: log}
+	var (
+		si                   = &OpenAPI{log: log}
+		latestVersionFetcher = func(ctx context.Context) (string, error) { return appVersion.Latest(ctx) }
+	)
 
 	si.handlers.settingsGet = settings_get.New().Handle
 	si.handlers.sessionCreate = session_create.New().Handle
@@ -68,7 +71,7 @@ func NewOpenAPI(ctx context.Context, log *zap.Logger) *OpenAPI {
 	si.handlers.requestGet = request_get.New().Handle
 	si.handlers.requestDelete = request_delete.New().Handle
 	si.handlers.appVersion = version.New(appVersion.Version()).Handle
-	si.handlers.appVersionLatest = version_latest.New(func() (string, error) { return appVersion.Latest(ctx) }).Handle
+	si.handlers.appVersionLatest = version_latest.New(latestVersionFetcher).Handle
 	si.handlers.readinessProbe = ready.New().HandleGet
 	si.handlers.readinessProbeHead = ready.New().HandleHead
 	si.handlers.livenessProbe = live.New().HandleGet
@@ -90,39 +93,39 @@ func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if resp, err := o.handlers.sessionCreate(payload); err != nil {
+	if resp, err := o.handlers.sessionCreate(r.Context(), payload); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, _ *http.Request, sID sID) {
-	if resp, err := o.handlers.sessionGet(sID); err != nil {
+func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, r *http.Request, sID sID) {
+	if resp, err := o.handlers.sessionGet(r.Context(), sID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ApiSessionDelete(w http.ResponseWriter, _ *http.Request, sID sID) {
-	if resp, err := o.handlers.sessionDelete(sID); err != nil {
+func (o *OpenAPI) ApiSessionDelete(w http.ResponseWriter, r *http.Request, sID sID) {
+	if resp, err := o.handlers.sessionDelete(r.Context(), sID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ApiSessionListRequests(w http.ResponseWriter, _ *http.Request, sID sID) {
-	if resp, err := o.handlers.requestsList(sID); err != nil {
+func (o *OpenAPI) ApiSessionListRequests(w http.ResponseWriter, r *http.Request, sID sID) {
+	if resp, err := o.handlers.requestsList(r.Context(), sID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, _ *http.Request, sID sID) {
-	if resp, err := o.handlers.requestsDelete(sID); err != nil {
+func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, r *http.Request, sID sID) {
+	if resp, err := o.handlers.requestsDelete(r.Context(), sID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
@@ -130,21 +133,21 @@ func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, _ *http.Req
 }
 
 func (o *OpenAPI) ApiSessionRequestsSubscribe(w http.ResponseWriter, r *http.Request, sID sID, _ skip) {
-	if err := o.handlers.requestsSubscribe(w, r, sID); err != nil {
+	if err := o.handlers.requestsSubscribe(r.Context(), w, r, sID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	}
 }
 
-func (o *OpenAPI) ApiSessionGetRequest(w http.ResponseWriter, _ *http.Request, sID sID, rID rID) {
-	if resp, err := o.handlers.requestGet(sID, rID); err != nil {
+func (o *OpenAPI) ApiSessionGetRequest(w http.ResponseWriter, r *http.Request, sID sID, rID rID) {
+	if resp, err := o.handlers.requestGet(r.Context(), sID, rID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ApiSessionDeleteRequest(w http.ResponseWriter, _ *http.Request, sID sID, rID rID) {
-	if resp, err := o.handlers.requestDelete(sID, rID); err != nil {
+func (o *OpenAPI) ApiSessionDeleteRequest(w http.ResponseWriter, r *http.Request, sID sID, rID rID) {
+	if resp, err := o.handlers.requestDelete(r.Context(), sID, rID); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
@@ -155,20 +158,20 @@ func (o *OpenAPI) ApiAppVersion(w http.ResponseWriter, _ *http.Request) {
 	o.respToJson(w, o.handlers.appVersion())
 }
 
-func (o *OpenAPI) ApiAppVersionLatest(w http.ResponseWriter, _ *http.Request) {
-	if resp, err := o.handlers.appVersionLatest(w); err != nil {
+func (o *OpenAPI) ApiAppVersionLatest(w http.ResponseWriter, r *http.Request) {
+	if resp, err := o.handlers.appVersionLatest(r.Context(), w); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)
 	}
 }
 
-func (o *OpenAPI) ReadinessProbe(w http.ResponseWriter, _ *http.Request) {
-	o.handlers.readinessProbe(w)
+func (o *OpenAPI) ReadinessProbe(w http.ResponseWriter, r *http.Request) {
+	o.handlers.readinessProbe(r.Context(), w)
 }
 
-func (o *OpenAPI) ReadinessProbeHead(w http.ResponseWriter, _ *http.Request) {
-	o.handlers.readinessProbeHead(w)
+func (o *OpenAPI) ReadinessProbeHead(w http.ResponseWriter, r *http.Request) {
+	o.handlers.readinessProbeHead(r.Context(), w)
 }
 
 func (o *OpenAPI) LivenessProbe(w http.ResponseWriter, _ *http.Request) {

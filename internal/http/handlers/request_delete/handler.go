@@ -1,6 +1,10 @@
 package request_delete
 
-import "gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
+import (
+	"context"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
+)
 
 type (
 	sID = openapi.SessionUUIDInPath
@@ -11,6 +15,6 @@ type (
 
 func New() *Handler { return &Handler{} }
 
-func (h *Handler) Handle(sID, rID) (*openapi.SuccessfulOperationResponse, error) {
+func (h *Handler) Handle(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error) {
 	return &openapi.SuccessfulOperationResponse{}, nil
 }
