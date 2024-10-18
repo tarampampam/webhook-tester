@@ -1,0 +1,26 @@
+{
+  "name": "WebHook Tester",
+  "short_name": "WebHook Tester",
+  "id": "app",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "orientation": "natural",
+  "theme_color": "#dcdcdc",
+  "background_color": "#18181c",
+  "display": "standalone"
+}

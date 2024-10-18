@@ -23,6 +23,22 @@ func New(root fs.FS) http.Handler { //nolint:funlen
 		indexFileName     = "index.html"
 	)
 
+	var fileCacheBoostExtensionsMap = map[string]struct{}{
+		".gz":          {},
+		".svg":         {},
+		".png":         {},
+		".jpg":         {},
+		".jpeg":        {},
+		".woff":        {},
+		".otf":         {},
+		".ttf":         {},
+		".eot":         {},
+		".ico":         {},
+		".css":         {},
+		".js":          {},
+		".webmanifest": {},
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var filePath = strings.TrimLeft(path.Clean(r.URL.Path), "/")
 
@@ -73,6 +89,12 @@ func New(root fs.FS) http.Handler { //nolint:funlen
 			w.WriteHeader(http.StatusOK)
 
 			return
+		}
+
+		if ext := strings.ToLower(path.Ext(r.URL.Path)); ext != "" {
+			if _, ok := fileCacheBoostExtensionsMap[ext]; ok {
+				w.Header().Set("Cache-Control", "public, max-age=604800") // 1 week
+			}
 		}
 
 		fileServer.ServeHTTP(w, r)

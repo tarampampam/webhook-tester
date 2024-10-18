@@ -16,6 +16,9 @@ export default defineConfig({
       '~': srcDir,
     },
   },
+  define: {
+    __LATEST_RELEASE_LINK__: JSON.stringify('https://github.com/tarampampam/webhook-tester/releases/latest'),
+  },
   build: {
     emptyOutDir: true,
     outDir: distDir,

@@ -3,14 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/favicon-48x48.png" sizes="48x48" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="WebHook Tester" />
+  <link rel="manifest" href="/site.webmanifest" />
 
   <title>WebHook Tester</title>
   <meta name="description" content="Allows you to easily test webhooks and other types of HTTP requests"/>
 
-  <style></style>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      height: 100%;
+      width: 100%;
+      background-color: #fff;
+      color: #010101;
+      font-family: sans-serif;
+      font-size: 16px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html, body {
+        background-color: #18181c;
+        color: #dcdcdc;
+      }
+    }
+
+    body, #root {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    #root {
+      flex-grow: 1;
+      align-items: stretch;
+    }
+
+    #please-wait-app-loading {
+      font-family: sans-serif;
+      font-size: 0.7em;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      width: 100%;
+
+      .loader {
+        display: inline-block;
+        opacity: 0;
+        transition: opacity;
+        animation: app-loading-spinner-fade-in ease 1300ms;
+        animation-iteration-count: 1;
+        animation-fill-mode: forwards;
+
+        &, .inner, .inner:before, .inner:after {
+          width: 100px;
+          height: 100px;
+        }
+
+        .inner {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          text-align: center;
+
+          &:before, &:after {
+            content: '';
+            border-radius: 50%;
+            position: absolute;
+            inset: 0;
+            box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.3) inset;
+          }
+
+          &:after {
+            box-shadow: 0 2px 0 #ff3d00 inset;
+            animation: app-loading-spinner-rotate 1350ms linear infinite;
+          }
+        }
+      }
+    }
+
+    @keyframes app-loading-spinner-rotate {
+      0%   { transform: rotate(0) }
+      100% { transform: rotate(360deg) }
+    }
+    @keyframes app-loading-spinner-fade-in {
+      30%  { opacity: 0 }
+      100% { opacity: 1 }
+    }
+  </style>
 </head>
 <body>
 <div id="root">
+  <div id="please-wait-app-loading">
+    <span class="loader">
+      <span class="inner">
+        Please wait...
+      </span>
+    </span>
+  </div>
 </div>
 <script type="module" src="/src/main.tsx"></script>
 </body>

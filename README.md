@@ -17,7 +17,7 @@ Global flags:
 | `--log-level="…"`  | Logging level (debug/info/warn/error/fatal) |    `info`     |      `LOG_LEVEL`      |
 | `--log-format="…"` | Logging format (console/json)               |   `console`   |     `LOG_FORMAT`      |
 
-### `start` command (aliases: `s`, `server`, `serve`)
+### `start` command (aliases: `s`, `server`, `serve`, `http-server`)
 
 Start HTTP/HTTPs servers.
 
