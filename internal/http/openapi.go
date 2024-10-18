@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/live"
@@ -22,6 +23,8 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/version"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/version_latest"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
+	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 	appVersion "gh.tarampamp.am/webhook-tester/v2/internal/version"
 )
 
@@ -35,30 +38,43 @@ type OpenAPI struct {
 	log *zap.Logger
 
 	handlers struct {
-		settingsGet        func() openapi.SettingsResponse
-		sessionCreate      func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
-		sessionGet         func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
-		sessionDelete      func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsList       func(context.Context, sID) (*openapi.CapturedRequestsListResponse, error)
-		requestsDelete     func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsSubscribe  func(context.Context, http.ResponseWriter, *http.Request, sID) error
-		requestGet         func(context.Context, sID, rID) (*openapi.CapturedRequestsResponse, error)
-		requestDelete      func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
-		appVersion         func() openapi.VersionResponse
-		appVersionLatest   func(context.Context, http.ResponseWriter) (*openapi.VersionResponse, error)
-		readinessProbe     func(context.Context, http.ResponseWriter)
-		readinessProbeHead func(context.Context, http.ResponseWriter)
-		livenessProbe      func(http.ResponseWriter)
-		livenessProbeHead  func(http.ResponseWriter)
+		settingsGet       func() openapi.SettingsResponse
+		sessionCreate     func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
+		sessionGet        func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
+		sessionDelete     func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsList      func(context.Context, sID) (*openapi.CapturedRequestsListResponse, error)
+		requestsDelete    func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsSubscribe func(context.Context, http.ResponseWriter, *http.Request, sID) error
+		requestGet        func(context.Context, sID, rID) (*openapi.CapturedRequestsResponse, error)
+		requestDelete     func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
+		appVersion        func() openapi.VersionResponse
+		appVersionLatest  func(context.Context, http.ResponseWriter) (*openapi.VersionResponse, error)
+		readinessProbe    func(context.Context, http.ResponseWriter, string)
+		livenessProbe     func(http.ResponseWriter, string)
 	}
 }
 
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // verify interface implementation
 
-func NewOpenAPI(ctx context.Context, log *zap.Logger) *OpenAPI {
+func NewOpenAPI(
+	ctx context.Context,
+	log *zap.Logger,
+	rdc interface { // note: may be nil, and it's okay
+		Ping(context.Context) *redis.StatusCmd
+	},
+	db storage.Storage,
+	pubSub pubsub.PubSub[any],
+) *OpenAPI {
 	var (
 		si                   = &OpenAPI{log: log}
 		latestVersionFetcher = func(ctx context.Context) (string, error) { return appVersion.Latest(ctx) }
+		readyChecker         = func(ctx context.Context) error {
+			if rdc == nil {
+				return nil
+			}
+
+			return rdc.Ping(ctx).Err()
+		}
 	)
 
 	si.handlers.settingsGet = settings_get.New().Handle
@@ -72,10 +88,8 @@ func NewOpenAPI(ctx context.Context, log *zap.Logger) *OpenAPI {
 	si.handlers.requestDelete = request_delete.New().Handle
 	si.handlers.appVersion = version.New(appVersion.Version()).Handle
 	si.handlers.appVersionLatest = version_latest.New(latestVersionFetcher).Handle
-	si.handlers.readinessProbe = ready.New().HandleGet
-	si.handlers.readinessProbeHead = ready.New().HandleHead
-	si.handlers.livenessProbe = live.New().HandleGet
-	si.handlers.livenessProbeHead = live.New().HandleHead
+	si.handlers.readinessProbe = ready.New(readyChecker).Handle
+	si.handlers.livenessProbe = live.New().Handle
 
 	return si
 }
@@ -167,19 +181,19 @@ func (o *OpenAPI) ApiAppVersionLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OpenAPI) ReadinessProbe(w http.ResponseWriter, r *http.Request) {
-	o.handlers.readinessProbe(r.Context(), w)
+	o.handlers.readinessProbe(r.Context(), w, r.Method)
 }
 
 func (o *OpenAPI) ReadinessProbeHead(w http.ResponseWriter, r *http.Request) {
-	o.handlers.readinessProbeHead(r.Context(), w)
+	o.handlers.readinessProbe(r.Context(), w, r.Method)
 }
 
-func (o *OpenAPI) LivenessProbe(w http.ResponseWriter, _ *http.Request) {
-	o.handlers.livenessProbe(w)
+func (o *OpenAPI) LivenessProbe(w http.ResponseWriter, r *http.Request) {
+	o.handlers.livenessProbe(w, r.Method)
 }
 
-func (o *OpenAPI) LivenessProbeHead(w http.ResponseWriter, _ *http.Request) {
-	o.handlers.livenessProbeHead(w)
+func (o *OpenAPI) LivenessProbeHead(w http.ResponseWriter, r *http.Request) {
+	o.handlers.livenessProbe(w, r.Method)
 }
 
 // -------------------------------------------------- Error handlers --------------------------------------------------

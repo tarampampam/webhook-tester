@@ -10,23 +10,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	appHttp "gh.tarampamp.am/webhook-tester/v2/internal/http"
+	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
 func TestServer_StartHTTP(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx = context.Background()
-		log = zap.NewNop()
-		srv = appHttp.NewServer(ctx, log)
+		ctx  = context.Background()
+		log  = zap.NewNop()
+		srv  = appHttp.NewServer(ctx, log)
+		mini = miniredis.RunT(t)
 	)
 
-	srv.Register(ctx, log, false)
+	srv.Register(
+		ctx,
+		log,
+		redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+		storage.NewInMemory(time.Minute, 8),
+		pubsub.NewInMemory[any](),
+		false,
+	)
 
 	var baseUrl, stop = startServer(t, ctx, srv)
 

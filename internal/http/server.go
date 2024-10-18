@@ -8,12 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/frontend"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/middleware/logreq"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/middleware/webhook"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
+	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 	"gh.tarampamp.am/webhook-tester/v2/web"
 )
 
@@ -55,9 +58,18 @@ func NewServer(baseCtx context.Context, log *zap.Logger, opts ...ServerOption) *
 	return &server
 }
 
-func (s *Server) Register(ctx context.Context, log *zap.Logger, useLiveFrontend bool) *Server {
+func (s *Server) Register(
+	ctx context.Context,
+	log *zap.Logger,
+	rdc interface { // note: may be nil, and it's okay
+		Ping(context.Context) *redis.StatusCmd
+	},
+	db storage.Storage,
+	pubSub pubsub.PubSub[any],
+	useLiveFrontend bool,
+) *Server {
 	var (
-		oAPI    = NewOpenAPI(ctx, log)                    // OpenAPI server implementation
+		oAPI    = NewOpenAPI(ctx, log, rdc, db, pubSub)   // OpenAPI server implementation
 		spa     = frontend.New(web.Dist(useLiveFrontend)) // file server for SPA (also handles 404 errors)
 		mux     = http.NewServeMux()                      // base router for the OpenAPI server
 		handler = openapi.HandlerWithOptions(oAPI, openapi.StdHTTPServerOptions{

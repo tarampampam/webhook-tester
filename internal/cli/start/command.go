@@ -319,16 +319,16 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		}
 	}
 
-	var stor storage.Storage
+	var db storage.Storage
 
 	// create the storage
 	switch cmd.options.storage.driver {
 	case StorageDriverMemory:
 		var inMemory = storage.NewInMemory(cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests)) //nolint:contextcheck,lll
 		defer func() { _ = inMemory.Close() }()
-		stor = inMemory //nolint:wsl
+		db = inMemory //nolint:wsl
 	case StorageDriverRedis:
-		stor = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
+		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
 	default:
 		return fmt.Errorf("unknown storage driver [%s]", cmd.options.storage.driver)
 	}
@@ -345,8 +345,6 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		return fmt.Errorf("unknown Pub/Sub driver [%s]", cmd.options.pubSub.driver)
 	}
 
-	_, _ = stor, pubSub // FIXME
-
 	var httpLog = log.Named("http")
 
 	// create HTTP server
@@ -357,6 +355,9 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	).Register(
 		ctx,
 		httpLog,
+		rdc,
+		db,
+		pubSub,
 		cmd.options.frontend.useLive,
 	)
 
