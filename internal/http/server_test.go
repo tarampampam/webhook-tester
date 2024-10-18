@@ -18,6 +18,8 @@ import (
 )
 
 func TestServer_StartHTTP(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = context.Background()
 		log = zap.NewNop()
@@ -31,6 +33,8 @@ func TestServer_StartHTTP(t *testing.T) {
 	t.Cleanup(stop)
 
 	t.Run("index", func(t *testing.T) {
+		t.Parallel()
+
 		var status, body, headers = sendRequest(t, "GET", baseUrl)
 
 		require.Equal(t, http.StatusOK, status)
@@ -39,7 +43,9 @@ func TestServer_StartHTTP(t *testing.T) {
 	})
 
 	t.Run("robots.txt", func(t *testing.T) {
-		var status, body, headers = sendRequest(t, "GET", baseUrl+"/robots.txt")
+		t.Parallel()
+
+		var status, body, headers = sendRequest(t, "GET", baseUrl+"/////robots.txt")
 
 		require.Equal(t, http.StatusOK, status)
 		require.Contains(t, string(body), "User-agent")
@@ -48,6 +54,8 @@ func TestServer_StartHTTP(t *testing.T) {
 	})
 
 	t.Run("SPA 404", func(t *testing.T) {
+		t.Parallel()
+
 		var status, body, headers = sendRequest(t, "GET", baseUrl+"/foo-404")
 
 		require.Equal(t, http.StatusOK, status)
@@ -56,7 +64,9 @@ func TestServer_StartHTTP(t *testing.T) {
 	})
 
 	t.Run("API 404", func(t *testing.T) {
-		var status, body, headers = sendRequest(t, "GET", baseUrl+"/api/foo-404")
+		t.Parallel()
+
+		var status, body, headers = sendRequest(t, "GET", baseUrl+"/////api/foo-404")
 
 		require.Equal(t, http.StatusNotFound, status)
 		require.Contains(t, string(body), "not found")
@@ -64,6 +74,8 @@ func TestServer_StartHTTP(t *testing.T) {
 	})
 
 	t.Run("ready handler (outside /api prefix)", func(t *testing.T) {
+		t.Parallel()
+
 		var status, body, headers = sendRequest(t, "GET", baseUrl+"/ready")
 
 		require.Equal(t, http.StatusOK, status)
@@ -72,6 +84,8 @@ func TestServer_StartHTTP(t *testing.T) {
 	})
 
 	t.Run("api handler", func(t *testing.T) {
+		t.Parallel()
+
 		var status, body, headers = sendRequest(t, "GET", baseUrl+"/api/settings")
 
 		require.Equal(t, http.StatusOK, status)
@@ -79,12 +93,17 @@ func TestServer_StartHTTP(t *testing.T) {
 		require.Contains(t, headers.Get("Content-Type"), "application/json")
 	})
 
-	t.Run("webhook capture", func(t *testing.T) { // TODO: need to be updated
+	t.Run("webhook capture", func(t *testing.T) {
+		t.Parallel()
+
 		var status, body, headers = sendRequest(t, "POST", baseUrl+"/"+uuid.New().String())
 
 		require.Equal(t, http.StatusOK, status)
-		require.Contains(t, string(body), "CAPTURED")
+		require.Contains(t, string(body), "CAPTURED") // TODO: need to be updated
 		require.Contains(t, headers.Get("Content-Type"), "text/plain")
+		require.Equal(t, headers.Get("Access-Control-Allow-Origin"), "*")
+		require.Equal(t, headers.Get("Access-Control-Allow-Methods"), "*")
+		require.Equal(t, headers.Get("Access-Control-Allow-Headers"), "*")
 	})
 
 	t.Run("API routes exists", func(t *testing.T) {
@@ -107,6 +126,8 @@ func TestServer_StartHTTP(t *testing.T) {
 			{http.MethodGet, "/api/version/latest"},
 		} {
 			t.Run(fmt.Sprintf("(%d) %s %s", i, params.method, params.url), func(t *testing.T) {
+				t.Parallel()
+
 				var status, body, headers = sendRequest(t, params.method, baseUrl+params.url)
 
 				require.NotEqual(t, http.StatusNotFound, status)
