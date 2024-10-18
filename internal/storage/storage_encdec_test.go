@@ -2,7 +2,6 @@ package storage_test
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 	"time"
 
@@ -43,46 +42,6 @@ func TestTime_JSON_Marshal_Unmarshal(t *testing.T) {
 		marshaled, err := json.Marshal(originalValue)
 		require.NoError(t, err)
 		require.Equal(t, `{"time":0}`, string(marshaled))
-
-		var unmarshalled = someStruct{}
-
-		require.NoError(t, json.Unmarshal(marshaled, &unmarshalled))
-		require.Equal(t, originalValue, unmarshalled)
-	})
-}
-
-func TestURL_JSON_Marshal_Unmarshal(t *testing.T) {
-	t.Parallel()
-
-	type someStruct struct {
-		URL storage.URL `json:"url"`
-	}
-
-	t.Run("common case", func(t *testing.T) {
-		var (
-			someUrl, _    = url.Parse("https://example.com/path?query=value#fragment")
-			originalValue = someStruct{URL: storage.URL{URL: *someUrl}}
-		)
-
-		marshaled, err := json.Marshal(originalValue)
-		require.NoError(t, err)
-		require.Equal(t, `{"url":"https://example.com/path?query=value#fragment"}`, string(marshaled))
-
-		var unmarshalled = someStruct{}
-
-		require.NoError(t, json.Unmarshal(marshaled, &unmarshalled))
-		require.Equal(t, originalValue, unmarshalled)
-	})
-
-	t.Run("zero value", func(t *testing.T) {
-		var (
-			zeroValue     storage.URL
-			originalValue = someStruct{URL: zeroValue}
-		)
-
-		marshaled, err := json.Marshal(originalValue)
-		require.NoError(t, err)
-		require.Equal(t, `{"url":""}`, string(marshaled))
 
 		var unmarshalled = someStruct{}
 

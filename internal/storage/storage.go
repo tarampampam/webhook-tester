@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 )
 
@@ -61,24 +60,27 @@ type Storage interface {
 type (
 	// Session describes session settings (like response data and any additional information).
 	Session struct {
-		Code        uint16        `json:"code"`         // default server response code
-		Content     []byte        `json:"content"`      // session server response content
-		ContentType string        `json:"content_type"` // response content type
-		Delay       time.Duration `json:"delay"`        // delay before response sending
-		CreatedAt   Time          `json:"created_at"`   // creation time
-		ExpiresAt   time.Time     `json:"-"`            // expiration time
+		Code      uint16        `json:"code"`       // default server response code
+		Headers   []HttpHeader  `json:"headers"`    // server response headers
+		Delay     time.Duration `json:"delay"`      // delay before response sending
+		CreatedAt Time          `json:"created_at"` // creation time
+		ExpiresAt time.Time     `json:"-"`          // expiration time
 	}
 
 	// Request describes recorded request and additional meta-data.
 	Request struct {
-		ClientAddr string            `json:"client_addr"` // client hostname or IP address
-		Method     string            `json:"method"`      // HTTP method name (i.e., 'GET', 'POST')
-		Body       []byte            `json:"body"`        // request body (payload)
-		Headers    map[string]string `json:"headers"`     // HTTP request headers
-		URL        URL               `json:"url"`         // Uniform Resource Identifier
-		CreatedAt  Time              `json:"created_at"`  // creation time
+		ClientAddr string       `json:"client_addr"` // client hostname or IP address
+		Method     string       `json:"method"`      // HTTP method name (i.e., 'GET', 'POST')
+		Body       []byte       `json:"body"`        // request body (payload)
+		Headers    []HttpHeader `json:"headers"`     // HTTP request headers
+		URL        string       `json:"url"`         // Uniform Resource Identifier
+		CreatedAt  Time         `json:"created_at"`  // creation time
 	}
 
-	Time struct{ time.Time } // custom type to override serialization
-	URL  struct{ url.URL }   // custom type to override serialization
+	HttpHeader struct {
+		Name  string `json:"name"`  // the name of the header, e.g., "Content-Type"
+		Value string `json:"value"` // the value of the header, e.g., "application/json"
+	}
+
+	Time struct{ time.Time } // custom type to override serialization // TODO: come up with a better solution
 )

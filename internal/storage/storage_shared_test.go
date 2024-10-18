@@ -3,7 +3,6 @@ package storage_test
 import (
 	"context"
 	"io"
-	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -37,19 +36,18 @@ func testSessionCreateReadDelete(
 		var impl = new(time.Minute, 1)
 		defer func() { _ = toCloser(impl).Close() }()
 
+		var sessionHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
+
 		const (
-			code        uint16 = 201
-			content            = " \nfoo bar\n\t \nbaz"
-			contentType        = "text/javascript"
-			delay              = time.Second * 123
+			code  uint16 = 201
+			delay        = time.Second * 123
 		)
 
 		// create
 		var sID, newErr = impl.NewSession(ctx, storage.Session{
-			Code:        code,
-			Content:     []byte(content),
-			ContentType: contentType,
-			Delay:       delay,
+			Code:    code,
+			Headers: sessionHeaders,
+			Delay:   delay,
 		})
 
 		require.NoError(t, newErr)
@@ -59,8 +57,7 @@ func testSessionCreateReadDelete(
 		got, getErr := impl.GetSession(ctx, sID)
 		require.NoError(t, getErr)
 		require.Equal(t, code, got.Code)
-		require.Equal(t, []byte(content), got.Content)
-		require.Equal(t, contentType, got.ContentType)
+		require.Equal(t, sessionHeaders, got.Headers)
 		require.Equal(t, delay, got.Delay)
 		assert.NotZero(t, got.CreatedAt)
 
@@ -180,10 +177,7 @@ func testRequestCreateReadDelete(
 
 	var ctx = context.Background()
 
-	var (
-		u, _    = url.Parse("https://example.com/foo/bar")
-		someUrl = &storage.URL{URL: *u}
-	)
+	const someUrl = "https://example.com/foo/bar"
 
 	t.Run("create, read, delete", func(t *testing.T) {
 		t.Parallel()
@@ -193,10 +187,9 @@ func testRequestCreateReadDelete(
 
 		// create session
 		sID, newErr := impl.NewSession(ctx, storage.Session{
-			Code:        201,
-			Content:     []byte("foo bar"),
-			ContentType: "text/javascript",
-			Delay:       time.Second,
+			Code:    201,
+			Headers: []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}},
+			Delay:   time.Second,
 		})
 		require.NoError(t, newErr)
 		require.NotEmpty(t, sID)
@@ -207,15 +200,15 @@ func testRequestCreateReadDelete(
 			body       = " \nfoo bar\n\t \nbaz"
 		)
 
-		var headers = map[string]string{"foo": "bar", "bar": "baz"}
+		var requestHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
 
 		// create
 		rID, newReqErr := impl.NewRequest(ctx, sID, storage.Request{
 			ClientAddr: clientAddr,
 			Method:     method,
 			Body:       []byte(body),
-			Headers:    headers,
-			URL:        *someUrl,
+			Headers:    requestHeaders,
+			URL:        someUrl,
 		})
 		require.NoError(t, newReqErr)
 		require.NotEmpty(t, rID)
@@ -226,8 +219,8 @@ func testRequestCreateReadDelete(
 		require.Equal(t, clientAddr, got.ClientAddr)
 		require.Equal(t, method, got.Method)
 		require.Equal(t, []byte(body), got.Body)
-		require.Equal(t, headers, got.Headers)
-		require.Equal(t, *someUrl, got.URL)
+		require.Equal(t, requestHeaders, got.Headers)
+		require.Equal(t, someUrl, got.URL)
 		assert.NotZero(t, got.CreatedAt)
 
 		{ // read all
