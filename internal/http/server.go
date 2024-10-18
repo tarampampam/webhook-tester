@@ -5,10 +5,14 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
 
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/frontend"
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/middleware/logreq"
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/middleware/webhook"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
 	"gh.tarampamp.am/webhook-tester/v2/web"
 )
@@ -52,26 +56,33 @@ func NewServer(baseCtx context.Context, log *zap.Logger, opts ...ServerOption) *
 }
 
 func (s *Server) Register(ctx context.Context, log *zap.Logger, useLiveFrontend bool) *Server {
-	var frontendFs = web.Dist(useLiveFrontend)
-
-	_ = frontendFs // FIXME
-
 	var (
-		// create openapi server implementation
-		openapiServer = NewOpenAPI(ctx, log)
-
-		// create the base router for the openapi server
-		openapiMux = http.NewServeMux()
-
-		// "convert" the openapi server to the [http.Handler]
-		openapiHandler = openapi.HandlerWithOptions(openapiServer, openapi.StdHTTPServerOptions{
-			ErrorHandlerFunc: openapiServer.HandleInternalError,
-			BaseRouter:       openapiMux,
-			Middlewares:      []openapi.MiddlewareFunc{openapi.CorsMiddleware()},
+		oAPI    = NewOpenAPI(ctx, log)                    // OpenAPI server implementation
+		spa     = frontend.New(web.Dist(useLiveFrontend)) // file server for SPA (also handles 404 errors)
+		mux     = http.NewServeMux()                      // base router for the OpenAPI server
+		handler = openapi.HandlerWithOptions(oAPI, openapi.StdHTTPServerOptions{
+			ErrorHandlerFunc: oAPI.HandleInternalError, // set error handler for internal server errors
+			BaseRouter:       mux,
 		})
 	)
 
-	_ = openapiHandler // FIXME
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// custom logic for handling 404 errors
+		if strings.HasPrefix(strings.TrimLeft(r.URL.Path, "/"), "api") {
+			// if the request path starts with "api", return the 404 error in the format required by the API
+			oAPI.HandleNotFoundError(w, r)
+		} else {
+			// otherwise, serve the SPA frontend
+			spa.ServeHTTP(w, r)
+		}
+	}))
+
+	// apply middlewares
+	s.http.Handler = logreq.New(log, nil)( // logger middleware
+		webhook.New(log)( // webhook capture as a middleware
+			handler,
+		),
+	)
 
 	return s
 }
