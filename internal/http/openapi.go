@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/live"
@@ -59,23 +58,12 @@ var _ openapi.ServerInterface = (*OpenAPI)(nil) // verify interface implementati
 func NewOpenAPI(
 	ctx context.Context,
 	log *zap.Logger,
-	rdc interface { // note: may be nil, and it's okay
-		Ping(context.Context) *redis.StatusCmd
-	},
+	rdyChecker func(context.Context) error,
+	lastAppVer func(context.Context) (string, error),
 	db storage.Storage,
 	pubSub pubsub.PubSub[any],
 ) *OpenAPI {
-	var (
-		si                   = &OpenAPI{log: log}
-		latestVersionFetcher = func(ctx context.Context) (string, error) { return appVersion.Latest(ctx) }
-		readyChecker         = func(ctx context.Context) error {
-			if rdc == nil {
-				return nil
-			}
-
-			return rdc.Ping(ctx).Err()
-		}
-	)
+	var si = &OpenAPI{log: log}
 
 	si.handlers.settingsGet = settings_get.New().Handle
 	si.handlers.sessionCreate = session_create.New().Handle
@@ -87,8 +75,8 @@ func NewOpenAPI(
 	si.handlers.requestGet = request_get.New().Handle
 	si.handlers.requestDelete = request_delete.New().Handle
 	si.handlers.appVersion = version.New(appVersion.Version()).Handle
-	si.handlers.appVersionLatest = version_latest.New(latestVersionFetcher).Handle
-	si.handlers.readinessProbe = ready.New(readyChecker).Handle
+	si.handlers.appVersionLatest = version_latest.New(lastAppVer).Handle
+	si.handlers.readinessProbe = ready.New(rdyChecker).Handle
 	si.handlers.livenessProbe = live.New().Handle
 
 	return si

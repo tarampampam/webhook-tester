@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -25,16 +23,16 @@ func TestServer_StartHTTP(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx  = context.Background()
-		log  = zap.NewNop()
-		srv  = appHttp.NewServer(ctx, log)
-		mini = miniredis.RunT(t)
+		ctx = context.Background()
+		log = zap.NewNop()
+		srv = appHttp.NewServer(ctx, log)
 	)
 
 	srv.Register(
 		ctx,
 		log,
-		redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+		func(context.Context) error { return nil },
+		func(context.Context) (string, error) { return "v1.0.0", nil },
 		storage.NewInMemory(time.Minute, 8),
 		pubsub.NewInMemory[any](),
 		false,

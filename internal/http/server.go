@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/frontend"
@@ -61,17 +60,16 @@ func NewServer(baseCtx context.Context, log *zap.Logger, opts ...ServerOption) *
 func (s *Server) Register(
 	ctx context.Context,
 	log *zap.Logger,
-	rdc interface { // note: may be nil, and it's okay
-		Ping(context.Context) *redis.StatusCmd
-	},
+	rdyChecker func(context.Context) error,
+	lastAppVer func(context.Context) (string, error),
 	db storage.Storage,
 	pubSub pubsub.PubSub[any],
 	useLiveFrontend bool,
 ) *Server {
 	var (
-		oAPI    = NewOpenAPI(ctx, log, rdc, db, pubSub)   // OpenAPI server implementation
-		spa     = frontend.New(web.Dist(useLiveFrontend)) // file server for SPA (also handles 404 errors)
-		mux     = http.NewServeMux()                      // base router for the OpenAPI server
+		oAPI    = NewOpenAPI(ctx, log, rdyChecker, lastAppVer, db, pubSub) // OpenAPI server implementation
+		spa     = frontend.New(web.Dist(useLiveFrontend))                  // file server for SPA (also handles 404 errors)
+		mux     = http.NewServeMux()                                       // base router for the OpenAPI server
 		handler = openapi.HandlerWithOptions(oAPI, openapi.StdHTTPServerOptions{
 			ErrorHandlerFunc: oAPI.HandleInternalError, // set error handler for internal server errors
 			BaseRouter:       mux,

@@ -19,6 +19,7 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/logger"
 	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/version"
 )
 
 type (
@@ -355,7 +356,8 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	).Register(
 		ctx,
 		httpLog,
-		rdc,
+		cmd.readinessChecker(rdc),
+		cmd.latestAppVersionGetter(),
 		db,
 		pubSub,
 		cmd.options.frontend.useLive,
@@ -397,4 +399,20 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	}
 
 	return nil
+}
+
+// readinessChecker returns a readiness checker. Feel free to add more checks/dependencies here if needed.
+func (cmd *command) readinessChecker(rdc *redis.Client) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		if rdc == nil {
+			return nil
+		}
+
+		return rdc.Ping(ctx).Err()
+	}
+}
+
+// latestAppVersionGetter returns a function to get the latest app version.
+func (cmd *command) latestAppVersionGetter() func(ctx context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) { return version.Latest(ctx) }
 }
