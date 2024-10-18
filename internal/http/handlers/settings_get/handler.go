@@ -12,7 +12,7 @@ func New(s config.AppSettings) *Handler { return &Handler{cfg: s} }
 func (h *Handler) Handle() (resp openapi.SettingsResponse) {
 	resp.Limits.MaxRequestBodySize = h.cfg.MaxRequestBodySize
 	resp.Limits.MaxRequests = h.cfg.MaxRequests
-	resp.Limits.SessionTTL = uint32(h.cfg.SessionTTL.Seconds())
+	resp.Limits.SessionTtl = uint32(h.cfg.SessionTTL.Seconds())
 
 	return
 }

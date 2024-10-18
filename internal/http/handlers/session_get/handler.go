@@ -23,13 +23,13 @@ func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.SessionOptionsR
 		return nil, fmt.Errorf("failed to get session: %w", sErr)
 	}
 
-	var sHeaders = make(openapi.HttpHeaders, len(sess.Headers))
+	var sHeaders = make([]openapi.HttpHeader, len(sess.Headers))
 	for i, header := range sess.Headers {
 		sHeaders[i].Name, sHeaders[i].Value = header.Name, header.Value
 	}
 
 	return &openapi.SessionOptionsResponse{
-		CreatedAt: int(sess.CreatedAt.Unix()),
+		CreatedAtUnixMilli: sess.CreatedAt.UnixMilli(),
 		Response: openapi.SessionResponseOptions{
 			Delay:              uint16(sess.Delay.Seconds()),
 			Headers:            sHeaders,

@@ -6,6 +6,4 @@ type Handler struct{ ver string }
 
 func New(ver string) *Handler { return &Handler{ver: ver} }
 
-func (h *Handler) Handle() openapi.VersionResponse {
-	return openapi.VersionResponse{Version: h.ver}
-}
+func (h *Handler) Handle() openapi.VersionResponse { return openapi.VersionResponse{Version: h.ver} }

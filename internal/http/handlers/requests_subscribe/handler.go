@@ -116,17 +116,17 @@ func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pub
 				continue
 			}
 
-			var rHeaders = make(openapi.HttpHeaders, len(r.Headers))
+			var rHeaders = make([]openapi.HttpHeader, len(r.Headers))
 			for i, header := range r.Headers {
 				rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
 			}
 
 			// write the response to the client
 			if err := ws.WriteJSON(openapi.CapturedRequest{
-				CapturedAt:           r.CreatedAtUnix,
+				CapturedAtUnixMilli:  openapi.UnixMilliTime(r.CreatedAtUnixMilli),
 				ClientAddress:        r.ClientAddr,
 				Headers:              rHeaders,
-				Method:               openapi.HttpMethod(strings.ToUpper(r.Method)),
+				Method:               strings.ToUpper(r.Method),
 				RequestPayloadBase64: base64.StdEncoding.EncodeToString(r.Body),
 				Url:                  r.URL,
 				Uuid:                 rID,

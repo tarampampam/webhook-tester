@@ -24,16 +24,16 @@ func (h *Handler) Handle(ctx context.Context, sID sID, rID rID) (*openapi.Captur
 		return nil, rErr
 	}
 
-	var rHeaders = make(openapi.HttpHeaders, len(r.Headers))
+	var rHeaders = make([]openapi.HttpHeader, len(r.Headers))
 	for i, header := range r.Headers {
 		rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
 	}
 
 	return &openapi.CapturedRequestsResponse{
-		CapturedAt:           int(r.CreatedAt.Unix()),
+		CapturedAtUnixMilli:  r.CreatedAt.UnixMilli(),
 		ClientAddress:        r.ClientAddr,
 		Headers:              rHeaders,
-		Method:               openapi.HttpMethod(strings.ToUpper(r.Method)),
+		Method:               strings.ToUpper(r.Method),
 		RequestPayloadBase64: base64.StdEncoding.EncodeToString(r.Body),
 		Url:                  r.URL,
 		Uuid:                 rID,

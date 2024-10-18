@@ -24,13 +24,13 @@ type PubSub[T any] interface {
 
 type (
 	CapturedRequest struct {
-		ID            string       `json:"id"`
-		ClientAddr    string       `json:"client_addr"`
-		Method        string       `json:"method"`
-		Body          []byte       `json:"body"`
-		Headers       []HttpHeader `json:"headers"`
-		URL           string       `json:"url"`
-		CreatedAtUnix int          `json:"created_at_unix"`
+		ID                 string       `json:"id"`
+		ClientAddr         string       `json:"client_addr"`
+		Method             string       `json:"method"`
+		Body               []byte       `json:"body"`
+		Headers            []HttpHeader `json:"headers"`
+		URL                string       `json:"url"`
+		CreatedAtUnixMilli int          `json:"created_at_unix_milli"`
 	}
 
 	HttpHeader struct {

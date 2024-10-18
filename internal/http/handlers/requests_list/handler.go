@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -34,19 +35,24 @@ func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.CapturedRequest
 			return nil, fmt.Errorf("failed to parse request UUID: %w", pErr)
 		}
 
-		var rHeaders = make(openapi.HttpHeaders, len(r.Headers))
+		var rHeaders = make([]openapi.HttpHeader, len(r.Headers))
 		for i, header := range r.Headers {
 			rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
 		}
 
 		list = append(list, openapi.CapturedRequest{
-			CapturedAt:           int(r.CreatedAt.Unix()),
+			CapturedAtUnixMilli:  r.CreatedAt.UnixMilli(),
 			ClientAddress:        r.ClientAddr,
 			Headers:              rHeaders,
-			Method:               openapi.HttpMethod(strings.ToUpper(r.Method)),
+			Method:               strings.ToUpper(r.Method),
 			RequestPayloadBase64: base64.StdEncoding.EncodeToString(r.Body),
 			Url:                  r.URL,
 			Uuid:                 rUUID,
+		})
+
+		// sort the list by the captured time from newest to oldest
+		slices.SortFunc(list, func(a, b openapi.CapturedRequest) int {
+			return int(b.CapturedAtUnixMilli - a.CapturedAtUnixMilli)
 		})
 	}
 

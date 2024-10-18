@@ -183,23 +183,24 @@ paths:
 components:
   schemas: # ------------------------------------------------ SCHEMAS -------------------------------------------------
     StatusCode:
-      type: integer
       description: HTTP status code
+      type: integer
       example: 301
       minimum: 100
       maximum: 530
 
     Base64Encoded:
-      type: string
       description: Base64-encoded content
+      type: string
       maxLength: 10240
       example: aGVsbG8gd29ybGQ=
 
-    UnixTime:
+    UnixMilliTime:
+      description: Unix timestamp in milliseconds (the number of milliseconds elapsed since January 1, 1970 UTC)
       type: integer
-      description: Unix timestamp
       example: 1667845578
       minimum: 1600000000
+      x-go-type: int64
 
     UUID:
       type: string
@@ -208,30 +209,28 @@ components:
       example: 9b6bbab9-c197-4dd3-bc3f-3cb6253820c7
 
     HttpMethod:
+      description: HTTP method (GET, POST, PUT, DELETE, etc.)
       type: string
-      enum: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, TRACE]
+      minLength: 1
       example: GET
 
-    HttpHeaders:
-      description: HTTP headers list
-      type: array
-      items:
-        type: object
-        properties:
-          name: {type: string, minLength: 1, maxLength: 40, example: User-Agent}
-          value: {type: string, minLength: 0, maxLength: 2048, example: curl/7.68.0}
-        required: [name, value]
-        additionalProperties: false
+    HttpHeader:
+      type: object
+      properties:
+        name: {type: string, minLength: 1, maxLength: 40, example: User-Agent}
+        value: {type: string, minLength: 0, maxLength: 2048, example: curl/7.68.0}
+      required: [name, value]
+      additionalProperties: false
 
     SessionResponseOptions:
       description: Session response options
       type: object
       properties:
-        statusCode: {$ref: '#/components/schemas/StatusCode'}
-        headers: {$ref: '#/components/schemas/HttpHeaders'}
+        status_code: {$ref: '#/components/schemas/StatusCode'}
+        headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
         delay: {type: integer, description: Delay in seconds, maximum: 30, example: 5, x-go-type: uint16}
-        responseBodyBase64: {$ref: '#/components/schemas/Base64Encoded'}
-      required: [statusCode, headers, delay, responseBodyBase64]
+        response_body_base64: {$ref: '#/components/schemas/Base64Encoded'}
+      required: [status_code, headers, delay, response_body_base64]
       additionalProperties: false
 
     AppSettings:
@@ -242,10 +241,10 @@ components:
           type: object
           description: App limit settings
           properties:
-            maxRequests: {type: integer, x-go-type: uint16, example: 128}
-            maxRequestBodySize: {type: integer, x-go-type: uint32, example: 1024}
-            sessionTTL: {type: integer, x-go-type: uint32, example: 5, description: In seconds}
-          required: [maxRequests, maxRequestBodySize, sessionTTL]
+            max_requests: {type: integer, x-go-type: uint16, example: 128}
+            max_request_body_size: {type: integer, x-go-type: uint32, example: 1024}
+            session_ttl: {type: integer, x-go-type: uint32, example: 5, description: In seconds}
+          required: [max_requests, max_request_body_size, session_ttl]
           additionalProperties: false
       required: [limits]
       additionalProperties: false
@@ -255,13 +254,13 @@ components:
       description: Recorded request
       properties:
         uuid: {$ref: '#/components/schemas/UUID'}
-        clientAddress: {type: string, format: IPv4, example: '214.184.32.7'}
+        client_address: {type: string, format: IPv4, example: '214.184.32.7'}
         method: {$ref: '#/components/schemas/HttpMethod'}
-        requestPayloadBase64: {$ref: '#/components/schemas/Base64Encoded'}
-        headers: {$ref: '#/components/schemas/HttpHeaders'}
+        request_payload_base64: {$ref: '#/components/schemas/Base64Encoded'}
+        headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
         url: {description: URL, type: string, example: 'https://example.com/path?query=string'}
-        capturedAt: {$ref: '#/components/schemas/UnixTime'}
-      required: [uuid, clientAddress, method, requestPayloadBase64, headers, url, capturedAt]
+        captured_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
+      required: [uuid, client_address, method, request_payload_base64, headers, url, captured_at_unix_milli]
       additionalProperties: false
 
   headers: # ------------------------------------------------ HEADERS -------------------------------------------------
@@ -357,8 +356,8 @@ components:
             properties:
               uuid: {$ref: '#/components/schemas/UUID'}
               response: {$ref: '#/components/schemas/SessionResponseOptions'}
-              createdAt: {$ref: '#/components/schemas/UnixTime'}
-            required: [uuid, response, createdAt]
+              created_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
+            required: [uuid, response, created_at_unix_milli]
             additionalProperties: false
 
     CapturedRequestsListResponse:
