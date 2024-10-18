@@ -115,6 +115,6 @@ ENV \
 
 #EXPOSE "80/tcp" "443/tcp"
 
-HEALTHCHECK --interval=10s --start-interval=1s --start-period=5s --timeout=1s CMD ["/bin/app", "http-server", "healthcheck"]
+HEALTHCHECK --interval=10s --start-interval=1s --start-period=5s --timeout=1s CMD ["/bin/app", "start", "healthcheck"]
 ENTRYPOINT ["/bin/app"]
 CMD ["start"]

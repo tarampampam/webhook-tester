@@ -235,7 +235,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 	cmd.c = &cli.Command{
 		Name:    "start",
 		Usage:   "Start HTTP/HTTPs servers",
-		Aliases: []string{"s", "server", "serve"},
+		Aliases: []string{"s", "server", "serve", "http-server"},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			var opt = &cmd.options
 
@@ -383,6 +383,8 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		log.Info("HTTP server starting",
 			zap.String("address", cmd.options.addr),
 			zap.Uint16("port", cmd.options.http.tcpPort),
+			zap.String("storage", cmd.options.storage.driver),
+			zap.String("pubsub", cmd.options.pubSub.driver),
 		)
 
 		if err := server.StartHTTP(ctx, httpLn); err != nil {
