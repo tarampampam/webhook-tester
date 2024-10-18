@@ -1,6 +1,8 @@
 package pubsub
 
-import "context"
+import (
+	"context"
+)
 
 type (
 	Publisher[T any] interface {
@@ -19,3 +21,20 @@ type PubSub[T any] interface {
 	Publisher[T]
 	Subscriber[T]
 }
+
+type (
+	CapturedRequest struct {
+		ID            string       `json:"id"`
+		ClientAddr    string       `json:"client_addr"`
+		Method        string       `json:"method"`
+		Body          []byte       `json:"body"`
+		Headers       []HttpHeader `json:"headers"`
+		URL           string       `json:"url"`
+		CreatedAtUnix int          `json:"created_at_unix"`
+	}
+
+	HttpHeader struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+)

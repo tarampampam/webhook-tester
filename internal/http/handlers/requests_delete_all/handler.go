@@ -4,12 +4,21 @@ import (
 	"context"
 
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
+	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
-type Handler struct{}
+type (
+	sID = openapi.SessionUUIDInPath
 
-func New() *Handler { return &Handler{} }
+	Handler struct{ db storage.Storage }
+)
 
-func (h *Handler) Handle(context.Context, openapi.SessionUUIDInPath) (*openapi.SuccessfulOperationResponse, error) {
-	return &openapi.SuccessfulOperationResponse{}, nil
+func New(db storage.Storage) *Handler { return &Handler{db: db} }
+
+func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.SuccessfulOperationResponse, error) {
+	if err := h.db.DeleteAllRequests(ctx, sID.String()); err != nil {
+		return nil, err
+	}
+
+	return &openapi.SuccessfulOperationResponse{Success: true}, nil
 }

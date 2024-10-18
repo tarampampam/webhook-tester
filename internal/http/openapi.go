@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -57,25 +58,24 @@ type OpenAPI struct {
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // verify interface implementation
 
 func NewOpenAPI(
-	ctx context.Context,
 	log *zap.Logger,
 	rdyChecker func(context.Context) error,
 	lastAppVer func(context.Context) (string, error),
 	cfg config.AppSettings,
 	db storage.Storage,
-	pubSub pubsub.PubSub[any],
+	pubSub pubsub.PubSub[pubsub.CapturedRequest],
 ) *OpenAPI {
 	var si = &OpenAPI{log: log}
 
 	si.handlers.settingsGet = settings_get.New(cfg).Handle
 	si.handlers.sessionCreate = session_create.New(db).Handle
 	si.handlers.sessionGet = session_get.New(db).Handle
-	si.handlers.sessionDelete = session_delete.New().Handle
-	si.handlers.requestsList = requests_list.New().Handle
-	si.handlers.requestsDelete = requests_delete_all.New().Handle
-	si.handlers.requestsSubscribe = requests_subscribe.New().Handle
-	si.handlers.requestGet = request_get.New().Handle
-	si.handlers.requestDelete = request_delete.New().Handle
+	si.handlers.sessionDelete = session_delete.New(db).Handle
+	si.handlers.requestsList = requests_list.New(db).Handle
+	si.handlers.requestsDelete = requests_delete_all.New(db).Handle
+	si.handlers.requestsSubscribe = requests_subscribe.New(db, pubSub).Handle
+	si.handlers.requestGet = request_get.New(db).Handle
+	si.handlers.requestDelete = request_delete.New(db).Handle
 	si.handlers.appVersion = version.New(appVersion.Version()).Handle
 	si.handlers.appVersionLatest = version_latest.New(lastAppVer).Handle
 	si.handlers.readinessProbe = ready.New(rdyChecker).Handle
@@ -112,7 +112,13 @@ func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
 
 func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, r *http.Request, sID sID) {
 	if resp, err := o.handlers.sessionGet(r.Context(), sID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -120,7 +126,13 @@ func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, r *http.Request, sID sID)
 
 func (o *OpenAPI) ApiSessionDelete(w http.ResponseWriter, r *http.Request, sID sID) {
 	if resp, err := o.handlers.sessionDelete(r.Context(), sID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -128,7 +140,13 @@ func (o *OpenAPI) ApiSessionDelete(w http.ResponseWriter, r *http.Request, sID s
 
 func (o *OpenAPI) ApiSessionListRequests(w http.ResponseWriter, r *http.Request, sID sID) {
 	if resp, err := o.handlers.requestsList(r.Context(), sID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -136,7 +154,13 @@ func (o *OpenAPI) ApiSessionListRequests(w http.ResponseWriter, r *http.Request,
 
 func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, r *http.Request, sID sID) {
 	if resp, err := o.handlers.requestsDelete(r.Context(), sID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -144,13 +168,25 @@ func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, r *http.Req
 
 func (o *OpenAPI) ApiSessionRequestsSubscribe(w http.ResponseWriter, r *http.Request, sID sID, _ skip) {
 	if err := o.handlers.requestsSubscribe(r.Context(), w, r, sID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	}
 }
 
 func (o *OpenAPI) ApiSessionGetRequest(w http.ResponseWriter, r *http.Request, sID sID, rID rID) {
 	if resp, err := o.handlers.requestGet(r.Context(), sID, rID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -158,7 +194,13 @@ func (o *OpenAPI) ApiSessionGetRequest(w http.ResponseWriter, r *http.Request, s
 
 func (o *OpenAPI) ApiSessionDeleteRequest(w http.ResponseWriter, r *http.Request, sID sID, rID rID) {
 	if resp, err := o.handlers.requestDelete(r.Context(), sID, rID); err != nil {
-		o.errorToJson(w, err, http.StatusInternalServerError)
+		var statusCode = http.StatusInternalServerError
+
+		if errors.Is(err, storage.ErrNotFound) {
+			statusCode = http.StatusNotFound
+		}
+
+		o.errorToJson(w, err, statusCode)
 	} else {
 		o.respToJson(w, resp)
 	}
@@ -197,6 +239,13 @@ func (o *OpenAPI) LivenessProbeHead(w http.ResponseWriter, r *http.Request) {
 // HandleInternalError is a default error handler for internal server errors (e.g. query parameters binding
 // errors, and so on).
 func (o *OpenAPI) HandleInternalError(w http.ResponseWriter, _ *http.Request, err error) {
+	//	Invalid format for parameter session_uuid: error unmarshaling 'xxxxxx' text as *uuid.UUID: invalid UUID format
+	// to
+	//	invalid UUID format
+	if err != nil && strings.Contains(err.Error(), "invalid UUID") {
+		err = errors.New("invalid UUID format")
+	}
+
 	o.errorToJson(w, err, http.StatusBadRequest)
 }
 

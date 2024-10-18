@@ -36,7 +36,7 @@ func TestServer_StartHTTP(t *testing.T) {
 		func(context.Context) (string, error) { return "v1.0.0", nil },
 		config.AppSettings{},
 		storage.NewInMemory(time.Minute, 8),
-		pubsub.NewInMemory[any](),
+		pubsub.NewInMemory[pubsub.CapturedRequest](),
 		false,
 	)
 
