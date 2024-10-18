@@ -22,9 +22,10 @@ func TestInMemory_Session_CreateReadDelete(t *testing.T) {
 func TestInMemory_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	testRequestCreateReadDelete(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-		return storage.NewInMemory(sTTL, maxReq)
-	})
+	testRequestCreateReadDelete(t,
+		func(sTTL time.Duration, maxReq uint32) storage.Storage { return storage.NewInMemory(sTTL, maxReq) },
+		func(t time.Duration) { <-time.After(t) },
+	)
 }
 
 func TestInMemory_Close(t *testing.T) {

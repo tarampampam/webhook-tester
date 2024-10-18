@@ -59,7 +59,7 @@ func testSessionCreateReadDelete(
 		require.Equal(t, code, got.Code)
 		require.Equal(t, sessionHeaders, got.Headers)
 		require.Equal(t, delay, got.Delay)
-		assert.NotZero(t, got.CreatedAt)
+		assert.NotZero(t, got.CreatedAtUnixMilli)
 
 		// delete
 		require.NoError(t, impl.DeleteSession(ctx, sID))                      // success
@@ -132,19 +132,19 @@ func testSessionCreateReadDelete(
 		{ // check the created and expiration time
 			var now = time.Now()
 
-			require.InDelta(t, now.UnixMilli(), sess.CreatedAt.UnixMilli(), 50)
+			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
 			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
 		}
 
 		var ( // store the original values
-			originalCreatedAt = sess.CreatedAt.Time
+			originalCreatedAt = sess.CreatedAtUnixMilli
 			originalTTL       = sess.ExpiresAt
 		)
 
 		// reload the session
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
-		require.Equal(t, originalCreatedAt, sess.CreatedAt.Time) // should be the same
+		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli) // should be the same
 		require.InDelta(t, originalTTL.UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
 
 		// add TTL
@@ -156,7 +156,7 @@ func testSessionCreateReadDelete(
 		// the session should be still alive
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
-		require.Equal(t, originalCreatedAt, sess.CreatedAt.Time)
+		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli)
 		require.NotEqual(t, originalTTL, sess.ExpiresAt) // changed
 
 		// wait for expiration (2x)
@@ -172,6 +172,7 @@ func testSessionCreateReadDelete(
 func testRequestCreateReadDelete(
 	t *testing.T,
 	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
+	sleep func(time.Duration),
 ) {
 	t.Helper()
 
@@ -221,7 +222,7 @@ func testRequestCreateReadDelete(
 		require.Equal(t, []byte(body), got.Body)
 		require.Equal(t, requestHeaders, got.Headers)
 		require.Equal(t, someUrl, got.URL)
-		assert.NotZero(t, got.CreatedAt)
+		assert.NotZero(t, got.CreatedAtUnixMilli)
 
 		{ // read all
 			all, err := impl.GetAllRequests(ctx, sID)
@@ -258,6 +259,8 @@ func testRequestCreateReadDelete(
 		require.NoError(t, err)
 		require.NotEmpty(t, rID1)
 
+		sleep(time.Millisecond) // the accuracy is one millisecond
+
 		// create request #2
 		rID2, err := impl.NewRequest(ctx, sID, storage.Request{})
 		require.NoError(t, err)
@@ -275,6 +278,8 @@ func testRequestCreateReadDelete(
 			req, _ = impl.GetRequest(ctx, sID, rID2)
 			require.NotNil(t, req)
 		}
+
+		sleep(time.Millisecond)
 
 		// create request #3
 		rID3, err := impl.NewRequest(ctx, sID, storage.Request{})
@@ -301,6 +306,8 @@ func testRequestCreateReadDelete(
 
 		// and now add one more request - after that, the request #2 should be deleted (the storage should keep the
 		// requests with numbers 3 and 4)
+
+		sleep(time.Millisecond)
 
 		// create request #4
 		rID4, err := impl.NewRequest(ctx, sID, storage.Request{})

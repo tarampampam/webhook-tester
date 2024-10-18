@@ -355,7 +355,6 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		appHttp.WithWriteTimeout(cmd.options.timeouts.httpWrite),
 		appHttp.WithIDLETimeout(cmd.options.timeouts.httpIdle),
 	).Register(
-		ctx,
 		httpLog,
 		cmd.readinessChecker(rdc),
 		cmd.latestAppVersionGetter(),

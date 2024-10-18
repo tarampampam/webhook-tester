@@ -32,13 +32,16 @@ func TestRedis_Request_CreateReadDelete(t *testing.T) {
 
 	var mini = miniredis.RunT(t)
 
-	testRequestCreateReadDelete(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-		return storage.NewRedis(
-			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-			sTTL,
-			maxReq,
-		)
-	})
+	testRequestCreateReadDelete(t,
+		func(sTTL time.Duration, maxReq uint32) storage.Storage {
+			return storage.NewRedis(
+				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+				sTTL,
+				maxReq,
+			)
+		},
+		func(t time.Duration) { mini.FastForward(t) },
+	)
 }
 
 //	func TestRedis_RaceProvocation(t *testing.T) {

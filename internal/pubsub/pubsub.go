@@ -30,7 +30,7 @@ type (
 		Body               []byte       `json:"body"`
 		Headers            []HttpHeader `json:"headers"`
 		URL                string       `json:"url"`
-		CreatedAtUnixMilli int          `json:"created_at_unix_milli"`
+		CreatedAtUnixMilli int64        `json:"created_at_unix_milli"`
 	}
 
 	HttpHeader struct {

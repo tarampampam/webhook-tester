@@ -41,7 +41,7 @@ func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.CapturedRequest
 		}
 
 		list = append(list, openapi.CapturedRequest{
-			CapturedAtUnixMilli:  r.CreatedAt.UnixMilli(),
+			CapturedAtUnixMilli:  r.CreatedAtUnixMilli,
 			ClientAddress:        r.ClientAddr,
 			Headers:              rHeaders,
 			Method:               strings.ToUpper(r.Method),

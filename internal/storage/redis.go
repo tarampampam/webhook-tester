@@ -66,7 +66,7 @@ func (s *Redis) isSessionExists(ctx context.Context, sID string) (bool, error) {
 }
 
 func (s *Redis) NewSession(ctx context.Context, session Session) (sID string, _ error) {
-	sID, session.CreatedAt.Time = s.newID(), time.Now()
+	sID, session.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
 
 	data, mErr := s.encDec.Encode(session)
 	if mErr != nil {
@@ -159,7 +159,7 @@ func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
 	return nil
 }
 
-func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen
+func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return "", err
@@ -167,7 +167,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 		return "", ErrSessionNotFound
 	}
 
-	rID, r.CreatedAt.Time = s.newID(), time.Now()
+	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
 
 	data, mErr := s.encDec.Encode(r)
 	if mErr != nil {
@@ -176,7 +176,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 	// save the request data
 	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(r.CreatedAt.UnixNano()), Member: rID})
+		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(r.CreatedAtUnixMilli), Member: rID})
 		pipe.Set(ctx, s.requestKey(sID, rID), data, s.sessionTTL)
 
 		return nil
@@ -202,30 +202,6 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 		}); err != nil {
 			return "", err
 		}
-	}
-
-	// update the expiration date
-	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		if len(ids) > 0 {
-			var forUpdate = make([]string, 0, len(ids))
-
-			if len(ids) > int(s.maxRequests) {
-				forUpdate = ids[len(ids)-int(s.maxRequests):]
-			} else {
-				forUpdate = append(forUpdate, ids...)
-			}
-
-			for i := range forUpdate {
-				pipe.PExpire(ctx, s.requestKey(sID, forUpdate[i]), s.sessionTTL)
-			}
-		}
-
-		pipe.PExpire(ctx, s.requestsKey(sID), s.sessionTTL)
-		pipe.PExpire(ctx, s.sessionKey(sID), s.sessionTTL)
-
-		return nil
-	}); err != nil {
-		return "", err
 	}
 
 	return rID, nil

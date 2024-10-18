@@ -123,7 +123,7 @@ func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pub
 
 			// write the response to the client
 			if err := ws.WriteJSON(openapi.CapturedRequest{
-				CapturedAtUnixMilli:  openapi.UnixMilliTime(r.CreatedAtUnixMilli),
+				CapturedAtUnixMilli:  r.CreatedAtUnixMilli,
 				ClientAddress:        r.ClientAddr,
 				Headers:              rHeaders,
 				Method:               strings.ToUpper(r.Method),

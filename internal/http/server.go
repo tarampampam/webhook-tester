@@ -59,7 +59,6 @@ func NewServer(baseCtx context.Context, log *zap.Logger, opts ...ServerOption) *
 }
 
 func (s *Server) Register(
-	ctx context.Context,
 	log *zap.Logger,
 	rdyChk func(context.Context) error,
 	lastAppVer func(context.Context) (string, error),
@@ -91,7 +90,7 @@ func (s *Server) Register(
 
 	// apply middlewares
 	s.http.Handler = logreq.New(log, nil)( // logger middleware
-		webhook.New(log)( // webhook capture as a middleware
+		webhook.New(log.Named("webhook"), db, pubSub, cfg.MaxRequestBodySize)( // webhook capture as a middleware
 			handler,
 		),
 	)

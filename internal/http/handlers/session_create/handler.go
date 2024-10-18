@@ -53,7 +53,7 @@ func (h *Handler) Handle(ctx context.Context, p openapi.CreateSessionRequest) (*
 	}
 
 	return &openapi.SessionOptionsResponse{
-		CreatedAtUnixMilli: sess.CreatedAt.UnixMilli(),
+		CreatedAtUnixMilli: sess.CreatedAtUnixMilli,
 		Response: openapi.SessionResponseOptions{
 			Delay:              uint16(sess.Delay.Seconds()),
 			Headers:            rHeaders,

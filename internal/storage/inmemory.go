@@ -112,7 +112,7 @@ func (s *InMemory) NewSession(ctx context.Context, session Session) (sID string,
 
 	var now = time.Now()
 
-	sID, session.CreatedAt.Time, session.ExpiresAt = s.newID(), now, now.Add(s.sessionTTL)
+	sID, session.CreatedAtUnixMilli, session.ExpiresAt = s.newID(), now.UnixMilli(), now.Add(s.sessionTTL)
 
 	s.sessions.Store(sID, &sessionData{session: session})
 
@@ -192,7 +192,7 @@ func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID s
 		return "", ErrSessionNotFound // session not found
 	}
 
-	rID, r.CreatedAt.Time = s.newID(), time.Now()
+	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
 
 	data.requests.Store(rID, r)
 
@@ -205,7 +205,7 @@ func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID s
 		var all = make([]rq, 0) // a slice for all session requests
 
 		data.requests.Range(func(id string, req Request) bool { // iterate over all session requests and fill the slice
-			all = append(all, rq{id, req.CreatedAt.UnixNano()})
+			all = append(all, rq{id, req.CreatedAtUnixMilli})
 
 			return true
 		})
@@ -302,7 +302,7 @@ func (s *InMemory) DeleteAllRequests(ctx context.Context, sID string) error {
 		return true
 	})
 
-	return nil // no requests
+	return nil
 }
 
 // Close closes the storage and stops the cleanup goroutine. Any further calls to the storage methods will

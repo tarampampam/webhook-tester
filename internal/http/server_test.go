@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -27,15 +26,29 @@ func TestServer_StartHTTP(t *testing.T) {
 		ctx = context.Background()
 		log = zap.NewNop()
 		srv = appHttp.NewServer(ctx, log)
+		db  = storage.NewInMemory(time.Minute, 8)
 	)
 
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	const webhookResponse = "CAPTURED !!! OLOLO"
+
+	sID, err := db.NewSession(ctx, storage.Session{
+		Code:         http.StatusExpectationFailed,
+		ResponseBody: []byte(webhookResponse),
+		Headers:      []storage.HttpHeader{{Name: "Content-Type", Value: "text/someShit"}},
+	})
+	require.NoError(t, err)
+
+	rID, err := db.NewRequest(ctx, sID, storage.Request{})
+	require.NoError(t, err)
+
 	srv.Register(
-		ctx,
 		log,
 		func(context.Context) error { return nil },
 		func(context.Context) (string, error) { return "v1.0.0", nil },
 		config.AppSettings{},
-		storage.NewInMemory(time.Minute, 8),
+		db,
 		pubsub.NewInMemory[pubsub.CapturedRequest](),
 		false,
 	)
@@ -108,38 +121,33 @@ func TestServer_StartHTTP(t *testing.T) {
 	t.Run("webhook capture", func(t *testing.T) {
 		t.Parallel()
 
-		var status, body, headers = sendRequest(t, "POST", baseUrl+"/"+uuid.New().String())
+		var status, body, headers = sendRequest(t, "POST", baseUrl+"/"+sID)
 
-		require.Equal(t, http.StatusOK, status)
-		require.Contains(t, string(body), "CAPTURED") // TODO: need to be updated
-		require.Contains(t, headers.Get("Content-Type"), "text/plain")
+		require.Equal(t, http.StatusExpectationFailed, status)
+		require.Contains(t, string(body), webhookResponse)
+		require.Contains(t, headers.Get("Content-Type"), "text/someShit")
 		require.Equal(t, headers.Get("Access-Control-Allow-Origin"), "*")
 		require.Equal(t, headers.Get("Access-Control-Allow-Methods"), "*")
 		require.Equal(t, headers.Get("Access-Control-Allow-Headers"), "*")
 	})
 
 	t.Run("API routes exists", func(t *testing.T) {
-		var (
-			sID = uuid.New().String()
-			rID = uuid.New().String()
-		)
+		t.Parallel()
 
-		for i, params := range []struct{ method, url string }{
+		for i, params := range []struct{ method, url string }{ // order matters
 			{http.MethodPost, "/api/session"},
-			{http.MethodDelete, "/api/session/" + sID},
 			{http.MethodGet, "/api/session/" + sID},
-			{http.MethodDelete, "/api/session/" + sID + "/requests"},
 			{http.MethodGet, "/api/session/" + sID + "/requests"},
 			{http.MethodGet, "/api/session/" + sID + "/requests/subscribe"},
-			{http.MethodDelete, "/api/session/" + sID + "/requests/" + rID},
 			{http.MethodGet, "/api/session/" + sID + "/requests/" + rID},
 			{http.MethodGet, "/api/settings"},
 			{http.MethodGet, "/api/version"},
 			{http.MethodGet, "/api/version/latest"},
+			{http.MethodDelete, "/api/session/" + sID + "/requests/" + rID},
+			{http.MethodDelete, "/api/session/" + sID + "/requests"},
+			{http.MethodDelete, "/api/session/" + sID},
 		} {
 			t.Run(fmt.Sprintf("(%d) %s %s", i, params.method, params.url), func(t *testing.T) {
-				t.Parallel()
-
 				var status, body, headers = sendRequest(t, params.method, baseUrl+params.url)
 
 				require.NotEqual(t, http.StatusNotFound, status)

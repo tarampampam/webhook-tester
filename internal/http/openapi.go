@@ -114,7 +114,7 @@ func (o *OpenAPI) ApiSessionGet(w http.ResponseWriter, r *http.Request, sID sID)
 	if resp, err := o.handlers.sessionGet(r.Context(), sID); err != nil {
 		var statusCode = http.StatusInternalServerError
 
-		if errors.Is(err, storage.ErrSessionNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -128,7 +128,7 @@ func (o *OpenAPI) ApiSessionDelete(w http.ResponseWriter, r *http.Request, sID s
 	if resp, err := o.handlers.sessionDelete(r.Context(), sID); err != nil {
 		var statusCode = http.StatusInternalServerError
 
-		if errors.Is(err, storage.ErrSessionNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -142,7 +142,7 @@ func (o *OpenAPI) ApiSessionListRequests(w http.ResponseWriter, r *http.Request,
 	if resp, err := o.handlers.requestsList(r.Context(), sID); err != nil {
 		var statusCode = http.StatusInternalServerError
 
-		if errors.Is(err, storage.ErrSessionNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -156,7 +156,7 @@ func (o *OpenAPI) ApiSessionDeleteAllRequests(w http.ResponseWriter, r *http.Req
 	if resp, err := o.handlers.requestsDelete(r.Context(), sID); err != nil {
 		var statusCode = http.StatusInternalServerError
 
-		if errors.Is(err, storage.ErrSessionNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -170,7 +170,7 @@ func (o *OpenAPI) ApiSessionRequestsSubscribe(w http.ResponseWriter, r *http.Req
 	if err := o.handlers.requestsSubscribe(r.Context(), w, r, sID); err != nil {
 		var statusCode = http.StatusInternalServerError
 
-		if errors.Is(err, storage.ErrSessionNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
