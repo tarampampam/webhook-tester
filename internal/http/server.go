@@ -90,7 +90,7 @@ func (s *Server) Register(
 
 	// apply middlewares
 	s.http.Handler = logreq.New(log, nil)( // logger middleware
-		webhook.New(log.Named("webhook"), db, pubSub, cfg.MaxRequestBodySize)( // webhook capture as a middleware
+		webhook.New(log.Named("webhook"), db, pubSub, cfg)( // webhook capture as a middleware
 			handler,
 		),
 	)

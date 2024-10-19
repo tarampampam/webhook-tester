@@ -1,18 +1,15 @@
 import { createPath, matchRoutes, type RouteObject, useLocation } from 'react-router-dom'
+import { apiClient } from '~/api'
 import { HomeLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
-import { NoSessionScreen, SessionLayout } from '~/screens/session'
+import { SessionLayout } from '~/screens/session'
 import { SessionRequestScreen } from '~/screens/session/request'
-import { apiClient } from '~/api'
+import { HomeScreen } from '~/screens/home'
 
 export enum RouteIDs {
   Home = 'home',
-  NoSession = 'no-session',
   Session = 'session',
-  SessionNotFound = 'session.404', // TODO: implement
   SessionRequest = 'request',
-  SessionRequestNotFound = 'request.404', // TODO: implement
-  NotFound = '404', // TODO: use it
 }
 
 export const routes: RouteObject[] = [
@@ -20,24 +17,23 @@ export const routes: RouteObject[] = [
     path: '/',
     element: <HomeLayout apiClient={apiClient} />,
     errorElement: <NotFoundScreen />,
-    id: RouteIDs.Home,
     children: [
       {
         index: true,
-        element: <NoSessionScreen />,
-        id: RouteIDs.NoSession,
+        element: <HomeScreen />,
+        id: RouteIDs.Home,
       },
-    ],
-  },
-  {
-    path: 'session/:sID',
-    id: RouteIDs.Session,
-    element: <SessionLayout />,
-    children: [
       {
-        path: ':rID',
-        id: RouteIDs.SessionRequest,
-        element: <SessionRequestScreen />,
+        path: 'session/:sID',
+        id: RouteIDs.Session,
+        element: <SessionLayout />,
+        children: [
+          {
+            path: ':rID',
+            id: RouteIDs.SessionRequest,
+            element: <SessionRequestScreen />,
+          },
+        ],
       },
     ],
   },
@@ -61,9 +57,9 @@ export function useCurrentRouteID(): RouteIDs | undefined {
 }
 
 type RouteParams<T extends RouteIDs> = T extends RouteIDs.Session
-  ? [string] // sID
+  ? [string /* sID */]
   : T extends RouteIDs.SessionRequest
-    ? [string, string] // sID, rID
+    ? [string /* sID */, string /* rID */]
     : [] // no params
 
 /**
@@ -76,9 +72,7 @@ type RouteParams<T extends RouteIDs> = T extends RouteIDs.Session
  */
 export function pathTo<T extends RouteIDs>(
   path: RouteIDs,
-  ...params: T extends RouteIDs
-    ? RouteParams<Exclude<T, RouteIDs.SessionNotFound | RouteIDs.SessionRequestNotFound | RouteIDs.NotFound>>
-    : never
+  ...params: T extends RouteIDs ? RouteParams<T> : never
 ): string {
   switch (path) {
     case RouteIDs.Home:

@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"gh.tarampamp.am/webhook-tester/v2/internal/config"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/openapi"
 	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
@@ -22,7 +23,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 	log *zap.Logger,
 	db storage.Storage,
 	pub pubsub.Publisher[pubsub.CapturedRequest],
-	maxBodySize uint32,
+	cfg config.AppSettings,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +44,16 @@ func New( //nolint:funlen,gocognit,gocyclo
 				return
 			}
 
+			{ // increase the session lifetime
+				var delta = time.Now().Add(cfg.SessionTTL).Sub(time.Unix(0, sess.CreatedAtUnixMilli*int64(time.Millisecond)))
+
+				if err := db.AddSessionTTL(ctx, sID, delta); err != nil {
+					respondWithError(w, log, http.StatusInternalServerError, err.Error())
+
+					return
+				}
+			}
+
 			// read the request body
 			var body []byte
 
@@ -53,10 +64,10 @@ func New( //nolint:funlen,gocognit,gocyclo
 			}
 
 			// check the request body size and respond with an error if it's too large
-			if maxBodySize > 0 && uint32(len(body)) > maxBodySize { //nolint:gosec
+			if cfg.MaxRequestBodySize > 0 && uint32(len(body)) > cfg.MaxRequestBodySize { //nolint:gosec
 				respondWithError(w, log,
 					http.StatusRequestEntityTooLarge,
-					fmt.Sprintf("The request body is too large (current: %d, max: %d)", len(body), maxBodySize),
+					fmt.Sprintf("The request body is too large (current: %d, max: %d)", len(body), cfg.MaxRequestBodySize),
 				)
 
 				return

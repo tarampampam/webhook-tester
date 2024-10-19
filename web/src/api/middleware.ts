@@ -50,7 +50,8 @@ export const throwIfNotValidResponse: Middleware = {
               .join(', ')
             break
         }
-      } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_) {
         message += ' (failed to parse the response body as JSON)'
       }
     }
