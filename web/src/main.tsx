@@ -1,17 +1,26 @@
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { MantineProvider } from '@mantine/core'
 import { routes } from './routing'
-import '~/theme/app.scss'
+import '@mantine/core/styles.css'
+import '~/theme/app.css'
 
 /** App component */
 const App = (): React.JSX.Element => {
-  // render the app
-  return <RouterProvider router={createBrowserRouter(routes)} />
+  return (
+    <MantineProvider
+      // https://mantine.dev/theming/mantine-provider/
+      defaultColorScheme="auto"
+    >
+      <RouterProvider router={createBrowserRouter(routes)} />
+    </MantineProvider>
+  )
 }
 
-// and here we go :D
-createRoot(document.getElementById('root') as HTMLElement).render(
+const root = document.getElementById('root') as HTMLElement
+
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>

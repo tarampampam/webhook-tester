@@ -1,12 +1,14 @@
 import type React from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useParams } from 'react-router-dom'
 
 export default function Layout(): React.JSX.Element {
+  const { sID } = useParams<Readonly<{ sID: string }>>()
+
   return (
-    <main>
-      <h1>Session Layout</h1>
+    <div>
+      <h1>Session Layout ({sID})</h1>
 
       <Outlet />
-    </main>
+    </div>
   )
 }

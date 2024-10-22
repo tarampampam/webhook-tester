@@ -14,6 +14,9 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "@mantine/core": "^7.13.3",
+    "@mantine/hooks": "^7.13.3",
+    "@tabler/icons-react": "^3.19.0",
     "openapi-fetch": "^0.12.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -37,8 +40,10 @@
     "eslint-plugin-react-refresh": "^0.4.12",
     "globals": "^15.11.0",
     "openapi-typescript": "^7.4.1",
+    "postcss": "^8.4.47",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.3.3",
-    "sass": "^1.79.5",
     "typescript": "^5.6.3",
     "vite": "^5.4.9",
     "vitest": "^2.1.3",

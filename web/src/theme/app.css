@@ -1,0 +1,19 @@
+html,
+body {
+  font-family: sans-serif;
+  font-size: 16px;
+}
+
+@media screen and (min-width: 2000px) {
+  body,
+  html {
+    font-size: 19px;
+  }
+}
+
+@media screen and (min-width: 2300px) {
+  body,
+  html {
+    font-size: 22px;
+  }
+}

@@ -10,6 +10,9 @@ help: ## Show this help
 shell: ## Start shell
 	docker compose run $(DC_RUN_ARGS) app bash
 
+web-shell: ## Start shell in web directory
+	docker compose run $(DC_RUN_ARGS) -w '/src/web' app bash
+
 generate: ## Run code generation
 	docker compose run $(DC_RUN_ARGS) app go generate -skip readme ./...
 	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run generate
@@ -25,7 +28,7 @@ lint: ## Run linters
 	docker compose run $(DC_RUN_ARGS) app golangci-lint run
 
 up: ## Start the application in watch mode
-	docker compose build
+	#docker compose build
 	docker compose up --detach --build --remove-orphans
 	docker compose kill app-http --remove-orphans 2>/dev/null || true
 	#docker compose up --detach --wait whoami httpbin
