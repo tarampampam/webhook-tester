@@ -13,9 +13,11 @@ import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '../routing'
 import LogoTextSvg from '~/assets/togo-text.svg'
+import { useNavBar } from '~/shared'
 
 export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const [opened, { toggle }] = useDisclosure()
+  const navBar = useNavBar()
   const [currentVersion, setCurrentVersion] = useState<Readonly<SemVer> | null>(null)
   const [latestVersion, setLatestVersion] = useState<Readonly<SemVer> | null>(null)
   const isUpdateAvailable = currentVersion && latestVersion && currentVersion.compare(latestVersion) === -1
@@ -47,15 +49,15 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
               style={{ height: 20 }}
               title={currentVersion ? 'v' + currentVersion.toString() : undefined}
             />
-            <Button.Group>
-              <Button variant="default" size="xs" leftSection={<IconHelpHexagonFilled size={'1.3em'} />}>
+            <Button.Group visibleFrom="md">
+              <Button variant="default" size="xs" leftSection={<IconHelpHexagonFilled size="1.3em" />}>
                 Help
               </Button>
               {isUpdateAvailable ? (
                 <Button
                   variant="default"
                   size="xs"
-                  leftSection={<IconRefreshAlert size={'1.3em'} />}
+                  leftSection={<IconRefreshAlert size="1.3em" />}
                   component={Link}
                   to={__LATEST_RELEASE_LINK__}
                   target="_blank"
@@ -66,7 +68,7 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
                 <Button
                   variant="default"
                   size="xs"
-                  leftSection={<IconBrandGithubFilled size={'1.3em'} />}
+                  leftSection={<IconBrandGithubFilled size="1.3em" />}
                   component={Link}
                   to={__GITHUB_PROJECT_LINK__}
                   target="_blank"
@@ -76,26 +78,36 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
               )}
             </Button.Group>
           </Group>
-          <Group gap={5} visibleFrom="xs">
-            <Button
-              leftSection={<IconCopy size={'1.2em'} />}
-              variant="gradient"
-              gradient={{ from: 'teal', to: 'lime', deg: -90 }}
-            >
-              Copy Webhook URL
-            </Button>
-            <Button
-              leftSection={<IconCirclePlusFilled size={'1.3em'} />}
-              variant="gradient"
-              gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
-            >
-              New URL
-            </Button>
+          <Group visibleFrom="xs">
+            <Button.Group>
+              <Button
+                leftSection={<IconCopy size="1.2em" />}
+                variant="gradient"
+                gradient={{ from: 'teal', to: 'lime', deg: -90 }}
+              >
+                Copy Webhook URL
+              </Button>
+              <Button
+                leftSection={<IconCirclePlusFilled size="1.3em" />}
+                variant="gradient"
+                gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
+              >
+                New URL
+              </Button>
+            </Button.Group>
           </Group>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar p="md" withBorder={false}>
+        {navBar.component ? navBar.component : <>No navbar</>}
+      </AppShell.Navbar>
+
+      <AppShell.Main>
+        <Outlet />
+      </AppShell.Main>
+
+      <AppShell.Aside>
         <p>
           <Link to={pathTo(RouteIDs.Home)}>Home</Link>
         </p>
@@ -108,11 +120,7 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
         <p>
           <Link to={'/foobar-404'}>404</Link>
         </p>
-      </AppShell.Navbar>
-
-      <AppShell.Main>
-        <Outlet />
-      </AppShell.Main>
+      </AppShell.Aside>
     </AppShell>
   )
 }

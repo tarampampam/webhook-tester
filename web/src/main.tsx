@@ -2,6 +2,7 @@ import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
+import { NavBarProvider } from '~/shared'
 import { routes } from './routing'
 import '@mantine/core/styles.css'
 import '~/theme/app.css'
@@ -13,7 +14,9 @@ const App = (): React.JSX.Element => {
       // https://mantine.dev/theming/mantine-provider/
       defaultColorScheme="auto"
     >
-      <RouterProvider router={createBrowserRouter(routes)} />
+      <NavBarProvider>
+        <RouterProvider router={createBrowserRouter(routes)} />
+      </NavBarProvider>
     </MantineProvider>
   )
 }

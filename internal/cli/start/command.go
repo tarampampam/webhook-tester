@@ -385,6 +385,13 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 			zap.Uint16("port", cmd.options.http.tcpPort),
 			zap.String("storage", cmd.options.storage.driver),
 			zap.String("pubsub", cmd.options.pubSub.driver),
+			zap.String("open", fmt.Sprintf("http://%s:%d", func() string {
+				if addr := cmd.options.addr; addr == "0.0.0.0" || addr == "::" || strings.HasPrefix(addr, "127.") {
+					return "127.0.0.1"
+				}
+
+				return cmd.options.addr
+			}(), cmd.options.http.tcpPort)),
 		)
 
 		if err := server.StartHTTP(ctx, httpLn); err != nil {
