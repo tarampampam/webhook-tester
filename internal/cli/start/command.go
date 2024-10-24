@@ -298,7 +298,7 @@ func validateDuration(name string, minValue, maxValue time.Duration) func(d time
 }
 
 // Run current command.
-func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen
+func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 

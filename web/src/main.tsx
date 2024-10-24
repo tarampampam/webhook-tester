@@ -2,18 +2,19 @@ import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
 import { NavBarProvider } from '~/shared'
 import { routes } from './routing'
 import '@mantine/core/styles.css'
+import '@mantine/code-highlight/styles.css'
+import '@mantine/notifications/styles.css'
 import '~/theme/app.css'
 
 /** App component */
 const App = (): React.JSX.Element => {
   return (
-    <MantineProvider
-      // https://mantine.dev/theming/mantine-provider/
-      defaultColorScheme="auto"
-    >
+    <MantineProvider defaultColorScheme="auto">
+      <Notifications />
       <NavBarProvider>
         <RouterProvider router={createBrowserRouter(routes)} />
       </NavBarProvider>

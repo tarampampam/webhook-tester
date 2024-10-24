@@ -36,7 +36,7 @@ export const routes: RouteObject[] = [
         index: true,
         element: (
           <RedirectIfLastUsedIsKnown>
-            <HomeScreen />
+            <HomeScreen url={new URL('http://127.0.0.1:8081/33569c52-6c64-46eb-92b4-d3cb3824daa8')} />
           </RedirectIfLastUsedIsKnown>
         ),
         id: RouteIDs.Home,

@@ -1,7 +1,7 @@
 import { useDisclosure } from '@mantine/hooks'
 import React, { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import { AppShell, Group, Burger, Image, Button } from '@mantine/core'
+import { AppShell, Group, Center, Burger, Image, Button, Text, Loader } from '@mantine/core'
 import {
   IconCopy,
   IconCirclePlusFilled,
@@ -12,15 +12,18 @@ import {
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '../routing'
-import LogoTextSvg from '~/assets/togo-text.svg'
 import { useNavBar } from '~/shared'
+import LogoTextSvg from '~/assets/togo-text.svg'
 
 export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const [opened, { toggle }] = useDisclosure()
   const navBar = useNavBar()
-  const [currentVersion, setCurrentVersion] = useState<Readonly<SemVer> | null>(null)
-  const [latestVersion, setLatestVersion] = useState<Readonly<SemVer> | null>(null)
+  const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
+  const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
   const isUpdateAvailable = currentVersion && latestVersion && currentVersion.compare(latestVersion) === -1
+  // const [webhookUrl, setWebhookUrl] = useState<URL>(
+  //   new URL(`${window.location.origin}/33569c52-6c64-46eb-92b4-d3cb3824daa8`)
+  // )
 
   useEffect(() => {
     apiClient
@@ -50,57 +53,29 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
               title={currentVersion ? 'v' + currentVersion.toString() : undefined}
             />
             <Button.Group visibleFrom="md">
-              <Button variant="default" size="xs" leftSection={<IconHelpHexagonFilled size="1.3em" />}>
-                Help
-              </Button>
-              {isUpdateAvailable ? (
-                <Button
-                  variant="default"
-                  size="xs"
-                  leftSection={<IconRefreshAlert size="1.3em" />}
-                  component={Link}
-                  to={__LATEST_RELEASE_LINK__}
-                  target="_blank"
-                >
-                  Update available {latestVersion && <>(v{latestVersion.toString()})</>}
-                </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  size="xs"
-                  leftSection={<IconBrandGithubFilled size="1.3em" />}
-                  component={Link}
-                  to={__GITHUB_PROJECT_LINK__}
-                  target="_blank"
-                >
-                  GitHub
-                </Button>
-              )}
+              <buttons.OpenHelp />
+              {isUpdateAvailable ? <buttons.OpenLatestRelease newVer={latestVersion} /> : <buttons.OpenGitHubProject />}
             </Button.Group>
           </Group>
           <Group visibleFrom="xs">
             <Button.Group>
-              <Button
-                leftSection={<IconCopy size="1.2em" />}
-                variant="gradient"
-                gradient={{ from: 'teal', to: 'lime', deg: -90 }}
-              >
-                Copy Webhook URL
-              </Button>
-              <Button
-                leftSection={<IconCirclePlusFilled size="1.3em" />}
-                variant="gradient"
-                gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
-              >
-                New URL
-              </Button>
+              <buttons.CopyWebHookUrl />
+              <buttons.CreateNewSession />
             </Button.Group>
           </Group>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar p="md" withBorder={false}>
-        {navBar.component ? navBar.component : <>No navbar</>}
+        <div>
+          {navBar.component ? (
+            navBar.component
+          ) : (
+            <Center pt="2em">
+              <Loader color="dimmed" size="1em" mr={8} mb={3} /> <Text c="dimmed">Waiting for first request</Text>
+            </Center>
+          )}
+        </div>
       </AppShell.Navbar>
 
       <AppShell.Main>
@@ -123,4 +98,54 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
       </AppShell.Aside>
     </AppShell>
   )
+}
+
+const buttons = {
+  OpenHelp: (): React.JSX.Element => (
+    <Button variant="default" size="xs" leftSection={<IconHelpHexagonFilled size="1.3em" />}>
+      Help
+    </Button>
+  ),
+  OpenLatestRelease: ({ newVer }: { newVer?: SemVer }): React.JSX.Element => (
+    <Button
+      variant="default"
+      size="xs"
+      leftSection={<IconRefreshAlert size="1.3em" />}
+      component={Link}
+      to={__LATEST_RELEASE_LINK__}
+      target="_blank"
+    >
+      Update available {newVer && <>(v{newVer.toString()})</>}
+    </Button>
+  ),
+  OpenGitHubProject: (): React.JSX.Element => (
+    <Button
+      variant="default"
+      size="xs"
+      leftSection={<IconBrandGithubFilled size="1.3em" />}
+      component={Link}
+      to={__GITHUB_PROJECT_LINK__}
+      target="_blank"
+    >
+      GitHub
+    </Button>
+  ),
+  CopyWebHookUrl: (): React.JSX.Element => (
+    <Button
+      leftSection={<IconCopy size="1.2em" />}
+      variant="gradient"
+      gradient={{ from: 'teal', to: 'lime', deg: -90 }}
+    >
+      Copy Webhook URL
+    </Button>
+  ),
+  CreateNewSession: (): React.JSX.Element => (
+    <Button
+      leftSection={<IconCirclePlusFilled size="1.3em" />}
+      variant="gradient"
+      gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
+    >
+      New URL
+    </Button>
+  ),
 }

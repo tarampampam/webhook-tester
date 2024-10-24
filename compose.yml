@@ -20,7 +20,7 @@ services:
 
   app-http:
     build: *app-build
-    command: go run ./cmd/webhook-tester/ start --use-live-frontend
+    command: go run ./cmd/webhook-tester/ start --use-live-frontend --auto-create-sessions
     volumes: [.:/src:rw]
     ports: ['8080:8080/tcp']
     depends_on: {app-web-dist: {condition: service_healthy}}
