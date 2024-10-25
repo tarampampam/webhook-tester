@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react'
 import { Flex, Divider, Title, Text, Button, Space, Blockquote } from '@mantine/core'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { notifications } from '@mantine/notifications'
@@ -16,9 +17,18 @@ import {
   IconBrandCSharp,
   IconInfoCircle,
 } from '@tabler/icons-react'
-import type React from 'react'
+import { sessionToUrl, useLastUsedSID } from '~/shared'
 
-export default function Screen({ url }: { url: URL }): React.JSX.Element {
+export default function Screen(): React.JSX.Element {
+  const [lastUsedSID] = useLastUsedSID()
+  const [url, setUrl] = useState<URL>(sessionToUrl(lastUsedSID || '...'))
+
+  useEffect(() => {
+    if (lastUsedSID) {
+      setUrl(sessionToUrl(lastUsedSID))
+    }
+  }, [lastUsedSID])
+
   const handleSendTestRequest = async () => {
     const id = notifications.show({
       title: 'Sending request',

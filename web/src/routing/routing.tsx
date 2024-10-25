@@ -6,7 +6,7 @@ import { NotFoundScreen } from '~/screens/not-found'
 import { SessionLayout } from '~/screens/session'
 import { SessionRequestScreen } from '~/screens/session/request'
 import { HomeScreen } from '~/screens/home'
-import { useLaseUsedRID, useLaseUsedSID } from '../shared'
+import { useLastUsedRID, useLastUsedSID } from '../shared'
 
 export enum RouteIDs {
   Home = 'home',
@@ -15,12 +15,10 @@ export enum RouteIDs {
 }
 
 const RedirectIfLastUsedIsKnown = ({ children }: { children: React.JSX.Element }): React.JSX.Element => {
-  const [sID, rID] = [useLaseUsedSID()[0], useLaseUsedRID()[0]]
+  const [sID, rID] = [useLastUsedSID()[0], useLastUsedRID()[0]]
 
   if (sID && rID) {
     return <Navigate to={pathTo(RouteIDs.SessionRequest, sID, rID)} />
-  } else if (sID) {
-    return <Navigate to={pathTo(RouteIDs.Session, sID)} />
   }
 
   return children
@@ -36,7 +34,7 @@ export const routes: RouteObject[] = [
         index: true,
         element: (
           <RedirectIfLastUsedIsKnown>
-            <HomeScreen url={new URL('http://127.0.0.1:8081/33569c52-6c64-46eb-92b4-d3cb3824daa8')} />
+            <HomeScreen />
           </RedirectIfLastUsedIsKnown>
         ),
         id: RouteIDs.Home,

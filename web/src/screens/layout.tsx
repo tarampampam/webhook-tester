@@ -90,7 +90,13 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
           <Link to={pathTo(RouteIDs.Session, 'sID')}>Session</Link>
         </p>
         <p>
+          <Link to={pathTo(RouteIDs.Session, 'sID2')}>Session 2</Link>
+        </p>
+        <p>
           <Link to={pathTo(RouteIDs.SessionRequest, 'sID', 'rID')}>Request</Link>
+        </p>
+        <p>
+          <Link to={pathTo(RouteIDs.SessionRequest, 'sID2', 'rID2')}>Request 2</Link>
         </p>
         <p>
           <Link to={'/foobar-404'}>404</Link>

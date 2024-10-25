@@ -15,7 +15,7 @@ const panic = (message) => {
  * @param {string} output Output d.ts file
  * @return {Promise<void>}
  */
-const generate = async (input, output) => {
+const apiGenerate = async (input, output) => {
   const ast = await openapiTS(new URL(input, import.meta.url), {
     additionalProperties: false,
     arrayLength: true,
@@ -36,6 +36,6 @@ if (!input || typeof input !== 'string') {
   panic('Please provide an output file')
 }
 
-await Promise.all([generate(input, output)]).catch((error) => {
+await Promise.all([apiGenerate(input, output)]).catch((error) => {
   panic(error)
 })

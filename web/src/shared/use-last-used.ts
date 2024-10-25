@@ -2,7 +2,7 @@ import { useLocalStorage, useSessionStorage } from '@mantine/hooks'
 
 const storageKeyPrefix = 'webhook-tester-v2-last-used'
 
-export function useLaseUsedSID(): readonly [string | undefined, (value: string | undefined) => void] {
+export function useLastUsedSID(): readonly [string | undefined, (value: string | undefined) => void] {
   const [sID, setSID, removeSID] = useLocalStorage<string | undefined>({
     key: `${storageKeyPrefix}-sid`,
     defaultValue: undefined,
@@ -20,7 +20,7 @@ export function useLaseUsedSID(): readonly [string | undefined, (value: string |
   ]
 }
 
-export function useLaseUsedRID(): readonly [string | undefined, (value: string | undefined) => void] {
+export function useLastUsedRID(): readonly [string | undefined, (value: string | undefined) => void] {
   const [rID, setRID, removeRID] = useSessionStorage<string | undefined>({
     key: `${storageKeyPrefix}-rid`,
     defaultValue: undefined,

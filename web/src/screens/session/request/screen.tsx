@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { useLaseUsedRID } from '~/shared'
+import { useLastUsedRID } from '~/shared'
 
 export default function Screen(): React.JSX.Element {
   const { rID } = useParams<Readonly<{ rID: string }>>()
-  const setLastUsedRID = useLaseUsedRID()[1]
+  const setLastUsedRID = useLastUsedRID()[1]
 
   useEffect((): undefined | (() => void) => {
     if (rID) {

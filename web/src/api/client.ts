@@ -4,12 +4,40 @@ import { APIErrorUnknown } from './errors'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
 import { components, paths } from './schema.gen'
 
+type DeepReadonly<T> = { readonly [P in keyof T]: DeepReadonly<T[P]> }
+
+type AppSettings = {
+  limits: { maxRequests: number; maxRequestBodySize: number; sessionTTL: number }
+}
+
+type SessionOptions = {
+  uuid: string
+  response: {
+    statusCode: number
+    headers: Array<{ name: string; value: string }>
+    delay: number
+    responseBody: Uint8Array
+  }
+  createdAt: Date
+}
+
+type CapturedRequest = {
+  uuid: string
+  clientAddress: string
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
+  requestPayload: Uint8Array
+  headers: Array<{ name: string; value: string }>
+  url: URL
+  capturedAt: Date
+}
+
 export class Client {
   private readonly baseUrl: URL
   private readonly api: OpenapiClient<paths>
   private cache: Partial<{
     currentVersion: Readonly<SemVer>
     latestVersion: Readonly<SemVer>
+    settings: DeepReadonly<AppSettings>
   }> = {}
 
   constructor(opt?: ClientOptions) {
@@ -72,23 +100,185 @@ export class Client {
       return this.cache.latestVersion
     }
 
-    throw new APIErrorUnknown({ message: response.statusText, response }) // will never happen due to the middleware
+    throw new APIErrorUnknown({ message: response.statusText, response })
   }
 
   /**
-   * The promise resolves with a closer function that can be called to close the WebSocket connection.
-   * */
-  async routesSubscribe({
-    sID,
-    onConnected,
-    onUpdate,
-    onError,
+   * Returns the app settings.
+   *
+   * @throws {APIError}
+   */
+  async getSettings(force: boolean = false): Promise<DeepReadonly<AppSettings>> {
+    if (this.cache.settings && !force) {
+      return this.cache.settings
+    }
+
+    const { data, response } = await this.api.GET('/api/settings')
+
+    if (data) {
+      this.cache.settings = Object.freeze({
+        limits: Object.freeze({
+          maxRequests: data.limits.max_requests,
+          maxRequestBodySize: data.limits.max_request_body_size,
+          sessionTTL: data.limits.session_ttl, // in seconds
+        }),
+      })
+
+      return this.cache.settings
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Creates a new session with the specified response settings.
+   *
+   * @throws {APIError}
+   */
+  async newSession({
+    statusCode = 200,
+    headers = {},
+    delay = 0,
+    responseBody = new Uint8Array(),
   }: {
-    sID: string // session ID
-    onConnected?: () => void // called when the WebSocket connection is established
-    onUpdate: (request: components['schemas']['CapturedRequest']) => void // called when the update is received
-    onError?: (err: Error) => void // called when an error occurs on alive connection
-  }): Promise</* closer */ () => void> {
+    statusCode: number
+    headers?: Record<string, string>
+    delay?: number
+    responseBody?: Uint8Array
+  }): Promise<DeepReadonly<SessionOptions>> {
+    const { data, response } = await this.api.POST('/api/session', {
+      body: {
+        status_code: Math.min(Math.max(100, statusCode), 530), // clamp to the valid range
+        headers: Object.entries(headers)
+          .map(([name, value]) => ({ name, value })) // convert to array of objects
+          .filter((h) => h.value), // remove empty values
+        delay: Math.min(Math.max(0, delay), 30), // clamp to the valid range
+        response_body_base64: btoa(new TextDecoder().decode(responseBody)),
+      },
+    })
+
+    if (data) {
+      return Object.freeze({
+        uuid: data.uuid,
+        response: Object.freeze({
+          statusCode: data.response.status_code,
+          headers: data.response.headers,
+          delay: data.response.delay,
+          responseBody: Object.freeze(new TextEncoder().encode(atob(data.response.response_body_base64))),
+        }),
+        createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
+      })
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Returns the session by its ID.
+   *
+   * @throws {APIError}
+   */
+  async getSession(sID: string): Promise<DeepReadonly<SessionOptions>> {
+    const { data, response } = await this.api.GET(`/api/session/{session_uuid}`, {
+      params: { path: { session_uuid: sID } },
+    })
+
+    if (data) {
+      return Object.freeze({
+        uuid: data.uuid,
+        response: Object.freeze({
+          statusCode: data.response.status_code,
+          headers: data.response.headers,
+          delay: data.response.delay,
+          responseBody: Object.freeze(new TextEncoder().encode(atob(data.response.response_body_base64))),
+        }),
+        createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
+      })
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Deletes the session by its ID.
+   *
+   * @throws {APIError}
+   */
+  async deleteSession(sID: string): Promise<boolean> {
+    const { data, response } = await this.api.DELETE('/api/session/{session_uuid}', {
+      params: { path: { session_uuid: sID } },
+    })
+
+    if (data) {
+      return data.success
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Returns the list of captured requests for the session by its ID.
+   *
+   * @throws {APIError}
+   */
+  async getSessionRequests(sID: string): Promise<DeepReadonly<Array<CapturedRequest>>> {
+    const { data, response } = await this.api.GET('/api/session/{session_uuid}/requests', {
+      params: { path: { session_uuid: sID } },
+    })
+
+    if (data) {
+      return Object.freeze(
+        data.map((req) =>
+          Object.freeze({
+            uuid: req.uuid,
+            clientAddress: req.client_address,
+            method: req.method,
+            requestPayload: Object.freeze(new TextEncoder().encode(atob(req.request_payload_base64))),
+            headers: Object.freeze(req.headers),
+            url: new URL(req.url),
+            capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
+          })
+        )
+      )
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Deletes all captured requests for the session by its ID.
+   *
+   * @throws {APIError}
+   */
+  async deleteAllSessionRequests(sID: string): Promise<boolean> {
+    const { data, response } = await this.api.DELETE('/api/session/{session_uuid}/requests', {
+      params: { path: { session_uuid: sID } },
+    })
+
+    if (data) {
+      return data.success
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Subscribes to the captured requests for the session by its ID.
+   *
+   * The promise resolves with a closer function that can be called to close the WebSocket connection.
+   */
+  async subscribeToSessionRequests(
+    sID: string,
+    {
+      onConnected,
+      onUpdate,
+      onError,
+    }: {
+      onConnected?: () => void // called when the WebSocket connection is established
+      onUpdate: (request: components['schemas']['CapturedRequest']) => void // called when the update is received
+      onError?: (err: Error) => void // called when an error occurs on alive connection
+    }
+  ): Promise</* closer */ () => void> {
     const protocol = this.baseUrl.protocol === 'https:' ? 'wss:' : 'ws:'
     const path: keyof paths = '/api/session/{session_uuid}/requests/subscribe'
 
@@ -133,6 +323,48 @@ export class Client {
         reject(err)
       }
     })
+  }
+
+  /**
+   * Returns the captured request by its ID.
+   *
+   * @throws {APIError}
+   */
+  async getSessionRequest(sID: string, rID: string): Promise<DeepReadonly<CapturedRequest>> {
+    const { data, response } = await this.api.GET('/api/session/{session_uuid}/requests/{request_uuid}', {
+      params: { path: { session_uuid: sID, request_uuid: rID } },
+    })
+
+    if (data) {
+      return Object.freeze({
+        uuid: data.uuid,
+        clientAddress: data.client_address,
+        method: data.method,
+        requestPayload: Object.freeze(new TextEncoder().encode(atob(data.request_payload_base64))),
+        headers: Object.freeze(data.headers),
+        url: new URL(data.url),
+        capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
+      })
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
+   * Deletes the captured request by its ID.
+   *
+   * @throws {APIError}
+   */
+  async deleteSessionRequest(sID: string, rID: string): Promise<boolean> {
+    const { data, response } = await this.api.DELETE('/api/session/{session_uuid}/requests/{request_uuid}', {
+      params: { path: { session_uuid: sID, request_uuid: rID } },
+    })
+
+    if (data) {
+      return data.success
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
   }
 }
 
