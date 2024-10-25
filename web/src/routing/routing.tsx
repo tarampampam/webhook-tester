@@ -1,7 +1,7 @@
 import type React from 'react'
 import { createPath, matchRoutes, Navigate, type RouteObject, useLocation } from 'react-router-dom'
 import { apiClient } from '~/api'
-import { HomeLayout } from '~/screens'
+import { DefaultLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
 import { SessionLayout } from '~/screens/session'
 import { SessionRequestScreen } from '~/screens/session/request'
@@ -14,7 +14,7 @@ export enum RouteIDs {
   SessionRequest = 'request',
 }
 
-const RedirectIfLastUsedIsKnown = ({ children }: { children: React.JSX.Element }): React.JSX.Element => {
+const HomeWrapper = ({ children }: { children: React.JSX.Element }): React.JSX.Element => {
   const [sID, rID] = [useLastUsedSID()[0], useLastUsedRID()[0]]
 
   if (sID && rID) {
@@ -27,15 +27,15 @@ const RedirectIfLastUsedIsKnown = ({ children }: { children: React.JSX.Element }
 export const routes: RouteObject[] = [
   {
     path: '/',
-    element: <HomeLayout apiClient={apiClient} />,
+    element: <DefaultLayout apiClient={apiClient} />,
     errorElement: <NotFoundScreen />,
     children: [
       {
         index: true,
         element: (
-          <RedirectIfLastUsedIsKnown>
-            <HomeScreen />
-          </RedirectIfLastUsedIsKnown>
+          <HomeWrapper>
+            <HomeScreen apiClient={apiClient} />
+          </HomeWrapper>
         ),
         id: RouteIDs.Home,
       },

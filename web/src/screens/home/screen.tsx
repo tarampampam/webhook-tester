@@ -17,9 +17,13 @@ import {
   IconBrandCSharp,
   IconInfoCircle,
 } from '@tabler/icons-react'
+import { useNavigate } from 'react-router-dom'
 import { sessionToUrl, useLastUsedSID } from '~/shared'
+import type { Client } from '../../api'
+import { pathTo, RouteIDs } from '../../routing'
 
-export default function Screen(): React.JSX.Element {
+export default function Screen({ apiClient }: { apiClient: Client }): React.JSX.Element {
+  const navigate = useNavigate()
   const [lastUsedSID] = useLastUsedSID()
   const [url, setUrl] = useState<URL>(sessionToUrl(lastUsedSID || '...'))
 
@@ -28,6 +32,38 @@ export default function Screen(): React.JSX.Element {
       setUrl(sessionToUrl(lastUsedSID))
     }
   }, [lastUsedSID])
+
+  if (!lastUsedSID) {
+    const id = notifications.show({
+      title: 'Creating new session',
+      message: 'Please wait...',
+      autoClose: false,
+      loading: true,
+    })
+
+    apiClient
+      .newSession({})
+      .then((sInfo) => {
+        notifications.update({
+          id,
+          title: 'Session created',
+          message: 'Redirecting to the new session...',
+          autoClose: 3000,
+          loading: false,
+        })
+
+        navigate(pathTo(RouteIDs.Session, sInfo.uuid))
+      })
+      .catch(() => {
+        notifications.update({
+          id,
+          title: 'Failed to create session',
+          message: 'Please try again later',
+          color: 'red',
+          loading: false,
+        })
+      })
+  }
 
   const handleSendTestRequest = async () => {
     const id = notifications.show({
@@ -53,7 +89,6 @@ export default function Screen(): React.JSX.Element {
         title: 'Request failed',
         message: String(error),
         color: 'red',
-        autoClose: 5000,
         loading: false,
       })
     }

@@ -141,7 +141,7 @@ export class Client {
     delay = 0,
     responseBody = new Uint8Array(),
   }: {
-    statusCode: number
+    statusCode?: number
     headers?: Record<string, string>
     delay?: number
     responseBody?: Uint8Array
