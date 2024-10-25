@@ -19,7 +19,7 @@ export type NewSessionOptions = {
 
 const storageKeyPrefix = 'webhook-tester-v2-new-session'
 
-export default function NewSessionModal({
+export default function HeaderNewSessionModal({
   opened,
   loading = false,
   onClose,
@@ -46,7 +46,7 @@ export default function NewSessionModal({
   })
   const [responseBody, setResponseBody] = useSessionStorage<string>({
     key: `${storageKeyPrefix}-response-body`,
-    defaultValue: '',
+    defaultValue: '{"captured": true}',
   })
   const [destroyCurrentSession, setDestroyCurrentSession] = useSessionStorage<boolean>({
     key: `${storageKeyPrefix}-destroy-current-session`,

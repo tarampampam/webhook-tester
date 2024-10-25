@@ -2,17 +2,16 @@ import { AppShell, Center, Loader, Text } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import React, { useEffect, useState } from 'react'
-import { Link, Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '../routing'
-import { default as Header } from './header'
-import type { NewSessionOptions } from './new-session-modal'
+import { Header, type NewSessionOptions } from './components'
 
 type ContextType = Readonly<{
   navBar: React.JSX.Element | null
   setNavBar: (_: React.JSX.Element | null) => void
-  setWebHookUrl: (_: URL | undefined) => void
+  emitWebHookUrlChange: (_: URL | undefined) => void
 }>
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
@@ -133,29 +132,8 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet context={{ navBar, setNavBar, setWebHookUrl } satisfies ContextType} />
+        <Outlet context={{ navBar, setNavBar, emitWebHookUrlChange: setWebHookUrl } satisfies ContextType} />
       </AppShell.Main>
-
-      <AppShell.Aside>
-        <p>
-          <Link to={pathTo(RouteIDs.Home)}>Home</Link>
-        </p>
-        <p>
-          <Link to={pathTo(RouteIDs.Session, 'sID')}>Session</Link>
-        </p>
-        <p>
-          <Link to={pathTo(RouteIDs.Session, 'sID2')}>Session 2</Link>
-        </p>
-        <p>
-          <Link to={pathTo(RouteIDs.Session, 'sID', 'rID')}>Request</Link>
-        </p>
-        <p>
-          <Link to={pathTo(RouteIDs.Session, 'sID2', 'rID2')}>Request 2</Link>
-        </p>
-        <p>
-          <Link to={'/foobar-404'}>404</Link>
-        </p>
-      </AppShell.Aside>
     </AppShell>
   )
 }

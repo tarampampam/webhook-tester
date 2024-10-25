@@ -239,7 +239,7 @@ export class Client {
             method: req.method,
             requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
             headers: Object.freeze(req.headers),
-            url: new URL(req.url),
+            url: Object.freeze(new URL(req.url)),
             capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
           })
         )
@@ -279,7 +279,7 @@ export class Client {
       onError,
     }: {
       onConnected?: () => void // called when the WebSocket connection is established
-      onUpdate: (request: components['schemas']['CapturedRequest']) => void // called when the update is received
+      onUpdate: (request: DeepReadonly<CapturedRequest>) => void // called when the update is received
       onError?: (err: Error) => void // called when an error occurs on alive connection
     }
   ): Promise</* closer */ () => void> {
@@ -311,9 +311,19 @@ export class Client {
 
         ws.onmessage = (event): void => {
           if (event.data) {
-            const content = JSON.parse(event.data) as components['schemas']['CapturedRequest']
+            const req = JSON.parse(event.data) as components['schemas']['CapturedRequest']
 
-            onUpdate(Object.freeze(content))
+            onUpdate(
+              Object.freeze({
+                uuid: req.uuid,
+                clientAddress: req.client_address,
+                method: req.method,
+                requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
+                headers: Object.freeze(req.headers),
+                url: Object.freeze(new URL(req.url)),
+                capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
+              })
+            )
           }
         }
       } catch (e) {
@@ -346,7 +356,7 @@ export class Client {
         method: data.method,
         requestPayload: new TextEncoder().encode(atob(data.request_payload_base64)),
         headers: Object.freeze(data.headers),
-        url: new URL(data.url),
+        url: Object.freeze(new URL(data.url)),
         capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
       })
     }

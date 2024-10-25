@@ -1,101 +1,66 @@
-import React, { useEffect, useState } from 'react'
-import { Outlet, useParams } from 'react-router-dom'
-import { Flex, Text, Button, Space, Blockquote } from '@mantine/core'
+import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
-import { notifications } from '@mantine/notifications'
+import { Blockquote, Button, Flex, Space, Text } from '@mantine/core'
+import { notifications as notify } from '@mantine/notifications'
 import {
-  IconExternalLink,
-  IconRun,
+  IconBrandCSharp,
   IconBrandDebian,
-  IconBrandWindows,
+  IconBrandGolang,
   IconBrandJavascript,
   IconBrandNodejs,
-  IconBrandGolang,
-  IconCup,
-  IconBrandPython,
   IconBrandPhp,
+  IconBrandPython,
+  IconBrandWindows,
+  IconCup,
   IconDiamond,
-  IconBrandCSharp,
+  IconExternalLink,
   IconInfoCircle,
+  IconRun,
 } from '@tabler/icons-react'
-import { sessionToUrl, useLastUsedSID } from '~/shared'
-import type { Client } from '~/api'
-import { useLayoutOutletContext } from '../layout'
 
-type Element = React.JSX.Element // type alias for better readability
-
-export default function Layout({ apiClient }: { apiClient: Client }): Element {
-  const [{ sID }, { rID }] = [
-    useParams<Readonly<{ sID: string }>>() as { sID: string }, // I'm sure that sID is always present
-    useParams<Readonly<{ rID?: string }>>(), // rID is optional
-  ]
-  const { setNavBar, setWebHookUrl } = useLayoutOutletContext()
-  const [lastUsedSID, setLastUsedSID] = useLastUsedSID()
-  const [currentWebHookUrl, setCurrentWebHookUrl] = useState<URL>(sessionToUrl(lastUsedSID || '...'))
-
-  useEffect((): (() => void) => {
-    if (sID) {
-      setNavBar(<>My navbar for {sID}</>)
-      setLastUsedSID(sID)
-    }
-
-    return (): void => {
-      setNavBar(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sID, setNavBar]) // do NOT add setLastUsedSID here to avoid infinite loop
-
-  useEffect(() => {
-    if (lastUsedSID) {
-      setCurrentWebHookUrl(sessionToUrl(lastUsedSID))
-    }
-  }, [lastUsedSID])
-
-  // tell the parent layout that we have a new URL
-  useEffect(() => setWebHookUrl(currentWebHookUrl), [currentWebHookUrl, setWebHookUrl])
-
+export default function SessionDetails({ webHookUrl }: { webHookUrl: URL }): React.JSX.Element {
   /** Sends a test request to the generated URL. */
-  const handleSendTestRequest = async () => {
-    const id = notifications.show({
+  const handleSendTestRequest = (): void => {
+    const id = notify.show({
       title: 'Sending request',
       message: 'Please wait...',
       autoClose: false,
       loading: true,
     })
 
-    try {
-      await sendTestRequest(currentWebHookUrl)
-
-      notifications.update({
-        id,
-        title: 'Request sent',
-        message: 'Check the console for details',
-        autoClose: 2000,
-        loading: false,
+    sendTestRequest(webHookUrl)
+      .then(() => {
+        notify.update({
+          id,
+          title: 'Request sent',
+          message: 'Check the console for details',
+          autoClose: 2000,
+          loading: false,
+        })
       })
-    } catch (error) {
-      notifications.update({
-        id,
-        title: 'Request failed',
-        message: String(error),
-        color: 'red',
-        loading: false,
+      .catch((error) => {
+        notify.update({
+          id,
+          title: 'Request failed',
+          message: String(error),
+          color: 'orange',
+          loading: false,
+        })
       })
-    }
   }
 
   return (
-    <div>
+    <>
       <Text>Here&apos;s your unique URL:</Text>
       <Flex my="md" align="center" justify="space-between" gap="xs" direction={{ base: 'column', lg: 'row' }}>
-        <CodeHighlight code={currentWebHookUrl.toString()} language="bash" w="100%" pr="lg" />
+        <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" pr="lg" />
         <Button.Group w={{ base: '100%', lg: 'auto' }}>
           <Button
             variant="gradient"
             gradient={{ from: 'cyan', to: 'teal', deg: 90 }}
             leftSection={<IconExternalLink size="1.4em" />}
             component="a"
-            href={currentWebHookUrl.toString()}
+            href={webHookUrl.toString()}
             target="_blank"
           >
             Open in a new tab
@@ -104,7 +69,8 @@ export default function Layout({ apiClient }: { apiClient: Client }): Element {
             variant="gradient"
             gradient={{ from: 'teal', to: 'cyan', deg: 90 }}
             leftSection={<IconRun size="1.5em" />}
-            onClick={() => handleSendTestRequest().catch(console.error)}
+            onClick={handleSendTestRequest}
+            onAuxClick={handleSendTestRequest}
           >
             Send a request
           </Button>
@@ -116,31 +82,31 @@ export default function Layout({ apiClient }: { apiClient: Client }): Element {
           {
             fileName: 'curl',
             language: 'bash',
-            code: `curl -v -X POST --data '{"foo": "bar"}' ${currentWebHookUrl.toString()}`,
+            code: `curl -v -X POST --data '{"foo": "bar"}' ${webHookUrl.toString()}`,
             icon: <IconBrandDebian size="1.2em" />,
           },
           {
             fileName: 'wget',
             language: 'bash',
-            code: `wget -O- --post-data '{"foo": "bar"}' ${currentWebHookUrl.toString()}`,
+            code: `wget -O- --post-data '{"foo": "bar"}' ${webHookUrl.toString()}`,
             icon: <IconBrandDebian size="1.2em" />,
           },
           {
             fileName: 'HTTPie',
             language: 'bash',
-            code: `http POST ${currentWebHookUrl.toString()} foo=bar --verbose`,
+            code: `http POST ${webHookUrl.toString()} foo=bar --verbose`,
             icon: <IconBrandDebian size="1.2em" />,
           },
           {
             fileName: 'get',
             language: 'bash',
-            code: `get --data '{"foo": "bar"}' ${currentWebHookUrl.toString()} --method=post --verbose`,
+            code: `get --data '{"foo": "bar"}' ${webHookUrl.toString()} --method=post --verbose`,
             icon: <IconBrandDebian size="1.2em" />,
           },
           {
             fileName: 'PowerShell',
             language: 'bash',
-            code: `Invoke-RestMethod -Uri ${currentWebHookUrl.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
+            code: `Invoke-RestMethod -Uri ${webHookUrl.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
             icon: <IconBrandWindows size="1.2em" />,
           },
         ]}
@@ -153,48 +119,48 @@ export default function Layout({ apiClient }: { apiClient: Client }): Element {
           {
             fileName: 'JavaScript',
             language: 'javascript',
-            code: snippet('js', currentWebHookUrl),
+            code: snippet('js', webHookUrl),
             icon: <IconBrandJavascript size="1.2em" />,
           },
           {
             fileName: 'Node.js',
             language: 'javascript',
-            code: snippet('node', currentWebHookUrl),
+            code: snippet('node', webHookUrl),
             icon: <IconBrandNodejs size="1.2em" />,
           },
           {
             fileName: 'Go',
             language: 'go',
-            code: snippet('go', currentWebHookUrl),
+            code: snippet('go', webHookUrl),
             icon: <IconBrandGolang size="1.2em" />,
           },
           {
             fileName: 'Java',
             language: 'java',
-            code: snippet('java', currentWebHookUrl),
+            code: snippet('java', webHookUrl),
             icon: <IconCup size="1.2em" />,
           },
           {
             fileName: 'Python',
             language: 'python',
-            code: snippet('python', currentWebHookUrl),
+            code: snippet('python', webHookUrl),
             icon: <IconBrandPython size="1.2em" />,
           },
           {
             fileName: 'PHP',
             language: 'php',
-            code: snippet('php', currentWebHookUrl),
+            code: snippet('php', webHookUrl),
             icon: <IconBrandPhp size="1.2em" />,
           },
           {
             fileName: 'Ruby',
             language: 'ruby',
-            code: snippet('ruby', currentWebHookUrl),
+            code: snippet('ruby', webHookUrl),
             icon: <IconDiamond size="1.2em" />,
           },
           {
             language: 'csharp',
-            code: snippet('csharp', currentWebHookUrl),
+            code: snippet('csharp', webHookUrl),
             icon: <IconBrandCSharp size="1.2em" />,
           },
         ]}
@@ -208,9 +174,7 @@ export default function Layout({ apiClient }: { apiClient: Client }): Element {
         Click &quot;New URL&quot; (in the top right corner) to create a new url with the ability to customize status
         code, response body, etc.
       </Blockquote>
-
-      <Outlet />
-    </div>
+    </>
   )
 }
 

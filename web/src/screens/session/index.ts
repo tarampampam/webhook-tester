@@ -1,1 +1,1 @@
-export { default as SessionLayout } from './layout'
+export { default as SessionAndRequestScreen } from './screen'

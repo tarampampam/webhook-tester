@@ -2,7 +2,7 @@ import { createPath, type RouteObject } from 'react-router-dom'
 import { apiClient } from '~/api'
 import { DefaultLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
-import { SessionLayout } from '~/screens/session'
+import { SessionAndRequestScreen } from '~/screens/session'
 import { HomeScreen } from '~/screens/home'
 
 export enum RouteIDs {
@@ -25,7 +25,7 @@ export const routes: RouteObject[] = [
         // please note that `sID` and `rID` accessed via `useParams` hook, and changing this will break the app
         path: 's/:sID/:rID?',
         id: RouteIDs.Session,
-        element: <SessionLayout apiClient={apiClient} />,
+        element: <SessionAndRequestScreen apiClient={apiClient} />,
       },
     ],
   },

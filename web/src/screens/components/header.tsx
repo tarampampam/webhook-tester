@@ -11,9 +11,9 @@ import {
 } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import NewSessionModal, { type NewSessionOptions } from './new-session-modal'
-import HelpModal from './help-modal'
-import LogoTextSvg from '~/assets/togo-text.svg'
+import HeaderHelpModal from './header-help-modal'
+import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'
+import LogoTextSvg from '../../assets/togo-text.svg'
 
 export default function Header({
   currentVersion,
@@ -75,14 +75,14 @@ export default function Header({
 
   return (
     <>
-      <NewSessionModal
+      <HeaderNewSessionModal
         opened={isNewSessionModalOpened}
         loading={isNewSessionLoading}
         onClose={newSessionModalHandlers.close}
         onCreate={handleNewSessionCreate}
         maxRequestBodySize={maxRequestBodySize}
       />
-      <HelpModal
+      <HeaderHelpModal
         opened={isHelpModalOpened}
         onClose={helpModalHandlers.close}
         webHookUrl={webHookUrl}
@@ -138,7 +138,7 @@ export default function Header({
             <Button
               leftSection={<IconCopy size="1.2em" />}
               variant="gradient"
-              gradient={{ from: 'teal', to: 'lime', deg: -90 }}
+              gradient={{ from: 'teal', to: 'lime', deg: 90 }}
               onClick={handleCpyWebhookUrl}
             >
               Copy Webhook URL
@@ -146,7 +146,7 @@ export default function Header({
             <Button
               leftSection={<IconCirclePlusFilled size="1.3em" />}
               variant="gradient"
-              gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
+              gradient={{ from: 'lime', to: 'teal', deg: 90 }}
               onClick={newSessionModalHandlers.open}
             >
               New URL

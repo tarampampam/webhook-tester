@@ -2,7 +2,7 @@ import { CodeHighlight } from '@mantine/code-highlight'
 import { Divider, Modal, Text, Title } from '@mantine/core'
 import React from 'react'
 
-export default function HelpModal({
+export default function HeaderHelpModal({
   opened,
   onClose,
   webHookUrl = undefined,
