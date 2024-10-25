@@ -88,7 +88,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 				Method:     r.Method,
 				Body:       body,
 				Headers:    rHeaders,
-				URL:        r.URL.RequestURI(),
+				URL:        fullUrlFromRequest(r),
 			})
 			if rErr != nil {
 				respondWithError(w, log, http.StatusInternalServerError, rErr.Error())
@@ -98,8 +98,15 @@ func New( //nolint:funlen,gocognit,gocyclo
 
 			// publish the captured request to the pub/sub
 			go func() {
+				const timeout = 10 * time.Second
+
+				// create a new context with a timeout (since parent context may be already canceled, we need to create
+				// a new one)
+				var newCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), timeout)
+				defer cancel()
+
 				// read the actual data from the storage (the main point is the time of creation)
-				captured, dbErr := db.GetRequest(ctx, sID, rID)
+				captured, dbErr := db.GetRequest(newCtx, sID, rID)
 				if dbErr != nil {
 					log.Error("failed to get a captured request", zap.Error(dbErr))
 
@@ -111,7 +118,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 					headers[i] = pubsub.HttpHeader{Name: h.Name, Value: h.Value}
 				}
 
-				if err := pub.Publish(ctx, sID, pubsub.CapturedRequest{
+				if err := pub.Publish(newCtx, sID, pubsub.CapturedRequest{
 					ID:                 rID,
 					ClientAddr:         captured.ClientAddr,
 					Method:             captured.Method,
@@ -219,6 +226,16 @@ func respondWithError(w http.ResponseWriter, log *zap.Logger, code int, msg stri
 	if _, err := w.Write([]byte(s.String())); err != nil {
 		log.Error("failed to respond with an error", zap.Error(err), zap.Int("code", code), zap.String("msg", msg))
 	}
+}
+
+// fullUrlFromRequest returns the full URL from the request.
+func fullUrlFromRequest(r *http.Request) string {
+	var scheme = "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
 }
 
 // we will trust following HTTP headers for the real ip extracting (priority low -> high).

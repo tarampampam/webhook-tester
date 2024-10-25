@@ -258,7 +258,10 @@ components:
         method: {$ref: '#/components/schemas/HttpMethod'}
         request_payload_base64: {$ref: '#/components/schemas/Base64Encoded'}
         headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
-        url: {description: URL, type: string, example: 'https://example.com/path?query=string'}
+        url:
+          description: The URL's hostname, schema, and port may differ from those on the frontend due to proxying
+          type: string
+          example: 'https://example.com/path?query=string'
         captured_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
       required: [uuid, client_address, method, request_payload_base64, headers, url, captured_at_unix_milli]
       additionalProperties: false
