@@ -242,7 +242,7 @@ components:
           description: App limit settings
           properties:
             max_requests: {type: integer, x-go-type: uint16, example: 128}
-            max_request_body_size: {type: integer, x-go-type: uint32, example: 1024}
+            max_request_body_size: {type: integer, x-go-type: uint32, example: 1024, description: In bytes}
             session_ttl: {type: integer, x-go-type: uint32, example: 5, description: In seconds}
           required: [max_requests, max_request_body_size, session_ttl]
           additionalProperties: false

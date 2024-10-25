@@ -1,27 +1,13 @@
-import type React from 'react'
-import { createPath, matchRoutes, Navigate, type RouteObject, useLocation } from 'react-router-dom'
+import { createPath, type RouteObject } from 'react-router-dom'
 import { apiClient } from '~/api'
 import { DefaultLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
 import { SessionLayout } from '~/screens/session'
-import { SessionRequestScreen } from '~/screens/session/request'
 import { HomeScreen } from '~/screens/home'
-import { useLastUsedRID, useLastUsedSID } from '../shared'
 
 export enum RouteIDs {
   Home = 'home',
   Session = 'session',
-  SessionRequest = 'request',
-}
-
-const HomeWrapper = ({ children }: { children: React.JSX.Element }): React.JSX.Element => {
-  const [sID, rID] = [useLastUsedSID()[0], useLastUsedRID()[0]]
-
-  if (sID && rID) {
-    return <Navigate to={pathTo(RouteIDs.SessionRequest, sID, rID)} />
-  }
-
-  return children
 }
 
 export const routes: RouteObject[] = [
@@ -32,51 +18,22 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: (
-          <HomeWrapper>
-            <HomeScreen apiClient={apiClient} />
-          </HomeWrapper>
-        ),
+        element: <HomeScreen apiClient={apiClient} />,
         id: RouteIDs.Home,
       },
       {
-        path: 'session/:sID',
+        // please note that `sID` and `rID` accessed via `useParams` hook, and changing this will break the app
+        path: 's/:sID/:rID?',
         id: RouteIDs.Session,
-        element: <SessionLayout />,
-        children: [
-          {
-            path: ':rID',
-            id: RouteIDs.SessionRequest,
-            element: <SessionRequestScreen />,
-          },
-        ],
+        element: <SessionLayout apiClient={apiClient} />,
       },
     ],
   },
 ]
 
-/** Resolves the current route ID from the router. */
-export function useCurrentRouteID(): RouteIDs | undefined {
-  const match = matchRoutes(routes, useLocation())
-
-  if (match) {
-    const ids = Object.values<string>(RouteIDs)
-
-    for (const route of match.reverse()) {
-      if (route.route.id && ids.includes(route.route.id)) {
-        return route.route.id as RouteIDs
-      }
-    }
-  }
-
-  return undefined
-}
-
 type RouteParams<T extends RouteIDs> = T extends RouteIDs.Session
-  ? [string /* sID */]
-  : T extends RouteIDs.SessionRequest
-    ? [string /* sID */, string /* rID */]
-    : [] // no params
+  ? [string /* sID */, string? /* rID (optional) */]
+  : [] // no params
 
 /**
  * Converts a route ID to a path to use in a link.
@@ -94,15 +51,13 @@ export function pathTo<T extends RouteIDs>(
     case RouteIDs.Home:
       return createPath({ pathname: '/' })
     case RouteIDs.Session: {
-      const sID = encodeURIComponent(params[0] ?? '')
+      const [sID, rID] = [params[0] ?? 'no-session', params[1]]
 
-      return createPath({ pathname: `/session/${sID}` })
-    }
-    case RouteIDs.SessionRequest: {
-      const sID = encodeURIComponent(params[0] ?? '')
-      const rID = encodeURIComponent(params[1] ?? '')
+      if (!rID) {
+        return createPath({ pathname: `/s/${encodeURIComponent(sID)}` })
+      }
 
-      return createPath({ pathname: `/session/${sID}/${rID}` })
+      return createPath({ pathname: `/s/${encodeURIComponent(sID)}/${encodeURIComponent(rID)}` })
     }
     default:
       throw new Error(`Unknown route: ${path}`) // will never happen because of the type guard

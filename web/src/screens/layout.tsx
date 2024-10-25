@@ -1,85 +1,139 @@
+import { AppShell, Center, Loader, Text } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
+import { notifications as notify } from '@mantine/notifications'
 import React, { useEffect, useState } from 'react'
-import { Link, Outlet } from 'react-router-dom'
-import { AppShell, Group, Center, Burger, Image, Button, Text, Loader } from '@mantine/core'
-import {
-  IconCopy,
-  IconCirclePlusFilled,
-  IconBrandGithubFilled,
-  IconRefreshAlert,
-  IconHelpHexagonFilled,
-} from '@tabler/icons-react'
+import { Link, Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '../routing'
-import { useNavBar } from '~/shared'
-import LogoTextSvg from '~/assets/togo-text.svg'
+import { default as Header } from './header'
+import type { NewSessionOptions } from './new-session-modal'
 
-export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.Element {
-  const [opened, { toggle }] = useDisclosure()
-  const navBar = useNavBar()
+type ContextType = Readonly<{
+  navBar: React.JSX.Element | null
+  setNavBar: (_: React.JSX.Element | null) => void
+  setWebHookUrl: (_: URL | undefined) => void
+}>
+
+export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
+  const params = useParams<{ sID?: string; rID?: string }>()
+  const navigate = useNavigate()
+  const [navBarIsOpened, navBarHandlers] = useDisclosure()
   const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
   const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
-  const isUpdateAvailable = currentVersion && latestVersion && currentVersion.compare(latestVersion) === -1
-  // const [webhookUrl, setWebhookUrl] = useState<URL>(
-  //   new URL(`${window.location.origin}/33569c52-6c64-46eb-92b4-d3cb3824daa8`)
-  // )
+  // const [maxRequestsPerSession, setMaxRequestsPerSession] = useState<number>(0)
+  const [maxRequestBodySize, setMaxRequestBodySize] = useState<number>(0)
+  const [sessionTTLSec, setSessionTTLSec] = useState<number>(0)
+  const [navBar, setNavBar] = useState<React.JSX.Element | null>(null)
+  const [webHookUrl, setWebHookUrl] = useState<URL | undefined>(undefined)
 
   useEffect(() => {
-    apiClient
-      .currentVersion()
-      .then((v) => setCurrentVersion(v))
-      .catch(console.error)
+    // load current and latest versions on mount
+    apiClient.currentVersion().then(setCurrentVersion).catch(console.error)
+    apiClient.latestVersion().then(setLatestVersion).catch(console.error)
 
+    // and load the settings
     apiClient
-      .latestVersion()
-      .then((v) => setLatestVersion(v))
+      .getSettings()
+      .then((settings) => {
+        // setMaxRequestsPerSession(settings.limits.maxRequests)
+        setMaxRequestBodySize(settings.limits.maxRequestBodySize)
+        setSessionTTLSec(settings.limits.sessionTTL)
+      })
       .catch(console.error)
   }, [apiClient])
+
+  /** Handles creating a new session and optionally destroying the current one. */
+  const handleNewSessionCreate = async (s: NewSessionOptions) => {
+    const id = notify.show({
+      title: 'Creating new session',
+      message: 'Please wait...',
+      autoClose: false,
+      loading: true,
+    })
+
+    let newSessionID: string
+
+    // create a new session
+    try {
+      newSessionID = (
+        await apiClient.newSession({
+          statusCode: s.statusCode,
+          headers: Object.fromEntries(s.headers.map((h) => [h.name, h.value])),
+          delay: s.delay,
+          responseBody: new TextEncoder().encode(s.responseBody),
+        })
+      ).uuid
+    } catch (err) {
+      notify.update({
+        id,
+        title: 'Failed to create new session',
+        message: String(err),
+        color: 'red',
+        loading: false,
+      })
+
+      return
+    }
+
+    // destroy the current session, if needed
+    try {
+      if (s.destroyCurrentSession && params.sID) {
+        await apiClient.deleteSession(params.sID)
+      }
+    } catch (err) {
+      notify.show({
+        title: 'Failed to delete current session',
+        message: String(err),
+        color: 'red',
+        autoClose: 5000,
+      })
+    }
+
+    notify.update({
+      id,
+      title: 'A new session has started!',
+      message: undefined,
+      color: 'green',
+      autoClose: 7000,
+      loading: false,
+    })
+
+    navigate(pathTo(RouteIDs.Session, newSessionID)) // navigate to the new session
+  }
 
   return (
     <AppShell
       header={{ height: 70 }}
-      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !navBarIsOpened } }}
       padding="md"
     >
       <AppShell.Header>
-        <Group h="100%" px="md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <Group>
-            <Image
-              src={LogoTextSvg}
-              style={{ height: 20 }}
-              title={currentVersion ? 'v' + currentVersion.toString() : undefined}
-            />
-            <Button.Group visibleFrom="md">
-              <buttons.OpenHelp />
-              {isUpdateAvailable ? <buttons.OpenLatestRelease newVer={latestVersion} /> : <buttons.OpenGitHubProject />}
-            </Button.Group>
-          </Group>
-          <Group visibleFrom="xs">
-            <Button.Group>
-              <buttons.CopyWebHookUrl />
-              <buttons.CreateNewSession />
-            </Button.Group>
-          </Group>
-        </Group>
+        <Header
+          currentVersion={currentVersion}
+          latestVersion={latestVersion}
+          maxRequestBodySize={maxRequestBodySize}
+          sessionTTLSec={sessionTTLSec}
+          webHookUrl={webHookUrl}
+          isBurgerOpened={navBarIsOpened}
+          onBurgerClick={navBarHandlers.toggle}
+          onNewSessionCreate={handleNewSessionCreate}
+        />
       </AppShell.Header>
 
       <AppShell.Navbar p="md" withBorder={false}>
-        <div>
-          {navBar.component ? (
-            navBar.component
-          ) : (
-            <Center pt="2em">
-              <Loader color="dimmed" size="1em" mr={8} mb={3} /> <Text c="dimmed">Waiting for first request</Text>
-            </Center>
-          )}
-        </div>
+        {navBar ? ( // navBar may be replaced by a child component (<Outlet />)
+          navBar
+        ) : (
+          <Center pt="2em">
+            <Loader color="dimmed" size="1em" mr={8} mb={3} />
+            <Text c="dimmed">Waiting for first request</Text>
+          </Center>
+        )}
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet />
+        <Outlet context={{ navBar, setNavBar, setWebHookUrl } satisfies ContextType} />
       </AppShell.Main>
 
       <AppShell.Aside>
@@ -93,10 +147,10 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
           <Link to={pathTo(RouteIDs.Session, 'sID2')}>Session 2</Link>
         </p>
         <p>
-          <Link to={pathTo(RouteIDs.SessionRequest, 'sID', 'rID')}>Request</Link>
+          <Link to={pathTo(RouteIDs.Session, 'sID', 'rID')}>Request</Link>
         </p>
         <p>
-          <Link to={pathTo(RouteIDs.SessionRequest, 'sID2', 'rID2')}>Request 2</Link>
+          <Link to={pathTo(RouteIDs.Session, 'sID2', 'rID2')}>Request 2</Link>
         </p>
         <p>
           <Link to={'/foobar-404'}>404</Link>
@@ -106,52 +160,6 @@ export default function Layout({ apiClient }: { apiClient: Client }): React.JSX.
   )
 }
 
-const buttons = {
-  OpenHelp: (): React.JSX.Element => (
-    <Button variant="default" size="xs" leftSection={<IconHelpHexagonFilled size="1.3em" />}>
-      Help
-    </Button>
-  ),
-  OpenLatestRelease: ({ newVer }: { newVer?: SemVer }): React.JSX.Element => (
-    <Button
-      variant="default"
-      size="xs"
-      leftSection={<IconRefreshAlert size="1.3em" />}
-      component={Link}
-      to={__LATEST_RELEASE_LINK__}
-      target="_blank"
-    >
-      Update available {newVer && <>(v{newVer.toString()})</>}
-    </Button>
-  ),
-  OpenGitHubProject: (): React.JSX.Element => (
-    <Button
-      variant="default"
-      size="xs"
-      leftSection={<IconBrandGithubFilled size="1.3em" />}
-      component={Link}
-      to={__GITHUB_PROJECT_LINK__}
-      target="_blank"
-    >
-      GitHub
-    </Button>
-  ),
-  CopyWebHookUrl: (): React.JSX.Element => (
-    <Button
-      leftSection={<IconCopy size="1.2em" />}
-      variant="gradient"
-      gradient={{ from: 'teal', to: 'lime', deg: -90 }}
-    >
-      Copy Webhook URL
-    </Button>
-  ),
-  CreateNewSession: (): React.JSX.Element => (
-    <Button
-      leftSection={<IconCirclePlusFilled size="1.3em" />}
-      variant="gradient"
-      gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
-    >
-      New URL
-    </Button>
-  ),
+export function useLayoutOutletContext(): ContextType {
+  return useOutletContext<ContextType>()
 }

@@ -7,7 +7,11 @@ import { components, paths } from './schema.gen'
 type DeepReadonly<T> = { readonly [P in keyof T]: DeepReadonly<T[P]> }
 
 type AppSettings = {
-  limits: { maxRequests: number; maxRequestBodySize: number; sessionTTL: number }
+  limits: {
+    maxRequests: number
+    maxRequestBodySize: number // In bytes
+    sessionTTL: number // In seconds
+  }
 }
 
 type SessionOptions = {
@@ -164,7 +168,7 @@ export class Client {
           statusCode: data.response.status_code,
           headers: data.response.headers,
           delay: data.response.delay,
-          responseBody: Object.freeze(new TextEncoder().encode(atob(data.response.response_body_base64))),
+          responseBody: new TextEncoder().encode(atob(data.response.response_body_base64)),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -190,7 +194,7 @@ export class Client {
           statusCode: data.response.status_code,
           headers: data.response.headers,
           delay: data.response.delay,
-          responseBody: Object.freeze(new TextEncoder().encode(atob(data.response.response_body_base64))),
+          responseBody: new TextEncoder().encode(atob(data.response.response_body_base64)),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -233,7 +237,7 @@ export class Client {
             uuid: req.uuid,
             clientAddress: req.client_address,
             method: req.method,
-            requestPayload: Object.freeze(new TextEncoder().encode(atob(req.request_payload_base64))),
+            requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
             headers: Object.freeze(req.headers),
             url: new URL(req.url),
             capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
@@ -340,7 +344,7 @@ export class Client {
         uuid: data.uuid,
         clientAddress: data.client_address,
         method: data.method,
-        requestPayload: Object.freeze(new TextEncoder().encode(atob(data.request_payload_base64))),
+        requestPayload: new TextEncoder().encode(atob(data.request_payload_base64)),
         headers: Object.freeze(data.headers),
         url: new URL(data.url),
         capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
