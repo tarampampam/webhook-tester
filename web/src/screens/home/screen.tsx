@@ -1,20 +1,38 @@
 import type React from 'react'
 import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useLastUsedRID, useLastUsedSID } from '~/shared'
 import type { Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
 
 export default function HomeScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
-  const navigate = useNavigate()
+  const [navigate, { hash }] = [useNavigate(), useLocation()]
   const [lastSID, lastRID] = [useLastUsedSID()[0], useLastUsedRID()[0]]
+
+  if (hash) {
+    // v1 used url hash (anchor) to store the current state (sID and rID). To improve the user experience, we should
+    // redirect to the new URL if the hash appears in the following format:
+    //  #/:sID/:rID
+
+    const [sID, rID]: Array<string | undefined> = hash
+      .replace(/^#\/+/, '')
+      .split('/')
+      .map((v) => v || undefined)
+      .filter((v) => v && v.length === 36) // 36 characters is the length of a UUID
+
+    if (sID && rID) {
+      return <Navigate to={pathTo(RouteIDs.SessionAndRequest, sID, rID)} />
+    } else if (sID) {
+      return <Navigate to={pathTo(RouteIDs.SessionAndRequest, sID)} />
+    }
+  }
 
   // automatically redirect to the last used session and/or request, if available
   if (lastSID && lastRID) {
-    return <Navigate to={pathTo(RouteIDs.Session, lastSID, lastRID)} />
+    return <Navigate to={pathTo(RouteIDs.SessionAndRequest, lastSID, lastRID)} />
   } else if (lastSID) {
-    return <Navigate to={pathTo(RouteIDs.Session, lastSID)} />
+    return <Navigate to={pathTo(RouteIDs.SessionAndRequest, lastSID)} />
   }
 
   // if no session is available, create a new one and redirect to it
@@ -29,9 +47,16 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
     apiClient
       .newSession({})
       .then((sInfo) => {
-        notify.hide(id)
+        notify.update({
+          id,
+          title: 'A new session has been created',
+          message: `Session ID: ${sInfo.uuid}`,
+          color: 'green',
+          autoClose: 5000,
+          loading: false,
+        })
 
-        navigate(pathTo(RouteIDs.Session, sInfo.uuid))
+        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.uuid))
       })
       .catch(() => {
         notify.update({

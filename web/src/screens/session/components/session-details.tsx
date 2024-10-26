@@ -1,6 +1,6 @@
 import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
-import { Blockquote, Button, Flex, Space, Text } from '@mantine/core'
+import { Badge, Button, Flex, Table, Text, Skeleton, type MantineColor } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import {
   IconBrandCSharp,
@@ -14,11 +14,26 @@ import {
   IconCup,
   IconDiamond,
   IconExternalLink,
-  IconInfoCircle,
   IconRun,
 } from '@tabler/icons-react'
 
-export default function SessionDetails({ webHookUrl }: { webHookUrl: URL }): React.JSX.Element {
+export type SessionProps = {
+  statusCode: number
+  headers: ReadonlyArray<{ name: string; value: string }>
+  delay: number
+  body: Readonly<Uint8Array>
+  createdAt: Readonly<Date>
+}
+
+export default function SessionDetails({
+  webHookUrl,
+  loading = false,
+  sessionProps = null,
+}: {
+  webHookUrl: URL
+  loading?: boolean
+  sessionProps: Readonly<SessionProps> | null
+}): React.JSX.Element {
   /** Sends a test request to the generated URL. */
   const handleSendTestRequest = (): void => {
     const id = notify.show({
@@ -62,6 +77,7 @@ export default function SessionDetails({ webHookUrl }: { webHookUrl: URL }): Rea
             component="a"
             href={webHookUrl.toString()}
             target="_blank"
+            disabled={loading}
           >
             Open in a new tab
           </Button>
@@ -71,6 +87,7 @@ export default function SessionDetails({ webHookUrl }: { webHookUrl: URL }): Rea
             leftSection={<IconRun size="1.5em" />}
             onClick={handleSendTestRequest}
             onAuxClick={handleSendTestRequest}
+            disabled={loading}
           >
             Send a request
           </Button>
@@ -169,11 +186,83 @@ export default function SessionDetails({ webHookUrl }: { webHookUrl: URL }): Rea
         defaultExpanded={false}
         withExpandButton
       />
-      <Space h="xl" />
-      <Blockquote color="blue" icon={<IconInfoCircle />}>
-        Click &quot;New URL&quot; (in the top right corner) to create a new url with the ability to customize status
-        code, response body, etc.
-      </Blockquote>
+      {loading && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
+      {!!sessionProps && (
+        <Table my="md" highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th w={200} ta="right">
+                Option
+              </Table.Th>
+              <Table.Th>Value</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {!!sessionProps.statusCode && (
+              <Table.Tr key="status">
+                <Table.Td ta="right">Status code</Table.Td>
+                <Table.Td>
+                  <Badge
+                    color={((): MantineColor => {
+                      switch (true) {
+                        case sessionProps.statusCode <= 299:
+                          return 'teal'
+                        case sessionProps.statusCode <= 399:
+                          return 'orange'
+                        case sessionProps.statusCode <= 499:
+                          return 'red'
+                        default:
+                          return 'cyan'
+                      }
+                    })()}
+                  >
+                    {sessionProps.statusCode}
+                  </Badge>
+                </Table.Td>
+              </Table.Tr>
+            )}
+            {!!sessionProps.delay && (
+              <Table.Tr key="delay">
+                <Table.Td ta="right">Delay</Table.Td>
+                <Table.Td>{sessionProps.delay} sec</Table.Td>
+              </Table.Tr>
+            )}
+            {!!sessionProps.headers.length && (
+              <Table.Tr key="headers">
+                <Table.Td ta="right">Response headers</Table.Td>
+                <Table.Td>
+                  <CodeHighlightTabs
+                    code={[
+                      {
+                        code: sessionProps.headers.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                        language: 'bash',
+                      },
+                    ]}
+                    expandCodeLabel="Show all headers"
+                    defaultExpanded={false}
+                    withHeader={false}
+                    withExpandButton
+                  />
+                </Table.Td>
+              </Table.Tr>
+            )}
+            {!!sessionProps.body.length && (
+              <Table.Tr key="body">
+                <Table.Td ta="right">Response body</Table.Td>
+                <Table.Td>
+                  <CodeHighlightTabs
+                    code={[{ code: String.fromCharCode(...sessionProps.body), language: 'json' }]}
+                    expandCodeLabel="Show full response"
+                    defaultExpanded={false}
+                    withHeader={false}
+                    withExpandButton
+                  />
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      )}
     </>
   )
 }

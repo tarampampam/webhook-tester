@@ -5,13 +5,13 @@ import React from 'react'
 export default function HeaderHelpModal({
   opened,
   onClose,
-  webHookUrl = undefined,
+  webHookUrl = null,
   sessionTTLSec = 0,
   maxBodySizeBytes = 0,
 }: {
   opened: boolean
   onClose: () => void
-  webHookUrl?: URL
+  webHookUrl: URL | null
   sessionTTLSec?: number
   maxBodySizeBytes?: number
 }): React.JSX.Element {

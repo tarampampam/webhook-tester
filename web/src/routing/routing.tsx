@@ -7,7 +7,7 @@ import { HomeScreen } from '~/screens/home'
 
 export enum RouteIDs {
   Home = 'home',
-  Session = 'session',
+  SessionAndRequest = 'session-and-request',
 }
 
 export const routes: RouteObject[] = [
@@ -24,14 +24,14 @@ export const routes: RouteObject[] = [
       {
         // please note that `sID` and `rID` accessed via `useParams` hook, and changing this will break the app
         path: 's/:sID/:rID?',
-        id: RouteIDs.Session,
+        id: RouteIDs.SessionAndRequest,
         element: <SessionAndRequestScreen apiClient={apiClient} />,
       },
     ],
   },
 ]
 
-type RouteParams<T extends RouteIDs> = T extends RouteIDs.Session
+type RouteParams<T extends RouteIDs> = T extends RouteIDs.SessionAndRequest
   ? [string /* sID */, string? /* rID (optional) */]
   : [] // no params
 
@@ -50,7 +50,7 @@ export function pathTo<T extends RouteIDs>(
   switch (path) {
     case RouteIDs.Home:
       return createPath({ pathname: '/' })
-    case RouteIDs.Session: {
+    case RouteIDs.SessionAndRequest: {
       const [sID, rID] = [params[0] ?? 'no-session', params[1]]
 
       if (!rID) {

@@ -20,6 +20,7 @@ import (
 )
 
 func New( //nolint:funlen,gocognit,gocyclo
+	appCtx context.Context,
 	log *zap.Logger,
 	db storage.Storage,
 	pub pubsub.Publisher[pubsub.CapturedRequest],
@@ -34,10 +35,10 @@ func New( //nolint:funlen,gocognit,gocyclo
 				return
 			}
 
-			var ctx = r.Context()
+			var reqCtx = r.Context()
 
 			// get the session from the storage
-			sess, sErr := db.GetSession(ctx, sID)
+			sess, sErr := db.GetSession(reqCtx, sID) //nolint:contextcheck
 			if sErr != nil {
 				respondWithError(w, log, http.StatusInternalServerError, sErr.Error())
 
@@ -47,7 +48,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 			{ // increase the session lifetime
 				var delta = time.Now().Add(cfg.SessionTTL).Sub(time.Unix(0, sess.CreatedAtUnixMilli*int64(time.Millisecond)))
 
-				if err := db.AddSessionTTL(ctx, sID, delta); err != nil {
+				if err := db.AddSessionTTL(reqCtx, sID, delta); err != nil { //nolint:contextcheck
 					respondWithError(w, log, http.StatusInternalServerError, err.Error())
 
 					return
@@ -83,12 +84,12 @@ func New( //nolint:funlen,gocognit,gocyclo
 			slices.SortFunc(rHeaders, func(i, j storage.HttpHeader) int { return strings.Compare(i.Name, j.Name) })
 
 			// and save the request to the storage
-			rID, rErr := db.NewRequest(ctx, sID, storage.Request{
+			rID, rErr := db.NewRequest(reqCtx, sID, storage.Request{ //nolint:contextcheck
 				ClientAddr: extractRealIP(r),
 				Method:     r.Method,
 				Body:       body,
 				Headers:    rHeaders,
-				URL:        fullUrlFromRequest(r),
+				URL:        extractFullUrl(r),
 			})
 			if rErr != nil {
 				respondWithError(w, log, http.StatusInternalServerError, rErr.Error())
@@ -96,17 +97,12 @@ func New( //nolint:funlen,gocognit,gocyclo
 				return
 			}
 
-			// publish the captured request to the pub/sub
+			// publish the captured request to the pub/sub. important note - we should use the app ctx instead of the req ctx
+			// because the request context can be canceled before the goroutine finishes (and moreover - before the
+			// subscribers will receive the event - in this case the event will be lost)
 			go func() {
-				const timeout = 10 * time.Second
-
-				// create a new context with a timeout (since parent context may be already canceled, we need to create
-				// a new one)
-				var newCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), timeout)
-				defer cancel()
-
 				// read the actual data from the storage (the main point is the time of creation)
-				captured, dbErr := db.GetRequest(newCtx, sID, rID)
+				captured, dbErr := db.GetRequest(appCtx, sID, rID)
 				if dbErr != nil {
 					log.Error("failed to get a captured request", zap.Error(dbErr))
 
@@ -118,7 +114,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 					headers[i] = pubsub.HttpHeader{Name: h.Name, Value: h.Value}
 				}
 
-				if err := pub.Publish(newCtx, sID, pubsub.CapturedRequest{
+				if err := pub.Publish(appCtx, sID, pubsub.CapturedRequest{
 					ID:                 rID,
 					ClientAddr:         captured.ClientAddr,
 					Method:             captured.Method,
@@ -133,7 +129,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 
 			// wait for the delay if it's set
 			if sess.Delay > 0 {
-				sleep(ctx, sess.Delay)
+				sleep(reqCtx, sess.Delay) //nolint:contextcheck
 			}
 
 			// set the header to allow CORS requests from any origin and method
@@ -228,8 +224,8 @@ func respondWithError(w http.ResponseWriter, log *zap.Logger, code int, msg stri
 	}
 }
 
-// fullUrlFromRequest returns the full URL from the request.
-func fullUrlFromRequest(r *http.Request) string {
+// extractFullUrl returns the full URL from the request.
+func extractFullUrl(r *http.Request) string {
 	var scheme = "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -272,7 +268,6 @@ func sleep(ctx context.Context, d time.Duration) {
 
 	select {
 	case <-ctx.Done():
-		return
 	case <-timer.C:
 	}
 }

@@ -4,36 +4,34 @@ import { APIErrorUnknown } from './errors'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
 import { components, paths } from './schema.gen'
 
-type DeepReadonly<T> = { readonly [P in keyof T]: DeepReadonly<T[P]> }
-
-type AppSettings = {
-  limits: {
+type AppSettings = Readonly<{
+  limits: Readonly<{
     maxRequests: number
     maxRequestBodySize: number // In bytes
     sessionTTL: number // In seconds
-  }
-}
+  }>
+}>
 
-type SessionOptions = {
+type SessionOptions = Readonly<{
   uuid: string
-  response: {
+  response: Readonly<{
     statusCode: number
-    headers: Array<{ name: string; value: string }>
+    headers: ReadonlyArray<{ name: string; value: string }>
     delay: number
-    responseBody: Uint8Array
-  }
-  createdAt: Date
-}
+    body: Readonly<Uint8Array>
+  }>
+  createdAt: Readonly<Date>
+}>
 
-type CapturedRequest = {
+type CapturedRequest = Readonly<{
   uuid: string
   clientAddress: string
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
   requestPayload: Uint8Array
-  headers: Array<{ name: string; value: string }>
-  url: URL
-  capturedAt: Date
-}
+  headers: ReadonlyArray<{ name: string; value: string }>
+  url: Readonly<URL>
+  capturedAt: Readonly<Date>
+}>
 
 export class Client {
   private readonly baseUrl: URL
@@ -41,7 +39,7 @@ export class Client {
   private cache: Partial<{
     currentVersion: Readonly<SemVer>
     latestVersion: Readonly<SemVer>
-    settings: DeepReadonly<AppSettings>
+    settings: AppSettings
   }> = {}
 
   constructor(opt?: ClientOptions) {
@@ -112,7 +110,7 @@ export class Client {
    *
    * @throws {APIError}
    */
-  async getSettings(force: boolean = false): Promise<DeepReadonly<AppSettings>> {
+  async getSettings(force: boolean = false): Promise<AppSettings> {
     if (this.cache.settings && !force) {
       return this.cache.settings
     }
@@ -149,7 +147,7 @@ export class Client {
     headers?: Record<string, string>
     delay?: number
     responseBody?: Uint8Array
-  }): Promise<DeepReadonly<SessionOptions>> {
+  }): Promise<SessionOptions> {
     const { data, response } = await this.api.POST('/api/session', {
       body: {
         status_code: Math.min(Math.max(100, statusCode), 530), // clamp to the valid range
@@ -166,9 +164,9 @@ export class Client {
         uuid: data.uuid,
         response: Object.freeze({
           statusCode: data.response.status_code,
-          headers: data.response.headers,
+          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
-          responseBody: new TextEncoder().encode(atob(data.response.response_body_base64)),
+          body: new TextEncoder().encode(atob(data.response.response_body_base64)),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -182,7 +180,7 @@ export class Client {
    *
    * @throws {APIError}
    */
-  async getSession(sID: string): Promise<DeepReadonly<SessionOptions>> {
+  async getSession(sID: string): Promise<SessionOptions> {
     const { data, response } = await this.api.GET(`/api/session/{session_uuid}`, {
       params: { path: { session_uuid: sID } },
     })
@@ -192,9 +190,9 @@ export class Client {
         uuid: data.uuid,
         response: Object.freeze({
           statusCode: data.response.status_code,
-          headers: data.response.headers,
+          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
-          responseBody: new TextEncoder().encode(atob(data.response.response_body_base64)),
+          body: new TextEncoder().encode(atob(data.response.response_body_base64)),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -225,7 +223,7 @@ export class Client {
    *
    * @throws {APIError}
    */
-  async getSessionRequests(sID: string): Promise<DeepReadonly<Array<CapturedRequest>>> {
+  async getSessionRequests(sID: string): Promise<ReadonlyArray<CapturedRequest>> {
     const { data, response } = await this.api.GET('/api/session/{session_uuid}/requests', {
       params: { path: { session_uuid: sID } },
     })
@@ -238,7 +236,7 @@ export class Client {
             clientAddress: req.client_address,
             method: req.method,
             requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
-            headers: Object.freeze(req.headers),
+            headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
             url: Object.freeze(new URL(req.url)),
             capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
           })
@@ -279,7 +277,7 @@ export class Client {
       onError,
     }: {
       onConnected?: () => void // called when the WebSocket connection is established
-      onUpdate: (request: DeepReadonly<CapturedRequest>) => void // called when the update is received
+      onUpdate: (request: CapturedRequest) => void // called when the update is received
       onError?: (err: Error) => void // called when an error occurs on alive connection
     }
   ): Promise</* closer */ () => void> {
@@ -344,7 +342,7 @@ export class Client {
    *
    * @throws {APIError}
    */
-  async getSessionRequest(sID: string, rID: string): Promise<DeepReadonly<CapturedRequest>> {
+  async getSessionRequest(sID: string, rID: string): Promise<CapturedRequest> {
     const { data, response } = await this.api.GET('/api/session/{session_uuid}/requests/{request_uuid}', {
       params: { path: { session_uuid: sID, request_uuid: rID } },
     })

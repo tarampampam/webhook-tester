@@ -11,7 +11,7 @@ import { Header, type NewSessionOptions } from './components'
 type ContextType = Readonly<{
   navBar: React.JSX.Element | null
   setNavBar: (_: React.JSX.Element | null) => void
-  emitWebHookUrlChange: (_: URL | undefined) => void
+  emitWebHookUrlChange: (_: URL | null) => void
 }>
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
@@ -24,7 +24,7 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
   const [maxRequestBodySize, setMaxRequestBodySize] = useState<number>(0)
   const [sessionTTLSec, setSessionTTLSec] = useState<number>(0)
   const [navBar, setNavBar] = useState<React.JSX.Element | null>(null)
-  const [webHookUrl, setWebHookUrl] = useState<URL | undefined>(undefined)
+  const [webHookUrl, setWebHookUrl] = useState<URL | null>(null)
 
   useEffect(() => {
     // load current and latest versions on mount
@@ -98,7 +98,7 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       loading: false,
     })
 
-    navigate(pathTo(RouteIDs.Session, newSessionID)) // navigate to the new session
+    navigate(pathTo(RouteIDs.SessionAndRequest, newSessionID)) // navigate to the new session
   }
 
   return (

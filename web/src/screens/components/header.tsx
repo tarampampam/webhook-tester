@@ -21,7 +21,7 @@ export default function Header({
   maxRequestBodySize = 0,
   sessionTTLSec = 0,
   maxBodySizeBytes = 0,
-  webHookUrl = undefined,
+  webHookUrl = null,
   isBurgerOpened = false,
   onBurgerClick = () => {},
   onNewSessionCreate = () => Promise.reject(),
@@ -31,7 +31,7 @@ export default function Header({
   maxRequestBodySize?: number
   sessionTTLSec?: number
   maxBodySizeBytes?: number
-  webHookUrl?: URL
+  webHookUrl: URL | null
   isBurgerOpened: boolean
   onBurgerClick: () => void
   onNewSessionCreate?: (_: NewSessionOptions) => Promise<void>
@@ -107,7 +107,7 @@ export default function Header({
             >
               Help
             </Button>
-            {isUpdateAvailable && latestVersion ? (
+            {isUpdateAvailable && !!latestVersion ? (
               <Button
                 variant="default"
                 size="xs"
@@ -117,7 +117,7 @@ export default function Header({
                 rel="preload"
                 target="_blank"
               >
-                Update available {latestVersion && <>(v{latestVersion.toString()})</>}
+                Update available {!!latestVersion && <>(v{latestVersion.toString()})</>}
               </Button>
             ) : (
               <Button
@@ -140,6 +140,7 @@ export default function Header({
               variant="gradient"
               gradient={{ from: 'teal', to: 'lime', deg: 90 }}
               onClick={handleCpyWebhookUrl}
+              disabled={!webHookUrl}
             >
               Copy Webhook URL
             </Button>

@@ -44,6 +44,7 @@ func TestServer_StartHTTP(t *testing.T) {
 	require.NoError(t, err)
 
 	srv.Register(
+		context.Background(),
 		log,
 		func(context.Context) error { return nil },
 		func(context.Context) (string, error) { return "v1.0.0", nil },
