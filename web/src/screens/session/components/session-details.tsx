@@ -3,6 +3,7 @@ import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Table, Text, Skeleton, type MantineColor } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
+import { storageKey } from '~/shared'
 import {
   IconBrandCSharp,
   IconBrandDebian,
@@ -26,8 +27,6 @@ export type SessionProps = {
   createdAt: Readonly<Date>
 }
 
-const storageKeyPrefix = 'webhook-tester-v2-session-details'
-
 export default function SessionDetails({
   webHookUrl,
   loading = false,
@@ -38,11 +37,11 @@ export default function SessionDetails({
   sessionProps: Readonly<SessionProps> | null
 }): React.JSX.Element {
   const [selectedShellTab, setSelectedShellTab] = useSessionStorage({
-    key: `${storageKeyPrefix}-selected-shell-tab`,
+    key: storageKey('session-details-selected-shell-tab'),
     defaultValue: 0,
   })
   const [selectedCodeTab, setSelectedCodeTab] = useSessionStorage({
-    key: `${storageKeyPrefix}-selected-code-tab`,
+    key: storageKey('session-details-selected-code-tab'),
     defaultValue: 0,
   })
 
@@ -215,7 +214,7 @@ export default function SessionDetails({
           </Table.Thead>
           <Table.Tbody>
             {!!sessionProps.statusCode && (
-              <Table.Tr key="status">
+              <Table.Tr>
                 <Table.Td ta="right">Status code</Table.Td>
                 <Table.Td>
                   <Badge
@@ -238,13 +237,13 @@ export default function SessionDetails({
               </Table.Tr>
             )}
             {!!sessionProps.delay && (
-              <Table.Tr key="delay">
+              <Table.Tr>
                 <Table.Td ta="right">Delay</Table.Td>
                 <Table.Td>{sessionProps.delay} sec</Table.Td>
               </Table.Tr>
             )}
             {!!sessionProps.headers.length && (
-              <Table.Tr key="headers">
+              <Table.Tr>
                 <Table.Td ta="right">Response headers</Table.Td>
                 <Table.Td>
                   <CodeHighlightTabs
@@ -263,7 +262,7 @@ export default function SessionDetails({
               </Table.Tr>
             )}
             {!!sessionProps.body.length && (
-              <Table.Tr key="body">
+              <Table.Tr>
                 <Table.Td ta="right">Response body</Table.Td>
                 <Table.Td>
                   <CodeHighlightTabs

@@ -9,8 +9,10 @@ import {
   Flex,
   Title,
   type MantineColor,
+  Button,
 } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
+import { IconTrash } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -28,10 +30,12 @@ const Request = ({
   sID,
   request,
   isActive = false,
+  onDelete,
 }: {
   sID: string
   request: ListedRequest
   isActive?: boolean
+  onDelete?: (sID: string, rID: string) => void
 }): React.JSX.Element => {
   const formatDateTime = (date: Date): string => dayjs(date).fromNow()
   const [elapsedTime, setElapsedTime] = useState<string>(formatDateTime(request.capturedAt))
@@ -72,7 +76,7 @@ const Request = ({
           to={pathTo(RouteIDs.SessionAndRequest, sID, request.id)}
         >
           <Flex align="center">
-            <Title order={3} style={{ fontWeight: 300 }}>
+            <Title order={4} style={{ fontWeight: 500 }}>
               {request.clientAddress}
             </Title>
             <Badge
@@ -91,7 +95,17 @@ const Request = ({
             </Text>
           </Text>
         </UnstyledButton>
-        <CloseButton size={16} iconSize={16} m="sm" ml={0} aria-label="Delete" title="Delete" />
+        {!!onDelete && (
+          <CloseButton
+            size={16}
+            iconSize={16}
+            m="sm"
+            ml={0}
+            aria-label="Delete"
+            title="Delete"
+            onClick={() => onDelete(sID, request.id)}
+          />
+        )}
       </Flex>
     </Badge>
   )
@@ -140,18 +154,48 @@ export default function SideBar({
   sID,
   rID,
   requests,
+  onRequestDelete,
+  onAllRequestsDelete,
 }: {
   sID: string | null
   rID: string | null
   requests: ReadonlyArray<ListedRequest>
+  onRequestDelete?: (sID: string, rID: string) => void
+  onAllRequestsDelete?: (sID: string) => void
 }): React.JSX.Element {
   return (
     <Stack align="stretch" justify="flex-start" gap="xs">
       {(!!sID &&
-        ((!!requests.length &&
-          requests.map((request) => (
-            <Request sID={sID} request={request} key={request.id} isActive={rID === request.id} />
-          ))) || <NoRequests />)) || <NoSession />}
+        ((!!requests.length && (
+          <>
+            {requests.map((request) => (
+              <Request
+                sID={sID}
+                request={request}
+                key={request.id}
+                isActive={rID === request.id}
+                onDelete={onRequestDelete && (() => onRequestDelete(sID, request.id))}
+              />
+            ))}
+            {requests.length > 1 && !!onAllRequestsDelete && (
+              <Center>
+                <Button
+                  leftSection={<IconTrash size="1em" />}
+                  size="compact-xs"
+                  variant="outline"
+                  color="red"
+                  px="xs"
+                  mb="sm"
+                  radius="xl"
+                  opacity={0.7}
+                  onClick={() => onAllRequestsDelete(sID)}
+                >
+                  Delete all requests
+                </Button>
+              </Center>
+            )}
+          </>
+        )) || <NoRequests />)) || <NoSession />}
     </Stack>
   )
 }

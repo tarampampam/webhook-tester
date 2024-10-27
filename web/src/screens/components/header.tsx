@@ -1,8 +1,9 @@
 import type { SemVer } from 'semver'
-import { Burger, Button, Group, Image } from '@mantine/core'
+import { Burger, Button, Checkbox, Group, Image, Popover, Stack } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { useClipboard, useDisclosure } from '@mantine/hooks'
 import {
+  IconAdjustmentsAlt,
   IconBrandGithubFilled,
   IconCirclePlusFilled,
   IconCopy,
@@ -11,6 +12,7 @@ import {
 } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useUISettings } from '~/shared'
 import HeaderHelpModal from './header-help-modal'
 import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'
 import LogoTextSvg from '~/assets/togo-text.svg'
@@ -37,6 +39,7 @@ export default function Header({
   onNewSessionCreate?: (_: NewSessionOptions) => Promise<void>
 }): React.JSX.Element {
   const clipboard = useClipboard({ timeout: 500 })
+  const { settings, updateSettings } = useUISettings()
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false)
   const [isNewSessionModalOpened, newSessionModalHandlers] = useDisclosure(false)
   const [isHelpModalOpened, helpModalHandlers] = useDisclosure(false)
@@ -107,6 +110,7 @@ export default function Header({
             >
               Help
             </Button>
+
             {isUpdateAvailable && !!latestVersion ? (
               <Button
                 variant="default"
@@ -135,15 +139,44 @@ export default function Header({
         </Group>
         <Group visibleFrom="xs">
           <Button.Group>
+            <Popover width={200} position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <Button
+                  leftSection={<IconAdjustmentsAlt size="1.3em" />}
+                  px="sm"
+                  variant="gradient"
+                  gradient={{ from: 'teal', to: 'lime', deg: 90 }}
+                >
+                  UI settings
+                </Button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <Stack>
+                  <Checkbox
+                    checked={settings.autoNavigateToNewRequest}
+                    onChange={(event) => updateSettings({ autoNavigateToNewRequest: event.target.checked })}
+                    label="Automatically navigate to the new request"
+                  />
+                  <Checkbox
+                    checked={settings.showRequestDetails}
+                    onChange={(event) => updateSettings({ showRequestDetails: event.target.checked })}
+                    label="Display request details"
+                  />
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+
             <Button
               leftSection={<IconCopy size="1.2em" />}
-              variant="gradient"
-              gradient={{ from: 'teal', to: 'lime', deg: 90 }}
+              variant="filled"
+              color="lime"
               onClick={handleCpyWebhookUrl}
               disabled={!webHookUrl}
+              visibleFrom="md"
             >
               Copy Webhook URL
             </Button>
+
             <Button
               leftSection={<IconCirclePlusFilled size="1.3em" />}
               variant="gradient"

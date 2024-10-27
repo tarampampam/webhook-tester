@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -40,6 +41,12 @@ func New( //nolint:funlen,gocognit,gocyclo
 			// get the session from the storage
 			sess, sErr := db.GetSession(reqCtx, sID) //nolint:contextcheck
 			if sErr != nil {
+				if errors.Is(sErr, storage.ErrNotFound) {
+					respondWithError(w, log, http.StatusNotFound, "The webhook has not been created yet or may have expired")
+
+					return
+				}
+
 				respondWithError(w, log, http.StatusInternalServerError, sErr.Error())
 
 				return

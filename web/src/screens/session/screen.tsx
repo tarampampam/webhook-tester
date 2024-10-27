@@ -5,9 +5,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useLastUsedSID, useLastUsedRID } from '~/shared'
+import { sessionToUrl, useLastUsedSID, useLastUsedRID, useUISettings } from '~/shared'
 import { useLayoutOutletContext } from '../layout'
-import { SessionDetails, type SessionProps } from './components'
+import { RequestDetails, SessionDetails, type SessionProps } from './components'
 
 export default function SessionAndRequestScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const [{ sID }, { rID }] = [
@@ -18,6 +18,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
   const [loading, setLoading] = useState<boolean>(false)
   const [sessionProps, setSessionProps] = useState<SessionProps | null>(null)
   const [setLastUsedSID, setLastUsedRID] = [useLastUsedSID()[1], useLastUsedRID()[1]]
+  const uiSettings = useUISettings().settingsRef
   const { setListedRequests, setSID: setParentSID, setRID: setParentRID } = useLayoutOutletContext()
   const closeSub = useRef<(() => void) | null>(null)
 
@@ -43,8 +44,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
         apiClient // TODO: load session and requests in parallel
           .getSessionRequests(sID)
           .then((requests) => {
-            console.log('GOT Requests:', requests) // TODO: for debugging purposes
-
+            // update the list of requests
             setListedRequests(
               requests.map((request) =>
                 Object.freeze({
@@ -68,16 +68,20 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
         apiClient
           .subscribeToSessionRequests(sID, {
             onUpdate: (request): void => {
-              // append the new request to the list
+              // append the new request in front of the list
               setListedRequests((prev) => [
-                ...prev,
                 Object.freeze({
                   id: request.uuid,
                   method: request.method,
                   clientAddress: request.clientAddress,
                   capturedAt: request.capturedAt,
                 }),
+                ...prev,
               ])
+
+              if (uiSettings.current.autoNavigateToNewRequest) {
+                navigate(pathTo(RouteIDs.SessionAndRequest, sID, request.uuid)) // navigate to the new request
+              }
             },
             onError: (error): void => {
               notify.show({ title: 'An error occurred with websocket', message: String(error), color: 'orange' })
@@ -96,6 +100,10 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
             message: err instanceof APIErrorNotFound ? `The session with ID ${sID} does not exist` : String(err),
             color: 'red',
           })
+
+          // clear the last used session ID and request ID
+          setLastUsedSID(null)
+          setLastUsedRID(null)
 
           navigate(pathTo(RouteIDs.Home)) // redirect to the home screen
 
@@ -123,16 +131,18 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
       setParentRID(null)
       setLastUsedRID(null)
     }
-  }, [rID])
+  }, [rID]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <>
-      <SessionDetails webHookUrl={sessionToUrl(sID)} loading={loading} sessionProps={sessionProps} />
+    (!!rID && <RequestDetails apiClient={apiClient} sID={sID} rID={rID} />) || (
+      <>
+        <SessionDetails webHookUrl={sessionToUrl(sID)} loading={loading} sessionProps={sessionProps} />
 
-      <Blockquote my="lg" color="blue" icon={<IconInfoCircle />}>
-        Click &quot;New URL&quot; (in the top right corner) to create a new url with the ability to customize status
-        code, response body, etc.
-      </Blockquote>
-    </>
+        <Blockquote my="lg" color="blue" icon={<IconInfoCircle />}>
+          Click &quot;New URL&quot; (in the top right corner) to create a new url with the ability to customize status
+          code, response body, etc.
+        </Blockquote>
+      </>
+    )
   )
 }

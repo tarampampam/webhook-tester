@@ -2,6 +2,7 @@ import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Tit
 import { useSessionStorage } from '@mantine/hooks'
 import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import React, { useState } from 'react'
+import { storageKey } from '~/shared'
 
 const limits = {
   statusCode: { min: 100, max: 530 },
@@ -17,8 +18,6 @@ export type NewSessionOptions = {
   destroyCurrentSession: boolean
 }
 
-const storageKeyPrefix = 'webhook-tester-v2-new-session'
-
 export default function HeaderNewSessionModal({
   opened,
   loading = false,
@@ -33,23 +32,23 @@ export default function HeaderNewSessionModal({
   maxRequestBodySize: number | null
 }): React.JSX.Element {
   const [statusCode, setStatusCode] = useSessionStorage<number>({
-    key: `${storageKeyPrefix}-status-code`,
+    key: storageKey('new-session-status-code'),
     defaultValue: 200,
   })
   const [headersList, setHeadersList] = useSessionStorage<string>({
-    key: `${storageKeyPrefix}-headers-list`,
+    key: storageKey('new-session-headers-list'),
     defaultValue: 'Content-Type: application/json\nServer: WebhookTester',
   })
   const [delay, setDelay] = useSessionStorage<number>({
-    key: `${storageKeyPrefix}-delay`,
+    key: storageKey('new-session-delay'),
     defaultValue: 0,
   })
   const [responseBody, setResponseBody] = useSessionStorage<string>({
-    key: `${storageKeyPrefix}-response-body`,
+    key: storageKey('new-session-response-body'),
     defaultValue: '{"captured": true}',
   })
   const [destroyCurrentSession, setDestroyCurrentSession] = useSessionStorage<boolean>({
-    key: `${storageKeyPrefix}-destroy-current-session`,
+    key: storageKey('new-session-destroy-current-session'),
     defaultValue: true,
   })
 
