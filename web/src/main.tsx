@@ -3,11 +3,15 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import { routes } from './routing'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
 import '@mantine/notifications/styles.css'
 import '~/theme/app.css'
+
+dayjs.extend(relativeTime) // https://day.js.org/docs/en/plugin/relative-time
 
 /** App component */
 const App = (): React.JSX.Element => {

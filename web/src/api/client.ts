@@ -230,17 +230,21 @@ export class Client {
 
     if (data) {
       return Object.freeze(
-        data.map((req) =>
-          Object.freeze({
-            uuid: req.uuid,
-            clientAddress: req.client_address,
-            method: req.method,
-            requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
-            headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
-            url: Object.freeze(new URL(req.url)),
-            capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
-          })
-        )
+        data
+          // convert the list of requests to the immutable objects with the correct types
+          .map((req) =>
+            Object.freeze({
+              uuid: req.uuid,
+              clientAddress: req.client_address,
+              method: req.method,
+              requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
+              headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
+              url: Object.freeze(new URL(req.url)),
+              capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
+            })
+          )
+          // sort the list by capturedAt date, to have the latest requests first
+          .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())
       )
     }
 

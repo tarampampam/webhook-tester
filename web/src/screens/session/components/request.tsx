@@ -1,24 +1,9 @@
-import React, { useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { useLastUsedRID } from '../../../shared'
+import React from 'react'
 
 export default function Request(): React.JSX.Element {
-  const { rID } = useParams<Readonly<{ rID: string }>>()
-  const setLastUsedRID = useLastUsedRID()[1]
-
-  useEffect((): undefined | (() => void) => {
-    if (rID) {
-      setLastUsedRID(rID)
-    }
-
-    return (): void => {
-      setLastUsedRID(undefined)
-    }
-  }, [rID, setLastUsedRID])
-
   return (
     <div>
-      <h1>Request screen ({rID})</h1>
+      <h1>Request screen</h1>
     </div>
   )
 }

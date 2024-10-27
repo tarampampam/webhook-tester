@@ -13,14 +13,12 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import HeaderHelpModal from './header-help-modal'
 import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'
-import LogoTextSvg from '../../assets/togo-text.svg'
+import LogoTextSvg from '~/assets/togo-text.svg'
 
 export default function Header({
   currentVersion,
   latestVersion,
-  maxRequestBodySize = 0,
-  sessionTTLSec = 0,
-  maxBodySizeBytes = 0,
+  appSettings = null,
   webHookUrl = null,
   isBurgerOpened = false,
   onBurgerClick = () => {},
@@ -28,9 +26,11 @@ export default function Header({
 }: {
   currentVersion: SemVer | null
   latestVersion: SemVer | null
-  maxRequestBodySize?: number
-  sessionTTLSec?: number
-  maxBodySizeBytes?: number
+  appSettings: {
+    setMaxRequestsPerSession: number
+    maxRequestBodySize: number
+    sessionTTLSec: number
+  } | null
   webHookUrl: URL | null
   isBurgerOpened: boolean
   onBurgerClick: () => void
@@ -80,14 +80,14 @@ export default function Header({
         loading={isNewSessionLoading}
         onClose={newSessionModalHandlers.close}
         onCreate={handleNewSessionCreate}
-        maxRequestBodySize={maxRequestBodySize}
+        maxRequestBodySize={(!!appSettings && appSettings.maxRequestBodySize) || null}
       />
       <HeaderHelpModal
         opened={isHelpModalOpened}
         onClose={helpModalHandlers.close}
         webHookUrl={webHookUrl}
-        sessionTTLSec={sessionTTLSec}
-        maxBodySizeBytes={maxBodySizeBytes}
+        sessionTTLSec={(!!appSettings && appSettings.sessionTTLSec) || null}
+        maxBodySizeBytes={(!!appSettings && appSettings.maxRequestBodySize) || null}
       />
 
       <Group h="100%" px="md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

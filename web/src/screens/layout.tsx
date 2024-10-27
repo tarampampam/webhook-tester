@@ -1,30 +1,36 @@
-import { AppShell, Center, Loader, Text } from '@mantine/core'
+import { AppShell, ScrollArea } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import React, { useEffect, useState } from 'react'
-import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
-import { pathTo, RouteIDs } from '../routing'
-import { Header, type NewSessionOptions } from './components'
+import { pathTo, RouteIDs } from '~/routing'
+import { sessionToUrl } from '~/shared'
+import { Header, SideBar, type NewSessionOptions, type ListedRequest } from './components'
 
 type ContextType = Readonly<{
-  navBar: React.JSX.Element | null
-  setNavBar: (_: React.JSX.Element | null) => void
-  emitWebHookUrlChange: (_: URL | null) => void
+  setListedRequests: (list: Array<ListedRequest> | ((prev: Array<ListedRequest>) => Array<ListedRequest>)) => void
+  sID: string | null
+  setSID: (sID: string | null) => void
+  rID: string | null
+  setRID: (rID: string | null) => void
 }>
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
-  const params = useParams<{ sID?: string; rID?: string }>()
   const navigate = useNavigate()
   const [navBarIsOpened, navBarHandlers] = useDisclosure()
   const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
   const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
-  // const [maxRequestsPerSession, setMaxRequestsPerSession] = useState<number>(0)
-  const [maxRequestBodySize, setMaxRequestBodySize] = useState<number>(0)
-  const [sessionTTLSec, setSessionTTLSec] = useState<number>(0)
-  const [navBar, setNavBar] = useState<React.JSX.Element | null>(null)
-  const [webHookUrl, setWebHookUrl] = useState<URL | null>(null)
+  const [[sID, setSID], [rID, setRID]] = [useState<string | null>(null), useState<string | null>(null)]
+  const [listedRequests, setListedRequests] = useState<Array<ListedRequest>>([])
+  const [appSettings, setAppSettings] = useState<
+    Readonly<{
+      setMaxRequestsPerSession: number
+      maxRequestBodySize: number
+      sessionTTLSec: number
+    } | null>
+  >(null)
 
   useEffect(() => {
     // load current and latest versions on mount
@@ -35,9 +41,13 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
     apiClient
       .getSettings()
       .then((settings) => {
-        // setMaxRequestsPerSession(settings.limits.maxRequests)
-        setMaxRequestBodySize(settings.limits.maxRequestBodySize)
-        setSessionTTLSec(settings.limits.sessionTTL)
+        setAppSettings(
+          Object.freeze({
+            setMaxRequestsPerSession: settings.limits.maxRequests,
+            maxRequestBodySize: settings.limits.maxRequestBodySize,
+            sessionTTLSec: settings.limits.sessionTTL,
+          })
+        )
       })
       .catch(console.error)
   }, [apiClient])
@@ -77,8 +87,8 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
 
     // destroy the current session, if needed
     try {
-      if (s.destroyCurrentSession && params.sID) {
-        await apiClient.deleteSession(params.sID)
+      if (s.destroyCurrentSession && !!sID) {
+        await apiClient.deleteSession(sID)
       }
     } catch (err) {
       notify.show({
@@ -107,32 +117,26 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !navBarIsOpened } }}
       padding="md"
     >
-      <AppShell.Header>
+      <AppShell.Header style={{ zIndex: 103 }}>
         <Header
           currentVersion={currentVersion}
           latestVersion={latestVersion}
-          maxRequestBodySize={maxRequestBodySize}
-          sessionTTLSec={sessionTTLSec}
-          webHookUrl={webHookUrl}
+          appSettings={appSettings}
+          webHookUrl={(sID && sessionToUrl(sID)) || null}
           isBurgerOpened={navBarIsOpened}
           onBurgerClick={navBarHandlers.toggle}
           onNewSessionCreate={handleNewSessionCreate}
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p="md" withBorder={false}>
-        {navBar ? ( // navBar may be replaced by a child component (<Outlet />)
-          navBar
-        ) : (
-          <Center pt="2em">
-            <Loader color="dimmed" size="1em" mr={8} mb={3} />
-            <Text c="dimmed">Waiting for first request</Text>
-          </Center>
-        )}
+      <AppShell.Navbar p="md" pr={0} style={{ zIndex: 102 }} withBorder={false}>
+        <AppShell.Section grow component={ScrollArea} pr="md">
+          <SideBar sID={sID} rID={rID} requests={listedRequests} />
+        </AppShell.Section>
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet context={{ navBar, setNavBar, emitWebHookUrlChange: setWebHookUrl } satisfies ContextType} />
+        <Outlet context={{ setListedRequests, sID, setSID, rID, setRID } satisfies ContextType} />
       </AppShell.Main>
     </AppShell>
   )

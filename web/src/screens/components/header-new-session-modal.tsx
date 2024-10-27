@@ -30,7 +30,7 @@ export default function HeaderNewSessionModal({
   loading?: boolean
   onClose: () => void
   onCreate: (_: NewSessionOptions) => void
-  maxRequestBodySize?: number
+  maxRequestBodySize: number | null
 }): React.JSX.Element {
   const [statusCode, setStatusCode] = useSessionStorage<number>({
     key: `${storageKeyPrefix}-status-code`,
@@ -89,7 +89,7 @@ export default function HeaderNewSessionModal({
       setWrongDelay(false)
     }
 
-    if (maxRequestBodySize > 0 && responseBody.length > maxRequestBodySize) {
+    if (!!maxRequestBodySize && maxRequestBodySize > 0 && responseBody.length > maxRequestBodySize) {
       setWrongResponseBody(true)
 
       return
@@ -162,7 +162,7 @@ export default function HeaderNewSessionModal({
       <Textarea
         my="sm"
         label="Response body"
-        description={`The content of the response${maxRequestBodySize > 0 && ` (max ${new Intl.NumberFormat().format(maxRequestBodySize)} characters)`}`}
+        description={`The content of the response${!!maxRequestBodySize && maxRequestBodySize > 0 && ` (max ${new Intl.NumberFormat().format(maxRequestBodySize)} characters)`}`}
         placeholder={'{"message": "Hello, World!"}'}
         leftSection={<IconVersions />}
         styles={{ input: { fontFamily: 'monospace', fontSize: '0.9em' } }}

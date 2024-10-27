@@ -1,3 +1,4 @@
+import { useSessionStorage } from '@mantine/hooks'
 import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Table, Text, Skeleton, type MantineColor } from '@mantine/core'
@@ -25,6 +26,8 @@ export type SessionProps = {
   createdAt: Readonly<Date>
 }
 
+const storageKeyPrefix = 'webhook-tester-v2-session-details'
+
 export default function SessionDetails({
   webHookUrl,
   loading = false,
@@ -34,6 +37,15 @@ export default function SessionDetails({
   loading?: boolean
   sessionProps: Readonly<SessionProps> | null
 }): React.JSX.Element {
+  const [selectedShellTab, setSelectedShellTab] = useSessionStorage({
+    key: `${storageKeyPrefix}-selected-shell-tab`,
+    defaultValue: 0,
+  })
+  const [selectedCodeTab, setSelectedCodeTab] = useSessionStorage({
+    key: `${storageKeyPrefix}-selected-code-tab`,
+    defaultValue: 0,
+  })
+
   /** Sends a test request to the generated URL. */
   const handleSendTestRequest = (): void => {
     const id = notify.show({
@@ -127,6 +139,8 @@ export default function SessionDetails({
             icon: <IconBrandWindows size="1.2em" />,
           },
         ]}
+        onTabChange={(index) => setSelectedShellTab(index)}
+        activeTab={selectedShellTab}
         w="100%"
         my="md"
       />
@@ -181,6 +195,8 @@ export default function SessionDetails({
             icon: <IconBrandCSharp size="1.2em" />,
           },
         ]}
+        onTabChange={(index) => setSelectedCodeTab(index)}
+        activeTab={selectedCodeTab}
         w="100%"
         my="md"
         defaultExpanded={false}
@@ -192,7 +208,7 @@ export default function SessionDetails({
           <Table.Thead>
             <Table.Tr>
               <Table.Th w={200} ta="right">
-                Option
+                WebHook option
               </Table.Th>
               <Table.Th>Value</Table.Th>
             </Table.Tr>

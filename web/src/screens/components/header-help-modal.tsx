@@ -12,8 +12,8 @@ export default function HeaderHelpModal({
   opened: boolean
   onClose: () => void
   webHookUrl: URL | null
-  sessionTTLSec?: number
-  maxBodySizeBytes?: number
+  sessionTTLSec: number | null
+  maxBodySizeBytes: number | null
 }): React.JSX.Element {
   return (
     <Modal
@@ -45,9 +45,11 @@ export default function HeaderHelpModal({
 
       <Text my="md">
         Feel free to bookmark this page to revisit the request details at any time.
-        {sessionTTLSec > 0 &&
+        {!!sessionTTLSec &&
+          sessionTTLSec > 0 &&
           ` Requests and tokens for this URL expire after ${sessionTTLSec / 60 / 60 / 24} days of inactivity.`}
-        {maxBodySizeBytes > 0 &&
+        {!!maxBodySizeBytes &&
+          maxBodySizeBytes > 0 &&
           ` The maximum size for incoming requests is ${bytesToKilobytes(maxBodySizeBytes)} KiB.`}
       </Text>
     </Modal>
