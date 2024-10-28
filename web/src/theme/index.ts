@@ -1,1 +1,1 @@
-export { isDarkMode } from './dark-mode'
+export { methodToColor } from './color'

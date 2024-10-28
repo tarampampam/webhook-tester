@@ -1,22 +1,11 @@
-import {
-  Center,
-  Loader,
-  Stack,
-  Text,
-  UnstyledButton,
-  Badge,
-  CloseButton,
-  Flex,
-  Title,
-  type MantineColor,
-  Button,
-} from '@mantine/core'
+import { Center, Loader, Stack, Text, UnstyledButton, Badge, CloseButton, Flex, Title, Button } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { IconTrash } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
+import { methodToColor } from '~/theme'
 import styles from './sidebar.module.css'
 
 export type ListedRequest = {
@@ -83,7 +72,7 @@ const Request = ({
               variant="dot"
               ml="xs"
               styles={{ label: { fontWeight: 300, cursor: 'pointer' } }}
-              color={methodColor(request.method)}
+              color={methodToColor(request.method)}
             >
               {request.method}
             </Badge>
@@ -109,31 +98,6 @@ const Request = ({
       </Flex>
     </Badge>
   )
-}
-
-const methodColor = (method: string): MantineColor => {
-  switch (method.toUpperCase()) {
-    case 'GET':
-      return 'blue'
-    case 'POST':
-      return 'green'
-    case 'PUT':
-      return 'yellow'
-    case 'DELETE':
-      return 'red'
-    case 'PATCH':
-      return 'purple'
-    case 'HEAD':
-      return 'teal'
-    case 'OPTIONS':
-      return 'orange'
-    case 'TRACE':
-      return 'pink'
-    case 'CONNECT':
-      return 'indigo'
-  }
-
-  return 'gray'
 }
 
 const NoRequests = (): React.JSX.Element => (

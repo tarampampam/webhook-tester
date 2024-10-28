@@ -54,7 +54,7 @@ export default function SessionDetails({
       loading: true,
     })
 
-    sendTestRequest(webHookUrl)
+    sendTestRequest(new URL(webHookUrl))
       .then(() => {
         notify.update({
           id,
@@ -290,11 +290,19 @@ const sendTestRequest = async (url: URL): Promise<Response> => {
 
   const methods: Readonly<Array<string>> = ['post', 'put', 'delete', 'patch']
 
+  if (Math.random() > 0.5) {
+    url.pathname += '/any/path' // add random path
+  }
+
+  url.searchParams.set('test', 'true')
+  url.searchParams.set('now', String(payload.now))
+  url.hash = '#hash'
+
   return fetch(
     new Request(url, {
       method: methods[Math.floor(Math.random() * methods.length)].toUpperCase(), // pick random method
       cache: 'no-cache',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Test-Header': 'test' },
       body: JSON.stringify(payload),
     })
   )

@@ -190,6 +190,7 @@ func shouldCaptureRequest(r *http.Request) (string, bool) {
 	return "", false
 }
 
+// TODO: add supporting of format requested by the user (json, html, plain text, etc).
 func respondWithError(w http.ResponseWriter, log *zap.Logger, code int, msg string) {
 	var s strings.Builder
 
