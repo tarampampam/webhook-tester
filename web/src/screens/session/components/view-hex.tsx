@@ -143,7 +143,7 @@ export default function ViewHex({
           </Box>
         </Grid.Col>
 
-        <Grid.Col span="auto">
+        <Grid.Col span="auto" visibleFrom="sm">
           <NativeSelect
             size="xs"
             mb="sm"

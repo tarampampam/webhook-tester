@@ -197,7 +197,7 @@ export default function RequestDetails({
           )}
         </Title>
         {(loading && <Skeleton radius="md" h="8em" w="100%" />) || (
-          <Tabs variant="default" defaultValue={TabsList.Binary /* TODO: set 'Text' */} keepMounted={false}>
+          <Tabs variant="default" defaultValue={TabsList.Text} keepMounted={false}>
             <Tabs.List>
               <Tabs.Tab value={TabsList.Text} leftSection={<IconLetterCase />} color="blue">
                 Text
