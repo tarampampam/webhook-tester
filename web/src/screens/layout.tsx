@@ -1,6 +1,7 @@
-import { AppShell, ScrollArea, Box } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { AppShell, ScrollArea, Box, Affix, Transition, Button } from '@mantine/core'
+import { useDisclosure, useWindowScroll } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
+import { IconArrowUp } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
 import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
@@ -21,6 +22,7 @@ type ContextType = Readonly<{
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const navigate = useNavigate()
+  const [scroll, scrollTo] = useWindowScroll()
   const [navBarIsOpened, navBarHandlers] = useDisclosure()
   const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
   const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
@@ -226,6 +228,21 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       <AppShell.Main>
         <Outlet context={{ setListedRequests, sID, setSID, rID, setRID } satisfies ContextType} />
       </AppShell.Main>
+
+      <Affix position={{ bottom: 20, right: 20 }}>
+        <Transition transition="slide-up" mounted={scroll.y > 0}>
+          {(transitionStyles) => (
+            <Button
+              color="teal"
+              leftSection={<IconArrowUp size="1.2em" />}
+              style={transitionStyles}
+              onClick={() => scrollTo({ y: 0 })}
+            >
+              Scroll to top
+            </Button>
+          )}
+        </Transition>
+      </Affix>
     </AppShell>
   )
 }

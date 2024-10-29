@@ -1,13 +1,13 @@
-import { Grid, Group, NativeSelect, Stack, Alert } from '@mantine/core'
+import { Alert, Box, Divider, Grid, NativeSelect } from '@mantine/core'
+import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
-import { IconInfoCircle } from '@tabler/icons-react'
 
 type DataItem = [string /* representation */, string | undefined /* ascii */]
 type DataLine = Array<DataItem>
 
 export default function ViewHex({
   input,
-  lengthLimit = 1024 * 10, // 10KB
+  lengthLimit = 1024 * 24, // 24KB
 }: {
   input: Uint8Array
   lengthLimit?: number
@@ -69,6 +69,8 @@ export default function ViewHex({
     setDataItems(lines)
   }, [input, displayType, lineSize, lengthLimit])
 
+  const fontSize: string | number = '0.75em'
+
   return (
     <>
       {trimmed && (
@@ -87,18 +89,16 @@ export default function ViewHex({
             value={lineNumberType}
             onChange={(e) => setLineNumberType(e.currentTarget.value as NumberBase)}
           />
-          <Stack style={{ fontFamily: 'monospace' }}>
-            <Group c="dimmed">&nbsp;</Group>
+          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', textAlign: 'right', fontSize }} c="dimmed">
             {!!dataItems && // print line numbers
-              Array(dataItems.length)
-                .fill(0)
-                .map((_, lineNum) => (
-                  <Group justify="flex-end" key={lineNum} c="dimmed">
-                    {byteToString(lineNum * lineSize, lineNumberType)}
-                  </Group>
-                ))}
-          </Stack>
+              '\n' +
+                Array<number>(dataItems.length)
+                  .fill(0)
+                  .map((_, lineNum) => byteToString(lineNum * lineSize, lineNumberType).toUpperCase())
+                  .join('\n')}
+          </Box>
         </Grid.Col>
+
         <Grid.Col span="content" mx="lg">
           <NativeSelect
             size="xs"
@@ -108,34 +108,41 @@ export default function ViewHex({
             value={displayType}
             onChange={(e) => setDisplayType(e.currentTarget.value as NumberBase)}
           />
-          <Stack style={{ fontFamily: 'monospace' }}>
-            <Group gap="0.3em">
+          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', fontSize }}>
+            <Box component="span" c="dimmed" size={fontSize}>
               {!!dataItems && // print column numbers
                 dataItems.length &&
-                dataItems[0].map((_, itemNum) => {
-                  return (
-                    <Group key={itemNum} c="dimmed">
-                      <div>{byteToString(itemNum, displayType).toUpperCase()}</div>
-                    </Group>
-                  )
-                })}
-            </Group>
+                dataItems[0]
+                  .map((_, colNum) => byteToString(colNum, displayType).toUpperCase() + (colNum % 4 === 3 ? ' ' : ''))
+                  .join(' ')
+                  .trimEnd()}
+            </Box>
             {!!dataItems &&
-              dataItems.map((line, lineNum) => {
-                return (
-                  <Group gap="0.3em" key={lineNum}>
-                    {line.map(([byte], itemNum) => {
-                      return (
-                        <Group key={lineNum + itemNum}>
-                          <div>{byte}</div>
-                        </Group>
-                      )
-                    })}
-                  </Group>
-                )
-              })}
-          </Stack>
+              '\n' +
+                dataItems
+                  .map((line) =>
+                    line
+                      .map(([byte], colNum) => byte + (colNum % 4 === 3 ? ' ' : ''))
+                      .join(' ')
+                      .trimEnd()
+                  )
+                  .join('\n')}
+            {trimmed && (
+              <Divider
+                my="xs"
+                label={
+                  <>
+                    <IconScissors size="1.2em" />
+                    <Box mx="xs">Data trimmed</Box>
+                    <IconScissors size="1.2em" />
+                  </>
+                }
+                labelPosition="center"
+              />
+            )}
+          </Box>
         </Grid.Col>
+
         <Grid.Col span="auto">
           <NativeSelect
             size="xs"
@@ -145,23 +152,13 @@ export default function ViewHex({
             value={lineSize.toString()}
             onChange={(e) => setLineSize(parseInt(e.currentTarget.value))}
           />
-          <Stack style={{ fontFamily: 'monospace' }}>
-            <Group c="dimmed">&nbsp;</Group>
+          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', fontSize }}>
             {!!dataItems &&
-              dataItems.map((line, lineNum) => {
-                return (
-                  <Group gap="0.1em" key={lineNum}>
-                    {line.map(([, ascii], itemNum) => {
-                      return (
-                        <Group key={itemNum}>
-                          <div>_{typeof ascii === 'string' ? ascii : '·'}</div>
-                        </Group>
-                      )
-                    })}
-                  </Group>
-                )
-              })}
-          </Stack>
+              '\n' +
+                dataItems
+                  .map((line) => line.map(([, ascii]) => (typeof ascii === 'string' ? ascii : '·')).join(''))
+                  .join('\n')}
+          </Box>
         </Grid.Col>
       </Grid>
     </>
@@ -175,7 +172,7 @@ enum NumberBase { // hello
   Hexadecimal = 'Hexadecimal', // 68, 65, 6c, 6c, 6f
 }
 
-const LineSizes: ReadonlyArray<number> = [1, 2, 4, 8, 16, 32]
+const LineSizes: ReadonlyArray<number> = [4, 8, 16, 32]
 
 const byteToString = (byte: number, base: NumberBase): string => {
   switch (base) {
@@ -197,9 +194,5 @@ const byteToString = (byte: number, base: NumberBase): string => {
 }
 
 const byteToAscii = (byte: number): string | undefined => {
-  if (byte >= 32 && byte <= 126) {
-    return String.fromCharCode(byte)
-  }
-
-  return undefined
+  return byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : undefined
 }
