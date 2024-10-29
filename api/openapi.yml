@@ -98,7 +98,7 @@ paths:
           description: WebSocket connection established
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/CapturedRequest'}
+              schema: {$ref: '#/components/schemas/CapturedRequestShort'}
         '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
@@ -264,6 +264,19 @@ components:
           example: 'https://example.com/path?query=string'
         captured_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
       required: [uuid, client_address, method, request_payload_base64, headers, url, captured_at_unix_milli]
+      additionalProperties: false
+
+    CapturedRequestShort:
+      type: object
+      description: The same as CapturedRequest, but without the request payload
+      properties:
+        uuid: {$ref: '#/components/schemas/UUID'}
+        client_address: {type: string, format: IPv4, example: '214.184.32.7'}
+        method: {$ref: '#/components/schemas/HttpMethod'}
+        headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
+        url: {type: string, example: 'https://example.com/path?query=string'}
+        captured_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
+      required: [uuid, client_address, method, headers, url, captured_at_unix_milli]
       additionalProperties: false
 
   headers: # ------------------------------------------------ HEADERS -------------------------------------------------

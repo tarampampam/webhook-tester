@@ -27,7 +27,6 @@ type (
 		ID                 string       `json:"id"`
 		ClientAddr         string       `json:"client_addr"`
 		Method             string       `json:"method"`
-		Body               []byte       `json:"body"`
 		Headers            []HttpHeader `json:"headers"`
 		URL                string       `json:"url"`
 		CreatedAtUnixMilli int64        `json:"created_at_unix_milli"`

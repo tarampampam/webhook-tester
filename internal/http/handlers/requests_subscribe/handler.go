@@ -2,7 +2,6 @@ package requests_subscribe
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -123,13 +122,12 @@ func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pub
 
 			// write the response to the client
 			if err := ws.WriteJSON(openapi.CapturedRequest{
-				CapturedAtUnixMilli:  r.CreatedAtUnixMilli,
-				ClientAddress:        r.ClientAddr,
-				Headers:              rHeaders,
-				Method:               strings.ToUpper(r.Method),
-				RequestPayloadBase64: base64.StdEncoding.EncodeToString(r.Body),
-				Url:                  r.URL,
-				Uuid:                 rID,
+				CapturedAtUnixMilli: r.CreatedAtUnixMilli,
+				ClientAddress:       r.ClientAddr,
+				Headers:             rHeaders,
+				Method:              strings.ToUpper(r.Method),
+				Url:                 r.URL,
+				Uuid:                rID,
 			}); err != nil {
 				return fmt.Errorf("failed to write the message: %w", err)
 			}

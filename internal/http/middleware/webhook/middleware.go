@@ -125,7 +125,6 @@ func New( //nolint:funlen,gocognit,gocyclo
 					ID:                 rID,
 					ClientAddr:         captured.ClientAddr,
 					Method:             captured.Method,
-					Body:               captured.Body,
 					Headers:            headers,
 					URL:                captured.URL,
 					CreatedAtUnixMilli: captured.CreatedAtUnixMilli,

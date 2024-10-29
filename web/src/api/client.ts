@@ -33,6 +33,8 @@ type CapturedRequest = Readonly<{
   capturedAt: Readonly<Date>
 }>
 
+type CapturedRequestShort = Omit<CapturedRequest, 'requestPayload'>
+
 export class Client {
   private readonly baseUrl: URL
   private readonly api: OpenapiClient<paths>
@@ -281,7 +283,7 @@ export class Client {
       onError,
     }: {
       onConnected?: () => void // called when the WebSocket connection is established
-      onUpdate: (request: CapturedRequest) => void // called when the update is received
+      onUpdate: (request: CapturedRequestShort) => void // called when the update is received
       onError?: (err: Error) => void // called when an error occurs on alive connection
     }
   ): Promise</* closer */ () => void> {
@@ -313,14 +315,13 @@ export class Client {
 
         ws.onmessage = (event): void => {
           if (event.data) {
-            const req = JSON.parse(event.data) as components['schemas']['CapturedRequest']
+            const req = JSON.parse(event.data) as components['schemas']['CapturedRequestShort']
 
             onUpdate(
               Object.freeze({
                 uuid: req.uuid,
                 clientAddress: req.client_address,
                 method: req.method,
-                requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
                 headers: Object.freeze(req.headers),
                 url: Object.freeze(new URL(req.url)),
                 capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
