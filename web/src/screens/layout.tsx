@@ -1,4 +1,4 @@
-import { AppShell, ScrollArea, Box, Affix, Transition, Button } from '@mantine/core'
+import { Affix, AppShell, Box, Button, ScrollArea, Transition } from '@mantine/core'
 import { useDisclosure, useWindowScroll } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import { IconArrowUp } from '@tabler/icons-react'
@@ -7,8 +7,8 @@ import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl } from '~/shared'
-import { Header, SideBar, type NewSessionOptions, type ListedRequest } from './components'
+import { sessionToUrl, stringToUint8Array } from '~/shared'
+import { Header, type ListedRequest, type NewSessionOptions, SideBar } from './components'
 
 type ContextType = Readonly<{
   setListedRequests: (
@@ -72,9 +72,9 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       newSessionID = (
         await apiClient.newSession({
           statusCode: s.statusCode,
-          headers: Object.fromEntries(s.headers.map((h) => [h.name, h.value])),
-          delay: s.delay,
-          responseBody: new TextEncoder().encode(s.responseBody),
+          headers: s.headers ? Object.fromEntries(s.headers.map((h) => [h.name, h.value])) : undefined,
+          delay: s.delay ? s.delay : undefined,
+          responseBody: s.responseBody ? stringToUint8Array(s.responseBody) : undefined,
         })
       ).uuid
     } catch (err) {

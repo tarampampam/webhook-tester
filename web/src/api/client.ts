@@ -1,5 +1,6 @@
 import createClient, { type Client as OpenapiClient, type ClientOptions } from 'openapi-fetch'
 import { coerce as semverCoerce, parse as semverParse, type SemVer } from 'semver'
+import { base64ToUint8Array, uint8ArrayToBase64 } from '~/shared'
 import { APIErrorUnknown } from './errors'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
 import { components, paths } from './schema.gen'
@@ -157,7 +158,7 @@ export class Client {
           .map(([name, value]) => ({ name, value })) // convert to array of objects
           .filter((h) => h.value), // remove empty values
         delay: Math.min(Math.max(0, delay), 30), // clamp to the valid range
-        response_body_base64: btoa(new TextDecoder().decode(responseBody)),
+        response_body_base64: uint8ArrayToBase64(responseBody),
       },
     })
 
@@ -168,7 +169,7 @@ export class Client {
           statusCode: data.response.status_code,
           headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
-          body: new TextEncoder().encode(atob(data.response.response_body_base64)),
+          body: base64ToUint8Array(data.response.response_body_base64),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -194,7 +195,7 @@ export class Client {
           statusCode: data.response.status_code,
           headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
-          body: new TextEncoder().encode(atob(data.response.response_body_base64)),
+          body: base64ToUint8Array(data.response.response_body_base64),
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -239,7 +240,7 @@ export class Client {
               uuid: req.uuid,
               clientAddress: req.client_address,
               method: req.method,
-              requestPayload: new TextEncoder().encode(atob(req.request_payload_base64)),
+              requestPayload: base64ToUint8Array(req.request_payload_base64),
               headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
               url: Object.freeze(new URL(req.url)),
               capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
@@ -357,7 +358,7 @@ export class Client {
         uuid: data.uuid,
         clientAddress: data.client_address,
         method: data.method,
-        requestPayload: new TextEncoder().encode(atob(data.request_payload_base64)),
+        requestPayload: base64ToUint8Array(data.request_payload_base64),
         headers: Object.freeze(data.headers),
         url: Object.freeze(new URL(data.url)),
         capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
