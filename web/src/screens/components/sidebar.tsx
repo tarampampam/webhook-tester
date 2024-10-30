@@ -1,6 +1,19 @@
-import { Center, Loader, Stack, Text, UnstyledButton, Badge, CloseButton, Flex, Title, Button } from '@mantine/core'
+import {
+  Badge,
+  Button,
+  type ButtonProps,
+  Center,
+  CloseButton,
+  Flex,
+  Group,
+  Loader,
+  Stack,
+  Text,
+  Title,
+  UnstyledButton,
+} from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
-import { IconTrash } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronsDown, IconChevronsUp, IconChevronUp, IconTrash } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -100,6 +113,103 @@ const Request = ({
   )
 }
 
+const Navigator = ({
+  sID,
+  rID,
+  requests,
+}: {
+  sID: string
+  rID: string | null
+  requests: ReadonlyArray<ListedRequest>
+}) => {
+  const [jumpBackwardEnabled, setJumpBackwardEnabled] = useState<boolean>(false)
+  const [jumpForwardEnabled, setJumpForwardEnabled] = useState<boolean>(false)
+
+  const [pathToFirst, setPathToFirst] = useState<string | null>(null)
+  const [pathToPrev, setPathToPrev] = useState<string | null>(null)
+  const [pathToNext, setPathToNext] = useState<string | null>(null)
+  const [pathToLast, setPathToLast] = useState<string | null>(null)
+
+  useEffect(() => {
+    const firstIdx = 0
+    const prevIdx = requests.findIndex((req) => req.id === rID) - 1
+    const nextIdx = requests.findIndex((req) => req.id === rID) + 1
+    const lastIdx = requests.length - 1
+
+    const firstID = requests[firstIdx] ? requests[firstIdx].id : null
+    const prevID = requests[prevIdx] ? requests[prevIdx].id : null
+    const nextID = requests[nextIdx] ? requests[nextIdx].id : null
+    const lastID = requests[lastIdx] ? requests[lastIdx].id : null
+    const moreThanOneRequest = requests.length > 1
+
+    setJumpBackwardEnabled(moreThanOneRequest && firstID !== rID)
+    setJumpForwardEnabled(moreThanOneRequest && lastID !== rID)
+
+    setPathToFirst(moreThanOneRequest && firstID ? pathTo(RouteIDs.SessionAndRequest, sID, firstID) : null)
+    setPathToPrev(moreThanOneRequest && prevID && rID ? pathTo(RouteIDs.SessionAndRequest, sID, prevID) : null)
+    setPathToNext(moreThanOneRequest && nextID && rID ? pathTo(RouteIDs.SessionAndRequest, sID, nextID) : null)
+    setPathToLast(moreThanOneRequest && lastID ? pathTo(RouteIDs.SessionAndRequest, sID, lastID) : null)
+  }, [requests, sID, rID])
+
+  const shortJumpButtonProps: Partial<ButtonProps> = {
+    variant: 'default',
+    size: 'compact-xs',
+  }
+
+  const longJumpButtonProps: Partial<ButtonProps> = {
+    ...shortJumpButtonProps,
+    styles: { section: { margin: 0 } },
+  }
+
+  return (
+    <Group justify="space-between">
+      <Button.Group>
+        <Button // jump to the first request
+          {...longJumpButtonProps}
+          leftSection={<IconChevronsUp size="1em" />}
+          disabled={!jumpBackwardEnabled}
+          renderRoot={(props) =>
+            jumpBackwardEnabled && pathToFirst ? <Link to={pathToFirst} {...props} /> : <button {...props} />
+          }
+          title="First request"
+        />
+        <Button // jump to the previous request
+          {...shortJumpButtonProps}
+          leftSection={<IconChevronUp size="1em" />}
+          disabled={!jumpBackwardEnabled}
+          renderRoot={(props) =>
+            jumpBackwardEnabled && pathToPrev ? <Link to={pathToPrev} {...props} /> : <button {...props} />
+          }
+        >
+          Previous
+        </Button>
+      </Button.Group>
+
+      <Button.Group>
+        <Button // jump to the next request
+          {...shortJumpButtonProps}
+          rightSection={<IconChevronDown size="1em" />}
+          disabled={!jumpForwardEnabled}
+          renderRoot={(props) =>
+            jumpForwardEnabled && pathToNext ? <Link to={pathToNext} {...props} /> : <button {...props} />
+          }
+        >
+          Next
+        </Button>
+        <Button // jump to the last request
+          {...longJumpButtonProps}
+          leftSection={<IconChevronsDown size="1em" />}
+          disabled={!jumpForwardEnabled}
+          renderRoot={(props) =>
+            jumpForwardEnabled && pathToLast ? <Link to={pathToLast} {...props} /> : <button {...props} />
+          }
+          title="Last request"
+        />
+      </Button.Group>
+    </Group>
+  )
+}
+
 const NoRequests = (): React.JSX.Element => (
   <Center pt="2em">
     <Loader color="dimmed" size="1em" mr={8} mb={3} />
@@ -132,6 +242,8 @@ export default function SideBar({
       {(!!sID &&
         ((!!requests.length && (
           <>
+            <Navigator sID={sID} rID={rID} requests={requests} />
+
             {requests.map((request) => (
               <Request
                 sID={sID}
@@ -141,6 +253,7 @@ export default function SideBar({
                 onDelete={onRequestDelete && (() => onRequestDelete(sID, request.id))}
               />
             ))}
+
             {requests.length > 1 && !!onAllRequestsDelete && (
               <Center>
                 <Button
