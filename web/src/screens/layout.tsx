@@ -1,4 +1,4 @@
-import { Affix, AppShell, Box, Button, ScrollArea, Transition } from '@mantine/core'
+import { Affix, AppShell, Button, ScrollArea, Transition } from '@mantine/core'
 import { useDisclosure, useWindowScroll } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import { IconArrowUp } from '@tabler/icons-react'
@@ -201,26 +201,30 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p="md" pr={0} style={{ zIndex: 102 }} withBorder={false}>
-        <AppShell.Section grow component={ScrollArea} pr="md" scrollbarSize={6}>
+      <AppShell.Navbar
+        p="md"
+        pr={0}
+        style={{ zIndex: 102 }}
+        withBorder={false}
+        onClick={(e) => {
+          // prevent this event firing on children
+          if (e.currentTarget !== e.target) {
+            return
+          }
+
+          if (sID) {
+            setRID(null)
+            navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+          }
+        }}
+      >
+        <AppShell.Section component={ScrollArea} pr="md" scrollbarSize={6}>
           <SideBar
             sID={sID}
             rID={rID}
             requests={listedRequests}
             onRequestDelete={handleDeleteRequest}
             onAllRequestsDelete={handleDeleteAllRequests}
-          />
-          <Box
-            h="100%"
-            w="100%"
-            pos="absolute"
-            onClick={() => {
-              // on click outside the requests list, navigate to the session
-              if (sID) {
-                setRID(null)
-                navigate(pathTo(RouteIDs.SessionAndRequest, sID))
-              }
-            }}
           />
         </AppShell.Section>
       </AppShell.Navbar>

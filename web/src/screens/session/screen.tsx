@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useLastUsedSID, useLastUsedRID, useUISettings } from '~/shared'
+import { sessionToUrl, useLastUsed, useUISettings } from '~/shared'
 import { useLayoutOutletContext } from '../layout'
 import { RequestDetails, SessionDetails, type SessionProps } from './components'
 
@@ -17,19 +17,20 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
   const navigate = useNavigate()
   const [loading, setLoading] = useState<boolean>(false)
   const [sessionProps, setSessionProps] = useState<SessionProps | null>(null)
-  const [setLastUsedSID, setLastUsedRID] = [useLastUsedSID()[1], useLastUsedRID()[1]]
-  const uiSettings = useUISettings().settingsRef
+  const { setLastUsedSID, setLastUsedRID } = useLastUsed()
+  const { ref: uiSettings } = useUISettings()
   const { setListedRequests, setSID: setParentSID, setRID: setParentRID } = useLayoutOutletContext()
   const closeSub = useRef<(() => void) | null>(null)
 
   useEffect((): (() => void) => {
-    setParentSID(sID) // set the parent layout's session ID
     setLoading(true)
 
     // 🚀 get the session details (thus validate the session ID)
     apiClient
       .getSession(sID)
       .then((session): void => {
+        setParentSID(session.uuid) // set the parent layout's session ID
+        setLastUsedSID(session.uuid) // store current session ID as the last used one
         setSessionProps(
           Object.freeze({
             statusCode: session.response.statusCode,
@@ -42,7 +43,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
 
         // 🚀 get the session requests
         apiClient // TODO: load session and requests in parallel
-          .getSessionRequests(sID)
+          .getSessionRequests(session.uuid)
           .then((requests) => {
             // update the list of requests
             setListedRequests(
@@ -62,12 +63,11 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
             console.error(err)
           })
 
-        setLastUsedSID(sID) // store current session ID as the last used one
-
         // 🚀 subscribe to the session requests via WebSocket
         apiClient
-          .subscribeToSessionRequests(sID, {
+          .subscribeToSessionRequests(session.uuid, {
             onUpdate: (request): void => {
+              // TODO: limit the maximum number of requests in the list
               // append the new request in front of the list
               setListedRequests((prev) => [
                 Object.freeze({

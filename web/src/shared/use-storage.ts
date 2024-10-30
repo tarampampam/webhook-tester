@@ -1,50 +1,49 @@
-import { useLocalStorage, useSessionStorage } from '@mantine/hooks'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
 /**
- * Returns the storage key for the given postfix.
+ * The list of keys used in the storage.
  */
-export function storageKey(postfix: string): string {
-  return `webhook-tester-v2-${postfix}`
+export enum UsedStorageKeys {
+  UISettings = 'ui-settings',
+  LastUsedSID = 'last-used-sid',
+  LastUserRID = 'last-used-rid',
+  NewSessionStatusCode = 'ns-status-code',
+  NewSessionHeadersList = 'ns-headers-list',
+  NewSessionSessionDelay = 'ns-session-delay',
+  NewSessionResponseBody = 'ns-response-body',
+  NewSessionDestroyCurrentSession = 'ns-destroy-current',
+  SessionDetailsShellTab = 'sd-selected-shell-tab',
+  SessionDetailsCodeTab = 'sd-selected-code-tab',
+  RequestDetailsHeadersExpand = 'rd-headers-expand',
 }
 
 /**
- * Hook to get and set the last used SID (Session ID) and functions to update it.
+ * Hook to get and set a value in the storage. The value is stored as JSON. The key is automatically prefixed with
+ * `webhook-tester-v2-`.
+ *
+ * The 3rd element in the returned tuple is a function to remove the value from the storage (this will not trigger any
+ * change in the state).
  */
-export function useLastUsedSID(): readonly [string | undefined, (value: string | undefined | null) => void] {
-  const [sID, setSID, removeSID] = useLocalStorage<string | undefined>({
-    key: storageKey('last-used-sid'),
-    defaultValue: undefined,
-  })
+export function useStorage<T>(
+  initValue: T,
+  key: UsedStorageKeys,
+  area: 'local' | 'session' = 'session'
+): readonly [T, Dispatch<SetStateAction<T>>, () => void] {
+  const storage: Storage = area === 'local' ? localStorage : sessionStorage
+  const storageKey = `webhook-tester-v2-${key}`
+  const loaded: string | null = storage.getItem(storageKey)
+  const [value, setValue] = useState<T>(loaded !== null ? JSON.parse(loaded) : initValue)
+
+  // update the value in the storage when it changes
+  useEffect(() => {
+    storage.setItem(storageKey, JSON.stringify(value))
+  }, [storage, storageKey, value])
 
   return [
-    sID,
-    (newValue: string | undefined | null): void => {
-      if (newValue) {
-        setSID(newValue)
-      } else {
-        removeSID()
-      }
-    },
-  ]
-}
-
-/**
- * Hook to get and set the last used RID (Request ID) and functions to update it.
- */
-export function useLastUsedRID(): readonly [string | undefined, (value: string | undefined | null) => void] {
-  const [rID, setRID, removeRID] = useSessionStorage<string | undefined>({
-    key: storageKey('last-used-rid'),
-    defaultValue: undefined,
-  })
-
-  return [
-    rID,
-    (newValue: string | undefined | null): void => {
-      if (newValue) {
-        setRID(newValue)
-      } else {
-        removeRID()
-      }
+    value,
+    setValue,
+    (): void => {
+      storage.removeItem(storageKey)
     },
   ]
 }

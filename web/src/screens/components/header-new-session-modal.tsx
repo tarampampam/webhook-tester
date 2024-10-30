@@ -1,8 +1,7 @@
-import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Title } from '@mantine/core'
-import { useSessionStorage } from '@mantine/hooks'
-import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import React, { useState } from 'react'
-import { storageKey } from '~/shared'
+import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Title } from '@mantine/core'
+import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
+import { useStorage, UsedStorageKeys } from '~/shared'
 
 const limits = {
   statusCode: { min: 100, max: 530 },
@@ -31,26 +30,23 @@ export default function HeaderNewSessionModal({
   onCreate: (_: NewSessionOptions) => void
   maxRequestBodySize: number | null
 }): React.JSX.Element {
-  const [statusCode, setStatusCode] = useSessionStorage<number>({
-    key: storageKey('new-session-status-code'),
-    defaultValue: 200,
-  })
-  const [headersList, setHeadersList] = useSessionStorage<string>({
-    key: storageKey('new-session-headers-list'),
-    defaultValue: 'Content-Type: application/json\nServer: WebhookTester',
-  })
-  const [delay, setDelay] = useSessionStorage<number>({
-    key: storageKey('new-session-delay'),
-    defaultValue: 0,
-  })
-  const [responseBody, setResponseBody] = useSessionStorage<string>({
-    key: storageKey('new-session-response-body'),
-    defaultValue: '{"captured": true}',
-  })
-  const [destroyCurrentSession, setDestroyCurrentSession] = useSessionStorage<boolean>({
-    key: storageKey('new-session-destroy-current-session'),
-    defaultValue: true,
-  })
+  const [statusCode, setStatusCode] = useStorage<number>(200, UsedStorageKeys.NewSessionStatusCode, 'session')
+  const [headersList, setHeadersList] = useStorage<string>(
+    'Content-Type: application/json\nServer: WebhookTester',
+    UsedStorageKeys.NewSessionHeadersList,
+    'session'
+  )
+  const [delay, setDelay] = useStorage<number>(0, UsedStorageKeys.NewSessionSessionDelay, 'session')
+  const [responseBody, setResponseBody] = useStorage<string>(
+    '{"captured": true}',
+    UsedStorageKeys.NewSessionResponseBody,
+    'session'
+  )
+  const [destroyCurrentSession, setDestroyCurrentSession] = useStorage<boolean>(
+    true,
+    UsedStorageKeys.NewSessionDestroyCurrentSession,
+    'session'
+  )
 
   const [wrongStatusCode, setWrongStatusCode] = useState<boolean>(false)
   const [wrongDelay, setWrongDelay] = useState<boolean>(false)

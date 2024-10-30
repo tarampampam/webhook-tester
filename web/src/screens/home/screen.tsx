@@ -2,13 +2,13 @@ import type React from 'react'
 import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useLastUsedRID, useLastUsedSID } from '~/shared'
 import type { Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
+import { useLastUsed } from '~/shared'
 
 export default function HomeScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const [lastSID, lastRID] = [useLastUsedSID()[0], useLastUsedRID()[0]]
+  const { lastUsedSID: lastSID, lastUsedRID: lastRID } = useLastUsed()
 
   if (hash) {
     // v1 used url hash (anchor) to store the current state (sID and rID). To improve the user experience, we should

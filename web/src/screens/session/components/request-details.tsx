@@ -1,12 +1,12 @@
 import { CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Code, Grid, Skeleton, Table, Text, Title, Tabs, Button, Flex } from '@mantine/core'
-import { useInterval, useSessionStorage } from '@mantine/hooks'
+import { useInterval } from '@mantine/hooks'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Client } from '~/api'
-import { storageKey, useUISettings } from '~/shared'
+import { UsedStorageKeys, useStorage, useUISettings } from '~/shared'
 import { methodToColor } from '~/theme'
 import ViewHex from './view-hex'
 import ViewText from './view-text'
@@ -20,10 +20,7 @@ export default function RequestDetails({
   sID: string
   rID: string
 }): React.JSX.Element {
-  const [headersExpanded, setHeadersExpanded] = useSessionStorage<boolean>({
-    key: storageKey('request-headers-expanded'),
-    defaultValue: false,
-  })
+  const [headersExpanded, setHeadersExpanded] = useStorage<boolean>(false, UsedStorageKeys.RequestDetailsHeadersExpand)
   const { settings: uiSettings } = useUISettings()
   const [loading, setLoading] = React.useState<boolean>(true)
   const [url, setUrl] = React.useState<URL | null>(null)

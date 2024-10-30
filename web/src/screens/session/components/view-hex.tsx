@@ -1,6 +1,6 @@
 import { Alert, Box, Divider, Grid, NativeSelect } from '@mantine/core'
 import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, type CSSProperties } from 'react'
 
 type DataItem = [string /* representation */, string | undefined /* ascii */]
 type DataLine = Array<DataItem>
@@ -70,6 +70,13 @@ export default function ViewHex({
   }, [input, displayType, lineSize, lengthLimit])
 
   const fontSize: string | number = '0.75em'
+  const monoSpaceStyle: CSSProperties = {
+    fontSize,
+    fontFamily: 'monospace',
+    whiteSpace: 'pre',
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+  }
 
   return (
     <>
@@ -78,8 +85,8 @@ export default function ViewHex({
           The request body is large and has been trimmed to {lengthLimit} bytes for performance reasons.
         </Alert>
       )}
-      <Grid my="sm">
-        <Grid.Col span="content" visibleFrom="md">
+      <Grid my="sm" justify="space-between" align="stretch" gutter="lg" grow>
+        <Grid.Col span="content" visibleFrom="lg">
           <NativeSelect
             size="xs"
             mb="sm"
@@ -89,7 +96,7 @@ export default function ViewHex({
             value={lineNumberType}
             onChange={(e) => setLineNumberType(e.currentTarget.value as NumberBase)}
           />
-          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', textAlign: 'right', fontSize }} c="dimmed">
+          <Box style={{ ...monoSpaceStyle, textAlign: 'right' }} c="dimmed">
             {!!dataItems && // print line numbers
               '\n' +
                 Array<number>(dataItems.length)
@@ -99,7 +106,7 @@ export default function ViewHex({
           </Box>
         </Grid.Col>
 
-        <Grid.Col span="content" mx="lg">
+        <Grid.Col span="content">
           <NativeSelect
             size="xs"
             mb="sm"
@@ -108,7 +115,7 @@ export default function ViewHex({
             value={displayType}
             onChange={(e) => setDisplayType(e.currentTarget.value as NumberBase)}
           />
-          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', fontSize }}>
+          <Box style={monoSpaceStyle}>
             <Box component="span" c="dimmed" size={fontSize}>
               {!!dataItems && // print column numbers
                 dataItems.length &&
@@ -143,7 +150,7 @@ export default function ViewHex({
           </Box>
         </Grid.Col>
 
-        <Grid.Col span="auto" visibleFrom="sm">
+        <Grid.Col span="content" visibleFrom="sm">
           <NativeSelect
             size="xs"
             mb="sm"
@@ -152,7 +159,7 @@ export default function ViewHex({
             value={lineSize.toString()}
             onChange={(e) => setLineSize(parseInt(e.currentTarget.value))}
           />
-          <Box style={{ fontFamily: 'monospace', whiteSpace: 'pre', fontSize }}>
+          <Box style={monoSpaceStyle}>
             {!!dataItems &&
               '\n' +
                 dataItems

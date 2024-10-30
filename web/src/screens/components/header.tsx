@@ -39,7 +39,7 @@ export default function Header({
   onNewSessionCreate?: (_: NewSessionOptions) => Promise<void>
 }): React.JSX.Element {
   const clipboard = useClipboard({ timeout: 500 })
-  const { settings, updateSettings } = useUISettings()
+  const { settings, update: updateSettings } = useUISettings()
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false)
   const [isNewSessionModalOpened, newSessionModalHandlers] = useDisclosure(false)
   const [isHelpModalOpened, helpModalHandlers] = useDisclosure(false)

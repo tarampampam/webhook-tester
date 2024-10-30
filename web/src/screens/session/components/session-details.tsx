@@ -1,9 +1,8 @@
-import { useSessionStorage } from '@mantine/hooks'
 import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Table, Text, Skeleton, type MantineColor } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import { storageKey } from '~/shared'
+import { UsedStorageKeys, useStorage } from '~/shared'
 import {
   IconBrandCSharp,
   IconBrandDebian,
@@ -36,14 +35,8 @@ export default function SessionDetails({
   loading?: boolean
   sessionProps: Readonly<SessionProps> | null
 }): React.JSX.Element {
-  const [selectedShellTab, setSelectedShellTab] = useSessionStorage({
-    key: storageKey('session-details-selected-shell-tab'),
-    defaultValue: 0,
-  })
-  const [selectedCodeTab, setSelectedCodeTab] = useSessionStorage({
-    key: storageKey('session-details-selected-code-tab'),
-    defaultValue: 0,
-  })
+  const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
+  const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
 
   /** Sends a test request to the generated URL. */
   const handleSendTestRequest = (): void => {

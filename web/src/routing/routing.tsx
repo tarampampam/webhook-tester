@@ -1,4 +1,4 @@
-import { createPath, type RouteObject } from 'react-router-dom'
+import { createPath, Navigate, type RouteObject } from 'react-router-dom'
 import { apiClient } from '~/api'
 import { DefaultLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
@@ -20,6 +20,11 @@ export const routes: RouteObject[] = [
         index: true,
         element: <HomeScreen apiClient={apiClient} />,
         id: RouteIDs.Home,
+      },
+      {
+        // redirect to the home screen if the path is just `/s/`
+        path: 's/',
+        element: <Navigate to={pathTo(RouteIDs.Home)} />,
       },
       {
         // please note that `sID` and `rID` accessed via `useParams` hook, and changing this will break the app

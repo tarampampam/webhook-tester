@@ -1,6 +1,5 @@
-import { useLocalStorage } from '@mantine/hooks'
 import React, { createContext, useContext, useEffect, useRef } from 'react'
-import { storageKey } from './use-storage'
+import { UsedStorageKeys, useStorage } from './use-storage'
 
 export type UISettings = {
   showRequestDetails: boolean
@@ -14,24 +13,20 @@ const defaults: Readonly<UISettings> = {
 
 export type UISettingsContext = {
   settings: Readonly<UISettings>
-  settingsRef: React.MutableRefObject<Readonly<UISettings>>
-  updateSettings: (newSettings: Partial<Readonly<UISettings>>) => void
+  ref: React.MutableRefObject<Readonly<UISettings>> // ref to the current settings object
+  update(newSettings: Partial<Readonly<UISettings>>): void
 }
 
 const uiSettingsContext = createContext<UISettingsContext>({
   settings: defaults,
-  settingsRef: { current: defaults },
-  updateSettings: () => {
+  ref: { current: defaults },
+  update: () => {
     throw new Error('The UISettingsProvider is not initialized')
   },
 })
 
 export const UISettingsProvider = ({ children }: { children: React.JSX.Element }) => {
-  const [settings, setSettings] = useLocalStorage<UISettings>({
-    key: storageKey('ui-settings'),
-    defaultValue: defaults,
-  })
-
+  const [settings, setSettings] = useStorage<UISettings>(defaults, UsedStorageKeys.UISettings, 'local')
   const ref = useRef<UISettings>(settings)
 
   useEffect(() => {
@@ -41,9 +36,9 @@ export const UISettingsProvider = ({ children }: { children: React.JSX.Element }
   return (
     <uiSettingsContext.Provider
       value={{
-        settings: settings,
-        settingsRef: ref,
-        updateSettings: (newSettings) => setSettings((prev) => ({ ...prev, ...newSettings })),
+        settings,
+        ref,
+        update: (newSettings) => setSettings((prev) => ({ ...prev, ...newSettings })),
       }}
     >
       {children}

@@ -18,9 +18,9 @@ import { IconChevronDown, IconChevronsDown, IconChevronsUp, IconChevronUp, IconT
 import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import PandaSvg from '~/assets/panda.svg'
 import { pathTo, RouteIDs } from '~/routing'
 import { methodToColor } from '~/theme'
-import PandaSvg from '~/assets/panda.svg'
 import styles from './sidebar.module.css'
 
 export type ListedRequest = {
@@ -217,9 +217,9 @@ const Navigator = ({
 }
 
 const NoRequests = (): React.JSX.Element => (
-  <Stack gap="xs">
+  <Stack gap="xs" h="100%" justify="space-between">
     <Center pt="2em">
-      <Image src={PandaSvg} w="50%" opacity={0.3} />
+      <Image src={PandaSvg} w="50%" />
     </Center>
     <Center>
       <Loader color="dimmed" size="1em" mr={8} mb={3} />

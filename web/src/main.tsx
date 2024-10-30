@@ -6,7 +6,7 @@ import { Notifications } from '@mantine/notifications'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { routes } from './routing'
-import { UISettingsProvider } from './shared'
+import { LastUsedProvider, UISettingsProvider } from './shared'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
 import '@mantine/notifications/styles.css'
@@ -20,7 +20,9 @@ const App = (): React.JSX.Element => {
     <MantineProvider defaultColorScheme="auto">
       <Notifications />
       <UISettingsProvider>
-        <RouterProvider router={createBrowserRouter(routes)} />
+        <LastUsedProvider>
+          <RouterProvider router={createBrowserRouter(routes)} />
+        </LastUsedProvider>
       </UISettingsProvider>
     </MantineProvider>
   )
