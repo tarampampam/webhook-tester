@@ -7,7 +7,7 @@ import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, stringToUint8Array } from '~/shared'
+import { sessionToUrl } from '~/shared'
 import { Header, type ListedRequest, type NewSessionOptions, SideBar } from './components'
 
 type ContextType = Readonly<{
@@ -74,7 +74,7 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
           statusCode: s.statusCode,
           headers: s.headers ? Object.fromEntries(s.headers.map((h) => [h.name, h.value])) : undefined,
           delay: s.delay ? s.delay : undefined,
-          responseBody: s.responseBody ? stringToUint8Array(s.responseBody) : undefined,
+          responseBody: s.responseBody ? new TextEncoder().encode(s.responseBody) : undefined,
         })
       ).uuid
     } catch (err) {

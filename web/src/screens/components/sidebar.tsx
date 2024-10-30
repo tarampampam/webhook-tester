@@ -6,6 +6,7 @@ import {
   CloseButton,
   Flex,
   Group,
+  Image,
   Loader,
   Stack,
   Text,
@@ -19,6 +20,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
 import { methodToColor } from '~/theme'
+import PandaSvg from '~/assets/panda.svg'
 import styles from './sidebar.module.css'
 
 export type ListedRequest = {
@@ -122,8 +124,10 @@ const Navigator = ({
   rID: string | null
   requests: ReadonlyArray<ListedRequest>
 }) => {
-  const [jumpBackwardEnabled, setJumpBackwardEnabled] = useState<boolean>(false)
-  const [jumpForwardEnabled, setJumpForwardEnabled] = useState<boolean>(false)
+  const [jumpFirstEnabled, setJumpFirstEnabled] = useState<boolean>(false)
+  const [jumpPrevEnabled, setJumpPrevEnabled] = useState<boolean>(false)
+  const [jumpNextEnabled, setJumpNextEnabled] = useState<boolean>(false)
+  const [jumpLastEnabled, setJumpLastEnabled] = useState<boolean>(false)
 
   const [pathToFirst, setPathToFirst] = useState<string | null>(null)
   const [pathToPrev, setPathToPrev] = useState<string | null>(null)
@@ -132,8 +136,8 @@ const Navigator = ({
 
   useEffect(() => {
     const firstIdx = 0
-    const prevIdx = requests.findIndex((req) => req.id === rID) - 1
-    const nextIdx = requests.findIndex((req) => req.id === rID) + 1
+    const prevIdx = requests.findIndex((req) => req.id === rID) + 1
+    const nextIdx = requests.findIndex((req) => req.id === rID) - 1
     const lastIdx = requests.length - 1
 
     const firstID = requests[firstIdx] ? requests[firstIdx].id : null
@@ -142,8 +146,10 @@ const Navigator = ({
     const lastID = requests[lastIdx] ? requests[lastIdx].id : null
     const moreThanOneRequest = requests.length > 1
 
-    setJumpBackwardEnabled(moreThanOneRequest && firstID !== rID)
-    setJumpForwardEnabled(moreThanOneRequest && lastID !== rID)
+    setJumpFirstEnabled(moreThanOneRequest && firstID !== rID)
+    setJumpPrevEnabled(moreThanOneRequest && !!prevID && !!rID && rID !== lastID)
+    setJumpNextEnabled(moreThanOneRequest && !!nextID && !!rID && rID !== firstID)
+    setJumpLastEnabled(moreThanOneRequest && lastID !== rID)
 
     setPathToFirst(moreThanOneRequest && firstID ? pathTo(RouteIDs.SessionAndRequest, sID, firstID) : null)
     setPathToPrev(moreThanOneRequest && prevID && rID ? pathTo(RouteIDs.SessionAndRequest, sID, prevID) : null)
@@ -167,41 +173,41 @@ const Navigator = ({
         <Button // jump to the first request
           {...longJumpButtonProps}
           leftSection={<IconChevronsUp size="1em" />}
-          disabled={!jumpBackwardEnabled}
+          disabled={!jumpFirstEnabled}
           renderRoot={(props) =>
-            jumpBackwardEnabled && pathToFirst ? <Link to={pathToFirst} {...props} /> : <button {...props} />
+            jumpFirstEnabled && pathToFirst ? <Link to={pathToFirst} {...props} /> : <button {...props} />
           }
           title="First request"
         />
-        <Button // jump to the previous request
+        <Button // jump to the next request
           {...shortJumpButtonProps}
           leftSection={<IconChevronUp size="1em" />}
-          disabled={!jumpBackwardEnabled}
+          disabled={!jumpNextEnabled}
           renderRoot={(props) =>
-            jumpBackwardEnabled && pathToPrev ? <Link to={pathToPrev} {...props} /> : <button {...props} />
+            jumpNextEnabled && pathToNext ? <Link to={pathToNext} {...props} /> : <button {...props} />
           }
         >
-          Previous
+          Newer
         </Button>
       </Button.Group>
 
       <Button.Group>
-        <Button // jump to the next request
+        <Button // jump to the previous request
           {...shortJumpButtonProps}
           rightSection={<IconChevronDown size="1em" />}
-          disabled={!jumpForwardEnabled}
+          disabled={!jumpPrevEnabled}
           renderRoot={(props) =>
-            jumpForwardEnabled && pathToNext ? <Link to={pathToNext} {...props} /> : <button {...props} />
+            jumpPrevEnabled && pathToPrev ? <Link to={pathToPrev} {...props} /> : <button {...props} />
           }
         >
-          Next
+          Older
         </Button>
         <Button // jump to the last request
           {...longJumpButtonProps}
           leftSection={<IconChevronsDown size="1em" />}
-          disabled={!jumpForwardEnabled}
+          disabled={!jumpLastEnabled}
           renderRoot={(props) =>
-            jumpForwardEnabled && pathToLast ? <Link to={pathToLast} {...props} /> : <button {...props} />
+            jumpLastEnabled && pathToLast ? <Link to={pathToLast} {...props} /> : <button {...props} />
           }
           title="Last request"
         />
@@ -211,10 +217,15 @@ const Navigator = ({
 }
 
 const NoRequests = (): React.JSX.Element => (
-  <Center pt="2em">
-    <Loader color="dimmed" size="1em" mr={8} mb={3} />
-    <Text c="dimmed">Waiting for first request</Text>
-  </Center>
+  <Stack gap="xs">
+    <Center pt="2em">
+      <Image src={PandaSvg} w="50%" opacity={0.3} />
+    </Center>
+    <Center>
+      <Loader color="dimmed" size="1em" mr={8} mb={3} />
+      <Text c="dimmed">Waiting for first request</Text>
+    </Center>
+  </Stack>
 )
 
 const NoSession = (): React.JSX.Element => (

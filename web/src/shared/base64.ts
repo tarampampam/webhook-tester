@@ -25,10 +25,3 @@ export function uint8ArrayToBase64(uint8Array: Uint8Array): string {
 
   return btoa(binaryString)
 }
-
-/**
- * Convert a string to a Uint8Array.
- */
-export function stringToUint8Array(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
-}
