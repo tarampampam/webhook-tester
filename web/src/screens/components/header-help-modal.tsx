@@ -8,12 +8,14 @@ export default function HeaderHelpModal({
   webHookUrl = null,
   sessionTTLSec = 0,
   maxBodySizeBytes = 0,
+  maxRequestsPerSession = 0,
 }: {
   opened: boolean
   onClose: () => void
   webHookUrl: URL | null
   sessionTTLSec: number | null
   maxBodySizeBytes: number | null
+  maxRequestsPerSession: number | null
 }): React.JSX.Element {
   return (
     <Modal
@@ -51,6 +53,9 @@ export default function HeaderHelpModal({
         {!!maxBodySizeBytes &&
           maxBodySizeBytes > 0 &&
           ` The maximum size for incoming requests is ${bytesToKilobytes(maxBodySizeBytes)} KiB.`}
+        {!!maxRequestsPerSession &&
+          maxRequestsPerSession > 0 &&
+          ` The maximum number of requests per session is ${maxRequestsPerSession}.`}
       </Text>
     </Modal>
   )

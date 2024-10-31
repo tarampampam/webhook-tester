@@ -363,6 +363,7 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 			MaxRequests:        cmd.options.storage.maxRequests,
 			MaxRequestBodySize: cmd.options.maxRequestPayloadSize,
 			SessionTTL:         cmd.options.storage.sessionTTL,
+			AutoCreateSessions: cmd.options.autoCreateSessions,
 		},
 		db,
 		pubSub,

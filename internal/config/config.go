@@ -6,4 +6,5 @@ type AppSettings struct {
 	MaxRequests        uint16
 	MaxRequestBodySize uint32
 	SessionTTL         time.Duration
+	AutoCreateSessions bool
 }

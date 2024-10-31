@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react'
 import { UsedStorageKeys, useStorage } from './use-storage'
 
-export type UISettings = {
+type UISettings = {
   showRequestDetails: boolean
   autoNavigateToNewRequest: boolean
 }
@@ -11,7 +11,7 @@ const defaults: Readonly<UISettings> = {
   autoNavigateToNewRequest: true,
 }
 
-export type UISettingsContext = {
+type UISettingsContext = {
   settings: Readonly<UISettings>
   ref: React.MutableRefObject<Readonly<UISettings>> // ref to the current settings object
   update(newSettings: Partial<Readonly<UISettings>>): void

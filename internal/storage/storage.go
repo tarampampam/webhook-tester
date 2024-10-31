@@ -19,7 +19,7 @@ var (
 type Storage interface {
 	// NewSession creates a new session and returns a session ID on success.
 	// The Session.CreatedAt field will be set to the current time.
-	NewSession(context.Context, Session) (sID string, _ error)
+	NewSession(_ context.Context, _ Session, id ...string) (sID string, _ error)
 
 	// GetSession retrieves session data.
 	// If the session is not found, ErrSessionNotFound will be returned.

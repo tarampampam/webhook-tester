@@ -1,5 +1,5 @@
 import { CodeHighlightTabs } from '@mantine/code-highlight'
-import { Badge, Code, Grid, Skeleton, Table, Text, Title, Tabs, Button, Flex } from '@mantine/core'
+import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
 import dayjs from 'dayjs'
@@ -32,18 +32,6 @@ export default function RequestDetails({
   const [headers, setHeaders] = React.useState<ReadonlyArray<{ name: string; value: string }> | null>(null)
   const [contentType, setContentType] = React.useState<string | null>(null)
 
-  // automatically update the elapsed time
-  {
-    useEffect(() => setElapsedTime(capturedAt ? dayjs(capturedAt).fromNow() : null), [capturedAt, setElapsedTime])
-    const interval = useInterval(() => setElapsedTime(capturedAt ? dayjs(capturedAt).fromNow() : null), 1000)
-
-    useEffect((): (() => void) => {
-      interval.start()
-
-      return interval.stop
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  }
-
   useEffect(() => {
     setLoading(true)
 
@@ -62,23 +50,15 @@ export default function RequestDetails({
       .finally(() => setLoading(false))
   }, [apiClient, sID, rID])
 
-  const formatUrlToDisplay = (url: URL): string => {
-    const { pathname, search, hash } = url
+  // automatically update the elapsed time
+  useEffect(() => setElapsedTime(capturedAt ? dayjs(capturedAt).fromNow() : null), [capturedAt, setElapsedTime])
+  const interval = useInterval(() => setElapsedTime(capturedAt ? dayjs(capturedAt).fromNow() : null), 1000)
 
-    return `${pathname}${search}${hash}`
-  }
+  useEffect((): (() => void) => {
+    interval.start()
 
-  const handleDownload = (data: Uint8Array, fileName: string): void => {
-    const blob = new Blob([data.buffer], { type: 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const downloadLink = document.createElement('a')
-
-    downloadLink.href = url
-    downloadLink.download = fileName
-    downloadLink.click()
-
-    setTimeout(() => URL.revokeObjectURL(url), 1000) // 1s
-  }
+    return interval.stop
+  }, [interval])
 
   return (
     <Grid>
@@ -92,18 +72,20 @@ export default function RequestDetails({
               <Table.Tbody>
                 <Table.Tr>
                   <Table.Td ta="right" w="15%">
-                    URL
+                    Path
                   </Table.Td>
                   <Table.Td>
                     {(loading && <Skeleton radius="xl" h="sm" w="80%" />) ||
-                      (url && <Code>{formatUrlToDisplay(url)}</Code>) || <>...</>}
+                      (url && <WebHookPath sID={sID} url={url} />) || <>...</>}
                   </Table.Td>
                 </Table.Tr>
                 <Table.Tr>
                   <Table.Td ta="right">Method</Table.Td>
                   <Table.Td>
                     {(loading && <Skeleton radius="xl" h="sm" w="15%" />) || (
-                      <Badge color={methodToColor(method ?? '')}>{method}</Badge>
+                      <Badge color={methodToColor(method ?? '')} mb="0.2em">
+                        {method}
+                      </Badge>
                     )}
                   </Table.Td>
                 </Table.Tr>
@@ -134,7 +116,7 @@ export default function RequestDetails({
                   <Table.Td>
                     {(loading && <Skeleton radius="xl" h="sm" w="45%" />) || (
                       <>
-                        {capturedAt && <>{dayjs(capturedAt).format('YYYY-MM-DD HH:mm:ss')}</>}
+                        {capturedAt && <>{dayjs(capturedAt).format('YYYY-MM-DD HH:mm:ss.SSS')}</>}
                         {elapsedTime && <span style={{ paddingLeft: '0.3em' }}>({elapsedTime})</span>}
                       </>
                     )}
@@ -147,8 +129,18 @@ export default function RequestDetails({
                   </Table.Td>
                 </Table.Tr>
                 <Table.Tr>
-                  <Table.Td ta="right">ID</Table.Td>
-                  <Table.Td>{(loading && <Skeleton radius="xl" h="sm" w="50%" />) || <>{rID}</>}</Table.Td>
+                  <Table.Td ta="right">
+                    <Text size="xs" c="dimmed" span>
+                      ID
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {(loading && <Skeleton radius="xl" h="xs" w="50%" />) || (
+                      <Text size="xs" c="dimmed" span>
+                        {rID}
+                      </Text>
+                    )}
+                  </Table.Td>
                 </Table.Tr>
               </Table.Tbody>
             </Table>
@@ -187,7 +179,7 @@ export default function RequestDetails({
               size="compact-sm"
               ml="sm"
               leftSection={<IconDownload size="1.2em" />}
-              onClick={() => handleDownload(payload, `${rID}.bin`)}
+              onClick={() => download(payload, `${rID}.bin`)}
             >
               Download
             </Button>
@@ -223,4 +215,59 @@ export default function RequestDetails({
 enum TabsList {
   Text = 'Text',
   Binary = 'Binary',
+}
+
+const WebHookPath = ({ sID, url }: { sID: string; url: URL }): React.JSX.Element => {
+  const { search, hash } = url // search may be '', '?' or '?key=value'; hash may be '', '#' or '#fragment'
+  let { pathname } = url // pathname is usually '/{sID}' or '/{sID}/any/path'
+
+  // remove the sID from the pathname since it's already displayed and useless a bit
+  if (pathname.startsWith('/' + sID)) {
+    pathname = pathname.slice(sID.length + 1)
+  }
+
+  // if the pathname is empty, set it to '/'
+  if (pathname === '') {
+    pathname = '/'
+  }
+
+  return (
+    <Text size="md" style={{ wordBreak: 'break-all' }}>
+      <Text span>{pathname}</Text>
+      {search && (
+        <Text variant="gradient" gradient={{ from: 'yellow', to: 'orange', deg: 90 }} span>
+          {search}
+        </Text>
+      )}
+      {hash && <Text c="dimmed">{hash}</Text>}
+      <Button
+        variant="light"
+        color="gray"
+        size="compact-xs"
+        component="a"
+        href={`${url.pathname}${search}${hash}`}
+        target="_blank"
+        ml="sm"
+        mb="0.1em"
+      >
+        Open
+      </Button>
+    </Text>
+  )
+}
+
+const download = (data: Uint8Array, fileName: string): void => {
+  const blob = new Blob([data.buffer], { type: 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+
+  a.href = url
+  a.download = fileName
+  a.click()
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+
+    a.remove()
+  }, 1000) // 1s
 }

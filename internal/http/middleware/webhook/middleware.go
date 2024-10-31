@@ -40,16 +40,39 @@ func New( //nolint:funlen,gocognit,gocyclo
 
 			// get the session from the storage
 			sess, sErr := db.GetSession(reqCtx, sID) //nolint:contextcheck
-			if sErr != nil {
+			if sErr != nil {                         //nolint:nestif
+				// if the session is not found
 				if errors.Is(sErr, storage.ErrNotFound) {
-					respondWithError(w, log, http.StatusNotFound, "The webhook has not been created yet or may have expired")
+					// but the auto-creation is enabled
+					if cfg.AutoCreateSessions {
+						// create a new session with some default values
+						if _, err := db.NewSession(reqCtx, storage.Session{ //nolint:contextcheck
+							Code: http.StatusOK,
+						}, sID); err != nil {
+							respondWithError(w, log, http.StatusInternalServerError, err.Error())
+
+							return
+						} else {
+							// and try to get it again
+							if sess, sErr = db.GetSession(reqCtx, sID); sErr != nil { //nolint:contextcheck
+								respondWithError(w, log, http.StatusInternalServerError, sErr.Error())
+
+								return
+							} else {
+								// add the header to indicate that the session has been created automatically
+								w.Header().Set("X-Wh-Created-Automatically", "1")
+							}
+						}
+					} else {
+						respondWithError(w, log, http.StatusNotFound, "The webhook has not been created yet or may have expired")
+
+						return
+					}
+				} else {
+					respondWithError(w, log, http.StatusInternalServerError, sErr.Error())
 
 					return
 				}
-
-				respondWithError(w, log, http.StatusInternalServerError, sErr.Error())
-
-				return
 			}
 
 			{ // increase the session lifetime

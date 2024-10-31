@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Title } from '@mantine/core'
 import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import { useStorage, UsedStorageKeys } from '~/shared'
@@ -52,7 +52,8 @@ export default function HeaderNewSessionModal({
   const [wrongDelay, setWrongDelay] = useState<boolean>(false)
   const [wrongResponseBody, setWrongResponseBody] = useState<boolean>(false)
 
-  const handleCreate = () => {
+  /** Handle the creation of a new session */
+  const handleCreate = useCallback(() => {
     // validate all the fields
     if (statusCode < limits.statusCode.min || statusCode > limits.statusCode.max) {
       setWrongStatusCode(true)
@@ -93,7 +94,7 @@ export default function HeaderNewSessionModal({
     }
 
     onCreate({ statusCode, headers, delay, responseBody, destroyCurrentSession })
-  }
+  }, [delay, destroyCurrentSession, headersList, maxRequestBodySize, onCreate, responseBody, statusCode])
 
   return (
     <Modal

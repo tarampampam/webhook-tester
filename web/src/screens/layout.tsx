@@ -2,12 +2,12 @@ import { Affix, AppShell, Button, ScrollArea, Transition } from '@mantine/core'
 import { useDisclosure, useWindowScroll } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import { IconArrowUp } from '@tabler/icons-react'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl } from '~/shared'
+import { sessionToUrl, useSessions } from '~/shared'
 import { Header, type ListedRequest, type NewSessionOptions, SideBar } from './components'
 
 type ContextType = Readonly<{
@@ -18,30 +18,54 @@ type ContextType = Readonly<{
   setSID: (sID: string | null) => void
   rID: string | null
   setRID: (rID: string | null) => void
+  appSettings: Readonly<AppSettings> | null
 }>
+
+type AppSettings = {
+  setMaxRequestsPerSession: number
+  maxRequestBodySize: number
+  sessionTTLSec: number
+}
+
+const JumpToTop = ({
+  scroll,
+  scrollTo,
+}: {
+  scroll: ReturnType<typeof useWindowScroll>[0]
+  scrollTo: ReturnType<typeof useWindowScroll>[1]
+}): React.JSX.Element => (
+  <Affix position={{ bottom: 20, right: 20 }}>
+    <Transition transition="slide-up" mounted={scroll.y > 0}>
+      {(transitionStyles) => (
+        <Button
+          color="teal"
+          leftSection={<IconArrowUp size="1.2em" />}
+          style={transitionStyles}
+          onClick={() => scrollTo({ y: 0 })}
+        >
+          Scroll to top
+        </Button>
+      )}
+    </Transition>
+  </Affix>
+)
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const navigate = useNavigate()
   const [scroll, scrollTo] = useWindowScroll()
+  const { sessions, addSession, removeSession, setLastUsed } = useSessions()
   const [navBarIsOpened, navBarHandlers] = useDisclosure()
   const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
   const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
   const [[sID, setSID], [rID, setRID]] = [useState<string | null>(null), useState<string | null>(null)]
   const [listedRequests, setListedRequests] = useState<ReadonlyArray<ListedRequest>>([])
-  const [appSettings, setAppSettings] = useState<
-    Readonly<{
-      setMaxRequestsPerSession: number
-      maxRequestBodySize: number
-      sessionTTLSec: number
-    } | null>
-  >(null)
+  const [appSettings, setAppSettings] = useState<Readonly<AppSettings | null>>(null)
 
+  // load current and latest versions + settings on mount
   useEffect(() => {
-    // load current and latest versions on mount
     apiClient.currentVersion().then(setCurrentVersion).catch(console.error)
     apiClient.latestVersion().then(setLatestVersion).catch(console.error)
 
-    // and load the settings
     apiClient
       .getSettings()
       .then((settings) => {
@@ -56,132 +80,207 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       .catch(console.error)
   }, [apiClient])
 
-  /** Handles creating a new session and optionally destroying the current one. */
-  const handleNewSessionCreate = async (s: NewSessionOptions) => {
-    const id = notify.show({
-      title: 'Creating new session',
-      message: 'Please wait...',
-      autoClose: false,
-      loading: true,
-    })
+  /** Handles creating a new session and optionally destroying the current one */
+  const handleNewSessionCreate = useCallback(
+    async (s: NewSessionOptions) => {
+      const id = notify.show({ title: 'Creating new WebHook', message: null, autoClose: false, loading: true })
 
-    let newSessionID: string
+      let newSID: string
 
-    // create a new session
-    try {
-      newSessionID = (
-        await apiClient.newSession({
-          statusCode: s.statusCode,
-          headers: s.headers ? Object.fromEntries(s.headers.map((h) => [h.name, h.value])) : undefined,
-          delay: s.delay ? s.delay : undefined,
-          responseBody: s.responseBody ? new TextEncoder().encode(s.responseBody) : undefined,
+      // create a new session
+      try {
+        newSID = (
+          await apiClient.newSession({
+            statusCode: s.statusCode,
+            headers: s.headers ? Object.fromEntries(s.headers.map((h) => [h.name, h.value])) : undefined,
+            delay: s.delay ? s.delay : undefined,
+            responseBody: s.responseBody ? new TextEncoder().encode(s.responseBody) : undefined,
+          })
+        ).uuid
+
+        addSession(newSID)
+      } catch (err) {
+        notify.update({
+          id,
+          title: 'Failed to create new WebHook',
+          message: String(err),
+          color: 'red',
+          loading: false,
         })
-      ).uuid
-    } catch (err) {
+
+        return
+      }
+
+      // remove the current session if needed (do it after creating a new session and in background)
+      if (s.destroyCurrentSession && !!sID) {
+        apiClient
+          .deleteSession(sID)
+          .then(() => removeSession(sID))
+          .catch((err) => {
+            notify.show({
+              title: 'Failed to delete current WebHook',
+              message: String(err),
+              color: 'red',
+              autoClose: 5000,
+            })
+
+            console.error(err)
+          })
+      }
+
       notify.update({
         id,
-        title: 'Failed to create new session',
-        message: String(err),
-        color: 'red',
+        title: 'A new WebHook has been created!',
+        message: null,
+        color: 'green',
+        autoClose: 7000,
         loading: false,
       })
 
-      return
-    }
+      navigate(pathTo(RouteIDs.SessionAndRequest, newSID)) // navigate to the new session
+    },
+    [addSession, apiClient, navigate, removeSession, sID]
+  )
 
-    // destroy the current session, if needed
-    try {
-      if (s.destroyCurrentSession && !!sID) {
-        await apiClient.deleteSession(sID)
+  /** Handles deleting a request */
+  const handleDeleteRequest = useCallback(
+    (sID: string, ridToRemove: string): void => {
+      const request = listedRequests.find((r) => r.id === ridToRemove)
+
+      // if the request is not found, show an error message
+      if (!request) {
+        notify.show({ title: 'Failed to delete request', message: 'Request not found', color: 'red', autoClose: 5000 })
+
+        return
       }
-    } catch (err) {
-      notify.show({
-        title: 'Failed to delete current session',
-        message: String(err),
-        color: 'red',
-        autoClose: 5000,
+
+      const requestIdx: number | -1 = listedRequests.findIndex((r) => r.id === ridToRemove)
+      const [nextRequest, prevRequest]: [ListedRequest | undefined, ListedRequest | undefined] = [
+        requestIdx !== -1 ? listedRequests[requestIdx + 1] : undefined,
+        requestIdx !== -1 ? listedRequests[requestIdx - 1] : undefined,
+      ]
+
+      // remove the request from the list
+      setListedRequests((prev) => prev.filter((r) => r.id !== ridToRemove))
+
+      // delete the request from the server
+      apiClient.deleteSessionRequest(sID, ridToRemove).catch((err) => {
+        notify.show({ title: 'Failed to delete request', message: String(err), color: 'red', autoClose: 5000 })
+
+        // restore the request to the list
+        setListedRequests((prev) => [...prev, request])
+
+        console.error(err)
       })
-    }
 
-    notify.update({
-      id,
-      title: 'A new session has started!',
-      message: undefined,
-      color: 'green',
-      autoClose: 7000,
-      loading: false,
-    })
+      if (rID === ridToRemove) {
+        // if the request is currently opened, navigate to the next one
+        if (nextRequest) {
+          navigate(pathTo(RouteIDs.SessionAndRequest, sID, nextRequest.id))
 
-    navigate(pathTo(RouteIDs.SessionAndRequest, newSessionID)) // navigate to the new session
-  }
+          return
+        } else if (prevRequest) {
+          // if there is no next request, navigate to the previous one
+          navigate(pathTo(RouteIDs.SessionAndRequest, sID, prevRequest.id))
 
-  /** Handles deleting a request. */
-  const handleDeleteRequest = (sID: string, rIDtoRemove: string): void => {
-    const request = listedRequests.find((r) => r.id === rIDtoRemove)
+          return
+        }
 
-    // if the request is not found, show an error message
-    if (!request) {
-      notify.show({ title: 'Failed to delete request', message: 'Request not found', color: 'red', autoClose: 5000 })
+        // if there is no next request, navigate to the session
+        navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+      }
+    },
+    [apiClient, listedRequests, navigate, rID]
+  )
 
-      return
-    }
+  /** Handles deleting all requests */
+  const handleDeleteAllRequests = useCallback(
+    (sID: string): void => {
+      const backup = [...listedRequests]
 
-    const requestIdx = listedRequests.findIndex((r) => r.id === rIDtoRemove)
-    const [nextRequest, prevRequest]: Partial<[ListedRequest, ListedRequest]> = [
-      listedRequests[requestIdx + 1],
-      listedRequests[requestIdx - 1],
-    ]
+      // remove all requests from the list
+      setListedRequests([])
 
-    // remove the request from the list
-    setListedRequests((prev) => prev.filter((r) => r.id !== rIDtoRemove))
+      // delete all requests from the server
+      apiClient.deleteAllSessionRequests(sID).catch((err) => {
+        notify.show({ title: 'Failed to delete requests', message: String(err), color: 'red', autoClose: 5000 })
 
-    // delete the request from the server
-    apiClient.deleteSessionRequest(sID, rIDtoRemove).catch((err) => {
-      notify.show({ title: 'Failed to delete request', message: String(err), color: 'red', autoClose: 5000 })
+        setListedRequests(backup)
 
-      // restore the request to the list
-      setListedRequests((prev) => [...prev, request])
+        console.error(err)
+      })
 
-      console.error(err)
-    })
+      // navigate to the session
+      navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+    },
+    [apiClient, listedRequests, navigate]
+  )
 
-    if (rID === rIDtoRemove) {
-      // if the request is currently opened, navigate to the next one
-      if (nextRequest) {
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, nextRequest.id))
+  /** Handles switching to a different session */
+  const handleSessionSwitch = useCallback(
+    (sID: string): void => {
+      setRID(null)
+      setSID(sID)
+      setLastUsed(sID)
 
-        return
-      } else if (prevRequest) {
-        // if there is no next request, navigate to the previous one
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, prevRequest.id))
+      notify.show({ title: 'Switched to another WebHook', message: sID, color: 'lime', autoClose: 3000 })
 
+      navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+    },
+    [navigate, setRID, setSID, setLastUsed]
+  )
+
+  /** Handles destroying a session */
+  const handleSessionDestroy = useCallback(
+    (sID: string): void => {
+      apiClient
+        .deleteSession(sID)
+        .then(() => {
+          const thisSessionIdx: number | -1 = sessions.indexOf(sID)
+          const switchTo = sessions[thisSessionIdx + 1] || sessions[thisSessionIdx - 1] || null
+
+          removeSession(sID)
+
+          notify.show({ title: 'WebHook deleted', message: null, color: 'lime', autoClose: 3000 })
+
+          if (switchTo) {
+            setSID(switchTo)
+            setLastUsed(switchTo)
+
+            navigate(pathTo(RouteIDs.SessionAndRequest, switchTo)) // navigate to the next or previous session
+          } else {
+            setSID(null)
+            setLastUsed(null)
+
+            // if there are no more sessions, navigate to the home screen
+            navigate(pathTo(RouteIDs.Home))
+          }
+        })
+        .catch((err) => {
+          notify.show({ title: 'Failed to delete session', message: String(err), color: 'red', autoClose: 5000 })
+
+          console.error(err)
+        })
+    },
+    [apiClient, navigate, removeSession, sessions, setLastUsed, setSID]
+  )
+
+  /** Handles clicking on the navbar */
+  const handleNavbarClick = useCallback(
+    (e: React.MouseEvent) => {
+      // prevent this event firing on children
+      if (e.currentTarget !== e.target) {
         return
       }
 
-      // if there is no next request, navigate to the session
-      navigate(pathTo(RouteIDs.SessionAndRequest, sID))
-    }
-  }
+      if (sID) {
+        setRID(null) // unset the request ID
 
-  /** Handles deleting all requests. */
-  const handleDeleteAllRequests = (sID: string): void => {
-    const backup = [...listedRequests]
-
-    // remove all requests from the list
-    setListedRequests([])
-
-    // delete all requests from the server
-    apiClient.deleteAllSessionRequests(sID).catch((err) => {
-      notify.show({ title: 'Failed to delete requests', message: String(err), color: 'red', autoClose: 5000 })
-
-      setListedRequests(backup)
-
-      console.error(err)
-    })
-
-    // navigate to the session
-    navigate(pathTo(RouteIDs.SessionAndRequest, sID))
-  }
+        navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+      }
+    },
+    [navigate, sID, setRID]
+  )
 
   return (
     <AppShell
@@ -193,31 +292,18 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
         <Header
           currentVersion={currentVersion}
           latestVersion={latestVersion}
+          sID={sID}
           appSettings={appSettings}
           webHookUrl={(sID && sessionToUrl(sID)) || null}
           isBurgerOpened={navBarIsOpened}
           onBurgerClick={navBarHandlers.toggle}
           onNewSessionCreate={handleNewSessionCreate}
+          onSessionSwitch={handleSessionSwitch}
+          onSessionDestroy={handleSessionDestroy}
         />
       </AppShell.Header>
 
-      <AppShell.Navbar
-        p="md"
-        pr={0}
-        style={{ zIndex: 102 }}
-        withBorder={false}
-        onClick={(e) => {
-          // prevent this event firing on children
-          if (e.currentTarget !== e.target) {
-            return
-          }
-
-          if (sID) {
-            setRID(null)
-            navigate(pathTo(RouteIDs.SessionAndRequest, sID))
-          }
-        }}
-      >
+      <AppShell.Navbar p="md" pr={0} style={{ zIndex: 102 }} withBorder={false} onClick={handleNavbarClick}>
         <AppShell.Section component={ScrollArea} pr="md" scrollbarSize={6}>
           <SideBar
             sID={sID}
@@ -230,23 +316,10 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet context={{ setListedRequests, sID, setSID, rID, setRID } satisfies ContextType} />
+        <Outlet context={{ setListedRequests, sID, setSID, rID, setRID, appSettings } satisfies ContextType} />
       </AppShell.Main>
 
-      <Affix position={{ bottom: 20, right: 20 }}>
-        <Transition transition="slide-up" mounted={scroll.y > 0}>
-          {(transitionStyles) => (
-            <Button
-              color="teal"
-              leftSection={<IconArrowUp size="1.2em" />}
-              style={transitionStyles}
-              onClick={() => scrollTo({ y: 0 })}
-            >
-              Scroll to top
-            </Button>
-          )}
-        </Transition>
-      </Affix>
+      <JumpToTop scroll={scroll} scrollTo={scrollTo} />
     </AppShell>
   )
 }

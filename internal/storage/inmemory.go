@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"sync"
@@ -103,7 +105,7 @@ func (s *InMemory) cleanup() {
 	}
 }
 
-func (s *InMemory) NewSession(ctx context.Context, session Session) (sID string, _ error) {
+func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
 	if err := ctx.Err(); err != nil {
 		return "", err // context is done
 	} else if s.closed.Load() {
@@ -112,7 +114,22 @@ func (s *InMemory) NewSession(ctx context.Context, session Session) (sID string,
 
 	var now = time.Now()
 
-	sID, session.CreatedAtUnixMilli, session.ExpiresAt = s.newID(), now.UnixMilli(), now.Add(s.sessionTTL)
+	if len(id) > 0 { // use the specified ID
+		if len(id[0]) == 0 {
+			return "", errors.New("empty session ID")
+		}
+
+		sID = id[0]
+
+		// check if the session with the specified ID already exists
+		if _, ok := s.sessions.Load(sID); ok {
+			return "", fmt.Errorf("session %s already exists", sID)
+		}
+	} else {
+		sID = s.newID() // generate a new ID
+	}
+
+	session.CreatedAtUnixMilli, session.ExpiresAt = now.UnixMilli(), now.Add(s.sessionTTL)
 
 	s.sessions.Store(sID, &sessionData{session: session})
 

@@ -1,33 +1,39 @@
-import type { SemVer } from 'semver'
-import { Burger, Button, Checkbox, Group, Image, Popover, Stack } from '@mantine/core'
-import { notifications as notify } from '@mantine/notifications'
+import { Burger, Button, Center, Checkbox, Group, Image, Popover, Select, Stack } from '@mantine/core'
 import { useClipboard, useDisclosure } from '@mantine/hooks'
+import { notifications as notify } from '@mantine/notifications'
 import {
   IconAdjustmentsAlt,
   IconBrandGithubFilled,
   IconCirclePlusFilled,
   IconCopy,
+  IconGrave2,
   IconHelpHexagonFilled,
   IconRefreshAlert,
+  IconUsersGroup,
 } from '@tabler/icons-react'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useUISettings } from '~/shared'
+import type { SemVer } from 'semver'
+import LogoTextSvg from '~/assets/togo-text.svg'
+import { useSessions, useUISettings } from '~/shared'
 import HeaderHelpModal from './header-help-modal'
 import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'
-import LogoTextSvg from '~/assets/togo-text.svg'
 
 export default function Header({
   currentVersion,
   latestVersion,
+  sID,
   appSettings = null,
   webHookUrl = null,
   isBurgerOpened = false,
   onBurgerClick = () => {},
   onNewSessionCreate = () => Promise.reject(),
+  onSessionSwitch,
+  onSessionDestroy,
 }: {
   currentVersion: SemVer | null
   latestVersion: SemVer | null
+  sID: string | null
   appSettings: {
     setMaxRequestsPerSession: number
     maxRequestBodySize: number
@@ -37,9 +43,12 @@ export default function Header({
   isBurgerOpened: boolean
   onBurgerClick: () => void
   onNewSessionCreate?: (_: NewSessionOptions) => Promise<void>
+  onSessionSwitch?: (to: string) => void
+  onSessionDestroy?: (sID: string) => void
 }): React.JSX.Element {
   const clipboard = useClipboard({ timeout: 500 })
   const { settings, update: updateSettings } = useUISettings()
+  const { sessions } = useSessions()
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false)
   const [isNewSessionModalOpened, newSessionModalHandlers] = useDisclosure(false)
   const [isHelpModalOpened, helpModalHandlers] = useDisclosure(false)
@@ -51,7 +60,8 @@ export default function Header({
     }
   }, [currentVersion, latestVersion])
 
-  const handleCpyWebhookUrl = () => {
+  /** Handle copying the webhook URL to the clipboard */
+  const handleCopyWebhookUrl = useCallback(() => {
     if (webHookUrl) {
       clipboard.copy(webHookUrl.toString())
 
@@ -62,19 +72,23 @@ export default function Header({
         autoClose: 3000,
       })
     }
-  }
+  }, [clipboard, webHookUrl])
 
-  const handleNewSessionCreate = async (options: NewSessionOptions) => {
-    setNewSessionLoading(true)
+  /** Handle creating a new session (interacting with the modal) */
+  const handleNewSessionCreate = useCallback(
+    async (options: NewSessionOptions) => {
+      setNewSessionLoading(true)
 
-    try {
-      await onNewSessionCreate(options)
-    } finally {
-      setNewSessionLoading(false)
-    }
+      try {
+        await onNewSessionCreate(options)
+      } finally {
+        setNewSessionLoading(false)
+      }
 
-    newSessionModalHandlers.close()
-  }
+      newSessionModalHandlers.close()
+    },
+    [newSessionModalHandlers, onNewSessionCreate]
+  )
 
   return (
     <>
@@ -91,6 +105,7 @@ export default function Header({
         webHookUrl={webHookUrl}
         sessionTTLSec={(!!appSettings && appSettings.sessionTTLSec) || null}
         maxBodySizeBytes={(!!appSettings && appSettings.maxRequestBodySize) || null}
+        maxRequestsPerSession={(!!appSettings && appSettings.setMaxRequestsPerSession) || null}
       />
 
       <Group h="100%" px="md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -139,7 +154,7 @@ export default function Header({
         </Group>
         <Group visibleFrom="xs">
           <Button.Group>
-            <Popover width={200} position="bottom" withArrow shadow="md">
+            <Popover width={200} position="bottom" shadow="md" withArrow>
               <Popover.Target>
                 <Button
                   leftSection={<IconAdjustmentsAlt size="1.3em" />}
@@ -166,11 +181,60 @@ export default function Header({
               </Popover.Dropdown>
             </Popover>
 
+            {sessions.length > 1 && (
+              <Popover position="bottom" shadow="md" withArrow>
+                <Popover.Target>
+                  <Button
+                    px="sm"
+                    variant="gradient"
+                    gradient={{ from: 'lime', to: 'lime', deg: 90 }}
+                    leftSection={<IconUsersGroup size="1.3em" />}
+                  >
+                    WebHooks
+                  </Button>
+                </Popover.Target>
+                <Popover.Dropdown>
+                  <Center>
+                    <Stack gap="xs" pb="0.25em">
+                      {!!onSessionSwitch && (
+                        <Select
+                          label="Switch to a different webhook"
+                          placeholder="Select a webhook ID to switch to"
+                          comboboxProps={{ withinPortal: false }}
+                          checkIconPosition="right"
+                          data={sessions}
+                          value={sID}
+                          onChange={(switchTo) => {
+                            if (switchTo) {
+                              onSessionSwitch(switchTo)
+                            }
+                          }}
+                        />
+                      )}
+                      {!!onSessionDestroy && !!sID && (
+                        <Button
+                          variant="light"
+                          size="compact-sm"
+                          leftSection={<IconGrave2 size="1.1em" />}
+                          color="red"
+                          disabled={!sID}
+                          onClick={() => onSessionDestroy(sID)}
+                        >
+                          Destroy this webhook
+                        </Button>
+                      )}
+                    </Stack>
+                  </Center>
+                </Popover.Dropdown>
+              </Popover>
+            )}
+
             <Button
               leftSection={<IconCopy size="1.2em" />}
-              variant="filled"
+              variant="gradient"
+              gradient={{ from: 'lime', to: 'lime', deg: 90 }}
               color="lime"
-              onClick={handleCpyWebhookUrl}
+              onClick={handleCopyWebhookUrl}
               disabled={!webHookUrl}
               visibleFrom="md"
             >

@@ -1,8 +1,6 @@
-import type React from 'react'
 import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
-import { Badge, Button, Flex, Table, Text, Skeleton, type MantineColor } from '@mantine/core'
+import { Badge, Button, Flex, type MantineColor, Skeleton, Table, Text } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import { UsedStorageKeys, useStorage } from '~/shared'
 import {
   IconBrandCSharp,
   IconBrandDebian,
@@ -17,6 +15,8 @@ import {
   IconExternalLink,
   IconRun,
 } from '@tabler/icons-react'
+import React, { useCallback } from 'react'
+import { UsedStorageKeys, useStorage } from '~/shared'
 
 export type SessionProps = {
   statusCode: number
@@ -38,8 +38,8 @@ export default function SessionDetails({
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
 
-  /** Sends a test request to the generated URL. */
-  const handleSendTestRequest = (): void => {
+  /** Sends a test request to the generated URL */
+  const handleSendTestRequest = useCallback((): void => {
     const id = notify.show({
       title: 'Sending request',
       message: 'Please wait...',
@@ -66,7 +66,7 @@ export default function SessionDetails({
           loading: false,
         })
       })
-  }
+  }, [webHookUrl])
 
   return (
     <>

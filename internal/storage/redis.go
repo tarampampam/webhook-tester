@@ -65,8 +65,25 @@ func (s *Redis) isSessionExists(ctx context.Context, sID string) (bool, error) {
 	return count == 1, nil
 }
 
-func (s *Redis) NewSession(ctx context.Context, session Session) (sID string, _ error) {
-	sID, session.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
+func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+	if len(id) > 0 { // use the specified ID
+		if len(id[0]) == 0 {
+			return "", errors.New("empty session ID")
+		}
+
+		sID = id[0]
+
+		// check if the session with the specified ID already exists
+		if exists, err := s.isSessionExists(ctx, sID); err != nil {
+			return "", err
+		} else if exists {
+			return "", fmt.Errorf("session %s already exists", sID)
+		}
+	} else {
+		sID = s.newID()
+	}
+
+	session.CreatedAtUnixMilli = time.Now().UnixMilli()
 
 	data, mErr := s.encDec.Encode(session)
 	if mErr != nil {

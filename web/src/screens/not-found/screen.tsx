@@ -5,6 +5,7 @@ import { pathTo, RouteIDs } from '~/routing'
 
 export default function Screen(): React.JSX.Element {
   return (
+    // TODO: improve the layout of the not found screen
     <Center maw="100%" h="100%">
       <div>
         <Text size="lg">The requested page was not found</Text>
