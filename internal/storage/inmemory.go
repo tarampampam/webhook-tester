@@ -91,9 +91,10 @@ func (s *InMemory) cleanup() {
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
 				data.Lock()
-				defer data.Unlock()
+				var expiresAt = data.session.ExpiresAt
+				data.Unlock()
 
-				if data.session.ExpiresAt.Before(now) {
+				if expiresAt.Before(now) {
 					_ = s.DeleteSession(ctx, sID)
 				}
 
@@ -148,7 +149,11 @@ func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error)
 		return nil, ErrSessionNotFound // not found
 	}
 
-	if data.session.ExpiresAt.Before(time.Now()) {
+	data.Lock()
+	var expiresAt = data.session.ExpiresAt
+	data.Unlock()
+
+	if expiresAt.Before(time.Now()) {
 		s.sessions.Delete(sID)
 
 		return nil, ErrSessionNotFound // session has been expired
@@ -170,9 +175,8 @@ func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.D
 	}
 
 	data.Lock()
-	defer data.Unlock()
-
 	data.session.ExpiresAt = data.session.ExpiresAt.Add(howMuch)
+	data.Unlock()
 
 	return nil
 }

@@ -133,7 +133,7 @@ func testSessionCreateReadDelete(
 			var now = time.Now()
 
 			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
-			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 15)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
 		}
 
 		var ( // store the original values
