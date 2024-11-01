@@ -1,5 +1,5 @@
-import React, { createContext } from 'react'
-import { UsedStorageKeys, useStorage } from './use-storage.ts'
+import React, { createContext, useContext } from 'react'
+import { UsedStorageKeys, useStorage } from './use-storage'
 
 type SessionsContext = {
   sessions: ReadonlyArray<string>
@@ -68,8 +68,8 @@ export const SessionsProvider = ({ children }: { children: React.JSX.Element }) 
   )
 }
 
-export function useSessions(): SessionsContext {
-  const ctx = React.useContext(sessionsContext)
+export function useSessions(): Readonly<SessionsContext> {
+  const ctx = useContext(sessionsContext)
 
   if (!ctx) {
     throw new Error('useSessions must be used within a SessionsProvider')

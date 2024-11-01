@@ -10,46 +10,6 @@ import { pathTo, RouteIDs } from '~/routing'
 import { sessionToUrl, useSessions } from '~/shared'
 import { Header, type ListedRequest, type NewSessionOptions, SideBar } from './components'
 
-type ContextType = Readonly<{
-  setListedRequests: (
-    list: ReadonlyArray<ListedRequest> | ((prev: ReadonlyArray<ListedRequest>) => ReadonlyArray<ListedRequest>)
-  ) => void
-  sID: string | null
-  setSID: (sID: string | null) => void
-  rID: string | null
-  setRID: (rID: string | null) => void
-  appSettings: Readonly<AppSettings> | null
-}>
-
-type AppSettings = {
-  setMaxRequestsPerSession: number
-  maxRequestBodySize: number
-  sessionTTLSec: number
-}
-
-const JumpToTop = ({
-  scroll,
-  scrollTo,
-}: {
-  scroll: ReturnType<typeof useWindowScroll>[0]
-  scrollTo: ReturnType<typeof useWindowScroll>[1]
-}): React.JSX.Element => (
-  <Affix position={{ bottom: 20, right: 20 }}>
-    <Transition transition="slide-up" mounted={scroll.y > 0}>
-      {(transitionStyles) => (
-        <Button
-          color="teal"
-          leftSection={<IconArrowUp size="1.2em" />}
-          style={transitionStyles}
-          onClick={() => scrollTo({ y: 0 })}
-        >
-          Scroll to top
-        </Button>
-      )}
-    </Transition>
-  </Affix>
-)
-
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const navigate = useNavigate()
   const [scroll, scrollTo] = useWindowScroll()
@@ -323,6 +283,46 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
     </AppShell>
   )
 }
+
+type ContextType = Readonly<{
+  setListedRequests: (
+    list: ReadonlyArray<ListedRequest> | ((prev: ReadonlyArray<ListedRequest>) => ReadonlyArray<ListedRequest>)
+  ) => void
+  sID: string | null
+  setSID: (sID: string | null) => void
+  rID: string | null
+  setRID: (rID: string | null) => void
+  appSettings: Readonly<AppSettings> | null
+}>
+
+type AppSettings = {
+  setMaxRequestsPerSession: number
+  maxRequestBodySize: number
+  sessionTTLSec: number
+}
+
+const JumpToTop = ({
+  scroll,
+  scrollTo,
+}: {
+  scroll: ReturnType<typeof useWindowScroll>[0]
+  scrollTo: ReturnType<typeof useWindowScroll>[1]
+}): React.JSX.Element => (
+  <Affix position={{ bottom: 20, right: 20 }}>
+    <Transition transition="slide-up" mounted={scroll.y > 0}>
+      {(transitionStyles) => (
+        <Button
+          color="teal"
+          leftSection={<IconArrowUp size="1.2em" />}
+          style={transitionStyles}
+          onClick={() => scrollTo({ y: 0 })}
+        >
+          Scroll to top
+        </Button>
+      )}
+    </Transition>
+  </Affix>
+)
 
 export function useLayoutOutletContext(): ContextType {
   return useOutletContext<ContextType>()

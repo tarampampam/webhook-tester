@@ -4,11 +4,13 @@ import { UsedStorageKeys, useStorage } from './use-storage'
 type UISettings = {
   showRequestDetails: boolean
   autoNavigateToNewRequest: boolean
+  showNativeRequestNotifications: boolean
 }
 
 const defaults: Readonly<UISettings> = {
   showRequestDetails: true,
   autoNavigateToNewRequest: true,
+  showNativeRequestNotifications: false,
 }
 
 type UISettingsContext = {

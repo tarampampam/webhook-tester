@@ -15,7 +15,8 @@ import {
   IconExternalLink,
   IconRun,
 } from '@tabler/icons-react'
-import React, { useCallback } from 'react'
+import dayjs from 'dayjs'
+import React, { useCallback, useRef } from 'react'
 import { UsedStorageKeys, useStorage } from '~/shared'
 
 export type SessionProps = {
@@ -37,30 +38,42 @@ export default function SessionDetails({
 }): React.JSX.Element {
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
+  const testNotifyID = useRef<string | null>(null)
 
   /** Sends a test request to the generated URL */
   const handleSendTestRequest = useCallback((): void => {
-    const id = notify.show({
-      title: 'Sending request',
-      message: 'Please wait...',
-      autoClose: false,
-      loading: true,
-    })
+    if (testNotifyID.current === null) {
+      testNotifyID.current = notify.show({
+        title: 'Sending request',
+        message: 'Please wait...',
+        autoClose: false,
+        loading: true,
+        onClose: () => (testNotifyID.current = null),
+      })
+    }
 
     sendTestRequest(new URL(webHookUrl))
       .then(() => {
+        if (testNotifyID.current === null) {
+          return
+        }
+
         notify.update({
-          id,
-          title: 'Request sent',
+          id: testNotifyID.current,
+          title: `Request sent at ${dayjs().format('HH:mm:ss SSS')}`,
           message: 'Check the console for details',
           autoClose: 2000,
           loading: false,
         })
       })
       .catch((error) => {
+        if (testNotifyID.current === null) {
+          return
+        }
+
         notify.update({
-          id,
-          title: 'Request failed',
+          id: testNotifyID.current,
+          title: 'Test request failed',
           message: String(error),
           color: 'orange',
           loading: false,

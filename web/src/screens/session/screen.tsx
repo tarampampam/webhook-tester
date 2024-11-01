@@ -1,11 +1,11 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Blockquote } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import { IconInfoCircle } from '@tabler/icons-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useSessions, useUISettings } from '~/shared'
+import { sessionToUrl, useBrowserNotifications, useSessions, useUISettings } from '~/shared'
 import { useLayoutOutletContext } from '../layout'
 import { RequestDetails, SessionDetails, type SessionProps } from './components'
 
@@ -19,23 +19,31 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
   const [loading, setLoading] = useState<boolean>(false)
   const [sessionProps, setSessionProps] = useState<SessionProps | null>(null)
   const { ref: uiSettings } = useUISettings()
-  const { setListedRequests, setSID: setParentSID, setRID: setParentRID, appSettings } = useLayoutOutletContext()
-  const closeSub = useRef<(() => void) | null>(null)
-  const appSettingsRef = useRef(appSettings)
+  const {
+    setListedRequests,
+    setSID: setParentSID,
+    setRID: setParentRID,
+    appSettings: __appSettings,
+  } = useLayoutOutletContext()
+  const { granted: __browserNotificationsGranted, show: showBrowserNotification } = useBrowserNotifications()
+  const closeSubRef = useRef<(() => void) | null>(null)
+  const appSettingsRef = useRef<typeof __appSettings | null>(__appSettings)
+  const browserNotificationsGrantedRef = useRef<boolean>(__browserNotificationsGranted)
 
-  // store the app settings in the ref to avoid unnecessary re-renders
+  // store some values in the ref to avoid unnecessary re-renders
   useEffect(() => {
-    appSettingsRef.current = appSettings
-  }, [appSettings])
+    appSettingsRef.current = __appSettings
+    browserNotificationsGrantedRef.current = __browserNotificationsGranted
+  }, [__appSettings, __browserNotificationsGranted])
 
   /** Subscribe to the session requests via WebSocket */
   const subscribe = useCallback(
     (sID: string) => {
-      if (closeSub.current) {
-        closeSub.current() // close the previous subscription
+      if (closeSubRef.current) {
+        closeSubRef.current() // close the previous subscription
       }
 
-      closeSub.current = null // reset the closer function
+      closeSubRef.current = null // reset the closer function
 
       apiClient
         .subscribeToSessionRequests(sID, {
@@ -52,6 +60,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
                 ...prev,
               ]
 
+              // limit the number of shown requests per session if the setting is set and the list is too long
               if (
                 !!appSettingsRef.current &&
                 appSettingsRef.current.setMaxRequestsPerSession &&
@@ -63,6 +72,37 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
               return newList
             })
 
+            // the in-app notification function to show the new request notification
+            const showInAppNotification = (): void => {
+              notify.show({
+                title: 'New request received',
+                message: `From ${request.clientAddress} with method ${request.method}`,
+                icon: <IconRocket />,
+                color: 'blue',
+              })
+            }
+
+            // show a notification about the new request using the browser's native notification API,
+            // if the permission is granted and the setting is enabled
+            if (browserNotificationsGrantedRef.current && uiSettings.current.showNativeRequestNotifications) {
+              showBrowserNotification('New request received', {
+                body: `From ${request.clientAddress} with method ${request.method}`,
+                autoClose: 5000,
+              })
+                // in case the notification is not shown, show the in-app notification
+                .then((n) => {
+                  if (!n) {
+                    showInAppNotification()
+                  }
+                })
+                // do the same in case of an error
+                .catch(showInAppNotification)
+            } else {
+              // otherwise, show the in-app notification
+              showInAppNotification()
+            }
+
+            // navigate to the new request if the setting is enabled
             if (uiSettings.current.autoNavigateToNewRequest) {
               navigate(pathTo(RouteIDs.SessionAndRequest, sID, request.uuid)) // navigate to the new request
             }
@@ -72,17 +112,17 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
           },
         })
         .then((closer): void => {
-          closeSub.current = closer // save the closer function to call it when the component unmounts
+          closeSubRef.current = closer // save the closer function to call it when the component unmounts
         })
         .catch(console.error)
     },
-    [apiClient, navigate, setListedRequests, uiSettings]
+    [apiClient, navigate, setListedRequests, uiSettings, showBrowserNotification]
   )
 
   /** Unsubscribe from the session requests */
   const unsubscribe = useCallback((): void => {
-    if (closeSub.current) {
-      closeSub.current() // close the subscription
+    if (closeSubRef.current) {
+      closeSubRef.current() // close the subscription
     }
   }, [])
 

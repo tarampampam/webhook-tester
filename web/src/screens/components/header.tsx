@@ -1,4 +1,4 @@
-import { Burger, Button, Center, Checkbox, Group, Image, Popover, Select, Stack } from '@mantine/core'
+import { Burger, Button, Center, Checkbox, Group, Image, Popover, Select, Stack, Text } from '@mantine/core'
 import { useClipboard, useDisclosure } from '@mantine/hooks'
 import { notifications as notify } from '@mantine/notifications'
 import {
@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import LogoTextSvg from '~/assets/togo-text.svg'
-import { useSessions, useUISettings } from '~/shared'
+import { useBrowserNotifications, useSessions, useUISettings } from '~/shared'
 import HeaderHelpModal from './header-help-modal'
 import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'
 
@@ -48,6 +48,7 @@ export default function Header({
 }): React.JSX.Element {
   const clipboard = useClipboard({ timeout: 500 })
   const { settings, update: updateSettings } = useUISettings()
+  const { granted: browserNotificationsGranted, request: askForBrowserNotifications } = useBrowserNotifications()
   const { sessions } = useSessions()
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false)
   const [isNewSessionModalOpened, newSessionModalHandlers] = useDisclosure(false)
@@ -154,7 +155,7 @@ export default function Header({
         </Group>
         <Group visibleFrom="xs">
           <Button.Group>
-            <Popover width={200} position="bottom" shadow="md" withArrow>
+            <Popover width={250} position="bottom" shadow="md" withArrow>
               <Popover.Target>
                 <Button
                   leftSection={<IconAdjustmentsAlt size="1.3em" />}
@@ -176,6 +177,28 @@ export default function Header({
                     checked={settings.showRequestDetails}
                     onChange={(event) => updateSettings({ showRequestDetails: event.target.checked })}
                     label="Display request details"
+                  />
+                  <Checkbox
+                    checked={settings.showNativeRequestNotifications}
+                    onChange={(event) => {
+                      if (browserNotificationsGranted) {
+                        updateSettings({ showNativeRequestNotifications: event.target.checked })
+                      } else {
+                        askForBrowserNotifications().then((granted) => {
+                          updateSettings({ showNativeRequestNotifications: granted && !event.target.checked })
+                        })
+                      }
+                    }}
+                    label={
+                      <>
+                        <Text size="sm">Use native notifications for new requests (instead of the in-app ones)</Text>
+                        {!browserNotificationsGranted && (
+                          <Text size="sm" c="dimmed" fw={700}>
+                            Permission required
+                          </Text>
+                        )}
+                      </>
+                    }
                   />
                 </Stack>
               </Popover.Dropdown>
