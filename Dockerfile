@@ -30,7 +30,7 @@ FROM golang:1.23-alpine as builder
 ARG APP_VERSION="undefined@docker"
 
 # renovate: source=github-releases name=deepmap/oapi-codegen
-ENV OAPI_CODEGEN_VERSION="2.2.0"
+ENV OAPI_CODEGEN_VERSION="2.4.1"
 
 RUN set -x \
     # Install `oapi-codegen`: <https://github.com/deepmap/oapi-codegen>
