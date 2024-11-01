@@ -18,14 +18,14 @@ concurrency:
 
 jobs:
   git-leaks:
-    name: 🔐 Check for GitLeaks
+    name: Check for GitLeaks
     runs-on: ubuntu-latest
     steps:
       - {uses: actions/checkout@v4, with: {fetch-depth: 0}}
       - uses: gacts/gitleaks@v1
 
   lint-and-test:
-    name: 🧪 Test and lint (backend)
+    name: Test and lint (backend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
       - run: go test -race -covermode=atomic ./...
 
   lint-and-test-web:
-    name: 🧪 Test and lint (web)
+    name: Test and lint (web)
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
@@ -50,7 +50,7 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" run build
 
   build-docker-image:
-    name: 🏗️ Build the docker image
+    name: Build the docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -9,7 +9,7 @@ on:
 
 jobs: # TODO: add standalone binary build job
   build-docker-image:
-    name: 🏗️ Build the docker image
+    name: Build the docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
