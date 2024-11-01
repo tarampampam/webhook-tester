@@ -179,11 +179,23 @@ $ app [GLOBAL FLAGS] start healthcheck [COMMAND FLAGS] [ARGUMENTS...]
 
 The following flags are supported:
 
+
 | Name         | Description      | Default value | Environment variables |
 |--------------|------------------|:-------------:|:---------------------:|
 | `--port="…"` | HTTP server port |    `8080`     |      `HTTP_PORT`      |
 
 <!--/GENERATED:CLI_DOCS-->
+
+## ☸️ Running it in Kubernetes
+
+This repository includes a helm chart with basic deployment-service configuration and a possible ingress. To deploy it to your cluster run
+
+```shell
+helm install webhook-tester ./charts/webhook-tester -f custom-values.yaml
+```
+
+All the binary arguments are configured in the `.Values.config` and are directly mapped to the same-name arguments.
+
 
 ## License
 
