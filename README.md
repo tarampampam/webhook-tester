@@ -187,6 +187,16 @@ services:
     ports: ['8080:8080/tcp'] # Open <http://127.0.0.1:8080/#/00000000-0000-0000-0000-000000000000>
 ```
 
+### ☸️ Running it in Kubernetes
+
+This repository includes a helm chart with basic deployment-service configuration and a possible ingress. To deploy it to your cluster run
+
+```shell
+helm install webhook-tester ./charts/webhook-tester -f custom-values.yaml
+```
+
+All the binary arguments are configured in the `.Values.config` and are directly mapped to the same-name arguments.
+
 ## Support
 
 [![Issues][badge_issues]][link_issues]
