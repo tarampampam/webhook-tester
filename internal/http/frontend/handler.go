@@ -39,6 +39,7 @@ func New(root fs.FS) http.Handler { //nolint:funlen
 		".webmanifest": {},
 	}
 
+	// TODO: add caching headers for static files
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var filePath = strings.TrimLeft(path.Clean(r.URL.Path), "/")
 

@@ -14,7 +14,7 @@ import {
 import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SemVer } from 'semver'
-import LogoTextSvg from '~/assets/togo-text.svg'
+import LogoTextSvg from '~/assets/logo-text.svg'
 import { useBrowserNotifications, useSessions, useUISettings } from '~/shared'
 import HeaderHelpModal from './header-help-modal'
 import HeaderNewSessionModal, { type NewSessionOptions } from './header-new-session-modal'

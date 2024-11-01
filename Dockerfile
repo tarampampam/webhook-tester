@@ -72,9 +72,9 @@ RUN --mount=type=bind,from=frontend,source=/src/web/dist,target=/src/web/dist \
     && go generate -skip readme ./... \
     && CGO_ENABLED=0 go build \
       -trimpath \
-      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/internal/version.version=${APP_VERSION}" \
+      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${APP_VERSION}" \
       -o ./app \
-      ./cmd/app/ \
+      ./cmd/webhook-tester/ \
     && ./app --version \
     # prepare rootfs for runtime
     && mkdir -p /tmp/rootfs \
