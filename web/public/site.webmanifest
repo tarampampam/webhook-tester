@@ -1,11 +1,18 @@
 {
   "name": "WebHook Tester",
   "short_name": "WebHook Tester",
+  "description": "Allows you to easily test webhooks and other types of HTTP requests",
   "id": "app",
   "start_url": "/",
   "scope": "/",
   "lang": "en",
   "icons": [
+    {
+      "src": "/favicon-48x48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/web-app-manifest-192x192.png",
       "sizes": "192x192",
@@ -16,7 +23,8 @@
       "src": "/web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "maskable",
+      "purpose": "any"
     }
   ],
   "orientation": "natural",
