@@ -82,7 +82,7 @@ jobs:
         run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
       # try to run the binary
       - if: matrix.os == runner.os && matrix.arch == 'amd64'
-        run: ./${{ steps.values.outputs.binary-name }} --version && ./webhook-tester -h
+        run: ./${{ steps.values.outputs.binary-name }} -h
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.values.outputs.binary-name }}
