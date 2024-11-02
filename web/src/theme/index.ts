@@ -1,0 +1,1 @@
+export { methodToColor } from './color'

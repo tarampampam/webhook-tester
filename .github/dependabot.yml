@@ -4,29 +4,28 @@
 version: 2
 
 updates:
-  - package-ecosystem: gomod
-    directory: /
-    groups: {gomod: {patterns: ['*'], exclude-patterns: ['github.com/gorilla/websocket']}}
-    schedule: {interval: monthly}
-    assignees: [tarampampam]
-
-  - package-ecosystem: npm
-    directory: /web
-    open-pull-requests-limit: 15
-    groups:
-      npm-production: {dependency-type: production, update-types: [minor, patch]}
-      npm-development: {dependency-type: development, update-types: [minor, patch]}
-    schedule: {interval: monthly}
-    assignees: [tarampampam]
-
   - package-ecosystem: github-actions
     directory: /
-    groups: {github-actions: {patterns: ['*']}}
     schedule: {interval: monthly}
+    groups: {github-actions: {patterns: ['*']}}
     assignees: [tarampampam]
 
   - package-ecosystem: docker
     directory: /
-    groups: {docker: {patterns: ['*']}}
     schedule: {interval: monthly}
+    groups: {docker: {patterns: ['*']}}
+    assignees: [tarampampam]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule: {interval: monthly}
+    groups: {gomod: {patterns: ['*']}}
+    assignees: [tarampampam]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule: {interval: monthly}
+    groups:
+      npm-production: {dependency-type: production, update-types: [minor, patch]}
+      npm-development: {dependency-type: development, update-types: [minor, patch]}
     assignees: [tarampampam]

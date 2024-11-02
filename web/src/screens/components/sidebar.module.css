@@ -1,0 +1,7 @@
+.requestBlock {
+  transition: box-shadow 300ms;
+
+  &:hover {
+    box-shadow: inset 5px 0 5px -5px var(--mantine-color-teal-5);
+  }
+}

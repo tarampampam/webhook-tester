@@ -1,0 +1,7 @@
+# The config struct: https://github.com/deepmap/oapi-codegen/blob/master/pkg/codegen/configuration.go#L14-L23
+
+generate:
+  models: true
+
+compatibility:
+  always-prefix-enum-values: true

@@ -1,369 +1,376 @@
 package storage
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type inmemorySession struct {
-	uuid        string
-	content     []byte
-	code        uint16
-	contentType string
-	delay       time.Duration
-	createdAt   time.Time
-	requests    map[string]*inmemoryRequest // key is request UUID
+type (
+	InMemory struct {
+		sessionTTL      time.Duration
+		maxRequests     uint32
+		sessions        syncMap[ /* sID */ string, *sessionData]
+		cleanupInterval time.Duration
 
-	expiresAtNano int64
-}
-
-func (s *inmemorySession) UUID() string         { return s.uuid }        // UUID unique session ID.
-func (s *inmemorySession) Content() []byte      { return s.content }     // Content session server response content.
-func (s *inmemorySession) Code() uint16         { return s.code }        // Code default server response code.
-func (s *inmemorySession) ContentType() string  { return s.contentType } // ContentType response content type.
-func (s *inmemorySession) Delay() time.Duration { return s.delay }       // Delay before response sending.
-func (s *inmemorySession) CreatedAt() time.Time { return s.createdAt }   // CreatedAt creation time.
-
-type inmemoryRequest struct {
-	uuid       string
-	clientAddr string
-	method     string
-	content    []byte
-	headers    map[string]string
-	uri        string
-	createdAt  time.Time
-}
-
-func (r *inmemoryRequest) UUID() string               { return r.uuid }       // UUID returns unique request ID.
-func (r *inmemoryRequest) ClientAddr() string         { return r.clientAddr } // ClientAddr client hostname or IP.
-func (r *inmemoryRequest) Method() string             { return r.method }     // Method HTTP method name.
-func (r *inmemoryRequest) Content() []byte            { return r.content }    // Content request body (payload).
-func (r *inmemoryRequest) Headers() map[string]string { return r.headers }    // Headers HTTP request headers.
-func (r *inmemoryRequest) URI() string                { return r.uri }        // URI Uniform Resource Identifier.
-func (r *inmemoryRequest) CreatedAt() time.Time       { return r.createdAt }  // CreatedAt creation time.
-
-var ErrClosed = errors.New("closed")
-
-type InMemory struct {
-	sessionTTL  time.Duration
-	maxRequests uint16
-
-	cleanupInterval time.Duration
-
-	storageMu sync.RWMutex
-	storage   map[string]*inmemorySession // key is session UUID
-
-	close    chan struct{}
-	closedMu sync.RWMutex
-	closed   bool
-}
-
-const defaultInMemoryCleanupInterval = time.Second // default cleanup interval
-
-// NewInMemory creates inmemory storage.
-func NewInMemory(sessionTTL time.Duration, maxRequests uint16, cleanup ...time.Duration) *InMemory {
-	ci := defaultInMemoryCleanupInterval
-
-	if len(cleanup) > 0 {
-		ci = cleanup[0]
+		close  chan struct{}
+		closed atomic.Bool
 	}
 
-	s := &InMemory{
+	sessionData struct {
+		sync.Mutex
+		session  Session
+		requests syncMap[ /* rID */ string, Request]
+	}
+)
+
+var ( // ensure interface implementation
+	_ Storage   = (*InMemory)(nil)
+	_ io.Closer = (*InMemory)(nil)
+)
+
+type InMemoryOption func(*InMemory)
+
+// WithInMemoryCleanupInterval sets the cleanup interval for expired sessions.
+func WithInMemoryCleanupInterval(v time.Duration) InMemoryOption {
+	return func(s *InMemory) { s.cleanupInterval = v }
+}
+
+// NewInMemory creates a new in-memory storage with the given session TTL and the maximum number of stored requests.
+// Note that the cleanup goroutine is started automatically if the cleanup interval is greater than zero.
+// To stop the cleanup goroutine and close the storage, call the InMemory.Close method.
+func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryOption) *InMemory {
+	var s = InMemory{
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
-		cleanupInterval: ci,
-		storage:         make(map[string]*inmemorySession),
-		close:           make(chan struct{}, 1),
+		close:           make(chan struct{}),
+		cleanupInterval: time.Second, // default cleanup interval
 	}
-	go s.cleanup()
 
-	return s
+	for _, opt := range opts {
+		opt(&s)
+	}
+
+	if s.cleanupInterval > time.Duration(0) {
+		go s.cleanup() // start cleanup goroutine
+	}
+
+	return &s
 }
 
-func (s *InMemory) cleanup() {
-	defer close(s.close)
+// newID generates a new (unique) ID.
+func (*InMemory) newID() string { return uuid.New().String() }
 
-	timer := time.NewTimer(s.cleanupInterval)
+func (s *InMemory) cleanup() {
+	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
+
+	var ctx = context.Background()
+
+	defer func() { // cleanup on exit
+		s.sessions.Range(func(sID string, _ *sessionData) bool {
+			_ = s.DeleteSession(ctx, sID)
+
+			return true
+		})
+	}()
 
 	for {
 		select {
-		case <-s.close:
-			s.storageMu.Lock()
-			for id := range s.storage {
-				delete(s.storage, id)
-			}
-			s.storageMu.Unlock()
-
+		case <-s.close: // close signal received
 			return
-
 		case <-timer.C:
-			s.storageMu.Lock()
-			var now = time.Now().UnixNano()
+			var now = time.Now()
 
-			for id, session := range s.storage {
-				if now > session.expiresAtNano {
-					delete(s.storage, id)
+			s.sessions.Range(func(sID string, data *sessionData) bool {
+				data.Lock()
+				var expiresAt = data.session.ExpiresAt
+				data.Unlock()
+
+				if expiresAt.Before(now) {
+					_ = s.DeleteSession(ctx, sID)
 				}
-			}
-			s.storageMu.Unlock()
+
+				return true
+			})
 
 			timer.Reset(s.cleanupInterval)
 		}
 	}
 }
 
-func (s *InMemory) isClosed() (closed bool) {
-	s.closedMu.RLock()
-	closed = s.closed
-	s.closedMu.RUnlock()
+func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	} else if s.closed.Load() {
+		return "", ErrClosed // storage is closed
+	}
+
+	var now = time.Now()
+
+	if len(id) > 0 { // use the specified ID
+		if len(id[0]) == 0 {
+			return "", errors.New("empty session ID")
+		}
+
+		sID = id[0]
+
+		// check if the session with the specified ID already exists
+		if _, ok := s.sessions.Load(sID); ok {
+			return "", fmt.Errorf("session %s already exists", sID)
+		}
+	} else {
+		sID = s.newID() // generate a new ID
+	}
+
+	session.CreatedAtUnixMilli, session.ExpiresAt = now.UnixMilli(), now.Add(s.sessionTTL)
+
+	s.sessions.Store(sID, &sessionData{session: session})
 
 	return
 }
 
-// Close current storage with data invalidation.
-func (s *InMemory) Close() error {
-	if s.isClosed() {
-		return ErrClosed
+func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
+		return nil, ErrClosed // storage is closed
 	}
 
-	s.closedMu.Lock()
-	s.closed = true
-	s.closedMu.Unlock()
+	data, ok := s.sessions.Load(sID)
+	if !ok {
+		return nil, ErrSessionNotFound // not found
+	}
 
-	s.close <- struct{}{}
+	data.Lock()
+	var expiresAt = data.session.ExpiresAt
+	data.Unlock()
+
+	if expiresAt.Before(time.Now()) {
+		s.sessions.Delete(sID)
+
+		return nil, ErrSessionNotFound // session has been expired
+	}
+
+	return &data.session, nil
+}
+
+func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
+	}
+
+	data, ok := s.sessions.Load(sID)
+	if !ok {
+		return ErrSessionNotFound // session not found
+	}
+
+	data.Lock()
+	data.session.ExpiresAt = data.session.ExpiresAt.Add(howMuch)
+	data.Unlock()
 
 	return nil
 }
 
-// GetSession returns session data.
-func (s *InMemory) GetSession(uuid string) (Session, error) {
-	if s.isClosed() {
-		return nil, ErrClosed
+func (s *InMemory) DeleteSession(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
 	}
 
-	s.storageMu.RLock()
-	session, ok := s.storage[uuid]
-	s.storageMu.RUnlock()
-
-	if ok {
-		// session has been expired?
-		if time.Now().UnixNano() > session.expiresAtNano {
-			s.storageMu.Lock()
-			delete(s.storage, uuid)
-			s.storageMu.Unlock()
-
-			return nil, nil // session has been expired (not found)
-		}
-
-		return session, nil
-	}
-
-	return nil, nil // not found
-}
-
-// CreateSession creates new session in storage using passed data.
-func (s *InMemory) CreateSession(content []byte, code uint16, contentType string, delay time.Duration, sessionUUID ...string) (string, error) { //nolint:lll
-	if s.isClosed() {
-		return "", ErrClosed
-	}
-
-	var id string
-
-	if len(sessionUUID) == 1 && IsValidUUID(sessionUUID[0]) {
-		id = sessionUUID[0]
+	if data, ok := s.sessions.LoadAndDelete(sID); !ok {
+		return ErrSessionNotFound // session not found
 	} else {
-		id = NewUUID()
+		data.requests.Range(func(rID string, _ Request) bool { // delete all session requests
+			data.requests.Delete(rID)
+
+			return true
+		})
 	}
 
-	now := time.Now()
-
-	s.storageMu.Lock()
-	s.storage[id] = &inmemorySession{
-		uuid:          id,
-		content:       content,
-		code:          code,
-		contentType:   contentType,
-		delay:         delay,
-		createdAt:     now,
-		requests:      make(map[string]*inmemoryRequest, s.maxRequests),
-		expiresAtNano: now.UnixNano() + s.sessionTTL.Nanoseconds(),
-	}
-	s.storageMu.Unlock()
-
-	return id, nil
+	return nil
 }
 
-// DeleteSession deletes session with passed UUID.
-func (s *InMemory) DeleteSession(uuid string) (bool, error) {
-	session, err := s.GetSession(uuid)
-	if err != nil {
-		return false, err
+func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	} else if s.closed.Load() {
+		return "", ErrClosed // storage is closed
 	}
 
-	if session != nil {
-		s.storageMu.Lock()
-		delete(s.storage, uuid)
-		s.storageMu.Unlock()
-
-		return true, nil // found and deleted
+	data, ok := s.sessions.Load(sID)
+	if !ok {
+		return "", ErrSessionNotFound // session not found
 	}
 
-	return false, nil // session was not found
-}
+	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
 
-// DeleteRequests deletes stored requests for session with passed UUID.
-func (s *InMemory) DeleteRequests(uuid string) (bool, error) {
-	session, err := s.GetSession(uuid)
-	if err != nil {
-		return false, err
-	}
+	data.requests.Store(rID, r)
 
-	if session != nil {
-		s.storageMu.Lock()
-		defer s.storageMu.Unlock()
-
-		if len(s.storage[uuid].requests) == 0 {
-			return false, nil // nothing to delete
+	{ // limit stored requests count
+		type rq struct { // a runtime representation of the request, used for sorting
+			id string
+			ts int64
 		}
 
-		for id := range s.storage[uuid].requests {
-			delete(s.storage[uuid].requests, id)
-		}
+		var all = make([]rq, 0) // a slice for all session requests
 
-		return true, nil // requests deleted
-	}
+		data.requests.Range(func(id string, req Request) bool { // iterate over all session requests and fill the slice
+			all = append(all, rq{id, req.CreatedAtUnixMilli})
 
-	return false, nil // session was not found
-}
-
-// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
-// stored requests for the session.
-func (s *InMemory) CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error) { //nolint:lll
-	session, err := s.GetSession(sessionUUID)
-	if err != nil {
-		return "", err
-	}
-
-	if session != nil {
-		s.storageMu.Lock()
-		defer s.storageMu.Unlock()
-
-		now := time.Now()
-		id := NewUUID()
-
-		// append new request
-		s.storage[sessionUUID].requests[id] = &inmemoryRequest{
-			uuid:       id,
-			clientAddr: clientAddr,
-			method:     method,
-			content:    content,
-			headers:    headers,
-			uri:        uri,
-			createdAt:  now,
-		}
-
-		// update session TTL
-		s.storage[sessionUUID].expiresAtNano = now.UnixNano() + s.sessionTTL.Nanoseconds()
-
-		// limit stored requests count
-		if rl := len(s.storage[sessionUUID].requests); rl > int(s.maxRequests) {
-			type rq struct {
-				id string
-				ts int64
-			}
-
-			allReq := make([]rq, 0, rl)
-
-			for k := range s.storage[sessionUUID].requests {
-				allReq = append(allReq, rq{k, s.storage[sessionUUID].requests[k].createdAt.UnixNano()})
-			}
-
-			sort.Slice(allReq, func(i, j int) bool { return allReq[i].ts > allReq[j].ts })
-
-			for i, plan := 0, allReq[int(s.maxRequests):]; i < len(plan); i++ {
-				delete(s.storage[sessionUUID].requests, plan[i].id)
-			}
-		}
-
-		return id, nil // request added
-	}
-
-	return "", nil // session was not found
-}
-
-// GetRequest returns request data.
-func (s *InMemory) GetRequest(sessionUUID, requestUUID string) (Request, error) {
-	session, err := s.GetSession(sessionUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	if session != nil {
-		s.storageMu.RLock()
-		defer s.storageMu.RUnlock()
-
-		if _, reqOk := s.storage[sessionUUID].requests[requestUUID]; reqOk {
-			return s.storage[sessionUUID].requests[requestUUID], nil
-		}
-
-		return nil, nil // request was not found
-	}
-
-	return nil, nil // session was not found
-}
-
-// GetAllRequests returns all request as a slice of structures.
-func (s *InMemory) GetAllRequests(sessionUUID string) ([]Request, error) {
-	session, err := s.GetSession(sessionUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	if session != nil {
-		s.storageMu.RLock()
-		defer s.storageMu.RUnlock()
-
-		if len(s.storage[sessionUUID].requests) == 0 {
-			return nil, nil // no requests
-		}
-
-		result := make([]Request, 0, len(s.storage[sessionUUID].requests))
-		for id := range s.storage[sessionUUID].requests {
-			result = append(result, s.storage[sessionUUID].requests[id])
-		}
-
-		sort.Slice(result, func(i, j int) bool {
-			return result[i].(*inmemoryRequest).createdAt.UnixNano() < result[j].(*inmemoryRequest).createdAt.UnixNano()
+			return true
 		})
 
-		return result, nil
-	}
+		if len(all) > int(s.maxRequests) { // if the number of requests exceeds the limit
+			sort.Slice(all, func(i, j int) bool { return all[i].ts > all[j].ts }) // sort requests by creation time
 
-	return nil, nil // session was not found
-}
-
-// DeleteRequest deletes stored request with passed session and request UUIDs.
-func (s *InMemory) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
-	session, err := s.GetSession(sessionUUID)
-	if err != nil {
-		return false, err
-	}
-
-	if session != nil {
-		s.storageMu.Lock()
-		defer s.storageMu.Unlock()
-
-		if _, ok := s.storage[sessionUUID].requests[requestUUID]; ok {
-			delete(s.storage[sessionUUID].requests, requestUUID)
-
-			return true, nil // deleted
+			for i := int(s.maxRequests); i < len(all); i++ { // delete the oldest requests
+				data.requests.Delete(all[i].id)
+			}
 		}
-
-		return false, nil // request was not found
 	}
 
-	return false, nil // session was not found
+	return
 }
+
+func (s *InMemory) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
+		return nil, ErrClosed // storage is closed
+	}
+
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
+		return nil, ErrSessionNotFound // session not found
+	}
+
+	if request, ok := session.requests.Load(rID); ok {
+		return &request, nil
+	}
+
+	return nil, ErrRequestNotFound // request not found
+}
+
+func (s *InMemory) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	} else if s.closed.Load() {
+		return nil, ErrClosed // storage is closed
+	}
+
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
+		return nil, ErrSessionNotFound // session not found
+	}
+
+	var all = make(map[string]Request)
+
+	session.requests.Range(func(id string, req Request) bool {
+		all[id] = req
+
+		return true
+	})
+
+	return all, nil
+}
+
+func (s *InMemory) DeleteRequest(ctx context.Context, sID, rID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
+	}
+
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
+		return ErrSessionNotFound // session not found
+	}
+
+	if _, ok := session.requests.LoadAndDelete(rID); ok {
+		return nil
+	}
+
+	return ErrRequestNotFound // request not found
+}
+
+func (s *InMemory) DeleteAllRequests(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
+	}
+
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
+		return ErrSessionNotFound // session not found
+	}
+
+	// delete all session requests
+	session.requests.Range(func(rID string, _ Request) bool {
+		session.requests.Delete(rID)
+
+		return true
+	})
+
+	return nil
+}
+
+// Close closes the storage and stops the cleanup goroutine. Any further calls to the storage methods will
+// return ErrClosed.
+func (s *InMemory) Close() error {
+	if s.closed.CompareAndSwap(false, true) {
+		close(s.close)
+
+		return nil
+	}
+
+	return ErrClosed
+}
+
+// syncMap is a thread-safe map with strong-typed keys and values.
+type syncMap[K comparable, V any] struct{ m sync.Map }
+
+// Delete deletes the value for a key.
+func (m *syncMap[K, V]) Delete(key K) { m.m.Delete(key) }
+
+// Load returns the value stored in the map for a key, or nil if no value is present.
+// The ok result indicates whether value was found in the map.
+func (m *syncMap[K, V]) Load(key K) (value V, ok bool) {
+	v, ok := m.m.Load(key)
+	if !ok {
+		return value, ok
+	}
+
+	return v.(V), ok
+}
+
+// LoadAndDelete deletes the value for a key, returning the previous value if any.
+// The loaded result reports whether the key was present.
+func (m *syncMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
+	v, loaded := m.m.LoadAndDelete(key)
+	if !loaded {
+		return value, loaded
+	}
+
+	return v.(V), loaded
+}
+
+// Range calls f sequentially for each key and value present in the map.
+// If f returns false, range stops the iteration.
+func (m *syncMap[K, V]) Range(f func(key K, value V) bool) {
+	m.m.Range(func(key, value any) bool { return f(key.(K), value.(V)) })
+}
+
+// Store sets the value for a key.
+func (m *syncMap[K, V]) Store(key K, value V) { m.m.Store(key, value) }

@@ -2,224 +2,90 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"sync"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/vmihailenco/msgpack/v5"
+	"github.com/redis/go-redis/v9"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
-type (
-	// Redis publisher/subscriber uses redis server for events publishing and delivering to the subscribers. Useful for
-	// application "distributed" mode running.
-	//
-	// Publishing/subscribing events order and delivering (in cases then there is no one active subscriber for the
-	// channel) is NOT guaranteed.
-	//
-	// Node: Do not forget to Close it after all. Closed publisher/subscriber cannot be opened back.
-	Redis struct {
-		ctx context.Context
-		rdb *redis.Client
+type redisClient interface {
+	redis.Cmdable
+	Subscribe(ctx context.Context, channels ...string) *redis.PubSub
+}
 
-		subsMu sync.Mutex
-		subs   map[string]*redisSubscription
+type Redis[T any] struct {
+	client redisClient
+	encDec encoding.EncoderDecoder
+}
 
-		closedMu sync.Mutex
-		closed   bool
-	}
-
-	redisSubscription struct {
-		start sync.Once
-		stop  chan struct{}
-
-		subscribersMu sync.Mutex
-		subscribers   map[chan<- Event]struct{}
-	}
+var ( // ensure interface implementation
+	_ Publisher[any]  = (*Redis[any])(nil)
+	_ Subscriber[any] = (*Redis[any])(nil)
 )
 
-// NewRedis creates new redis publisher/subscriber.
-func NewRedis(ctx context.Context, rdb *redis.Client) *Redis {
-	return &Redis{
-		ctx:  ctx,
-		rdb:  rdb,
-		subs: make(map[string]*redisSubscription),
-	}
+func NewRedis[T any](c redisClient, encDec encoding.EncoderDecoder) *Redis[T] {
+	return &Redis[T]{client: c, encDec: encDec}
 }
 
-// redisEvent is an internal structure for events serialization.
-type redisEvent struct {
-	Name string `msgpack:"n"`
-	Data []byte `msgpack:"d"`
-}
+func (ps *Redis[T]) Subscribe(ctx context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error) {
+	var (
+		pubSub        = ps.client.Subscribe(ctx, topic)
+		sub           = make(chan T)
+		stop, stopped = make(chan struct{}), make(chan struct{})
+	)
 
-// Publish an event into passed channel.
-func (ps *Redis) Publish(channelName string, event Event) error {
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
-	}
+	go func() {
+		defer close(stopped) // notify unsubscribe that the goroutine is stopped
 
-	if ps.isClosed() {
-		return errors.New("closed")
-	}
+		var channel = pubSub.Channel() // get the channel for the topic
 
-	b, err := msgpack.Marshal(redisEvent{Name: event.Name(), Data: event.Data()})
-	if err != nil {
-		return err
-	}
+		defer func() { _ = pubSub.Close() }() // guaranty that pubSub will be closed
 
-	return ps.rdb.Publish(ps.ctx, channelName, string(b)).Err()
-}
+		for {
+			select {
+			case <-ctx.Done():
+				return // check the context
+			case <-stop:
+				return // check the stopping notification
+			case msg := <-channel: // wait for the message
+				if msg == nil {
+					continue
+				}
 
-// Subscribe to the named channel and receive Event's into the passed channel.
-//
-// Note: that this function does not wait on a response from redis server, so the subscription may not be active
-// immediately.
-func (ps *Redis) Subscribe(channelName string, channel chan<- Event) error { //nolint:funlen
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
-	}
+				var event T
 
-	if ps.isClosed() {
-		return errors.New("closed")
-	}
+				if err := ps.encDec.Decode([]byte(msg.Payload), &event); err != nil {
+					continue
+				}
 
-	// create subscription if needed
-	ps.subsMu.Lock()
-	if _, exists := ps.subs[channelName]; !exists {
-		ps.subs[channelName] = &redisSubscription{
-			stop:        make(chan struct{}, 1),
-			subscribers: make(map[chan<- Event]struct{}),
-		}
-	}
-	ps.subsMu.Unlock()
-
-	ps.subs[channelName].subscribersMu.Lock()
-	defer ps.subs[channelName].subscribersMu.Unlock()
-
-	// append passed channel into subscribers map
-	if _, exists := ps.subs[channelName].subscribers[channel]; exists {
-		return errors.New("already subscribed")
-	}
-
-	ps.subs[channelName].subscribers[channel] = struct{}{}
-
-	ps.subs[channelName].start.Do(func() {
-		started := make(chan struct{}, 1)
-
-		go func(sub *redisSubscription) {
-			var (
-				pubSub = ps.rdb.Subscribe(ps.ctx, channelName)
-				ch     = pubSub.Channel()
-			)
-
-			defer func() {
-				_ = pubSub.Close()
-				_ = pubSub.Unsubscribe(ps.ctx, channelName)
-			}()
-
-			started <- struct{}{}
-			close(started)
-
-			for {
-				select {
-				case <-sub.stop:
+				select { // send the event to the subscriber
+				case <-ctx.Done():
 					return
-
-				case msg, opened := <-ch:
-					if !opened {
-						return
-					}
-
-					var rawEvent redisEvent
-					if err := msgpack.Unmarshal([]byte(msg.Payload), &rawEvent); err != nil {
-						continue
-					}
-
-					e := event{name: rawEvent.Name, data: rawEvent.Data}
-
-					sub.subscribersMu.Lock()
-
-					for receiver := range sub.subscribers { // iterate over all subscribed channels
-						go func(target chan<- Event) {
-							target <- &e // <- panic can be occurred here (if channel was closed too early from outside)
-						}(receiver)
-					}
-
-					sub.subscribersMu.Unlock()
+				case <-stop:
+					return
+				case sub <- event:
 				}
 			}
-		}(ps.subs[channelName])
+		}
+	}()
 
-		<-started // make sure that subscription was started
-	})
+	return sub, sync.OnceFunc(func() {
+		_ = pubSub.Close() // close the subscription
 
-	return nil
+		close(stop) // notify the goroutine to stop
+
+		<-stopped // wait for the goroutine to stop
+
+		close(sub) // close the subscription channel
+	}), nil
 }
 
-// Unsubscribe the subscription to the named channel for the passed events channel. Be careful with channel closing,
-// this can call the panics if some Event's scheduled for publishing.
-func (ps *Redis) Unsubscribe(channelName string, channel chan Event) error {
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
+func (ps *Redis[T]) Publish(ctx context.Context, topic string, event T) error {
+	data, mErr := ps.encDec.Encode(event)
+	if mErr != nil {
+		return mErr
 	}
 
-	if ps.isClosed() {
-		return errors.New("closed")
-	}
-
-	ps.subsMu.Lock()
-	defer ps.subsMu.Unlock()
-
-	if _, exists := ps.subs[channelName]; !exists {
-		return errors.New("subscription does not exists")
-	}
-
-	if _, exists := ps.subs[channelName].subscribers[channel]; !exists {
-		return errors.New("channel was not subscribed")
-	}
-
-	// cancel subscription
-	ps.subs[channelName].subscribersMu.Lock()
-	delete(ps.subs[channelName].subscribers, channel)
-	subscribersCount := len(ps.subs[channelName].subscribers)
-	ps.subs[channelName].subscribersMu.Unlock()
-
-	// in case when there is no one active subscriber for the channel - we should to notify redis subscriber about
-	// stopping and clean up
-	if subscribersCount == 0 {
-		ps.subs[channelName].stop <- struct{}{}
-		close(ps.subs[channelName].stop)
-		delete(ps.subs, channelName)
-	}
-
-	return nil
-}
-
-func (ps *Redis) isClosed() (isClosed bool) {
-	ps.closedMu.Lock()
-	isClosed = ps.closed
-	ps.closedMu.Unlock()
-
-	return
-}
-
-// Close this publisher/subscriber. This function can be called only once.
-func (ps *Redis) Close() error {
-	if ps.isClosed() {
-		return errors.New("already closed")
-	}
-
-	ps.closedMu.Lock()
-	ps.closed = true
-	ps.closedMu.Unlock()
-
-	ps.subsMu.Lock()
-	for channelName, sub := range ps.subs {
-		sub.stop <- struct{}{}
-		close(sub.stop)
-		delete(ps.subs, channelName)
-	}
-	ps.subsMu.Unlock()
-
-	return nil
+	return ps.client.Publish(ctx, topic, data).Err()
 }

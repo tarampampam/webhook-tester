@@ -3,157 +3,198 @@ package storage
 import (
 	"context"
 	"errors"
-	"sort"
+	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/vmihailenco/msgpack/v5"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+
+	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
-// Redis is redis storage implementation.
-type Redis struct {
-	ctx         context.Context
-	rdb         *redis.Client
-	ttl         time.Duration
-	maxRequests uint16
-}
-
-// NewRedis creates new redis storage instance.
-func NewRedis(ctx context.Context, rdb *redis.Client, sessionTTL time.Duration, maxRequests uint16) *Redis { //nolint:lll
-	return &Redis{
-		ctx:         ctx,
-		rdb:         rdb,
-		ttl:         sessionTTL,
-		maxRequests: maxRequests,
+type (
+	Redis struct {
+		sessionTTL  time.Duration
+		maxRequests uint32
+		client      redis.Cmdable
+		encDec      encoding.EncoderDecoder
 	}
+)
+
+var _ Storage = (*Redis)(nil) // ensure interface implementation
+
+type RedisOption func(*Redis)
+
+// NewRedis creates a new Redis storage.
+// Notes:
+//   - sTTL is the session TTL (redis accuracy is in milliseconds)
+//   - maxReq is the maximum number of requests to store for the session
+func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisOption) *Redis {
+	var s = Redis{
+		sessionTTL:  sTTL,
+		maxRequests: maxReq,
+		client:      c,
+		encDec:      encoding.JSON{},
+	}
+
+	for _, opt := range opts {
+		opt(&s)
+	}
+
+	return &s
 }
 
-// GetSession returns session data.
-func (s *Redis) GetSession(uuid string) (Session, error) {
-	value, err := s.rdb.Get(s.ctx, redisKey(uuid).session()).Bytes()
+// sessionKey returns the key for the session data.
+func (*Redis) sessionKey(sID string) string { return "webhook-tester-v2:session:" + sID }
 
+// requestsKey returns the key for the requests list.
+func (s *Redis) requestsKey(sID string) string { return s.sessionKey(sID) + ":requests" }
+
+// requestKey returns the key for the request data.
+func (s *Redis) requestKey(sID, rID string) string { return s.sessionKey(sID) + ":requests:" + rID }
+
+// newID generates a new (unique) ID.
+func (*Redis) newID() string { return uuid.New().String() }
+
+func (s *Redis) isSessionExists(ctx context.Context, sID string) (bool, error) {
+	count, err := s.client.Exists(ctx, s.sessionKey(sID)).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, nil // not found
+		return false, err
+	}
+
+	return count == 1, nil
+}
+
+func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+	if len(id) > 0 { // use the specified ID
+		if len(id[0]) == 0 {
+			return "", errors.New("empty session ID")
 		}
 
-		return nil, err
-	}
+		sID = id[0]
 
-	var sData = redisSession{}
-
-	if msgpackErr := msgpack.Unmarshal(value, &sData); msgpackErr != nil {
-		return nil, msgpackErr
-	}
-
-	sData.Uuid = uuid
-
-	return &sData, nil
-}
-
-// CreateSession creates new session in storage using passed data.
-func (s *Redis) CreateSession(content []byte, code uint16, contentType string, delay time.Duration, sessionUUID ...string) (string, error) { //nolint:lll
-	sData := redisSession{
-		RespContent:     content,
-		RespCode:        code,
-		RespContentType: contentType,
-		RespDelay:       delay.Nanoseconds(),
-		TS:              time.Now().Unix(),
-	}
-
-	packed, msgpackErr := msgpack.Marshal(sData)
-	if msgpackErr != nil {
-		return "", msgpackErr
-	}
-
-	var id string
-
-	if len(sessionUUID) == 1 && IsValidUUID(sessionUUID[0]) {
-		id = sessionUUID[0]
+		// check if the session with the specified ID already exists
+		if exists, err := s.isSessionExists(ctx, sID); err != nil {
+			return "", err
+		} else if exists {
+			return "", fmt.Errorf("session %s already exists", sID)
+		}
 	} else {
-		id = NewUUID()
+		sID = s.newID()
 	}
 
-	if err := s.rdb.Set(s.ctx, redisKey(id).session(), packed, s.ttl).Err(); err != nil {
+	session.CreatedAtUnixMilli = time.Now().UnixMilli()
+
+	data, mErr := s.encDec.Encode(session)
+	if mErr != nil {
+		return "", mErr
+	}
+
+	if err := s.client.Set(ctx, s.sessionKey(sID), data, s.sessionTTL).Err(); err != nil {
 		return "", err
 	}
 
-	return id, nil
+	return sID, nil
 }
 
-func (s *Redis) deleteKeys(keys ...string) (bool, error) {
-	cmdResult := s.rdb.Del(s.ctx, keys...)
+func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
+	data, rErr := s.client.Get(ctx, s.sessionKey(sID)).Bytes()
+	if rErr != nil {
+		if errors.Is(rErr, redis.Nil) {
+			return nil, ErrSessionNotFound
+		}
 
-	if err := cmdResult.Err(); err != nil {
-		return false, err
+		return nil, rErr
 	}
 
-	if count, err := cmdResult.Result(); err != nil {
-		return false, err
+	expire, err := s.client.PTTL(ctx, s.sessionKey(sID)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var session Session
+	if uErr := s.encDec.Decode(data, &session); uErr != nil {
+		return nil, uErr
+	}
+
+	session.ExpiresAt = time.Now().Add(expire)
+
+	return &session, nil
+}
+
+func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
+	currentTTL, tErr := s.client.PTTL(ctx, s.sessionKey(sID)).Result()
+	if tErr != nil {
+		return tErr
+	}
+
+	if currentTTL < 0 {
+		switch { // https://redis.io/docs/latest/commands/ttl/
+		case currentTTL == -2:
+			return ErrSessionNotFound
+		case currentTTL == -1:
+			return fmt.Errorf("no associated expire: %w", ErrSessionNotFound)
+		}
+
+		return errors.New("unexpected TTL value")
+	}
+
+	// read all stored request UUIDs
+	rIDs, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
+	if rErr != nil {
+		return rErr
+	}
+
+	// update the expiration date for the session and all requests
+	// https://redis.io/docs/latest/commands/expire/
+	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		var newTTL = currentTTL + howMuch
+		for _, rID := range rIDs {
+			pipe.PExpire(ctx, s.requestKey(sID, rID), newTTL)
+		}
+
+		pipe.PExpire(ctx, s.requestsKey(sID), newTTL)
+		pipe.PExpire(ctx, s.sessionKey(sID), newTTL)
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
+	if result := s.client.Del(ctx, s.sessionKey(sID)); result.Err() != nil {
+		return result.Err()
+	} else if count, rErr := result.Result(); rErr != nil {
+		return rErr
 	} else if count == 0 {
-		return false, nil
+		return ErrSessionNotFound
 	}
 
-	return true, nil
+	return nil
 }
 
-// DeleteSession deletes session with passed UUID.
-func (s *Redis) DeleteSession(uuid string) (bool, error) {
-	return s.deleteKeys(redisKey(uuid).session())
-}
-
-// DeleteRequests deletes stored requests for session with passed UUID.
-func (s *Redis) DeleteRequests(sessionUUID string) (bool, error) {
-	key := redisKey(sessionUUID)
-
-	// get request UUIDs, associated with session
-	requestUUIDs, readErr := s.rdb.ZRangeByScore(s.ctx, key.requests(), &redis.ZRangeBy{
-		Min: "-inf",
-		Max: "+inf",
-	}).Result()
-	if readErr != nil {
-		return false, readErr
+func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return "", err
+	} else if !exists {
+		return "", ErrSessionNotFound
 	}
 
-	// removing plan
-	var keys = []string{key.requests()}
+	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
 
-	for i := range requestUUIDs {
-		keys = append(keys, key.request(requestUUIDs[i]))
+	data, mErr := s.encDec.Encode(r)
+	if mErr != nil {
+		return "", mErr
 	}
 
-	return s.deleteKeys(keys...)
-}
-
-// CreateRequest creates new request in storage using passed data and updates expiration time for session and all
-// stored requests for the session.
-func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, uri string, content []byte, headers map[string]string) (string, error) { //nolint:funlen,lll
-	var (
-		now = time.Now()
-		key = redisKey(sessionUUID)
-	)
-
-	packed, msgpackErr := msgpack.Marshal(redisRequest{
-		ReqClientAddr: clientAddr,
-		ReqMethod:     method,
-		ReqContent:    content,
-		ReqHeaders:    headers,
-		ReqURI:        uri,
-		TS:            now.Unix(),
-	})
-	if msgpackErr != nil {
-		return "", msgpackErr
-	}
-
-	id := NewUUID()
-
-	// save request data
-	if _, err := s.rdb.Pipelined(s.ctx, func(pipe redis.Pipeliner) error {
-		pipe.ZAdd(s.ctx, key.requests(), &redis.Z{
-			Score:  float64(now.UnixNano()),
-			Member: id,
-		})
-		pipe.Set(s.ctx, key.request(id), packed, s.ttl)
+	// save the request data
+	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(r.CreatedAtUnixMilli), Member: rID})
+		pipe.Set(ctx, s.requestKey(sID, rID), data, s.sessionTTL)
 
 		return nil
 	}); err != nil {
@@ -161,20 +202,17 @@ func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, uri string, conte
 	}
 
 	// read all stored request UUIDs
-	requestUUIDs, readErr := s.rdb.ZRangeByScore(s.ctx, key.requests(), &redis.ZRangeBy{
-		Min: "-inf",
-		Max: "+inf",
-	}).Result()
-	if readErr != nil {
-		return "", readErr
+	ids, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
+	if rErr != nil {
+		return "", rErr
 	}
 
-	// if currently we have more than allowed requests - remove unnecessary
-	if len(requestUUIDs) > int(s.maxRequests) {
-		if _, err := s.rdb.Pipelined(s.ctx, func(pipe redis.Pipeliner) error {
-			for _, k := range requestUUIDs[:len(requestUUIDs)-int(s.maxRequests)] {
-				pipe.ZRem(s.ctx, key.requests(), k)
-				pipe.Del(s.ctx, key.request(k))
+	// if we have too many requests - remove unnecessary
+	if len(ids) > int(s.maxRequests) {
+		if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+			for _, id := range ids[:len(ids)-int(s.maxRequests)] {
+				pipe.ZRem(ctx, s.requestsKey(sID), id)
+				pipe.Del(ctx, s.requestKey(sID, id))
 			}
 
 			return nil
@@ -183,155 +221,137 @@ func (s *Redis) CreateRequest(sessionUUID, clientAddr, method, uri string, conte
 		}
 	}
 
-	// update expiring date
-	if _, err := s.rdb.Pipelined(s.ctx, func(pipe redis.Pipeliner) error {
-		if len(requestUUIDs) > 0 {
-			forUpdate := make([]string, 0, len(requestUUIDs))
+	return rID, nil
+}
 
-			if len(requestUUIDs) > int(s.maxRequests) {
-				forUpdate = requestUUIDs[len(requestUUIDs)-int(s.maxRequests):]
-			} else {
-				forUpdate = append(forUpdate, requestUUIDs...)
-			}
+func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
+	}
 
-			for i := range forUpdate {
-				pipe.Expire(s.ctx, key.request(forUpdate[i]), s.ttl)
-			}
+	data, rErr := s.client.Get(ctx, s.requestKey(sID, rID)).Bytes()
+	if rErr != nil {
+		if errors.Is(rErr, redis.Nil) {
+			return nil, ErrRequestNotFound
 		}
-		pipe.Expire(s.ctx, key.requests(), s.ttl)
-		pipe.Expire(s.ctx, key.session(), s.ttl)
+
+		return nil, rErr
+	}
+
+	var request Request
+	if uErr := s.encDec.Decode(data, &request); uErr != nil {
+		return nil, uErr
+	}
+
+	return &request, nil
+}
+
+func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
+	}
+
+	// read all stored request IDs
+	ids, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
+	if rErr != nil {
+		return nil, rErr
+	}
+
+	if len(ids) == 0 {
+		return make(map[string]Request), nil
+	}
+
+	var (
+		all  = make(map[string]Request, len(ids))
+		keys = make([]string, len(ids))
+	)
+
+	// convert request IDs to keys
+	for i, id := range ids {
+		keys[i] = s.requestKey(sID, id)
+	}
+
+	// read all request data
+	data, mErr := s.client.MGet(ctx, keys...).Result()
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	for i, d := range data {
+		if d == nil {
+			continue
+		}
+
+		var request Request
+		if uErr := s.encDec.Decode([]byte(d.(string)), &request); uErr != nil {
+			return nil, uErr
+		}
+
+		all[ids[i]] = request
+	}
+
+	return all, nil
+}
+
+func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return err
+	} else if !exists {
+		return ErrSessionNotFound
+	}
+
+	var deleted *redis.IntCmd
+
+	// delete the request
+	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.ZRem(ctx, s.requestsKey(sID), rID)
+		deleted = pipe.Del(ctx, s.requestKey(sID, rID))
 
 		return nil
 	}); err != nil {
-		return "", err
+		return err
 	}
 
-	return id, nil
+	if deleted.Val() == 0 {
+		return ErrRequestNotFound
+	}
+
+	return nil
 }
 
-// GetRequest returns request data.
-func (s *Redis) GetRequest(sessionUUID, requestUUID string) (Request, error) {
-	value, err := s.rdb.Get(s.ctx, redisKey(sessionUUID).request(requestUUID)).Bytes()
+func (s *Redis) DeleteAllRequests(ctx context.Context, sID string) error {
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return err
+	} else if !exists {
+		return ErrSessionNotFound
+	}
 
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, nil // not found
+	// read all stored request IDs
+	ids, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
+	if rErr != nil {
+		return rErr
+	}
+
+	// delete all requests
+	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, id := range ids {
+			pipe.Del(ctx, s.requestKey(sID, id))
 		}
 
-		return nil, err
+		pipe.Del(ctx, s.requestsKey(sID))
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	rData := redisRequest{}
-	if msgpackErr := msgpack.Unmarshal(value, &rData); msgpackErr != nil {
-		return nil, msgpackErr
-	}
-
-	rData.Uuid = requestUUID
-
-	return &rData, nil
+	return nil
 }
-
-// GetAllRequests returns all request as a slice of structures.
-func (s *Redis) GetAllRequests(sessionUUID string) ([]Request, error) {
-	var key = redisKey(sessionUUID)
-
-	if exists, existsErr := s.rdb.Exists(s.ctx, key.requests()).Result(); existsErr != nil {
-		return nil, existsErr
-	} else if exists == 0 {
-		return nil, nil // not found
-	}
-
-	UUIDs, allErr := s.rdb.ZRangeByScore(s.ctx, key.requests(), &redis.ZRangeBy{
-		Min: "-inf",
-		Max: "+inf",
-	}).Result()
-
-	if allErr != nil {
-		return nil, allErr
-	}
-
-	result := make([]Request, 0, 8) //nolint:mnd
-
-	if len(UUIDs) > 0 {
-		// convert request UUIDs into storage keys
-		keys := make([]string, len(UUIDs))
-
-		for i := range UUIDs {
-			keys[i] = key.request(UUIDs[i])
-		}
-
-		// read all requests in a one request
-		rawRequests, gettingErr := s.rdb.MGet(s.ctx, keys...).Result()
-		if gettingErr != nil {
-			return nil, gettingErr
-		}
-
-		for i := range UUIDs {
-			if packed, ok := rawRequests[i].(string); ok {
-				rData := redisRequest{}
-
-				if err := msgpack.Unmarshal([]byte(packed), &rData); err == nil { // errors with wrong data ignored
-					rData.Uuid = UUIDs[i]
-					result = append(result, &rData)
-				}
-			}
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].(*redisRequest).TS < result[j].(*redisRequest).TS
-	})
-
-	return result, nil
-}
-
-// DeleteRequest deletes stored request with passed session and request UUIDs.
-func (s *Redis) DeleteRequest(sessionUUID, requestUUID string) (bool, error) {
-	var key = redisKey(sessionUUID)
-
-	if _, err := s.rdb.ZRem(s.ctx, key.requests(), requestUUID).Result(); err != nil {
-		return false, err
-	}
-
-	return s.deleteKeys(key.request(requestUUID))
-}
-
-type redisKey string
-
-func (s redisKey) session() string          { return "webhook-tester:session:" + string(s) } // session data.
-func (s redisKey) requests() string         { return s.session() + ":requests" }             // requests list.
-func (s redisKey) request(id string) string { return s.session() + ":requests:" + id }       // request data.
-
-type redisSession struct {
-	Uuid            string `msgpack:"-"` //nolint:golint,stylecheck
-	RespContent     []byte `msgpack:"c"`
-	RespCode        uint16 `msgpack:"cd"`
-	RespContentType string `msgpack:"ct"`
-	RespDelay       int64  `msgpack:"d"`
-	TS              int64  `msgpack:"t"`
-}
-
-func (s *redisSession) UUID() string         { return s.Uuid }                     // UUID unique session ID.
-func (s *redisSession) Content() []byte      { return s.RespContent }              // Content session server content.
-func (s *redisSession) Code() uint16         { return s.RespCode }                 // Code default server response code.
-func (s *redisSession) ContentType() string  { return s.RespContentType }          // ContentType response content type.
-func (s *redisSession) Delay() time.Duration { return time.Duration(s.RespDelay) } // Delay before response sending.
-func (s *redisSession) CreatedAt() time.Time { return time.Unix(s.TS, 0) }         // CreatedAt creation time.
-
-type redisRequest struct {
-	Uuid          string            `msgpack:"-"` //nolint:golint,stylecheck
-	ReqClientAddr string            `msgpack:"a"`
-	ReqMethod     string            `msgpack:"m"`
-	ReqContent    []byte            `msgpack:"c"`
-	ReqHeaders    map[string]string `msgpack:"h"`
-	ReqURI        string            `msgpack:"u"`
-	TS            int64             `msgpack:"t"`
-}
-
-func (r *redisRequest) UUID() string               { return r.Uuid }             // UUID returns unique request ID.
-func (r *redisRequest) ClientAddr() string         { return r.ReqClientAddr }    // ClientAddr client hostname or IP.
-func (r *redisRequest) Method() string             { return r.ReqMethod }        // Method HTTP method name.
-func (r *redisRequest) Content() []byte            { return r.ReqContent }       // Content request body (payload).
-func (r *redisRequest) Headers() map[string]string { return r.ReqHeaders }       // Headers HTTP request headers.
-func (r *redisRequest) URI() string                { return r.ReqURI }           // URI Uniform Resource Identifier.
-func (r *redisRequest) CreatedAt() time.Time       { return time.Unix(r.TS, 0) } // CreatedAt creation time.

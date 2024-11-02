@@ -1,22 +1,39 @@
-// Package pubsub is used for events publishing and subscribing for them.
 package pubsub
 
-// Publisher allows to publish Event*s.
-type Publisher interface {
-	// Publish an event into passed channel.
-	Publish(channelName string, event Event) error
+import (
+	"context"
+)
+
+type (
+	Publisher[T any] interface {
+		// Publish an event into the topic.
+		Publish(_ context.Context, topic string, event T) error
+	}
+
+	Subscriber[T any] interface {
+		// Subscribe to the topic. The returned channel will receive events.
+		// The returned function should be called to unsubscribe.
+		Subscribe(_ context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error)
+	}
+)
+
+type PubSub[T any] interface {
+	Publisher[T]
+	Subscriber[T]
 }
 
-// Subscriber allows to Subscribe and Unsubscribe for Event*s.
-type Subscriber interface {
-	// Subscribe to the named channel and receive Event's into the passed channel.
-	//
-	// Keep in mind - passed channel (chan) must be created on the caller side and channels without active readers
-	// (or closed too early) can block application working (or break it at all).
-	//
-	// Also do not forget to Unsubscribe from the channel.
-	Subscribe(channelName string, channel chan<- Event) error
+type (
+	CapturedRequest struct {
+		ID                 string       `json:"id"`
+		ClientAddr         string       `json:"client_addr"`
+		Method             string       `json:"method"`
+		Headers            []HttpHeader `json:"headers"`
+		URL                string       `json:"url"`
+		CreatedAtUnixMilli int64        `json:"created_at_unix_milli"`
+	}
 
-	// Unsubscribe the subscription to the named channel for the passed events channel.
-	Unsubscribe(channelName string, channel chan Event) error
-}
+	HttpHeader struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+)

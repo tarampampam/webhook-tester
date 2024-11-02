@@ -1,162 +1,95 @@
 package pubsub
 
 import (
-	"errors"
+	"context"
 	"sync"
 )
 
-// InMemory publisher/subscriber uses memory for events publishing and delivering to the subscribers. Useful for
-// application "single node" mode running or unit testing.
-//
-// Publishing/subscribing events order is NOT guaranteed.
-//
-// Node: Do not forget to Close it after all. Closed publisher/subscriber cannot be opened back.
-type InMemory struct {
-	subsMu sync.Mutex
-	subs   map[string]map[chan<- Event]chan struct{} // map<channel name>map<subscribed ch.>stopping signal ch.
+type (
+	InMemory[T any] struct {
+		subsMu sync.Mutex
+		subs   map[ /* topic */ string]map[ /* subscription */ chan<- T]*inMemorySubState
+	}
 
-	closedMu sync.Mutex
-	closed   bool
+	inMemorySubState struct {
+		wg   sync.WaitGroup
+		stop chan struct{}
+	}
+)
+
+var ( // ensure interface implementation
+	_ Publisher[any]  = (*InMemory[any])(nil)
+	_ Subscriber[any] = (*InMemory[any])(nil)
+)
+
+func NewInMemory[T any]() *InMemory[T] {
+	return &InMemory[T]{subs: make(map[string]map[chan<- T]*inMemorySubState)}
 }
 
-// NewInMemory creates new inmemory publisher/subscriber.
-func NewInMemory() *InMemory {
-	return &InMemory{
-		subs: make(map[string]map[chan<- Event]chan struct{}),
+func (ps *InMemory[T]) Publish(ctx context.Context, topic string, event T) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
 	}
-}
-
-func (ps *InMemory) createSubscriptionIfNeeded(channelName string) {
-	ps.subsMu.Lock()
-	if _, exists := ps.subs[channelName]; !exists {
-		ps.subs[channelName] = make(map[chan<- Event]chan struct{})
-	}
-	ps.subsMu.Unlock()
-}
-
-// Publish an event into passed channel. Publishing is non-blocking operation.
-func (ps *InMemory) Publish(channelName string, event Event) error {
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
-	}
-
-	if ps.isClosed() {
-		return errors.New("closed")
-	}
-
-	ps.createSubscriptionIfNeeded(channelName)
 
 	ps.subsMu.Lock()
+	defer ps.subsMu.Unlock()
 
-	for target, stop := range ps.subs[channelName] {
-		go func(target chan<- Event, stop <-chan struct{}) { // send an event without blocking
+	if _, exists := ps.subs[topic]; !exists { // if there are no subscribers - do not publish
+		return nil
+	}
+
+	for sub, state := range ps.subs[topic] {
+		state.wg.Add(1) // tell the subscriber that we are about to send an event
+
+		go func(sub chan<- T, stop <-chan struct{}, wg *sync.WaitGroup) {
+			defer wg.Done() // notify the subscriber that we are done
+
 			select {
-			case <-stop:
-				return
-
-			case target <- event: // <- panic can be occurred here (if channel was closed too early outside)
+			case <-ctx.Done(): // check the context
+			case <-stop: // stopping notification
+			case sub <- event: // and in the same time try to send the event
 			}
-		}(target, stop)
+		}(sub, state.stop, &state.wg)
 	}
-
-	ps.subsMu.Unlock()
 
 	return nil
 }
 
-// Subscribe to the named channel and receive Event's into the passed channel. Channel must be created on the calling
-// side and NOT to be closed until subscription is not Unsubscribe*ed.
-//
-// Note: do not forget to call Unsubscribe when all is done.
-func (ps *InMemory) Subscribe(channelName string, channel chan<- Event) error {
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
-	}
-
-	if ps.isClosed() {
-		return errors.New("closed")
-	}
-
-	ps.createSubscriptionIfNeeded(channelName)
-
-	ps.subsMu.Lock()
-	defer ps.subsMu.Unlock()
-
-	if _, exists := ps.subs[channelName][channel]; exists {
-		return errors.New("already subscribed")
-	}
-
-	ps.subs[channelName][channel] = make(chan struct{}, 1)
-
-	return nil
-}
-
-// Unsubscribe the subscription to the named channel for the passed events channel. Be careful with channel closing,
-// this can call the panics if some Event's scheduled for publishing.
-func (ps *InMemory) Unsubscribe(channelName string, channel chan Event) error {
-	if channelName == "" {
-		return errors.New("empty channel name is not allowed")
-	}
-
-	if ps.isClosed() {
-		return errors.New("closed")
+func (ps *InMemory[T]) Subscribe(ctx context.Context, topic string) (<-chan T, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, func() { /* noop */ }, err // context is done
 	}
 
 	ps.subsMu.Lock()
 	defer ps.subsMu.Unlock()
 
-	if _, exists := ps.subs[channelName]; !exists {
-		return errors.New("subscription does not exists")
+	if _, exists := ps.subs[topic]; !exists { // create a subscription if needed
+		ps.subs[topic] = make(map[chan<- T]*inMemorySubState)
 	}
 
-	if _, exists := ps.subs[channelName][channel]; !exists {
-		return errors.New("channel was not subscribed")
-	}
+	var sub, state = make(chan T), &inMemorySubState{stop: make(chan struct{})}
 
-	// send "cancellation" signal to all publishing goroutines
-	ps.subs[channelName][channel] <- struct{}{}
-	close(ps.subs[channelName][channel])
+	ps.subs[topic][sub] = state
 
-	// unsubscribe channel
-	delete(ps.subs[channelName], channel)
+	return sub, sync.OnceFunc(func() {
+		close(state.stop) // notify all the publishers to stop
 
-	// cleanup subscriptions map, if needed
-	if len(ps.subs[channelName]) == 0 {
-		delete(ps.subs, channelName)
-	}
+		ps.subsMu.Lock()
 
-	return nil
-}
+		delete(ps.subs[topic], sub) // remove subscription
 
-func (ps *InMemory) isClosed() (isClosed bool) {
-	ps.closedMu.Lock()
-	isClosed = ps.closed
-	ps.closedMu.Unlock()
-
-	return
-}
-
-// Close this publisher/subscriber. This function can be called only once.
-func (ps *InMemory) Close() error {
-	if ps.isClosed() {
-		return errors.New("already closed")
-	}
-
-	ps.closedMu.Lock()
-	ps.closed = true
-	ps.closedMu.Unlock()
-
-	ps.subsMu.Lock()
-	for channelName, channels := range ps.subs {
-		for _, cancelCh := range channels {
-			// send "cancellation" signal to the all publishing goroutines
-			cancelCh <- struct{}{}
-			close(cancelCh)
+		if len(ps.subs[topic]) == 0 { // remove channel if there are no subscribers (cleanup)
+			delete(ps.subs, topic)
 		}
 
-		delete(ps.subs, channelName)
-	}
-	ps.subsMu.Unlock()
+		ps.subsMu.Unlock()
 
-	return nil
+		for len(sub) > 0 {
+			<-sub
+		}
+
+		state.wg.Wait() // wait until all the publishers are done
+
+		close(sub) // and close the subscription channel
+	}), nil
 }
