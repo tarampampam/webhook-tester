@@ -120,7 +120,7 @@ The following flags are supported:
 | Name                          | Description                                                                                                               |       Default value        |    Environment variables     |
 |-------------------------------|---------------------------------------------------------------------------------------------------------------------------|:--------------------------:|:----------------------------:|
 | `--addr="…"`                  | IP (v4 or v6) address to listen on (0.0.0.0 to bind to all interfaces)                                                    |         `0.0.0.0`          | `SERVER_ADDR`, `LISTEN_ADDR` |
-| `--http-port="…"`             | HTTP server port                                                                                                          |           `8080`           |         `HTTP_PORT`          |
+| `--port="…"`                  | HTTP server port                                                                                                          |           `8080`           |         `HTTP_PORT`          |
 | `--read-timeout="…"`          | maximum duration for reading the entire request, including the body (zero = no timeout)                                   |           `1m0s`           |     `HTTP_READ_TIMEOUT`      |
 | `--write-timeout="…"`         | maximum duration before timing out writes of the response (zero = no timeout)                                             |           `1m0s`           |     `HTTP_WRITE_TIMEOUT`     |
 | `--idle-timeout="…"`          | maximum amount of time to wait for the next request (keep-alive, zero = no timeout)                                       |           `1m0s`           |     `HTTP_IDLE_TIMEOUT`      |
@@ -146,9 +146,9 @@ $ app [GLOBAL FLAGS] start healthcheck [COMMAND FLAGS] [ARGUMENTS...]
 
 The following flags are supported:
 
-| Name              | Description      | Default value | Environment variables |
-|-------------------|------------------|:-------------:|:---------------------:|
-| `--http-port="…"` | HTTP server port |    `8080`     |      `HTTP_PORT`      |
+| Name         | Description      | Default value | Environment variables |
+|--------------|------------------|:-------------:|:---------------------:|
+| `--port="…"` | HTTP server port |    `8080`     |      `HTTP_PORT`      |
 
 <!--/GENERATED:CLI_DOCS-->
 
