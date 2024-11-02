@@ -25,9 +25,10 @@ jobs:
       # build the frontend
       - uses: actions/setup-node@v4
         with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
-      - run: npm --prefix "$NPM_PREFIX" install --no-audit
-      - run: npm --prefix "$NPM_PREFIX" run generate
-      - run: npm --prefix "$NPM_PREFIX" run build
+      - run: |
+          npm --prefix "$NPM_PREFIX" install --no-audit
+          npm --prefix "$NPM_PREFIX" run generate
+          npm --prefix "$NPM_PREFIX" run build
       # build the backend
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
       - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
@@ -45,6 +46,7 @@ jobs:
           file: ${{ steps.values.outputs.binary-name }}
           asset_name: ${{ steps.values.outputs.binary-name }}
           tag: ${{ github.ref }}
+      # TODO: add .deb package building and uploading
 
   build-docker-image:
     name: Build the docker image

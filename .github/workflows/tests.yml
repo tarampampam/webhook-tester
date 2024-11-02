@@ -63,13 +63,16 @@ jobs:
       - uses: actions/checkout@v4
       - {uses: gacts/github-slug@v1, id: slug}
       - id: values
-        run: echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+        run: |
+          echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+          echo "deb-name=webhook-tester_${{ steps.slug.outputs.commit-hash-short }}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
       # build the frontend
       - uses: actions/setup-node@v4
         with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
-      - run: npm --prefix "$NPM_PREFIX" install --no-audit
-      - run: npm --prefix "$NPM_PREFIX" run generate
-      - run: npm --prefix "$NPM_PREFIX" run build
+      - run: |
+          npm --prefix "$NPM_PREFIX" install --no-audit
+          npm --prefix "$NPM_PREFIX" run generate
+          npm --prefix "$NPM_PREFIX" run build
       # build the backend
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
       - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
@@ -89,6 +92,37 @@ jobs:
           path: ./${{ steps.values.outputs.binary-name }}
           if-no-files-found: error
           retention-days: 7
+      # build a Debian package
+      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        env:
+          PKG_NAME: ${{ steps.values.outputs.deb-name }}
+        run: |
+          mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
+          cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
+          echo -e "Package: webhook-tester\nVersion: ${{ steps.slug.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
+          dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
+      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.values.outputs.binary-name }}.deb
+          path: ./${{ steps.values.outputs.deb-name }}.deb
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e-test:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    needs: [build-app]
+    steps:
+      - uses: actions/checkout@v4
+      - {uses: actions/download-artifact@v4, with: {name: webhook-tester-linux-amd64}}
+      - run: chmod +x ./webhook-tester-linux-amd64
+      - run: ./webhook-tester-linux-amd64 start --port 8081 & # start the server in the background
+      - uses: grafana/setup-k6-action@v1
+      - uses: grafana/run-k6-action@v1
+        with: {path: ./tests/k6/run/*.js}
 
   build-docker-image:
     name: Build the docker image
