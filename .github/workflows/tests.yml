@@ -78,7 +78,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.commit-hash-short }}
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v0.0.0@${{ steps.slug.outputs.commit-hash-short }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
       # try to run the binary
       - if: matrix.os == runner.os && matrix.arch == 'amd64'
