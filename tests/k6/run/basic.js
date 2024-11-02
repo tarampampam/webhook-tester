@@ -1,59 +1,102 @@
-import http from 'k6/http';
-import { sleep } from 'k6';
+import execution from 'k6/execution'
+import http from 'k6/http'
+import {group, check as k6check} from 'k6'
+import {randomString} from '../shared/utils.js'
 
+/** @link https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/ */
 export const options = {
-  // A number specifying the number of VUs to run concurrently.
-  vus: 10,
-  // A string specifying the total duration of the test run.
-  duration: '30s',
+  scenarios: {
+    default: {
+      executor: 'per-vu-iterations',
+      vus: 1, // force to use only one VU
+    },
+  },
+}
 
-  // The following section contains configuration options for execution of this
-  // test script in Grafana Cloud.
-  //
-  // See https://grafana.com/docs/grafana-cloud/k6/get-started/run-cloud-tests-from-the-cli/
-  // to learn about authoring and running k6 test scripts in Grafana k6 Cloud.
-  //
-  // cloud: {
-  //   // The ID of the project to which the test is assigned in the k6 Cloud UI.
-  //   // By default tests are executed in default project.
-  //   projectID: "",
-  //   // The name of the test in the k6 Cloud UI.
-  //   // Test runs with the same name will be grouped.
-  //   name: "basic"
-  // },
+/**
+ * This is an overridden version of the native check function, designed to abort the test when an expectation fails.
+ * In addition, it improves the type checking by using the JSDoc annotation.
+ *
+ * @template VT
+ * @param {VT} val
+ * @param {Record<string, (VT) => Boolean>} set
+ */
+const check = (val, set) => {
+  try {
+    if (!k6check(val, set)) {
+      execution.test.abort('Failed expectation: ' + Object.keys(set).join(', '))
+    }
+  } catch (e) {
+    execution.test.abort(String(e))
 
-  // Uncomment this section to enable the use of Browser API in your tests.
-  //
-  // See https://grafana.com/docs/k6/latest/using-k6-browser/running-browser-tests/ to learn more
-  // about using Browser API in your test scripts.
-  //
-  // scenarios: {
-  //   // The scenario name appears in the result summary, tags, and so on.
-  //   // You can give the scenario any name, as long as each name in the script is unique.
-  //   ui: {
-  //     // Executor is a mandatory parameter for browser-based tests.
-  //     // Shared iterations in this case tells k6 to reuse VUs to execute iterations.
-  //     //
-  //     // See https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ for other executor types.
-  //     executor: 'shared-iterations',
-  //     options: {
-  //       browser: {
-  //         // This is a mandatory parameter that instructs k6 to launch and
-  //         // connect to a chromium-based browser, and use it to run UI-based
-  //         // tests.
-  //         type: 'chromium',
-  //       },
-  //     },
-  //   },
-  // }
-};
+    throw e
+  }
+}
 
-// The function that defines VU logic.
-//
-// See https://grafana.com/docs/k6/latest/examples/get-started-with-k6/ to learn more
-// about authoring k6 scripts.
-//
-export default function() {
-  http.get('https://test.k6.io');
-  sleep(1);
+/** @typedef {{baseUrl: String}} Context */
+/** @return Context */
+export const setup = () => {
+  const baseUrl = __ENV['BASE_URL']
+
+  if (!baseUrl) {
+    throw new Error('BASE_URL is required')
+  }
+
+  return {
+    baseUrl: baseUrl.replace(/\/$/, ''), // remove trailing slash
+  }
+}
+
+/** @param {Context} ctx */
+export default (ctx) => {
+  group('index', () => {
+    const resp = http.get(ctx.baseUrl)
+
+    check(resp, {
+      'status is 200': (r) => r.status === 200,
+      'content type': (r) => r.headers['Content-Type'].includes('text/html'),
+      'contains HTML': (r) => r.body.includes('<html'),
+    })
+  })
+
+  group('robots.txt', () => {
+    const resp = http.get(`${ctx.baseUrl}/robots.txt`)
+
+    check(resp, {
+      'status is 200': (r) => r.status === 200,
+      'content type': (r) => r.headers['Content-Type'].includes('text/plain'),
+      'contains useragent': (r) => r.body.includes('User-agent'),
+      'contains disallow': (r) => r.body.includes('Disallow'),
+    })
+  })
+
+  group('spa 404', () => {
+    const resp = http.get(`${ctx.baseUrl}/foo${randomString(10)}`)
+
+    check(resp, {
+      'status is 200': (r) => r.status === 200,
+      'content type': (r) => r.headers['Content-Type'].includes('text/html'),
+      'contains HTML': (r) => r.body.includes('<html'),
+    })
+  })
+
+  group('api 404', () => {
+    const resp = http.get(`${ctx.baseUrl}/////api/foo${randomString(10)}`)
+
+    check(resp, {
+      'status is 404': (r) => r.status === 404,
+      'content type': (r) => r.headers['Content-Type'].includes('application/json'),
+      'contains error': (r) => r.body.includes('error'),
+    })
+  })
+
+  group('ready handler', () => { // outside the /api path
+    const resp = http.get(`${ctx.baseUrl}/ready`)
+
+    check(resp, {
+      'status is 200': (r) => r.status === 200,
+      'content type': (r) => r.headers['Content-Type'].includes('text/plain'),
+      'contains ready': (r) => r.body.includes('OK'),
+    })
+  })
 }

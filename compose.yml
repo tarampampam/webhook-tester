@@ -20,15 +20,22 @@ services:
 
   app-http:
     build: *app-build
-    command: go run ./cmd/webhook-tester/ start --use-live-frontend --auto-create-sessions --max-requests 8
+    entrypoint: sh -c 'go build -buildvcs=false -o /var/tmp/app ./cmd/webhook-tester/ && exec $0 "$@"'
+    command: /var/tmp/app start --use-live-frontend --auto-create-sessions --max-requests 8
     volumes: [.:/src:rw]
     ports: ['8080:8080/tcp']
+    healthcheck:
+      test: ['CMD', '/var/tmp/app', 'start', 'healthcheck']
+      start_interval: 1s
+      interval: 10s
+      start_period: 10s
     depends_on: {app-web-dist: {condition: service_healthy}}
     security_opt: [no-new-privileges:true]
 
   k6:
     image: ghcr.io/grafana/k6:latest
     volumes: [.:/src:ro]
+    working_dir: /src
     depends_on: {app-http: {condition: service_healthy}}
     security_opt: [no-new-privileges:true]
 
