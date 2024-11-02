@@ -58,7 +58,7 @@ jobs:
         os: [linux, darwin, windows]
         arch: [amd64, arm64]
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
-    #needs: [lint-and-test, lint-and-test-web]
+    needs: [lint-and-test, lint-and-test-web]
     steps:
       - uses: actions/checkout@v4
       - {uses: gacts/github-slug@v1, id: slug}

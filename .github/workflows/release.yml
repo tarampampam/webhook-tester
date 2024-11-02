@@ -7,7 +7,45 @@ on:
   release: {types: [published]}
   workflow_dispatch: {}
 
-jobs: # TODO: add standalone binary build job
+jobs:
+  build-app:
+    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+    env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
+    steps:
+      - uses: actions/checkout@v4
+      - {uses: gacts/github-slug@v1, id: slug}
+      - id: values
+        run: echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+      # build the frontend
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+      - run: npm --prefix "$NPM_PREFIX" install --no-audit
+      - run: npm --prefix "$NPM_PREFIX" run generate
+      - run: npm --prefix "$NPM_PREFIX" run build
+      # build the backend
+      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
+      - run: go generate -skip readme ./...
+      - env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version }}
+        run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
+      # upload the binary
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.values.outputs.binary-name }}
+          asset_name: ${{ steps.values.outputs.binary-name }}
+          tag: ${{ github.ref }}
+
   build-docker-image:
     name: Build the docker image
     runs-on: ubuntu-latest
