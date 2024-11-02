@@ -99,7 +99,7 @@ jobs:
         run: |
           mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
           cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
-          echo -e "Package: webhook_tester\nVersion: 0.0.0" > ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Package: webhook-tester\nVersion: 0.0.0" > ${{ env.PKG_NAME }}/DEBIAN/control
           echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
           echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
           dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
