@@ -65,7 +65,7 @@ jobs:
       - id: values
         run: |
           echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-          echo "deb-name=webhook-tester_${{ steps.slug.outputs.commit-hash-short }}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          echo "deb-name=webhook-tester_0.0.0-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
       # build the frontend
       - uses: actions/setup-node@v4
         with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
