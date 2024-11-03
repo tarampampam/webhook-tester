@@ -64,8 +64,10 @@ jobs:
       - {uses: gacts/github-slug@v1, id: slug}
       - id: values
         run: |
+          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
+          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
           echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-          echo "deb-name=webhook-tester_0.0.0-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
       # build the frontend
       - uses: actions/setup-node@v4
         with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
@@ -81,7 +83,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v0.0.0@${{ steps.slug.outputs.commit-hash-short }}
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v${{ steps.values.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
       # try to run the binary
       - if: matrix.os == runner.os && matrix.arch == 'amd64'
@@ -99,7 +101,7 @@ jobs:
         run: |
           mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
           cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
-          echo -e "Package: webhook-tester\nVersion: 0.0.0" > ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
           echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
           echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
           dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
@@ -118,8 +120,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - {uses: actions/download-artifact@v4, with: {name: webhook-tester-linux-amd64}}
-      - run: chmod +x ./webhook-tester-linux-amd64
-      - run: ./webhook-tester-linux-amd64 start --port 8081 & # start the server in the background
+      - run: | # start the server in the background
+          chmod +x ./webhook-tester-linux-amd64
+          ./webhook-tester-linux-amd64 start --port 8081 &
       - uses: grafana/setup-k6-action@v1
       - uses: grafana/run-k6-action@v1
         env: {BASE_URL: 'http://127.0.0.1:8081'}
