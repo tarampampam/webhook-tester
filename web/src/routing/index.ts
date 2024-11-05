@@ -1,1 +1,1 @@
-export { routes, pathTo, RouteIDs } from './routing'
+export { createRoutes, pathTo, RouteIDs } from './routing'

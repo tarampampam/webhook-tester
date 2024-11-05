@@ -1,5 +1,5 @@
 import { createPath, Navigate, type RouteObject } from 'react-router-dom'
-import { apiClient } from '~/api'
+import { type Client } from '~/api'
 import { DefaultLayout } from '~/screens'
 import { NotFoundScreen } from '~/screens/not-found'
 import { SessionAndRequestScreen } from '~/screens/session'
@@ -10,7 +10,7 @@ export enum RouteIDs {
   SessionAndRequest = 'session-and-request',
 }
 
-export const routes: RouteObject[] = [
+export const createRoutes = (apiClient: Client): RouteObject[] => [
   {
     path: '/',
     element: <DefaultLayout apiClient={apiClient} />,

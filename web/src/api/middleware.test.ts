@@ -1,14 +1,12 @@
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, beforeAll, afterAll } from 'vitest'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
-import createFetchMock from 'vitest-fetch-mock'
+import fetchMock from '@fetch-mock/vitest'
 import type { Middleware } from 'openapi-fetch'
 import createClient from 'openapi-fetch'
 import { APIErrorCommon, APIErrorNotFound } from './errors'
 
-const fetchMocker = createFetchMock(vi)
-
-beforeAll(() => fetchMocker.enableMocks())
-afterEach(() => fetchMocker.resetMocks())
+beforeAll(() => fetchMock.mockGlobal())
+afterAll(() => fetchMock.mockRestore())
 
 interface paths {
   '/self': {
@@ -37,11 +35,11 @@ describe('throwIfNotJSON', () => {
   test('pass', async () => {
     const client = newClient(throwIfNotJSON)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 200,
       body: '"ok"',
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     const { data, error } = await client.GET('/self')
 
@@ -52,11 +50,11 @@ describe('throwIfNotJSON', () => {
   test('throws', async () => {
     const client = newClient(throwIfNotJSON)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 200,
       body: '"ok"',
       headers: { 'Content-Type': 'text/html' }, // the header is incorrect
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -73,11 +71,11 @@ describe('throwIfNotValidResponse', () => {
   test('pass', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 200,
       body: '"ok"',
       headers: { 'Content-Type': 'text/html' }, // the header doesn't matter
-    }))
+    })
 
     const { data, error } = await client.GET('/self')
 
@@ -88,11 +86,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws ({ message: "..." })', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 404,
       body: `{"message": "some value"}`,
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -107,11 +105,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws ({ error: "..." })', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 404,
       body: `{"error": "some value"}`,
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -126,11 +124,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws ({ errors: ["...", ...] })', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 404,
       body: `{"errors": ["some", "value"]}`,
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -145,11 +143,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws ({ errors: { "...": "..." } })', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 500,
       body: `{"errors": {"a": "some", "b": "value"}}`,
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -164,11 +162,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 500,
       body: `{"error]`, // since the content type, the error message will be `res.statusText`
       headers: { 'Content-Type': 'foo/bar' }, // the header is incorrect
-    }))
+    })
 
     try {
       await client.GET('/self')
@@ -183,11 +181,11 @@ describe('throwIfNotValidResponse', () => {
   test('throws json (Failed to parse the response body as JSON)', async () => {
     const client = newClient(throwIfNotValidResponse)
 
-    fetchMocker.mockResponseOnce(() => ({
+    fetchMock.getOnce(/\/self$/, {
       status: 500,
       body: `{"error]`,
       headers: { 'Content-Type': 'application/json' }, // the header is correct
-    }))
+    })
 
     try {
       await client.GET('/self')
