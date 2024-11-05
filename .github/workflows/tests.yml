@@ -116,13 +116,26 @@ jobs:
   e2e-test:
     name: End-to-end tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage-driver: [memory, redis]
+        pubsub-driver: [memory, redis]
+    services:
+      redis:
+        image: docker.io/library/redis:7-alpine
+        ports: ['6379:6379/tcp']
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
     needs: [build-app]
     steps:
       - uses: actions/checkout@v4
       - {uses: actions/download-artifact@v4, with: {name: webhook-tester-linux-amd64}}
       - run: | # start the server in the background
           chmod +x ./webhook-tester-linux-amd64
-          ./webhook-tester-linux-amd64 start --port 8081 &
+          ./webhook-tester-linux-amd64 start --port 8081 \
+            --storage-driver "${{ matrix.storage-driver }}" \
+            --pubsub-driver "${{ matrix.pubsub-driver }}" \
+            --redis-dsn "redis://127.0.0.1:6379/0" &
       - uses: grafana/setup-k6-action@v1
       - uses: grafana/run-k6-action@v1
         env: {BASE_URL: 'http://127.0.0.1:8081'}
