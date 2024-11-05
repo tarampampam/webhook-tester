@@ -11,7 +11,7 @@ import (
 func NewCommand(defaultHttpPort uint16) *cli.Command {
 	var (
 		httpPortFlag = cli.UintFlag{
-			Name:     "http-port",
+			Name:     "port",
 			Usage:    "HTTP server port",
 			Value:    uint64(defaultHttpPort),
 			Sources:  cli.EnvVars("HTTP_PORT"),

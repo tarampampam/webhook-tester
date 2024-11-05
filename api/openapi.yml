@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
-
 openapi: 3.0.3
 info:
   title: WebHook Tester
@@ -186,7 +184,7 @@ components:
       description: HTTP status code
       type: integer
       example: 301
-      minimum: 100
+      minimum: 200
       maximum: 530
 
     Base64Encoded:

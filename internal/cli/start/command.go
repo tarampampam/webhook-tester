@@ -92,7 +92,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			},
 		}
 		httpPortFlag = cli.UintFlag{
-			Name:     "http-port",
+			Name:     "port",
 			Category: httpCategory,
 			Usage:    "HTTP server port",
 			Value:    uint64(defaultHttpPort),

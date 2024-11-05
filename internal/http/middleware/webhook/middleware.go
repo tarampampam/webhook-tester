@@ -127,6 +127,8 @@ func New( //nolint:funlen,gocognit,gocyclo
 				return
 			}
 
+			w.Header().Set("X-Wh-Request-Id", rID)
+
 			// publish the captured request to the pub/sub. important note - we should use the app ctx instead of the req ctx
 			// because the request context can be canceled before the goroutine finishes (and moreover - before the
 			// subscribers will receive the event - in this case the event will be lost)

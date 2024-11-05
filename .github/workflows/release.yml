@@ -21,13 +21,18 @@ jobs:
       - uses: actions/checkout@v4
       - {uses: gacts/github-slug@v1, id: slug}
       - id: values
-        run: echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+        run: |
+          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
+          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
+          echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+          echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
       # build the frontend
       - uses: actions/setup-node@v4
-        with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
-      - run: npm --prefix "$NPM_PREFIX" install --no-audit
-      - run: npm --prefix "$NPM_PREFIX" run generate
-      - run: npm --prefix "$NPM_PREFIX" run build
+        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+      - run: |
+          npm --prefix "$NPM_PREFIX" install --no-audit
+          npm --prefix "$NPM_PREFIX" run generate
+          npm --prefix "$NPM_PREFIX" run build
       # build the backend
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
       - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
@@ -44,6 +49,24 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.values.outputs.binary-name }}
           asset_name: ${{ steps.values.outputs.binary-name }}
+          tag: ${{ github.ref }}
+      # build a Debian package
+      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        env:
+          PKG_NAME: ${{ steps.values.outputs.deb-name }}
+        run: |
+          mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
+          cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
+          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
+          echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
+          dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
+      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.values.outputs.deb-name }}.deb
+          asset_name: ${{ steps.values.outputs.binary-name }}.deb
           tag: ${{ github.ref }}
 
   build-docker-image:

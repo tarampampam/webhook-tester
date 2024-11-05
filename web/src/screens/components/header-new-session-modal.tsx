@@ -4,7 +4,7 @@ import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '
 import { useStorage, UsedStorageKeys } from '~/shared'
 
 const limits = {
-  statusCode: { min: 100, max: 530 },
+  statusCode: { min: 200, max: 530 },
   responseHeaders: { maxCount: 10, minNameLen: 1, maxNameLen: 40, maxValueLen: 2048 },
   delay: { min: 0, max: 30 },
 }
