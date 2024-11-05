@@ -90,7 +90,10 @@ func (s *Server) Register(
 	}))
 
 	// apply middlewares
-	s.http.Handler = logreq.New(log, nil)( // logger middleware
+	s.http.Handler = logreq.New(log, func(r *http.Request) bool {
+		// issue: https://github.com/tarampampam/webhook-tester/issues/575
+		return r.URL.Path == openapi.RouteLivenessProbe || r.URL.Path == openapi.RouteReadinessProbe
+	})( // logger middleware
 		webhook.New(ctx, log.Named("webhook"), db, pubSub, cfg)( // webhook capture as a middleware
 			handler,
 		),

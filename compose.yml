@@ -32,6 +32,16 @@ services:
     depends_on: {app-web-dist: {condition: service_healthy}}
     security_opt: [no-new-privileges:true]
 
+  redis:
+    image: docker.io/library/redis:7-alpine
+    volumes: [redis-data:/data:rw]
+    ports: ['6379/tcp']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 500ms
+      timeout: 1s
+    security_opt: [no-new-privileges:true]
+
   k6:
     image: ghcr.io/grafana/k6:latest
     volumes: [.:/src:ro]
@@ -45,3 +55,4 @@ services:
 volumes:
   app-modules-cache: {}
   app-tmp-data: {}
+  redis-data: {}

@@ -4,3 +4,22 @@ generate:
   std-http-server: true
   #echo-server: true
   #strict-server: true
+
+output-options:
+  user-templates:
+    stdhttp/std-http-interface.tmpl: | # Original source: https://bit.ly/40EkPHr
+      // ServerInterface represents all server handlers.
+      type ServerInterface interface {
+        {{range .}}{{.SummaryAsComment }}
+          // ({{.Method}} {{.Path}})
+          {{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}})
+        {{end}}
+      }
+
+      {{- /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM CODE BEGIN !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */}}
+      const (
+      {{ range . -}}
+        Route{{.OperationId}} = "{{ .Path | swaggerUriToStdHttpUri }}"
+      {{ end }}
+      )
+      {{- /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  CUSTOM CODE END  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */}}
