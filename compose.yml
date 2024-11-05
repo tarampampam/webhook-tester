@@ -36,6 +36,9 @@ services:
     image: ghcr.io/grafana/k6:latest
     volumes: [.:/src:ro]
     working_dir: /src
+    environment:
+      BASE_URL: http://app-http:8080
+      K6_NO_USAGE_REPORT: 'true'
     depends_on: {app-http: {condition: service_healthy}}
     security_opt: [no-new-privileges:true]
 

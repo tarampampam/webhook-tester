@@ -28,13 +28,11 @@ lint: ## Run linters
 	docker compose run $(DC_RUN_ARGS) app golangci-lint run
 
 e2e: ## Run end-to-end tests
-	docker compose run $(DC_RUN_ARGS) k6 run ./tests/k6/run/*.js
+	docker compose run $(DC_RUN_ARGS) k6 run ./tests/k6/run.js
 
 up: ## Start the application in watch mode
 	#docker compose build
-	docker compose up --detach --build --remove-orphans
 	docker compose kill app-http --remove-orphans 2>/dev/null || true
-	#docker compose up --detach --wait whoami httpbin
 	docker compose up app-http
 
 down: ## Stop the application

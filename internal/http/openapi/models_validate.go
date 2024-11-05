@@ -14,7 +14,7 @@ func (data CreateSessionRequest) Validate() error {
 		minHeaderKeyLen, maxHeaderKeyLen = 1, 40
 		maxHeaderValueLen                = 2048
 		maxResponseBodyLen               = 10240
-		minStatusCode, maxStatusCode     = StatusCode(100), StatusCode(530)
+		minStatusCode, maxStatusCode     = StatusCode(200), StatusCode(530)
 	)
 
 	if data.Delay > maxDelaySeconds {

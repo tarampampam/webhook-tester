@@ -126,7 +126,7 @@ jobs:
       - uses: grafana/setup-k6-action@v1
       - uses: grafana/run-k6-action@v1
         env: {BASE_URL: 'http://127.0.0.1:8081'}
-        with: {path: ./tests/k6/run/*.js}
+        with: {path: ./tests/k6/run.js}
 
   build-docker-image:
     name: Build the docker image
