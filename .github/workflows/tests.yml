@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
       - run: npm --prefix "$NPM_PREFIX" run lint
@@ -58,7 +58,7 @@ jobs:
         os: [linux, darwin, windows]
         arch: [amd64, arm64]
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
-#    needs: [lint-and-test, lint-and-test-web] # TODO: uncomment
+    needs: [lint-and-test, lint-and-test-web]
     steps:
       - uses: actions/checkout@v4
       - {uses: gacts/github-slug@v1, id: slug}
@@ -70,7 +70,7 @@ jobs:
           echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
       # build the frontend
       - uses: actions/setup-node@v4
-        with: {node-version: 22, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: |
           npm --prefix "$NPM_PREFIX" install --no-audit
           npm --prefix "$NPM_PREFIX" run generate
@@ -85,9 +85,9 @@ jobs:
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v${{ steps.values.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
-      # try to run the binary
-      - if: matrix.os == runner.os && matrix.arch == 'amd64'
+      - if: matrix.os == runner.os && matrix.arch == 'amd64' # try to run the binary
         run: ./${{ steps.values.outputs.binary-name }} -h
+      # upload the binary
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.values.outputs.binary-name }}
