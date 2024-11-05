@@ -5,7 +5,8 @@ import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { routes } from './routing'
+import { Client } from './api'
+import { createRoutes } from './routing'
 import { BrowserNotificationsProvider, SessionsProvider, UISettingsProvider } from './shared'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
@@ -16,13 +17,15 @@ dayjs.extend(relativeTime) // https://day.js.org/docs/en/plugin/relative-time
 
 /** App component */
 const App = (): React.JSX.Element => {
+  const apiClient = new Client()
+
   return (
     <MantineProvider defaultColorScheme="auto">
       <Notifications />
       <BrowserNotificationsProvider>
         <UISettingsProvider>
           <SessionsProvider>
-            <RouterProvider router={createBrowserRouter(routes)} />
+            <RouterProvider router={createBrowserRouter(createRoutes(apiClient))} />
           </SessionsProvider>
         </UISettingsProvider>
       </BrowserNotificationsProvider>

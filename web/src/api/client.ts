@@ -46,9 +46,17 @@ export class Client {
   }> = {}
 
   constructor(opt?: ClientOptions) {
-    this.baseUrl = new URL(
-      opt?.baseUrl ? opt.baseUrl.replace(/\/+$/, '') : window.location.protocol + '//' + window.location.host
-    )
+    const baseUrl: string | null = opt?.baseUrl
+      ? opt.baseUrl.replace(/\/+$/, '')
+      : typeof window !== 'undefined' // for non-browser environments, like tests
+        ? window.location.protocol + '//' + window.location.host
+        : null
+
+    if (!baseUrl) {
+      throw new Error('The base URL is not provided and cannot be determined')
+    }
+
+    this.baseUrl = new URL(baseUrl)
 
     this.api = createClient<paths>(opt)
     this.api.use(throwIfNotJSON, throwIfNotValidResponse)
@@ -385,5 +393,3 @@ export class Client {
     throw new APIErrorUnknown({ message: response.statusText, response })
   }
 }
-
-export default new Client() // singleton instance

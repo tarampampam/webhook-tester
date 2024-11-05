@@ -41,4 +41,10 @@ export default defineConfig({
   esbuild: {
     legalComments: 'none',
   },
+  // @ts-ignore-next-line The `vite` type definitions are not up-to-date
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './vitest.setup.js',
+  },
 })
