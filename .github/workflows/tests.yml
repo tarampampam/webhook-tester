@@ -85,6 +85,10 @@ jobs:
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v${{ steps.values.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
+      - uses: crazy-max/ghaction-upx@v3
+        with:
+          files: ./${{ steps.values.outputs.binary-name }}
+          args: -v -5 --color
       - if: matrix.os == runner.os && matrix.arch == 'amd64' # try to run the binary
         run: ./${{ steps.values.outputs.binary-name }} -h
       # upload the binary
