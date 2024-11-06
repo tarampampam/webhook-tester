@@ -20,6 +20,7 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/logger"
 	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v2/internal/tunnel"
 	"gh.tarampamp.am/webhook-tester/v2/internal/version"
 )
 
@@ -395,6 +396,15 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 				return cmd.options.addr
 			}(), cmd.options.http.tcpPort)),
 		)
+
+		tunUrl, closeTun, tunErr := tunnel.NewLocalTunnel(tunnel.WithLocalTunnelLogger(log)).Start(ctx, cmd.options.http.tcpPort)
+		if tunErr != nil {
+			closeTun()
+		} else {
+			defer closeTun()
+
+			log.Info("Tunnel started", zap.String("url", tunUrl.String()))
+		}
 
 		if err := server.StartHTTP(ctx, httpLn); err != nil {
 			cancel() // cancel the context on error (this is critical for us)

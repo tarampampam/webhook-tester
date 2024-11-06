@@ -12,6 +12,7 @@ require (
 	github.com/urfave/cli-docs/v3 v3.0.0-alpha5
 	github.com/urfave/cli/v3 v3.0.0-alpha9.1
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.8.0
 )
 
 require (
