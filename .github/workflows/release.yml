@@ -8,65 +8,83 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  build-web:
+    name: Build the frontend
+    runs-on: ubuntu-latest
+    env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+      - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
+      - run: npm --prefix "$NPM_PREFIX" run generate
+      - run: npm --prefix "$NPM_PREFIX" run build
+      - uses: actions/upload-artifact@v4
+        with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
+
   build-app:
-    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    name: Build the app
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         os: [linux, darwin, windows]
         arch: [amd64, arm64]
-    env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
+    needs: [build-web]
     steps:
       - uses: actions/checkout@v4
       - {uses: gacts/github-slug@v1, id: slug}
       - id: values
         run: |
-          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
-          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
-          echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-          echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
-      # build the frontend
-      - uses: actions/setup-node@v4
-        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
-      - run: |
-          npm --prefix "$NPM_PREFIX" install --no-audit
-          npm --prefix "$NPM_PREFIX" run generate
-          npm --prefix "$NPM_PREFIX" run build
-      # build the backend
+          echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
       - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
       - run: go generate -skip readme ./...
+      - {uses: actions/download-artifact@v4, with: {name: web-dist, path: ./web/dist}} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version }}
-        run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
-      # upload the binary
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version-semantic }}
+        run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
+          path: ./${{ steps.values.outputs.bin-name }}
+          if-no-files-found: error
+          retention-days: 1
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.values.outputs.binary-name }}
-          asset_name: ${{ steps.values.outputs.binary-name }}
+          file: ./${{ steps.values.outputs.bin-name }}
+          asset_name: ${{ steps.values.outputs.bin-name }}
           tag: ${{ github.ref }}
-      # build a Debian package
-      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        env:
-          PKG_NAME: ${{ steps.values.outputs.deb-name }}
+
+  build-deb-package:
+    name: Build the Debian package
+    runs-on: ubuntu-latest
+    strategy: {matrix: {arch: [amd64, arm64]}}
+    needs: [build-app]
+    steps:
+      - {uses: gacts/github-slug@v1, id: slug}
+      - {uses: actions/download-artifact@v4, with: {name: "webhook-tester-linux-${{ matrix.arch }}"}}
+      - id: values
         run: |
-          mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
-          cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
-          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
-          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
-          echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
-          dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
-      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: svenstaro/upload-release-action@v2
+          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
+          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
+          echo "pkg-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
+      - run: |
+          mkdir -p ./${{ steps.values.outputs.pkg-name }}/usr/local/bin ./${{ steps.values.outputs.pkg-name }}/DEBIAN
+          mv ./webhook-tester-linux-${{ matrix.arch }} ./${{ steps.values.outputs.pkg-name }}/usr/local/bin/webhook-tester
+          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ./${{ steps.values.outputs.pkg-name }}/DEBIAN/control
+          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}"    >> ./${{ steps.values.outputs.pkg-name }}/DEBIAN/control
+          echo -e "Description: Powerful tool for testing WebHooks and more"             >> ./${{ steps.values.outputs.pkg-name }}/DEBIAN/control
+          dpkg-deb --build --root-owner-group ${{ steps.values.outputs.pkg-name }}
+      - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.values.outputs.deb-name }}.deb
-          asset_name: ${{ steps.values.outputs.binary-name }}.deb
+          file: ./${{ steps.values.outputs.pkg-name }}.deb
+          asset_name: ${{ steps.values.outputs.pkg-name }}.deb
           tag: ${{ github.ref }}
 
   build-docker-image:
@@ -92,7 +110,7 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
-          build-args: "APP_VERSION=${{ steps.slug.outputs.version }}"
+          build-args: "APP_VERSION=${{ steps.slug.outputs.version-semantic }}"
           tags: | # TODO: add `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest` and `docker.io/tarampampam/webhook-tester:latest`
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version }}
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}

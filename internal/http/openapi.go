@@ -61,7 +61,7 @@ func NewOpenAPI(
 	log *zap.Logger,
 	rdyChecker func(context.Context) error,
 	lastAppVer func(context.Context) (string, error),
-	cfg config.AppSettings,
+	cfg *config.AppSettings,
 	db storage.Storage,
 	pubSub pubsub.PubSub[pubsub.CapturedRequest],
 ) *OpenAPI {

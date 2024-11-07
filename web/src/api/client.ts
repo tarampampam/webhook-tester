@@ -11,6 +11,10 @@ type AppSettings = Readonly<{
     maxRequestBodySize: number // In bytes
     sessionTTL: number // In seconds
   }>
+  tunnel: Readonly<{
+    enabled: boolean
+    url: URL | null
+  }>
 }>
 
 type SessionOptions = Readonly<{
@@ -47,7 +51,7 @@ export class Client {
 
   constructor(opt?: ClientOptions) {
     const baseUrl: string | null = opt?.baseUrl
-      ? opt.baseUrl.replace(/\/+$/, '')
+      ? opt.baseUrl
       : typeof window !== 'undefined' // for non-browser environments, like tests
         ? window.location.protocol + '//' + window.location.host
         : null
@@ -58,7 +62,7 @@ export class Client {
 
     this.baseUrl = new URL(baseUrl)
 
-    this.api = createClient<paths>(opt)
+    this.api = createClient<paths>({ ...opt, baseUrl: baseUrl.toString() })
     this.api.use(throwIfNotJSON, throwIfNotValidResponse)
   }
 
@@ -134,6 +138,10 @@ export class Client {
           maxRequests: data.limits.max_requests,
           maxRequestBodySize: data.limits.max_request_body_size,
           sessionTTL: data.limits.session_ttl, // in seconds
+        }),
+        tunnel: Object.freeze({
+          enabled: data.tunnel.enabled,
+          url: data?.tunnel.url ? new URL(data.tunnel.url) : null,
         }),
       })
 

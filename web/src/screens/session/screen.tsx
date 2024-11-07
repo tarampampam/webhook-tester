@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Blockquote } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
@@ -15,7 +15,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
     useParams<Readonly<{ rID?: string }>>(), // rID is optional for this layout
   ]
   const navigate = useNavigate()
-  const { sessions, setLastUsed, removeSession } = useSessions()
+  const { setLastUsed, removeSession } = useSessions()
   const [loading, setLoading] = useState<boolean>(false)
   const [sessionProps, setSessionProps] = useState<SessionProps | null>(null)
   const { ref: uiSettings } = useUISettings()
@@ -39,11 +39,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
   /** Subscribe to the session requests via WebSocket */
   const subscribe = useCallback(
     (sID: string) => {
-      if (closeSubRef.current) {
-        closeSubRef.current() // close the previous subscription
-      }
-
-      closeSubRef.current = null // reset the closer function
+      unsubscribe() // unsubscribe from the previous session requests
 
       apiClient
         .subscribeToSessionRequests(sID, {
@@ -116,6 +112,7 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
         })
         .catch(console.error)
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [apiClient, navigate, setListedRequests, uiSettings, showBrowserNotification]
   )
 
@@ -124,6 +121,8 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
     if (closeSubRef.current) {
       closeSubRef.current() // close the subscription
     }
+
+    closeSubRef.current = null // reset the closer function
   }, [])
 
   /** Load the session details and the list of requests */
@@ -186,26 +185,9 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
     [apiClient, navigate, setLastUsed, removeSession, setListedRequests, setParentSID, subscribe]
   )
 
-  /** Verify the session existence and remove the missing ones */
-  const invalidateMissingSessions = useCallback(() => {
-    Promise.allSettled(sessions.map((sID) => apiClient.getSession(sID))).then((results) => {
-      const missingSessions = results
-        .map((result, i) => (result.status === 'rejected' ? sessions[i] : null))
-        .filter((sID): sID is string => sID !== null)
-
-      if (missingSessions.length > 0) {
-        removeSession(...missingSessions)
-      }
-    })
-  }, [apiClient, removeSession, sessions])
-
   useEffect((): (() => void) => {
     // on mount
     loadSessionAndRequests(sID)
-
-    if (sessions.length) {
-      invalidateMissingSessions()
-    }
 
     // on unmount
     return (): void => {
@@ -213,7 +195,8 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
 
       unsubscribe()
     }
-  }, [loadSessionAndRequests, sessions, invalidateMissingSessions, sID, setParentSID, unsubscribe])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sID, setParentSID, unsubscribe])
 
   // notify the parent layout about the request ID change
   useEffect((): void => setParentRID(rID || null), [setParentRID, rID])

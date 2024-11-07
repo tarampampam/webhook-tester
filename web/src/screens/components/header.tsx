@@ -4,6 +4,7 @@ import { notifications as notify } from '@mantine/notifications'
 import {
   IconAdjustmentsAlt,
   IconBrandGithubFilled,
+  IconBuildingTunnel,
   IconCirclePlusFilled,
   IconCopy,
   IconGrave2,
@@ -34,11 +35,13 @@ export default function Header({
   currentVersion: SemVer | null
   latestVersion: SemVer | null
   sID: string | null
-  appSettings: {
+  appSettings: Readonly<{
     setMaxRequestsPerSession: number
     maxRequestBodySize: number
     sessionTTLSec: number
-  } | null
+    tunnelEnabled: boolean
+    tunnelUrl: URL | null
+  }> | null
   webHookUrl: URL | null
   isBurgerOpened: boolean
   onBurgerClick: () => void
@@ -117,7 +120,7 @@ export default function Header({
             style={{ height: 20 }}
             title={currentVersion ? 'v' + currentVersion.toString() : undefined}
           />
-          <Button.Group visibleFrom="md">
+          <Button.Group visibleFrom="sm">
             <Button
               variant="default"
               size="xs"
@@ -127,6 +130,23 @@ export default function Header({
               Help
             </Button>
 
+            {appSettings?.tunnelEnabled &&
+              !!appSettings.tunnelUrl &&
+              window.location.hostname !== appSettings.tunnelUrl.hostname && (
+                <Button
+                  variant="default"
+                  size="xs"
+                  leftSection={<IconBuildingTunnel size="1.3em" />}
+                  component={Link}
+                  to={appSettings.tunnelUrl.toString()}
+                  target="_blank"
+                >
+                  Tunnel
+                </Button>
+              )}
+          </Button.Group>
+
+          <Button.Group visibleFrom="lg">
             {isUpdateAvailable && !!latestVersion ? (
               <Button
                 variant="default"
