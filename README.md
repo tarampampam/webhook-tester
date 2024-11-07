@@ -77,6 +77,11 @@ chmod +x ./webhook-tester
 ./webhook-tester start
 ```
 
+> [!TIP]
+> Each release includes binaries for **linux**, **darwin** (macOS) and **windows** (`amd64` and `arm64` architectures).
+> You can download the binary for your system from the [releases page][link_releases] (section `Assets`). And - yes,
+> all what you need is just download and run single binary file.
+
 Alternatively, you can use the Docker image:
 
 | Registry                               | Image                                |

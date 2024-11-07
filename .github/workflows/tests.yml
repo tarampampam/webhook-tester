@@ -48,6 +48,8 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" run lint
       - run: npm --prefix "$NPM_PREFIX" run test
       - run: npm --prefix "$NPM_PREFIX" run build
+      - uses: actions/upload-artifact@v4
+        with: {name: web, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
     name: Build for ${{ matrix.os }} (${{ matrix.arch }})
@@ -57,64 +59,65 @@ jobs:
       matrix:
         os: [linux, darwin, windows]
         arch: [amd64, arm64]
-    env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     needs: [lint-and-test, lint-and-test-web]
     steps:
       - uses: actions/checkout@v4
-      - {uses: gacts/github-slug@v1, id: slug}
-      - id: values
-        run: |
-          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
-          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
-          echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-          echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
-      # build the frontend
-      - uses: actions/setup-node@v4
-        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
-      - run: |
-          npm --prefix "$NPM_PREFIX" install --no-audit
-          npm --prefix "$NPM_PREFIX" run generate
-          npm --prefix "$NPM_PREFIX" run build
-      # build the backend
-      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
-      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
-      - run: go generate -skip readme ./...
-      - env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: 0
-          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v${{ steps.values.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}
-        run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
-      - uses: crazy-max/ghaction-upx@v3 # compress the binary or just continue if it fails
-        continue-on-error: true
-        with: {files: "./${{ steps.values.outputs.binary-name }}", args: -v -5 --color}
-      - if: matrix.os == runner.os && matrix.arch == 'amd64' # try to run the binary
-        run: ./${{ steps.values.outputs.binary-name }} -h
-      # upload the binary
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.values.outputs.binary-name }}
-          path: ./${{ steps.values.outputs.binary-name }}
-          if-no-files-found: error
-          retention-days: 7
-      # build a Debian package
-      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        env:
-          PKG_NAME: ${{ steps.values.outputs.deb-name }}
-        run: |
-          mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
-          cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
-          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
-          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
-          echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
-          dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
-      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.values.outputs.binary-name }}.deb
-          path: ./${{ steps.values.outputs.deb-name }}.deb
-          if-no-files-found: error
-          retention-days: 7
+      - {uses: actions/download-artifact@v4, with: {name: web, path: ./web}}
+      - run: ls -lah . ./web ./web/dist
+#      - {uses: gacts/github-slug@v1, id: slug}
+#      - id: values
+#        run: |
+#          majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
+#          echo "version=${majorMinorPatch}" >> $GITHUB_OUTPUT
+#          echo "binary-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+#          echo "deb-name=webhook-tester_${majorMinorPatch}-1_${{ matrix.arch }}" >> $GITHUB_OUTPUT
+#      # build the frontend
+#      - uses: actions/setup-node@v4
+#        with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
+#      - run: |
+#          npm --prefix "$NPM_PREFIX" install --no-audit
+#          npm --prefix "$NPM_PREFIX" run generate
+#          npm --prefix "$NPM_PREFIX" run build
+#      # build the backend
+#      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+#      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
+#      - run: go generate -skip readme ./...
+#      - env:
+#          GOOS: ${{ matrix.os }}
+#          GOARCH: ${{ matrix.arch }}
+#          CGO_ENABLED: 0
+#          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=v${{ steps.values.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}
+#        run: go build -trimpath -ldflags "$LDFLAGS" -o ./${{ steps.values.outputs.binary-name }} ./cmd/webhook-tester/
+#      - uses: crazy-max/ghaction-upx@v3 # compress the binary or just continue if it fails
+#        continue-on-error: true
+#        with: {files: "./${{ steps.values.outputs.binary-name }}", args: -v -5 --color}
+#      - if: matrix.os == runner.os && matrix.arch == 'amd64' # try to run the binary
+#        run: ./${{ steps.values.outputs.binary-name }} -h
+#      # upload the binary
+#      - uses: actions/upload-artifact@v4
+#        with:
+#          name: ${{ steps.values.outputs.binary-name }}
+#          path: ./${{ steps.values.outputs.binary-name }}
+#          if-no-files-found: error
+#          retention-days: 7
+#      # build a Debian package
+#      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+#        env:
+#          PKG_NAME: ${{ steps.values.outputs.deb-name }}
+#        run: |
+#          mkdir -p ${{ env.PKG_NAME }}/usr/local/bin ${{ env.PKG_NAME }}/DEBIAN
+#          cp ${{ steps.values.outputs.binary-name }} ${{ env.PKG_NAME }}/usr/local/bin/webhook-tester
+#          echo -e "Package: webhook-tester\nVersion: ${{ steps.values.outputs.version }}" > ${{ env.PKG_NAME }}/DEBIAN/control
+#          echo -e "Architecture: ${{ matrix.arch }}\nMaintainer: ${{ github.actor }}" >> ${{ env.PKG_NAME }}/DEBIAN/control
+#          echo -e "Description: Powerful tool for testing WebHooks and more" >> ${{ env.PKG_NAME }}/DEBIAN/control
+#          dpkg-deb --build --root-owner-group ${{ env.PKG_NAME }}
+#      - if: matrix.os == 'linux' && matrix.arch == 'amd64'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: ${{ steps.values.outputs.binary-name }}.deb
+#          path: ./${{ steps.values.outputs.deb-name }}.deb
+#          if-no-files-found: error
+#          retention-days: 7
 
   e2e-test:
     name: End-to-end tests
