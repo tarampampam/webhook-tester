@@ -36,7 +36,7 @@ jobs:
       - run: go test -race -covermode=atomic ./...
 
   lint-and-test-web:
-    name: Test, lint and build frontend
+    name: Test, lint and build the frontend
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
@@ -56,14 +56,33 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
+      matrix: # https://pkg.go.dev/internal/platform
         os: [linux, darwin, windows]
         arch: [amd64, arm64]
     needs: [lint-and-test, lint-and-test-web]
     steps:
       - uses: actions/checkout@v4
-      - {uses: actions/download-artifact@v4, with: {name: web, path: ./web/dist}}
-      - run: ls -lah . ./web ./web/dist
+      - {uses: gacts/github-slug@v1, id: slug}
+      - id: values
+        run: |
+          echo "bin-path=./webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+          echo "app-version=${{ steps.slug.outputs.version }}@${{ steps.slug.outputs.commit-hash-short }}" >> $GITHUB_OUTPUT
+      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
+      - run: go generate -skip readme ./...
+      - {uses: actions/download-artifact@v4, with: {name: web, path: ./web/dist}} # put the built frontend
+      - env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.values.outputs.app-version }}
+        run: go build -trimpath -ldflags "$LDFLAGS" -o "${{ steps.values.outputs.bin-path }}" ./cmd/webhook-tester/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ steps.values.outputs.bin-path }}
+          if-no-files-found: error
+          retention-days: 7
 #      - {uses: gacts/github-slug@v1, id: slug}
 #      - id: values
 #        run: |
@@ -79,9 +98,6 @@ jobs:
 #          npm --prefix "$NPM_PREFIX" run generate
 #          npm --prefix "$NPM_PREFIX" run build
 #      # build the backend
-#      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
-#      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
-#      - run: go generate -skip readme ./...
 #      - env:
 #          GOOS: ${{ matrix.os }}
 #          GOARCH: ${{ matrix.arch }}
