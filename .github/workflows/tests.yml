@@ -63,7 +63,7 @@ jobs:
         with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
-    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    name: Build the app
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,7 +77,7 @@ jobs:
       - id: values
         run: |
           echo "app-version=${{ steps.slug.outputs.version-semantic }}@${{ steps.slug.outputs.commit-hash-short }}" >> $GITHUB_OUTPUT
-          echo "bin-path=./webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
+          echo "bin-name=./webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
       - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
       - run: go generate -skip readme ./...
@@ -87,16 +87,16 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.values.outputs.app-version }}
-        run: go build -trimpath -ldflags "$LDFLAGS" -o "${{ steps.values.outputs.bin-path }}" ./cmd/webhook-tester/
+        run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
       - uses: actions/upload-artifact@v4
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ steps.values.outputs.bin-path }}
+          path: ./${{ steps.values.outputs.bin-name }}
           if-no-files-found: error
           retention-days: 7
 
   build-deb-package:
-    name: Build the Debian package (${{ matrix.arch }})
+    name: Build the Debian package
     runs-on: ubuntu-latest
     strategy: {matrix: {arch: [amd64, arm64]}}
     needs: [build-app]
