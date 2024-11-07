@@ -7,10 +7,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/oapi-codegen/runtime v1.1.1
-	github.com/redis/go-redis/v9 v9.6.2
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/stretchr/testify v1.9.0
-	github.com/urfave/cli-docs/v3 v3.0.0-alpha5
-	github.com/urfave/cli/v3 v3.0.0-alpha9.1
+	github.com/urfave/cli-docs/v3 v3.0.0-alpha6
+	github.com/urfave/cli/v3 v3.0.0-alpha9.2
 	go.uber.org/zap v1.27.0
 	golang.ngrok.com/ngrok v1.11.0
 )
