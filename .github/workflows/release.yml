@@ -109,7 +109,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
+          platforms: linux/amd64,linux/arm64
           build-args: "APP_VERSION=${{ steps.slug.outputs.version-semantic }}"
           tags: | # TODO: add `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest` and `docker.io/tarampampam/webhook-tester:latest`
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version }}
