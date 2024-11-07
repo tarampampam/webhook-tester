@@ -84,7 +84,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./${{ steps.values.outputs.pkg-name }}.deb
-          asset_name: ${{ steps.values.outputs.pkg-name }}.deb
+          asset_name: webhook-tester-linux-${{ matrix.arch }}.deb
           tag: ${{ github.ref }}
 
   build-docker-image:
