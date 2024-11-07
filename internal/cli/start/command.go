@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -45,6 +46,12 @@ type (
 			pubSub struct {
 				driver string // Pub/Sub driver
 			}
+			tunnel struct {
+				driver string // tunnel driver
+			}
+			ngrok struct {
+				authToken string // ngrok authentication token
+			}
 			redis struct {
 				dsn string // redis-like server DSN
 			}
@@ -58,18 +65,16 @@ type (
 )
 
 const (
-	PubSubDriverMemory = "memory"
-	PubSubDriverRedis  = "redis"
-
-	StorageDriverMemory = "memory"
-	StorageDriverRedis  = "redis"
+	pubSubDriverMemory, pubSubDriverRedis   = "memory", "redis"
+	storageDriverMemory, storageDriverRedis = "memory", "redis"
+	tunnelDriverNgrok                       = "ngrok"
 )
 
 // NewCommand creates new `start` command.
 func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint:funlen
 	var cmd command
 
-	const httpCategory = "HTTP"
+	const httpCategory, tunnelCategory = "HTTP", "TUNNEL"
 
 	var (
 		httpAddrFlag = cli.StringFlag{
@@ -136,14 +141,14 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 		}
 		storageDriverFlag = cli.StringFlag{
 			Name:     "storage-driver",
-			Value:    StorageDriverMemory,
-			Usage:    "storage driver (" + strings.Join([]string{StorageDriverMemory, StorageDriverRedis}, "/") + ")",
+			Value:    storageDriverMemory,
+			Usage:    "storage driver (" + strings.Join([]string{storageDriverMemory, storageDriverRedis}, "/") + ")",
 			Sources:  cli.EnvVars("STORAGE_DRIVER"),
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
 			Validator: func(s string) error {
 				switch s {
-				case StorageDriverMemory, StorageDriverRedis:
+				case storageDriverMemory, storageDriverRedis:
 					return nil
 				default:
 					return fmt.Errorf("wrong storage driver [%s]", s)
@@ -194,19 +199,48 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 		}
 		pubSubDriverFlag = cli.StringFlag{
 			Name:     "pubsub-driver",
-			Value:    PubSubDriverMemory,
-			Usage:    "pub/sub driver (" + strings.Join([]string{PubSubDriverMemory, PubSubDriverRedis}, "/") + ")",
+			Value:    pubSubDriverMemory,
+			Usage:    "pub/sub driver (" + strings.Join([]string{pubSubDriverMemory, pubSubDriverRedis}, "/") + ")",
 			Sources:  cli.EnvVars("PUBSUB_DRIVER"),
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
 			Validator: func(s string) error {
 				switch s {
-				case PubSubDriverMemory, PubSubDriverRedis:
+				case pubSubDriverMemory, pubSubDriverRedis:
 					return nil
 				default:
 					return fmt.Errorf("wrong pub/sub driver [%s]", s)
 				}
 			},
+		}
+		tunnelDriverFlag = cli.StringFlag{
+			Name:     "tunnel-driver",
+			Category: tunnelCategory,
+			Value:    "", // no driver by default
+			Usage: "tunnel driver to expose your locally running app to the internet " +
+				"(" + strings.Join([]string{tunnelDriverNgrok}, "/") + ", empty to disable)",
+			Sources:  cli.EnvVars("TUNNEL_DRIVER"),
+			OnlyOnce: true,
+			Config:   cli.StringConfig{TrimSpace: true},
+			Validator: func(s string) error {
+				switch s {
+				case "":
+					return nil // no tunnel
+				case tunnelDriverNgrok:
+					return nil // ngrok
+				default:
+					return fmt.Errorf("wrong tunnel driver [%s]", s)
+				}
+			},
+		}
+		ngrokAuthTokenFlag = cli.StringFlag{
+			Name:     "ngrok-auth-token",
+			Category: tunnelCategory,
+			Usage: "ngrok authentication token (required for ngrok tunnel; create a new one " +
+				"at https://dashboard.ngrok.com/authtokens/new)",
+			Sources:  cli.EnvVars("NGROK_AUTHTOKEN"),
+			OnlyOnce: true,
+			Config:   cli.StringConfig{TrimSpace: true},
 		}
 		redisServerDsnFlag = cli.StringFlag{
 			Name: "redis-dsn",
@@ -252,9 +286,17 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name)) //nolint:gosec
 			opt.autoCreateSessions = c.Bool(autoCreateSessionsFlag.Name)
 			opt.pubSub.driver = c.String(pubSubDriverFlag.Name)
+			opt.tunnel.driver = c.String(tunnelDriverFlag.Name)
+			opt.ngrok.authToken = c.String(ngrokAuthTokenFlag.Name)
 			opt.redis.dsn = c.String(redisServerDsnFlag.Name)
 			opt.timeouts.shutdown = c.Duration(shutdownTimeoutFlag.Name)
 			opt.frontend.useLive = c.Bool(useLiveFrontendFlag.Name)
+
+			if opt.tunnel.driver == tunnelDriverNgrok && opt.ngrok.authToken == "" {
+				return fmt.Errorf("ngrok authentication token (--%s or %s) is required",
+					ngrokAuthTokenFlag.Name, ngrokAuthTokenFlag.Sources.String(),
+				)
+			}
 
 			return cmd.Run(ctx, log)
 		},
@@ -270,6 +312,8 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			&maxRequestPayloadSizeFlag,
 			&autoCreateSessionsFlag,
 			&pubSubDriverFlag,
+			&tunnelDriverFlag,
+			&ngrokAuthTokenFlag,
 			&redisServerDsnFlag,
 			&shutdownTimeoutFlag,
 			&useLiveFrontendFlag,
@@ -306,7 +350,7 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	var rdc *redis.Client // may be nil
 
 	// establish connection to Redis server if needed
-	if cmd.options.pubSub.driver == PubSubDriverRedis || cmd.options.storage.driver == StorageDriverRedis {
+	if cmd.options.pubSub.driver == pubSubDriverRedis || cmd.options.storage.driver == storageDriverRedis {
 		var opt, pErr = redis.ParseURL(cmd.options.redis.dsn)
 		if pErr != nil {
 			return fmt.Errorf("failed to parse Redis DSN: %w", pErr)
@@ -326,11 +370,11 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 
 	// create the storage
 	switch cmd.options.storage.driver {
-	case StorageDriverMemory:
+	case storageDriverMemory:
 		var inMemory = storage.NewInMemory(cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests)) //nolint:contextcheck,lll
 		defer func() { _ = inMemory.Close() }()
 		db = inMemory //nolint:wsl
-	case StorageDriverRedis:
+	case storageDriverRedis:
 		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
 	default:
 		return fmt.Errorf("unknown storage driver [%s]", cmd.options.storage.driver)
@@ -340,15 +384,22 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 
 	// create the Pub/Sub
 	switch cmd.options.pubSub.driver {
-	case PubSubDriverMemory:
+	case pubSubDriverMemory:
 		pubSub = pubsub.NewInMemory[pubsub.CapturedRequest]()
-	case PubSubDriverRedis:
+	case pubSubDriverRedis:
 		pubSub = pubsub.NewRedis[pubsub.CapturedRequest](rdc, encoding.JSON{})
 	default:
 		return fmt.Errorf("unknown Pub/Sub driver [%s]", cmd.options.pubSub.driver)
 	}
 
 	var httpLog = log.Named("http")
+
+	var appSettings = config.AppSettings{
+		MaxRequests:        cmd.options.storage.maxRequests,
+		MaxRequestBodySize: cmd.options.maxRequestPayloadSize,
+		SessionTTL:         cmd.options.storage.sessionTTL,
+		AutoCreateSessions: cmd.options.autoCreateSessions,
+	}
 
 	// create HTTP server
 	var server = appHttp.NewServer(ctx, httpLog,
@@ -360,12 +411,7 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		httpLog,
 		cmd.readinessChecker(rdc),
 		cmd.latestAppVersionGetter(),
-		config.AppSettings{
-			MaxRequests:        cmd.options.storage.maxRequests,
-			MaxRequestBodySize: cmd.options.maxRequestPayloadSize,
-			SessionTTL:         cmd.options.storage.sessionTTL,
-			AutoCreateSessions: cmd.options.autoCreateSessions,
-		},
+		&appSettings,
 		db,
 		pubSub,
 		cmd.options.frontend.useLive,
@@ -397,13 +443,25 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 			}(), cmd.options.http.tcpPort)),
 		)
 
-		tunUrl, closeTun, tunErr := tunnel.NewLocalTunnel(tunnel.WithLocalTunnelLogger(log)).Start(ctx, cmd.options.http.tcpPort)
-		if tunErr != nil {
-			closeTun()
-		} else {
-			defer closeTun()
+		var tun tunnel.Tunneler
 
-			log.Info("Tunnel started", zap.String("url", tunUrl.String()))
+		if cmd.options.tunnel.driver == tunnelDriverNgrok {
+			tun = tunnel.NewNgrok(cmd.options.ngrok.authToken, tunnel.WithNgrokLogger(log.Named("ngrok")))
+		}
+
+		if tun != nil {
+			defer func() { _ = tun.Close() }()
+
+			if pubUrl, err := tun.Expose(ctx, cmd.options.http.tcpPort); err != nil {
+				log.Error("Failed to start tunnel", zap.Error(err))
+			} else {
+				log.Info("Tunnel started", zap.String("url", pubUrl))
+
+				if u, uErr := url.Parse(pubUrl); uErr == nil {
+					// FIXME: concurrent write to the appSettings without mutex
+					appSettings.TunnelEnabled, appSettings.TunnelURL = true, u
+				}
+			}
 		}
 
 		if err := server.StartHTTP(ctx, httpLn); err != nil {

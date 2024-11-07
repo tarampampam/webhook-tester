@@ -54,7 +54,7 @@ func WithConnectionsPoolDialer(dialer func(context.Context, string, string) (net
 //
 // To close the pool and release all connections, call the returned cleanup function (it will close
 // all connections, stop all goroutines and empty the pool of connections).
-func NewConnectionsPool( //nolint:funlen
+func NewConnectionsPool( //nolint:funlen,gocognit,gocyclo
 	ctx context.Context,
 	remoteAddr string,
 	size uint,

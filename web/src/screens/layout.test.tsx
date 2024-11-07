@@ -18,6 +18,7 @@ describe('layout', () => {
     vi.spyOn(apiClient, 'latestVersion').mockResolvedValueOnce(new SemVer('99.0.0-unit-test'))
     vi.spyOn(apiClient, 'getSettings').mockResolvedValueOnce({
       limits: { maxRequests: 1000, sessionTTL: 60, maxRequestBodySize: 1000 },
+      tunnel: { enabled: true, url: new URL('http://unit/test') },
     })
 
     const { unmount } = render(

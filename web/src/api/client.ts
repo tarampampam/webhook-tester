@@ -11,6 +11,10 @@ type AppSettings = Readonly<{
     maxRequestBodySize: number // In bytes
     sessionTTL: number // In seconds
   }>
+  tunnel: Readonly<{
+    enabled: boolean
+    url: URL | null
+  }>
 }>
 
 type SessionOptions = Readonly<{
@@ -134,6 +138,10 @@ export class Client {
           maxRequests: data.limits.max_requests,
           maxRequestBodySize: data.limits.max_request_body_size,
           sessionTTL: data.limits.session_ttl, // in seconds
+        }),
+        tunnel: Object.freeze({
+          enabled: data.tunnel.enabled,
+          url: data?.tunnel.url ? new URL(data.tunnel.url) : null,
         }),
       })
 

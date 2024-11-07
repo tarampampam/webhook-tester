@@ -244,7 +244,15 @@ components:
             session_ttl: {type: integer, x-go-type: uint32, example: 5, description: In seconds}
           required: [max_requests, max_request_body_size, session_ttl]
           additionalProperties: false
-      required: [limits]
+        tunnel:
+          type: object
+          description: Tunnel settings
+          properties:
+            enabled: {type: boolean, example: true}
+            url: {type: string, example: 'https://tunnel.example.com/'} # optional
+          required: [enabled]
+          additionalProperties: false
+      required: [limits, tunnel]
       additionalProperties: false
 
     CapturedRequest:
@@ -269,7 +277,7 @@ components:
       description: The same as CapturedRequest, but without the request payload
       properties:
         uuid: {$ref: '#/components/schemas/UUID'}
-        client_address: {type: string, format: IPv4, example: '214.184.32.7'}
+        client_address: {type: string, example: '214.184.32.7', description: 'May be IPv6 like 2a0e:4005:1002:ffff:185:40:4:132'}
         method: {$ref: '#/components/schemas/HttpMethod'}
         headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
         url: {type: string, example: 'https://example.com/path?query=string'}

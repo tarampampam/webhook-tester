@@ -10,7 +10,6 @@ import {
   Loader,
   Stack,
   Text,
-  Title,
   UnstyledButton,
 } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
@@ -80,12 +79,12 @@ const Request = ({
           to={pathTo(RouteIDs.SessionAndRequest, sID, request.id)}
         >
           <Flex align="center">
-            <Title order={4} style={{ fontWeight: 500 }}>
+            <Text size="xl" fw={500} style={{ flex: 1, width: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {request.clientAddress}
-            </Title>
+            </Text>
             <Badge
               variant="dot"
-              ml="xs"
+              mx="xs"
               styles={{ label: { fontWeight: 300, cursor: 'pointer' } }}
               color={methodToColor(request.method)}
             >

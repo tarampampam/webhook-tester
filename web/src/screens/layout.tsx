@@ -34,11 +34,31 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
             setMaxRequestsPerSession: settings.limits.maxRequests,
             maxRequestBodySize: settings.limits.maxRequestBodySize,
             sessionTTLSec: settings.limits.sessionTTL,
+            tunnelEnabled: settings.tunnel.enabled,
+            tunnelUrl: settings.tunnel.url,
           })
         )
       })
       .catch(console.error)
+
+    if (sessions.length) {
+      invalidateMissingSessions()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiClient])
+
+  /** Verify the session existence and remove the missing ones */
+  const invalidateMissingSessions = useCallback(() => {
+    Promise.allSettled(sessions.map((sID) => apiClient.getSession(sID))).then((results) => {
+      const missingSessions = results
+        .map((result, i) => (result.status === 'rejected' ? sessions[i] : null))
+        .filter((sID): sID is string => sID !== null)
+
+      if (missingSessions.length > 0) {
+        removeSession(...missingSessions)
+      }
+    })
+  }, [apiClient, removeSession, sessions])
 
   /** Handles creating a new session and optionally destroying the current one */
   const handleNewSessionCreate = useCallback(
@@ -299,6 +319,8 @@ type AppSettings = {
   setMaxRequestsPerSession: number
   maxRequestBodySize: number
   sessionTTLSec: number
+  tunnelEnabled: boolean
+  tunnelUrl: URL | null
 }
 
 const JumpToTop = ({
