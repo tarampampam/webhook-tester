@@ -23,7 +23,7 @@ RUN set -x \
     && GOBIN=/bin go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}" \
     && go clean -cache -modcache \
     # renovate: source=github-releases name=golangci/golangci-lint
-    && GOLANGCI_LINT_VERSION="1.61.0" \
+    && GOLANGCI_LINT_VERSION="1.62.0" \
     && wget -O- -nv "https://cdn.jsdelivr.net/gh/golangci/golangci-lint@v${GOLANGCI_LINT_VERSION}/install.sh" \
       | sh -s -- -b /bin "v${GOLANGCI_LINT_VERSION}" \
     # customize the shell prompt (for the bash)
