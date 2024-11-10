@@ -3,9 +3,9 @@ import { notifications as notify } from '@mantine/notifications'
 import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
+import { APIErrorCommon, APIErrorNotFound, type Client, RequestEventAction } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useBrowserNotifications, useSessions, useUISettings } from '~/shared'
+import { sessionToUrl, useUISettings, useSessions, useBrowserNotifications } from '~/shared'
 import { useLayoutOutletContext } from '../layout'
 import { RequestDetails, SessionDetails, type SessionProps } from './components'
 
@@ -43,64 +43,85 @@ export default function SessionAndRequestScreen({ apiClient }: { apiClient: Clie
 
       apiClient
         .subscribeToSessionRequests(sID, {
-          onUpdate: (request): void => {
-            // append the new request in front of the list
-            setListedRequests((prev) => {
-              let newList = [
-                Object.freeze({
-                  id: request.uuid,
-                  method: request.method,
-                  clientAddress: request.clientAddress,
-                  capturedAt: request.capturedAt,
-                }),
-                ...prev,
-              ]
+          onUpdate: (requestEvent): void => {
+            switch (requestEvent.action) {
+              case RequestEventAction.create: {
+                if (requestEvent.request) {
+                  const req = requestEvent.request
 
-              // limit the number of shown requests per session if the setting is set and the list is too long
-              if (
-                !!appSettingsRef.current &&
-                appSettingsRef.current.setMaxRequestsPerSession &&
-                newList.length > appSettingsRef.current.setMaxRequestsPerSession
-              ) {
-                newList = newList.slice(0, appSettingsRef.current.setMaxRequestsPerSession)
-              }
+                  // append the new request in front of the list
+                  setListedRequests((prev) => {
+                    let newList = [
+                      Object.freeze({
+                        id: req.uuid,
+                        method: req.method,
+                        clientAddress: req.clientAddress,
+                        capturedAt: req.capturedAt,
+                      }),
+                      ...prev,
+                    ]
 
-              return newList
-            })
+                    // limit the number of shown requests per session if the setting is set and the list is too long
+                    if (
+                      !!appSettingsRef.current &&
+                      appSettingsRef.current.setMaxRequestsPerSession &&
+                      newList.length > appSettingsRef.current.setMaxRequestsPerSession
+                    ) {
+                      newList = newList.slice(0, appSettingsRef.current.setMaxRequestsPerSession)
+                    }
 
-            // the in-app notification function to show the new request notification
-            const showInAppNotification = (): void => {
-              notify.show({
-                title: 'New request received',
-                message: `From ${request.clientAddress} with method ${request.method}`,
-                icon: <IconRocket />,
-                color: 'blue',
-              })
-            }
+                    return newList
+                  })
 
-            // show a notification about the new request using the browser's native notification API,
-            // if the permission is granted and the setting is enabled
-            if (browserNotificationsGrantedRef.current && uiSettings.current.showNativeRequestNotifications) {
-              showBrowserNotification('New request received', {
-                body: `From ${request.clientAddress} with method ${request.method}`,
-                autoClose: 5000,
-              })
-                // in case the notification is not shown, show the in-app notification
-                .then((n) => {
-                  if (!n) {
+                  // the in-app notification function to show the new request notification
+                  const showInAppNotification = (): void => {
+                    notify.show({
+                      title: 'New request received',
+                      message: `From ${req.clientAddress} with method ${req.method}`,
+                      icon: <IconRocket />,
+                      color: 'blue',
+                    })
+                  }
+
+                  // show a notification about the new request using the browser's native notification API,
+                  // if the permission is granted and the setting is enabled
+                  if (browserNotificationsGrantedRef.current && uiSettings.current.showNativeRequestNotifications) {
+                    showBrowserNotification('New request received', {
+                      body: `From ${req.clientAddress} with method ${req.method}`,
+                      autoClose: 5000,
+                    })
+                      // in case the notification is not shown, show the in-app notification
+                      .then((n) => {
+                        if (!n) {
+                          showInAppNotification()
+                        }
+                      })
+                      // do the same in case of an error
+                      .catch(showInAppNotification)
+                  } else {
+                    // otherwise, show the in-app notification
                     showInAppNotification()
                   }
-                })
-                // do the same in case of an error
-                .catch(showInAppNotification)
-            } else {
-              // otherwise, show the in-app notification
-              showInAppNotification()
-            }
 
-            // navigate to the new request if the setting is enabled
-            if (uiSettings.current.autoNavigateToNewRequest) {
-              navigate(pathTo(RouteIDs.SessionAndRequest, sID, request.uuid)) // navigate to the new request
+                  // navigate to the new request if the setting is enabled
+                  if (uiSettings.current.autoNavigateToNewRequest) {
+                    navigate(pathTo(RouteIDs.SessionAndRequest, sID, req.uuid)) // navigate to the new request
+                  }
+                }
+
+                break
+              }
+
+              case RequestEventAction.delete: {
+                if (requestEvent.request) {
+                  // onRequestDelete?.(sID, requestEvent.request.uuid)
+                  // TODO: Implement requests storage
+                }
+
+                break
+              }
+
+              // TODO: handle other actions
             }
           },
           onError: (error): void => {

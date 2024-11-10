@@ -7,7 +7,7 @@ import { Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import { type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useSessions } from '~/shared'
+import { useSessions, sessionToUrl } from '~/shared'
 import { Header, type ListedRequest, type NewSessionOptions, SideBar } from './components'
 
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {

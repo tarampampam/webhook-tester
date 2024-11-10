@@ -32,6 +32,16 @@ paths:
         '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
+  /api/session/check/exists:
+    post:
+      summary: Batch check if sessions exist by UUID
+      tags: [api]
+      operationId: apiSessionCheckExists
+      requestBody: {$ref: '#/components/requestBodies/CheckSessionExistsRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/CheckSessionExistsResponse'}
+        '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
+
   /api/session/{session_uuid}:
     get:
       summary: Get session options by UUID
@@ -96,7 +106,7 @@ paths:
           description: WebSocket connection established
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/CapturedRequestShort'}
+              schema: {$ref: '#/components/schemas/RequestEvent'}
         '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
@@ -272,9 +282,19 @@ components:
       required: [uuid, client_address, method, request_payload_base64, headers, url, captured_at_unix_milli]
       additionalProperties: false
 
-    CapturedRequestShort:
+    RequestEvent:
       type: object
-      description: The same as CapturedRequest, but without the request payload
+      properties:
+        action:
+          type: string
+          enum: [create, delete, clear]
+          example: create
+        request: {$ref: '#/components/schemas/RequestEventRequest'}
+      required: [action]
+      additionalProperties: false
+
+    RequestEventRequest:
+      type: object
       properties:
         uuid: {$ref: '#/components/schemas/UUID'}
         client_address: {type: string, example: '214.184.32.7', description: 'May be IPv6 like 2a0e:4005:1002:ffff:185:40:4:132'}
@@ -352,6 +372,16 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/SessionResponseOptions'}
 
+    CheckSessionExistsRequest:
+      description: Check if a session exists by UUID
+      content:
+        application/json:
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/UUID'}
+            minItems: 1
+            maxItems: 100
+
   responses: # ---------------------------------------------- RESPONSES -----------------------------------------------
     VersionResponse:
       description: Information about the version
@@ -381,6 +411,19 @@ components:
               created_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
             required: [uuid, response, created_at_unix_milli]
             additionalProperties: false
+
+    CheckSessionExistsResponse:
+      description: A hashmap of session UUIDs and their existence
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              type: boolean
+              example: true
+            example:
+              9b6bbab9-c197-4dd3-bc3f-3cb6253820c7: true
+              9b6bbab9-c197-4dd3-bc3f-3cb6253820c8: false
 
     CapturedRequestsListResponse:
       description: List of captured requests, sorted from newest to oldest

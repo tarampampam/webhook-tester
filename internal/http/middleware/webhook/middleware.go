@@ -24,7 +24,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 	appCtx context.Context,
 	log *zap.Logger,
 	db storage.Storage,
-	pub pubsub.Publisher[pubsub.CapturedRequest],
+	pub pubsub.Publisher[pubsub.RequestEvent],
 	cfg *config.AppSettings,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -146,13 +146,16 @@ func New( //nolint:funlen,gocognit,gocyclo
 					headers[i] = pubsub.HttpHeader{Name: h.Name, Value: h.Value}
 				}
 
-				if err := pub.Publish(appCtx, sID, pubsub.CapturedRequest{
-					ID:                 rID,
-					ClientAddr:         captured.ClientAddr,
-					Method:             captured.Method,
-					Headers:            headers,
-					URL:                captured.URL,
-					CreatedAtUnixMilli: captured.CreatedAtUnixMilli,
+				if err := pub.Publish(appCtx, sID, pubsub.RequestEvent{
+					Action: pubsub.RequestActionCreate,
+					Request: &pubsub.Request{
+						ID:                 rID,
+						ClientAddr:         captured.ClientAddr,
+						Method:             captured.Method,
+						Headers:            headers,
+						URL:                captured.URL,
+						CreatedAtUnixMilli: captured.CreatedAtUnixMilli,
+					},
 				}); err != nil {
 					log.Error("failed to publish a captured request", zap.Error(err))
 				}

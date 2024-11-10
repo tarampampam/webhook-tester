@@ -23,7 +23,12 @@ type PubSub[T any] interface {
 }
 
 type (
-	CapturedRequest struct {
+	RequestEvent struct {
+		Action  RequestAction `json:"action"`
+		Request *Request      `json:"request"`
+	}
+
+	Request struct {
 		ID                 string       `json:"id"`
 		ClientAddr         string       `json:"client_addr"`
 		Method             string       `json:"method"`
@@ -36,4 +41,12 @@ type (
 		Name  string `json:"name"`
 		Value string `json:"value"`
 	}
+
+	RequestAction = string
+)
+
+const (
+	RequestActionCreate RequestAction = "create" // create a request
+	RequestActionDelete RequestAction = "delete" // delete a request
+	RequestActionClear  RequestAction = "clear"  // delete all requests
 )

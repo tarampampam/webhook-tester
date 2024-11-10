@@ -8,8 +8,7 @@ import { useSessions } from '~/shared'
 
 export default function HomeScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { addSession } = useSessions()
-  const { sessions, lastUsed, setLastUsed } = useSessions()
+  const { sessions, lastUsed, setLastUsed, addSession } = useSessions()
 
   useEffect(() => {
     if (hash) {

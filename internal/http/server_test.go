@@ -50,7 +50,7 @@ func TestServer_StartHTTP(t *testing.T) {
 		func(context.Context) (string, error) { return "v1.0.0", nil },
 		&config.AppSettings{},
 		db,
-		pubsub.NewInMemory[pubsub.CapturedRequest](),
+		pubsub.NewInMemory[pubsub.RequestEvent](),
 		false,
 	)
 

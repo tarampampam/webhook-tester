@@ -21,12 +21,12 @@ type (
 
 	Handler struct {
 		db       storage.Storage
-		sub      pubsub.Subscriber[pubsub.CapturedRequest]
+		sub      pubsub.Subscriber[pubsub.RequestEvent]
 		upgrader websocket.Upgrader
 	}
 )
 
-func New(db storage.Storage, sub pubsub.Subscriber[pubsub.CapturedRequest]) *Handler {
+func New(db storage.Storage, sub pubsub.Subscriber[pubsub.RequestEvent]) *Handler {
 	return &Handler{db: db, sub: sub}
 }
 
@@ -93,7 +93,7 @@ func (*Handler) reader(ctx context.Context, ws *websocket.Conn) error {
 // will block until the context is canceled, the client closes the connection, or an error during the writing occurs.
 //
 // This function sends the captured requests to the client and pings the client periodically.
-func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pubsub.CapturedRequest) error {
+func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pubsub.RequestEvent) error { //nolint:funlen
 	const pingInterval, pingDeadline = 10 * time.Second, 5 * time.Second
 
 	// create a ticker for the ping messages
@@ -110,25 +110,45 @@ func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pub
 				return nil // this should never happen, but just in case
 			}
 
-			rID, pErr := uuid.Parse(r.ID)
-			if pErr != nil {
-				continue
+			var (
+				action  openapi.RequestEventAction
+				request *openapi.RequestEventRequest
+			)
+
+			switch r.Action {
+			case pubsub.RequestActionCreate:
+				action = openapi.RequestEventActionCreate
+			case pubsub.RequestActionDelete:
+				action = openapi.RequestEventActionDelete
+			case pubsub.RequestActionClear:
+				action = openapi.RequestEventActionClear
+			default:
+				continue // skip the unknown action
 			}
 
-			var rHeaders = make([]openapi.HttpHeader, len(r.Headers))
-			for i, header := range r.Headers {
-				rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
+			if r.Request != nil {
+				rID, pErr := uuid.Parse(r.Request.ID)
+				if pErr != nil {
+					continue
+				}
+
+				var rHeaders = make([]openapi.HttpHeader, len(r.Request.Headers))
+				for i, header := range r.Request.Headers {
+					rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
+				}
+
+				request = &openapi.RequestEventRequest{
+					Uuid:                rID,
+					CapturedAtUnixMilli: r.Request.CreatedAtUnixMilli,
+					ClientAddress:       r.Request.ClientAddr,
+					Headers:             rHeaders,
+					Method:              strings.ToUpper(r.Request.Method),
+					Url:                 r.Request.URL,
+				}
 			}
 
 			// write the response to the client
-			if err := ws.WriteJSON(openapi.CapturedRequest{
-				CapturedAtUnixMilli: r.CreatedAtUnixMilli,
-				ClientAddress:       r.ClientAddr,
-				Headers:             rHeaders,
-				Method:              strings.ToUpper(r.Method),
-				Url:                 r.URL,
-				Uuid:                rID,
-			}); err != nil {
+			if err := ws.WriteJSON(openapi.RequestEvent{Action: action, Request: request}); err != nil {
 				return fmt.Errorf("failed to write the message: %w", err)
 			}
 

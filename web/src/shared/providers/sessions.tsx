@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react'
-import { UsedStorageKeys, useStorage } from './use-storage'
+import { UsedStorageKeys, useStorage } from '../hooks/use-storage.ts'
 
 type SessionsContext = {
   sessions: ReadonlyArray<string>

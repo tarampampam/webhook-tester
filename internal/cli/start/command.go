@@ -380,14 +380,14 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		return fmt.Errorf("unknown storage driver [%s]", cmd.options.storage.driver)
 	}
 
-	var pubSub pubsub.PubSub[pubsub.CapturedRequest]
+	var pubSub pubsub.PubSub[pubsub.RequestEvent]
 
 	// create the Pub/Sub
 	switch cmd.options.pubSub.driver {
 	case pubSubDriverMemory:
-		pubSub = pubsub.NewInMemory[pubsub.CapturedRequest]()
+		pubSub = pubsub.NewInMemory[pubsub.RequestEvent]()
 	case pubSubDriverRedis:
-		pubSub = pubsub.NewRedis[pubsub.CapturedRequest](rdc, encoding.JSON{})
+		pubSub = pubsub.NewRedis[pubsub.RequestEvent](rdc, encoding.JSON{})
 	default:
 		return fmt.Errorf("unknown Pub/Sub driver [%s]", cmd.options.pubSub.driver)
 	}
