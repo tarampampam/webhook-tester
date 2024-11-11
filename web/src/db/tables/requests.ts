@@ -7,6 +7,7 @@ export type Request = {
   method: string
   headers: Array<{ name: string; value: string }>
   url: URL
+  // requestPayload: Uint8Array // TODO: store request payload too?
   capturedAt: Date
 }
 

@@ -2,13 +2,16 @@ import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import React, { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { useSessions } from '~/shared'
+import { useData } from '~/shared'
 
-export default function HomeScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
+let count: number = 0
+
+export function HomeScreen(): React.JSX.Element {
+  console.debug(`🖌 HomeScreen rendering (${++count})`)
+
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { sessions, lastUsed, setLastUsed, addSession } = useSessions()
+  const { switchToRequest, switchToSession, lastUsedSID, allSessionIDs, newSession } = useData()
 
   useEffect(() => {
     if (hash) {
@@ -23,30 +26,58 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
         .filter((v) => v && v.length === 36) // 36 characters is the length of a UUID
 
       if (sID && rID) {
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, rID))
+        switchToRequest(sID, rID)
+          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID, rID)))
+          .catch(() => {
+            notify.show({ title: 'Failed to redirect to the request', message: null })
+
+            switchToSession(sID)
+              .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID)))
+              .catch(() => {
+                notify.show({ title: 'Failed to redirect to the WebHook', message: null, color: 'red' })
+
+                navigate(pathTo(RouteIDs.Home))
+              })
+          })
 
         return
       } else if (sID) {
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+        switchToSession(sID)
+          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID)))
+          .catch(() => {
+            notify.show({ title: 'Failed to redirect to the WebHook', message: null, color: 'red' })
+
+            navigate(pathTo(RouteIDs.Home))
+          })
 
         return
       }
     }
 
     // automatically redirect to the last used session, if available
-    if (lastUsed) {
+    if (lastUsedSID) {
       notify.show({ title: 'Redirected to the last used WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsed))
+      switchToSession(lastUsedSID)
+        .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID)))
+        .catch(() => {
+          notify.show({ title: 'Failed to redirect to the last used WebHook', message: null, color: 'red' })
+        })
 
       return
     }
 
     // automatically redirect to the last created session, if available
-    if (sessions.length) {
+    if (allSessionIDs.length) {
+      const lastCreated = allSessionIDs[allSessionIDs.length - 1]
+
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, sessions[sessions.length - 1]))
+      switchToSession(lastCreated)
+        .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, allSessionIDs[allSessionIDs.length - 1])))
+        .catch(() => {
+          notify.show({ title: 'Failed to redirect to the last created WebHook', message: null, color: 'red' })
+        })
 
       return
     }
@@ -59,22 +90,20 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
       loading: true,
     })
 
-    apiClient
-      .newSession({})
+    newSession({})
       .then((sInfo) => {
         notify.update({
           id,
           title: 'A new WebHook has been created',
-          message: `Session ID: ${sInfo.uuid}`,
+          message: `Session ID: ${sInfo.sID}`,
           color: 'green',
           autoClose: 5000,
           loading: false,
         })
 
-        addSession(sInfo.uuid)
-        setLastUsed(sInfo.uuid)
-
-        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.uuid))
+        switchToSession(sInfo.sID)
+          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.sID)))
+          .catch(() => notify.show({ title: 'Failed to redirect to the new WebHook', message: null, color: 'red' }))
       })
       .catch(() => {
         notify.update({
@@ -85,7 +114,7 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
           loading: false,
         })
       })
-  }, [apiClient, addSession, hash, lastUsed, navigate, sessions, setLastUsed])
+  }, [allSessionIDs, hash, lastUsedSID, navigate, newSession, switchToRequest, switchToSession])
 
   return (
     <>

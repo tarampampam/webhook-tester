@@ -17,6 +17,8 @@ export enum UsedStorageKeys {
   RequestDetailsHeadersExpand = 'rd-headers-expand',
 }
 
+export type StorageArea = 'local' | 'session'
+
 /**
  * Hook to get and set a value in the storage. The value is stored as JSON. The key is automatically prefixed with
  * `webhook-tester-v2-`.
@@ -27,7 +29,7 @@ export enum UsedStorageKeys {
 export function useStorage<T>(
   initValue: T,
   key: UsedStorageKeys,
-  area: 'local' | 'session' = 'session'
+  area: StorageArea = 'session'
 ): readonly [T, Dispatch<SetStateAction<T>>, () => void] {
   const storage: Storage = area === 'local' ? localStorage : sessionStorage
   const storageKey = `webhook-tester-v2-${key}`

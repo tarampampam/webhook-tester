@@ -5,14 +5,14 @@ import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { Client } from './api'
-import { Database } from './db'
-import { createRoutes } from './routing'
+import { Client } from '~/api'
+import { Database } from '~/db'
+import { createRoutes } from '~/routing'
+import { BrowserNotificationsProvider, DataProvider, SettingsProvider } from './shared'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
 import '@mantine/notifications/styles.css'
 import '~/theme/app.css'
-import { BrowserNotificationsProvider, DataProvider, SessionsProvider, UISettingsProvider } from './shared'
 
 dayjs.extend(relativeTime) // https://day.js.org/docs/en/plugin/relative-time
 
@@ -25,21 +25,17 @@ const App = (): React.JSX.Element => {
     <MantineProvider defaultColorScheme="auto">
       <Notifications />
       <BrowserNotificationsProvider>
-        <DataProvider api={api} db={db}>
-          <UISettingsProvider>
-            <SessionsProvider>
-              <RouterProvider router={createBrowserRouter(createRoutes(api))} />
-            </SessionsProvider>
-          </UISettingsProvider>
-        </DataProvider>
+        <SettingsProvider>
+          <DataProvider api={api} db={db}>
+            <RouterProvider router={createBrowserRouter(createRoutes(api))} />
+          </DataProvider>
+        </SettingsProvider>
       </BrowserNotificationsProvider>
     </MantineProvider>
   )
 }
 
-const root = document.getElementById('root') as HTMLElement
-
-createRoot(root).render(
+createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
     <App />
   </StrictMode>

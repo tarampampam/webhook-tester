@@ -6,3 +6,4 @@
 
 ## etc
 *.log
+/src/*-old

@@ -1,1 +1,1 @@
-export { default as SessionAndRequestScreen } from './screen'
+export { SessionAndRequestScreen } from './screen'

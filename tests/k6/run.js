@@ -53,7 +53,7 @@ export default (ctx) => {
 
         const sID = testApiCreateSession(baseUrl, statusCode, [{name: headerName, value: headerValue}], responseBody)
 
-        testApiSessionGet(baseUrl, sID, {statusCode, headers: [{name: headerName, value: headerValue}], responseBody})
+        testApiSessionGet(baseUrl, sID, {statusCode: status, head: [{name: headerName, value: headerValue}], responseBody: body})
 
         group('requests', () => {
           testApiSessionHasNoRequests(baseUrl, sID) // initially, there are no requests

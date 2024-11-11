@@ -64,7 +64,7 @@ paths:
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
   /api/session/{session_uuid}/requests:
-    get:
+    get: # TODO: add possibility to omit the request body
       summary: Get the list of requests for a session by UUID
       tags: [api]
       operationId: apiSessionListRequests

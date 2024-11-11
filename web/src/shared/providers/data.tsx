@@ -7,6 +7,10 @@ import { UsedStorageKeys, useStorage } from '~/shared'
 export type Session = {
   sID: string
   humanReadableName: string
+  responseCode: number
+  responseHeaders: Array<{ name: string; value: string }>
+  responseDelay: number
+  responseBody: Uint8Array
 }
 
 export type Request = {
@@ -36,8 +40,8 @@ type DataContext = {
     responseBody?: Uint8Array
   }): Promise<Session>
 
-  /** Switch to a session with the given ID. It returns `true` if the session was switched successfully. */
-  switchToSession(sID: string): Promise<boolean>
+  /** Switch to a session with the given ID. */
+  switchToSession(sID: string): Promise<void>
 
   /** Current active session */
   session: Readonly<Session> | null
@@ -55,13 +59,28 @@ type DataContext = {
   requests: ReadonlyArray<Omit<Request, 'payload'>> // omit the payload to reduce the memory usage
 
   /** Switch to a request with the given ID for the current session */
-  switchToRequest(rID: string): Promise<boolean>
+  switchToRequest(sID: string, rID: string | null): Promise<void>
 
   /** Remove a request with the given ID for the current session */
-  removeRequest(rID: string): Promise<void>
+  removeRequest(sID: string, rID: string): Promise<void>
+
+  /** Remove all requests for the session with the given ID */
+  removeAllRequests(sID: string): Promise<void>
+
+  /** The URL for the webhook (if session is active) */
+  webHookUrl: Readonly<URL> | null
+
+  /** The loading state of the session */
+  sessionLoading: boolean
+
+  /** The loading state of the request */
+  requestLoading: boolean
+
+  /** The loading state of the session requests */
+  requestsLoading: boolean
 }
 
-const notInitialized = () => {
+const notInitialized = (): never => {
   throw new Error('DataProvider is not initialized')
 }
 
@@ -76,9 +95,15 @@ const dataContext = createContext<DataContext>({
   requests: [],
   switchToRequest: () => notInitialized(),
   removeRequest: () => notInitialized(),
+  removeAllRequests: () => notInitialized(),
+  webHookUrl: null,
+  sessionLoading: false,
+  requestLoading: false,
+  requestsLoading: false,
 })
 
-// TODO: use notifications for error handling?
+// TODO: use notifications for error handling? not sure, since this is a "background" logic
+/** Error handler for non-critical errors */
 const errHandler = (err: Error | unknown) => console.error(err)
 
 /** Sort requests by the captured time (from newest to oldest) */
@@ -95,9 +120,106 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
   const [allSessionIDs, setAllSessionIDs] = useState<ReadonlyArray<string>>([])
   const [request, setRequest] = useState<Readonly<Request> | null>(null)
   const [requests, setRequests] = useState<ReadonlyArray<Omit<Request, 'payload'>>>([])
+  const [webHookUrl, setWebHookUrl] = useState<URL | null>(null)
+  const [sessionLoading, setSessionLoading] = useState<boolean>(false)
+  const [requestLoading, setRequestLoading] = useState<boolean>(false)
+  const [requestsLoading, setRequestsLoading] = useState<boolean>(false)
 
   // the subscription closer function (if not null, it means the subscription is active)
   const closeSubRef = useRef<(() => void) | null>(null)
+
+  /** Subscribe to the session requests on the server */
+  const subscribeToRequestEvents = useCallback(
+    (sID: string) => {
+      // unsubscribe from the previous session requests
+      if (closeSubRef.current) {
+        closeSubRef.current()
+      }
+
+      closeSubRef.current = null
+
+      return new Promise<void>((resolve, reject) => {
+        // subscribe to the session requests on the server
+        api
+          .subscribeToSessionRequests(sID, {
+            onUpdate: (requestEvent): void => {
+              switch (requestEvent.action) {
+                // a new request was captured
+                case RequestEventAction.create: {
+                  const req = requestEvent.request
+
+                  if (req) {
+                    // append the new request in front of the list
+                    setRequests((prev) => [
+                      {
+                        rID: req.uuid,
+                        clientAddress: req.clientAddress,
+                        method: req.method,
+                        headers: [...req.headers],
+                        url: req.url,
+                        capturedAt: req.capturedAt,
+                      },
+                      ...prev,
+                    ])
+
+                    // TODO: add limit for the number of requests per session
+                    // TODO: show notifications for new requests
+
+                    // save the request to the database
+                    db.createRequest({
+                      sID: sID,
+                      rID: req.uuid,
+                      method: req.method,
+                      clientAddress: req.clientAddress,
+                      url: new URL(req.url),
+                      capturedAt: req.capturedAt,
+                      headers: [...req.headers],
+                    }).catch(errHandler)
+                  }
+
+                  break
+                }
+
+                // a request was deleted
+                case RequestEventAction.delete: {
+                  const req = requestEvent.request
+
+                  if (req) {
+                    // remove the request from the list
+                    setRequests((prev) => prev.filter((r) => r.rID !== req.uuid))
+
+                    // remove the request from the database
+                    db.deleteRequest(req.uuid).catch(errHandler)
+                  }
+
+                  break
+                }
+
+                // all requests were cleared
+                case RequestEventAction.clear: {
+                  // clear the requests list
+                  setRequests([])
+
+                  // clear the requests from the database
+                  db.deleteAllRequests(sID).catch(errHandler)
+
+                  break
+                }
+              }
+            },
+            onError: (err) => reject(err),
+          })
+          .then((closer) => {
+            closeSubRef.current = closer
+            resolve()
+          })
+          .catch(reject)
+      })
+    },
+    [api, db]
+  )
+
+  // TODO: remove all useCallbacks - they are **probably** not needed
 
   /** Create a new session */
   const newSession = useCallback(
@@ -120,14 +242,27 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
             const humanReadableName = humanId()
 
             // save the session to the database
-            db.createSession({ sID: opts.uuid, humanReadableName, createdAt: opts.createdAt })
+            db.createSession({
+              sID: opts.uuid,
+              humanReadableName,
+              responseCode: statusCode,
+              responseDelay: delay,
+              responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+              responseBody,
+              createdAt: opts.createdAt,
+            })
               .then(() => {
                 // add the session ID to the list of all session IDs
                 setAllSessionIDs((prev) => [...prev, opts.uuid])
-                // empty the requests list
-                setRequests([])
 
-                resolve({ sID: opts.uuid, humanReadableName })
+                resolve({
+                  sID: opts.uuid,
+                  humanReadableName,
+                  responseCode: statusCode,
+                  responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+                  responseDelay: delay,
+                  responseBody,
+                })
               })
               .catch(reject)
           })
@@ -137,158 +272,162 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
     [api, db]
   )
 
+  /** Load the requests for the session with the given ID */
+  const loadRequests = useCallback(
+    (sID: string) => {
+      return new Promise<void>((resolve, reject) => {
+        // load requests for the session from the database (fast)
+        db.getSessionRequests(sID).then((reqs) => {
+          // update the requests list (first, to show the cached data)
+          setRequests(
+            reqs
+              .map((r) => ({
+                rID: r.rID,
+                clientAddress: r.clientAddress,
+                method: r.method,
+                headers: [...r.headers],
+                url: r.url,
+                capturedAt: r.capturedAt,
+              }))
+              .sort(requestsSorter)
+          )
+
+          setRequestsLoading(true)
+
+          // load requests from the server (slow)
+          api
+            .getSessionRequests(sID)
+            .then((reqs) => {
+              // update the requests list (second, to show the fresh data)
+              setRequests(
+                reqs
+                  .map((r) => ({
+                    rID: r.uuid,
+                    clientAddress: r.clientAddress,
+                    method: r.method,
+                    headers: [...r.headers],
+                    url: r.url,
+                    capturedAt: r.capturedAt,
+                  }))
+                  .sort(requestsSorter)
+              )
+
+              // update the requests in the database (for the future use)
+              db.createRequest(
+                ...reqs
+                  .map((r) => ({
+                    sID: sID,
+                    rID: r.uuid,
+                    method: r.method,
+                    clientAddress: r.clientAddress,
+                    url: new URL(r.url),
+                    capturedAt: r.capturedAt,
+                    headers: [...r.headers],
+                  }))
+                  .sort(requestsSorter)
+              ).catch(errHandler)
+
+              resolve()
+            })
+            .catch(reject)
+            .finally(() => setRequestsLoading(false))
+        })
+      })
+    },
+    [db, api]
+  )
+
   /** Switch to a session with the given ID. It returns `true` if the session was switched successfully. */
   const switchToSession = useCallback(
     (sID: string) => {
-      return new Promise<boolean>((resolve, reject) => {
-        // subscribe to the session requests
-        if (closeSubRef.current) {
-          closeSubRef.current()
-        }
-
-        // get the session from the database
+      return new Promise<void>((resolve, reject) => {
+        // first, try to find out if the session exists in the database
         db.getSession(sID)
-          .then((opts) => {
-            if (opts) {
-              // set the session as the current session
-              setSession({ sID: opts.sID, humanReadableName: opts.humanReadableName })
+          .then((dbSession) => {
+            // if the session exists in the database
+            if (dbSession) {
+              // set the session as the current session // FIXME: infinite rendering loop occurs here
+              setSession({
+                sID: dbSession.sID,
+                humanReadableName: dbSession.humanReadableName,
+                responseCode: dbSession.responseCode,
+                responseDelay: dbSession.responseDelay,
+                responseHeaders: dbSession.responseHeaders,
+                responseBody: dbSession.responseBody,
+              })
+
               // update the last used session ID
-              setLastUsedSID(opts.sID)
+              setLastUsedSID(dbSession.sID)
 
-              // load requests for the session from the database (fast)
-              db.getSessionRequests(opts.sID)
-                .then((reqs) => {
-                  setRequests(
-                    reqs
-                      .map((r) => ({
-                        rID: r.rID,
-                        clientAddress: r.clientAddress,
-                        method: r.method,
-                        headers: r.headers.map((h) => ({ name: h.name, value: h.value })),
-                        url: r.url,
-                        capturedAt: r.capturedAt,
-                      }))
-                      .sort(requestsSorter)
-                  )
-
-                  // load requests from the server (slow)
-                  api
-                    .getSessionRequests(opts.sID)
-                    .then((reqs) => {
-                      setRequests(
-                        reqs
-                          .map((r) => ({
-                            rID: r.uuid,
-                            clientAddress: r.clientAddress,
-                            method: r.method,
-                            headers: r.headers.map((h) => ({ name: h.name, value: h.value })),
-                            url: r.url,
-                            capturedAt: r.capturedAt,
-                          }))
-                          .sort(requestsSorter)
-                      )
-
-                      // update the requests in the database (for the future use)
-                      db.createRequest(
-                        ...reqs
-                          .map((r) => ({
-                            sID: opts.sID,
-                            rID: r.uuid,
-                            method: r.method,
-                            clientAddress: r.clientAddress,
-                            url: new URL(r.url),
-                            capturedAt: r.capturedAt,
-                            headers: r.headers.map((h) => ({ name: h.name, value: h.value })),
-                          }))
-                          .sort(requestsSorter)
-                      ).catch(errHandler)
-                    })
-                    .catch(errHandler)
-
-                  // subscribe to the session requests on the server
-                  api
-                    .subscribeToSessionRequests(opts.sID, {
-                      onUpdate: (requestEvent): void => {
-                        switch (requestEvent.action) {
-                          // a new request was captured
-                          case RequestEventAction.create: {
-                            const req = requestEvent.request
-
-                            if (req) {
-                              // append the new request in front of the list
-                              setRequests((prev) => [
-                                {
-                                  rID: req.uuid,
-                                  clientAddress: req.clientAddress,
-                                  method: req.method,
-                                  headers: req.headers.map((h) => ({ name: h.name, value: h.value })),
-                                  url: req.url,
-                                  capturedAt: req.capturedAt,
-                                },
-                                ...prev,
-                              ])
-
-                              // TODO: add limit for the number of requests per session
-                              // TODO: show notifications for new requests
-
-                              // save the request to the database
-                              db.createRequest({
-                                sID: opts.sID,
-                                rID: req.uuid,
-                                method: req.method,
-                                clientAddress: req.clientAddress,
-                                url: new URL(req.url),
-                                capturedAt: req.capturedAt,
-                                headers: req.headers.map((h) => ({ name: h.name, value: h.value })),
-                              }).catch(errHandler)
-                            }
-
-                            break
-                          }
-
-                          // a request was deleted
-                          case RequestEventAction.delete: {
-                            const req = requestEvent.request
-
-                            if (req) {
-                              // remove the request from the list
-                              setRequests((prev) => prev.filter((r) => r.rID !== req.uuid))
-
-                              // remove the request from the database
-                              db.deleteRequest(req.uuid).catch(errHandler)
-                            }
-
-                            break
-                          }
-
-                          // all requests were cleared
-                          case RequestEventAction.clear: {
-                            // clear the requests list
-                            setRequests([])
-
-                            // clear the requests from the database
-                            db.deleteAllRequests(opts.sID).catch(errHandler)
-
-                            break
-                          }
-                        }
-                      },
-                      onError: (error) => errHandler(error),
-                    })
-                    .then((closer) => (closeSubRef.current = closer))
-                    .catch(errHandler)
+              // load the requests for the session // FIXME: infinite rendering loop occurs here
+              loadRequests(dbSession.sID)
+                .then(() => subscribeToRequestEvents(dbSession.sID))
+                .then(resolve)
+                .catch((err) => {
+                  setLastUsedSID(null)
+                  reject(err)
                 })
-                .catch(errHandler)
+            } else {
+              // otherwise, try to get it from the server
+              setSessionLoading(true)
 
-              return resolve(true)
+              api
+                .getSession(sID)
+                .then((apiSession) => {
+                  const humanReadableName = humanId()
+
+                  // save the session to the database
+                  db.createSession({
+                    sID: apiSession.uuid,
+                    humanReadableName,
+                    responseCode: apiSession.response.statusCode,
+                    responseDelay: apiSession.response.delay,
+                    responseHeaders: [...apiSession.response.headers],
+                    responseBody: apiSession.response.body,
+                    createdAt: apiSession.createdAt,
+                  })
+                    .then(() => {
+                      // add the session ID to the list of all session IDs
+                      setAllSessionIDs((prev) => [...prev, apiSession.uuid])
+
+                      // set the session as the current session
+                      setSession({
+                        sID: apiSession.uuid,
+                        humanReadableName,
+                        responseCode: apiSession.response.statusCode,
+                        responseDelay: apiSession.response.delay,
+                        responseHeaders: [...apiSession.response.headers],
+                        responseBody: apiSession.response.body,
+                      })
+
+                      // update the last used session ID
+                      setLastUsedSID(apiSession.uuid)
+
+                      // load the requests for the session
+                      loadRequests(apiSession.uuid)
+                        .then(() => subscribeToRequestEvents(apiSession.uuid))
+                        .then(resolve)
+                        .catch((err) => {
+                          setLastUsedSID(null)
+                          reject(err)
+                        })
+                    })
+                    .catch(reject)
+                })
+                .catch((err) => {
+                  setLastUsedSID(null)
+                  reject(err)
+                })
+                .finally(() => setSessionLoading(false))
             }
-
-            return resolve(false)
           })
-          .catch(reject)
+          .catch((err) => {
+            setLastUsedSID(null)
+            reject(err)
+          })
       })
     },
-    [api, db, setLastUsedSID]
+    [api, db, loadRequests, subscribeToRequestEvents, setLastUsedSID]
   )
 
   /** Destroy a session with the given ID */
@@ -301,30 +440,34 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
             // remove the session from the list of all session IDs
             setAllSessionIDs((prev) => prev.filter((id) => id !== sID))
 
-            // if the session is the current session, unset the current session
-            if (!!session && session.sID === sID) {
-              setSession(null)
-            }
-
             // remove from the server too
-            api.deleteSession(sID).catch(errHandler)
-
-            resolve()
+            api
+              .deleteSession(sID)
+              .then((ok) => {
+                if (ok) {
+                  resolve()
+                } else {
+                  reject(new Error('Failed to delete the session on the server'))
+                }
+              })
+              .catch(reject)
           })
           .catch(reject)
       })
     },
-    [api, db, session]
+    [api, db]
   )
 
   /** Switch to a request with the given ID for the current session */
   const switchToRequest = useCallback(
-    (rID: string): Promise<boolean> => {
-      if (!session) {
-        return Promise.resolve(false)
+    (sID: string, rID: string | null): Promise<void> => {
+      if (!rID) {
+        setRequest(null)
+
+        return Promise.resolve()
       }
 
-      return new Promise((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         // get the request from the database (fast)
         db.getRequest(rID)
           .then((req) => {
@@ -334,15 +477,17 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
                 rID: req.rID,
                 clientAddress: req.clientAddress,
                 method: req.method,
-                headers: req.headers.map((h) => ({ name: h.name, value: h.value })),
+                headers: [...req.headers],
                 url: req.url,
                 payload: null, // database does not store the payload
                 capturedAt: req.capturedAt,
               })
 
+              setRequestLoading(true)
+
               // get the request payload from the server (slow)
               api
-                .getSessionRequest(session.sID, rID)
+                .getSessionRequest(sID, rID)
                 .then((req) => {
                   setRequest((prev) => {
                     if (prev) {
@@ -352,21 +497,54 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
                     return prev
                   })
                 })
+                .then(resolve)
                 .catch(reject)
+                .finally(() => setRequestLoading(false))
             } else {
-              resolve(false)
+              setRequestLoading(true)
+
+              // if the request does not exist in the database, try to get it from the server
+              api
+                .getSessionRequest(sID, rID)
+                .then((req) => {
+                  // set the current request with the data from the server
+                  setRequest({
+                    rID: req.uuid,
+                    clientAddress: req.clientAddress,
+                    method: req.method,
+                    headers: [...req.headers],
+                    url: req.url,
+                    payload: req.requestPayload,
+                    capturedAt: req.capturedAt,
+                  })
+
+                  // save the request to the database
+                  db.createRequest({
+                    sID,
+                    rID: req.uuid,
+                    method: req.method,
+                    clientAddress: req.clientAddress,
+                    url: new URL(req.url),
+                    capturedAt: req.capturedAt,
+                    headers: [...req.headers],
+                  })
+                    .then(resolve)
+                    .catch(reject)
+                })
+                .catch(reject)
+                .finally(() => setRequestLoading(false))
             }
           })
           .catch(reject)
       })
     },
-    [api, db, session]
+    [api, db]
   )
 
   /** Remove a request with the given ID for the current session */
   const removeRequest = useCallback(
-    (rID: string): Promise<void> => {
-      return new Promise((resolve, reject) => {
+    (sID: string, rID: string): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
         // remove the request from the database
         db.deleteRequest(rID)
           .then(() => {
@@ -374,16 +552,21 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
             setRequests((prev) => prev.filter((r) => r.rID !== rID).sort(requestsSorter))
 
             // remove from the server, if session is active
-            if (session) {
-              api.deleteSessionRequest(session.sID, rID).catch(errHandler)
-            }
-
-            resolve()
+            api
+              .deleteSessionRequest(sID, rID)
+              .then((ok) => {
+                if (ok) {
+                  resolve()
+                } else {
+                  reject(new Error('Failed to delete the request for the session on the server'))
+                }
+              })
+              .catch(reject)
           })
           .catch(reject)
       })
     },
-    [api, db, session]
+    [api, db]
   )
 
   // on provider mount
@@ -419,6 +602,41 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
       .catch(errHandler)
   }, [api, db])
 
+  /** Remove all requests for the session with the given ID */
+  const removeAllRequests = useCallback(
+    (sID: string): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        // remove all requests from the database
+        db.deleteAllRequests(sID)
+          .then(() => {
+            // clear the requests list
+            setRequests([])
+
+            // clear the requests on the server
+            api
+              .deleteAllSessionRequests(sID)
+              .then((ok) => {
+                if (ok) {
+                  resolve()
+                } else {
+                  reject(new Error('Failed to delete all requests for the session on the server'))
+                }
+              })
+              .catch(reject)
+          })
+          .catch(reject)
+      })
+    },
+    [api, db]
+  )
+
+  // watch for the session changes and update the webhook URL
+  useEffect(() => {
+    if (session) {
+      setWebHookUrl(Object.freeze(new URL(`${window.location.origin}/${session.sID}`)))
+    }
+  }, [session])
+
   return (
     <dataContext.Provider
       value={{
@@ -432,6 +650,11 @@ export const DataProvider = ({ api, db, children }: { api: Client; db: Database;
         requests,
         switchToRequest,
         removeRequest,
+        removeAllRequests,
+        webHookUrl,
+        sessionLoading,
+        requestLoading,
+        requestsLoading,
       }}
     >
       {children}
