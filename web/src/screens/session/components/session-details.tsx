@@ -2,7 +2,6 @@ import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Button, Flex, type MantineColor, Skeleton, Table, Text } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import {
-  IconBrandCSharp,
   IconBrandDebian,
   IconBrandGolang,
   IconBrandJavascript,
@@ -19,11 +18,7 @@ import dayjs from 'dayjs'
 import React, { useCallback, useRef } from 'react'
 import { useData, UsedStorageKeys, useStorage } from '~/shared'
 
-let count: number = 0
-
 export const SessionDetails = (): React.JSX.Element => {
-  console.debug(`🖌 SessionDetails rendering (${++count})`)
-
   const { session, webHookUrl, sessionLoading } = useData()
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
@@ -190,9 +185,9 @@ export const SessionDetails = (): React.JSX.Element => {
                 icon: <IconDiamond size="1.2em" />,
               },
               {
+                fileName: 'C#',
                 language: 'csharp',
                 code: snippet('csharp', webHookUrl),
-                icon: <IconBrandCSharp size="1.2em" />,
               },
             ]}
             onTabChange={(index) => setSelectedCodeTab(index)}
@@ -253,6 +248,7 @@ export const SessionDetails = (): React.JSX.Element => {
                     code={[
                       {
                         code: session.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                        fileName: 'response-headers',
                         language: 'bash',
                       },
                     ]}
@@ -269,7 +265,13 @@ export const SessionDetails = (): React.JSX.Element => {
                 <Table.Td ta="right">Response body</Table.Td>
                 <Table.Td>
                   <CodeHighlightTabs
-                    code={[{ code: String.fromCharCode(...session.responseBody), language: 'json' }]}
+                    code={[
+                      {
+                        code: String.fromCharCode(...session.responseBody),
+                        fileName: 'response-body',
+                        language: 'json',
+                      },
+                    ]}
                     expandCodeLabel="Show full response"
                     defaultExpanded={false}
                     withHeader={false}

@@ -9,18 +9,14 @@ import { pathTo, RouteIDs } from '~/routing'
 import { useData, useSettings } from '~/shared'
 import { Header, SideBar } from './components'
 
-let count: number = 0
-
 export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
-  console.debug(`🖌 DefaultLayout rendering (${++count})`)
-
   const navigate = useNavigate()
   const [scroll, scrollTo] = useWindowScroll()
   const [navBarIsOpened, navBarHandlers] = useDisclosure()
   const [currentVersion, setCurrentVersion] = useState<SemVer | null>(null)
   const [latestVersion, setLatestVersion] = useState<SemVer | null>(null)
   const { updateSettings } = useSettings()
-  const { session, switchToRequest } = useData()
+  const { session } = useData()
 
   // load current and latest versions&settings on mount
   useEffect(() => {
@@ -51,10 +47,10 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
       }
 
       if (session) {
-        switchToRequest(session.sID, null).then(() => navigate(pathTo(RouteIDs.SessionAndRequest, session.sID)))
+        navigate(pathTo(RouteIDs.SessionAndRequest, session.sID))
       }
     },
-    [navigate, session, switchToRequest]
+    [navigate, session]
   )
 
   return (

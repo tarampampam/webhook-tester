@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Title } from '@mantine/core'
+import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea } from '@mantine/core'
 import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import { notifications as notify } from '@mantine/notifications'
 import { useNavigate } from 'react-router-dom'
@@ -37,7 +37,7 @@ const controls = {
   },
   // destroy current session
   destroy: {
-    def: false,
+    def: true,
     key: UsedStorageKeys.NewSessionDestroyCurrentSession,
     area: 'session' satisfies StorageArea as StorageArea,
   },
@@ -68,17 +68,13 @@ const validate: { [K in keyof typeof controls]: (v: unknown) => boolean } = {
   destroy: (v) => typeof v === 'boolean',
 }
 
-let count: number = 0
-
 export const NewSessionModal: React.FC<{
   opened: boolean
   onClose: () => void
 }> = ({ opened, onClose }) => {
-  console.debug(`🖌 NewSessionModal rendering (${++count})`)
-
   const navigate = useNavigate()
   const { maxRequestBodySize: maxBodySize } = useSettings()
-  const { session, newSession, destroySession, switchToSession } = useData()
+  const { session, newSession, destroySession } = useData()
   const [loading, setLoading] = useState<boolean>(false)
 
   const [status, setStatus] = useStorage<number>(controls.code.def, controls.code.key, controls.code.area)
@@ -158,7 +154,9 @@ export const NewSessionModal: React.FC<{
           })
         }
 
-        switchToSession(newSID).then(() => navigate(pathTo(RouteIDs.SessionAndRequest, newSID)))
+        onClose()
+
+        navigate(pathTo(RouteIDs.SessionAndRequest, newSID))
       })
       .catch((err) => {
         notify.update({
@@ -178,7 +176,11 @@ export const NewSessionModal: React.FC<{
       onClose={onClose}
       size="md"
       overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-      title={<Title size="h3">Configure URL</Title>}
+      title={
+        <Text size="lg" fw={700}>
+          Configure URL
+        </Text>
+      }
       centered
     >
       <Text size="xs">

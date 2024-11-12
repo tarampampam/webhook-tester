@@ -1,16 +1,12 @@
 import type React from 'react'
 import { CodeHighlight } from '@mantine/code-highlight'
-import { Divider, Modal, Text, Title } from '@mantine/core'
+import { Divider, Modal, Text } from '@mantine/core'
 import { useData, useSettings } from '~/shared'
-
-let count: number = 0
 
 export const HelpModal: React.FC<{
   opened: boolean
   onClose: () => void
 }> = ({ opened, onClose }) => {
-  console.debug(`🖌 HelpModal rendering (${++count})`)
-
   const { webHookUrl } = useData()
   const { sessionTTLSec, maxRequestBodySize, maxRequestsPerSession } = useSettings()
 
@@ -23,7 +19,11 @@ export const HelpModal: React.FC<{
         backgroundOpacity: 0.55,
         blur: 3,
       }}
-      title={<Title size="h3">What is Webhook Tester?</Title>}
+      title={
+        <Text size="lg" fw={700}>
+          What is Webhook Tester?
+        </Text>
+      }
       centered
     >
       <Text my="md">

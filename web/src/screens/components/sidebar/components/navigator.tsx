@@ -5,11 +5,7 @@ import { Link } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
 import { useData } from '~/shared'
 
-let count: number = 0
-
 export const Navigator = (): React.JSX.Element => {
-  console.debug(`🖌 Navigator (sidebar) rendering (${++count})`)
-
   const { session, request, requests } = useData()
 
   const [jumpFirstEnabled, setJumpFirstEnabled] = useState<boolean>(false)

@@ -2,11 +2,7 @@ import type React from 'react'
 import { Checkbox, Stack, Text } from '@mantine/core'
 import { useBrowserNotifications, useSettings } from '~/shared'
 
-let count: number = 0
-
 export const UISettings = (): React.JSX.Element => {
-  console.debug(`🖌 UISettings rendering (${++count})`)
-
   const { autoNavigateToNewRequest, showRequestDetails, showNativeRequestNotifications, updateSettings } = useSettings()
   const { granted, request } = useBrowserNotifications()
 

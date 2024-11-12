@@ -243,18 +243,17 @@ export class Client {
     })
 
     if (data) {
-      return Object.freeze(
-        ids.reduce(
-          (acc, id) => {
-            acc[id] = Object.keys(data).includes(id)
+      // first, create an object with keys from the input array and values as `false`
+      const result = Object.fromEntries(ids.map((id) => [id, false])) as { [K in T]: boolean }
 
-            return acc
-          },
-          {} as {
-            [K in T]: boolean
-          }
-        )
-      )
+      // next, iterate over the response data and set the value to `true` if the ID exists and is `true`
+      for (const id in data) {
+        if (data[id] === true) {
+          result[id as T] = true
+        }
+      }
+
+      return Object.freeze(result)
     }
 
     throw new APIErrorUnknown({ message: response.statusText, response })

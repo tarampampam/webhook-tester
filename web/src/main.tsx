@@ -26,7 +26,7 @@ const App = (): React.JSX.Element => {
       <Notifications />
       <BrowserNotificationsProvider>
         <SettingsProvider>
-          <DataProvider api={api} db={db}>
+          <DataProvider api={api} db={db} errHandler={console.error}>
             <RouterProvider router={createBrowserRouter(createRoutes(api))} />
           </DataProvider>
         </SettingsProvider>

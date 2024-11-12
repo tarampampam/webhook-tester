@@ -9,7 +9,7 @@
     "lint:ts": "tsc --noEmit",
     "lint:es": "eslint ./src/**/*.{ts,tsx}",
     "test": "vitest --run",
-    "serve": "vite --strictPort",
+    "serve": "vite dev",
     "watch": "vite build --watch",
     "build": "tsc --noEmit && vite build"
   },

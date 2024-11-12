@@ -102,10 +102,6 @@ const dataContext = createContext<DataContext>({
   requestsLoading: false,
 })
 
-// TODO: use notifications for error handling? not sure, since this is a "background" logic
-/** Error handler for non-critical errors */
-const errHandler = (err: Error | unknown) => console.error(err)
-
 /** Sort requests by the captured time (from newest to oldest) */
 const requestsSorter = <T extends { capturedAt: Date }>(a: T, b: T) => b.capturedAt.getTime() - a.capturedAt.getTime()
 
@@ -114,7 +110,12 @@ const requestsSorter = <T extends { capturedAt: Date }>(a: T, b: T) => b.capture
  *
  * Think of it as the **core** of the business logic, handling all data and key methods related to sessions and requests.
  */
-export const DataProvider = ({ api, db, children }: { api: Client; db: Database; children: React.JSX.Element }) => {
+export const DataProvider: React.FC<{
+  api: Client
+  db: Database
+  errHandler: (err: Error | unknown) => void // error handler for non-critical errors
+  children: React.JSX.Element
+}> = ({ api, db, errHandler, children }) => {
   const [lastUsedSID, setLastUsedSID] = useStorage<string | null>(null, UsedStorageKeys.SessionsLastUsed, 'local')
   const [session, setSession] = useState<Readonly<Session> | null>(null)
   const [allSessionIDs, setAllSessionIDs] = useState<ReadonlyArray<string>>([])

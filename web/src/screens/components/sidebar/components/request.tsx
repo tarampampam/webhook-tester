@@ -11,17 +11,13 @@ import styles from './request.module.css'
 
 type TinyRequest = Omit<RequestData, 'payload'>
 
-let count: number = 0
-
 export const Request: React.FC<{
   sID: string
   request: TinyRequest
   isActive?: boolean
 }> = ({ sID, request, isActive = false }) => {
-  console.debug(`🖌 Request (sidebar) rendering (${++count})`)
-
   const navigate = useNavigate()
-  const { removeRequest, switchToRequest, requests } = useData()
+  const { removeRequest, requests } = useData()
 
   const formatDateTime = (date: Date): string => dayjs(date).fromNow()
   const [elapsedTime, setElapsedTime] = useState<string>(formatDateTime(request.capturedAt))
@@ -41,19 +37,15 @@ export const Request: React.FC<{
 
     // if the request is currently opened, navigate to the next one
     if (nextRequest) {
-      switchToRequest(sID, nextRequest.rID).then(() =>
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, nextRequest.rID))
-      )
+      navigate(pathTo(RouteIDs.SessionAndRequest, sID, nextRequest.rID))
     } else if (prevRequest) {
       // if there is no next request, navigate to the previous one
-      switchToRequest(sID, prevRequest.rID).then(() =>
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, prevRequest.rID))
-      )
+      navigate(pathTo(RouteIDs.SessionAndRequest, sID, prevRequest.rID))
     } else {
       // if there is no next request, navigate to the session
       navigate(pathTo(RouteIDs.SessionAndRequest, sID))
     }
-  }, [sID, request.rID, navigate, removeRequest, requests, switchToRequest])
+  }, [sID, request.rID, navigate, removeRequest, requests])
 
   useEffect((): (() => void) => {
     interval.start()

@@ -7,6 +7,7 @@ import { resolve, join } from 'path'
 const rootDir = resolve(__dirname)
 const [distDir, srcDir] = [join(rootDir, 'dist'), join(rootDir, 'src')]
 const isWatchMode = ['serve', 'dev', 'watch'].some((arg) => process.argv.slice(2).some((a) => a.indexOf(arg) !== -1))
+const devServerProxyTo = process.env?.['DEV_SERVER_PROXY_TO'] || null
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,6 +15,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': srcDir,
+      // /esm/icons/index.mjs only exports the icons statically, so no separate chunks are created.
+      // without this workaround vite dev server sends a bunch of chunks (more than 5k+) to the browser
+      // @link https://github.com/tabler/tabler-icons/issues/1233#issuecomment-2428245119
+      '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
     },
   },
   define: {
@@ -37,6 +42,17 @@ export default defineConfig({
     },
     sourcemap: isWatchMode,
     minify: true,
+  },
+  server: {
+    strictPort: true,
+    open: false,
+    proxy: devServerProxyTo && {
+      '^/api/.*': devServerProxyTo,
+      '^/api/.*/subscribe$': { ws: true, rewriteWsOrigin: true, secure: false, target: devServerProxyTo },
+      '/ready': devServerProxyTo,
+      '/healthz': devServerProxyTo,
+      '^/[0-9a-f-]{36}.*$': devServerProxyTo, // webhook url's
+    },
   },
   esbuild: {
     legalComments: 'none',

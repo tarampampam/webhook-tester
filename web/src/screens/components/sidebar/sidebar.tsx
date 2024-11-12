@@ -5,11 +5,7 @@ import { Request, Navigator } from './components'
 import PandaSvg from '~/assets/panda.svg'
 import { useData } from '~/shared'
 
-let count: number = 0
-
 export const SideBar = (): React.JSX.Element => {
-  console.debug(`🖌 SideBar rendering (${++count})`)
-
   const { session, request, requests, removeAllRequests } = useData()
 
   return (

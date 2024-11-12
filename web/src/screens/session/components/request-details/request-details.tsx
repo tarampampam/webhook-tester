@@ -9,11 +9,7 @@ import { useData, UsedStorageKeys, useSettings, useStorage } from '~/shared'
 import { methodToColor } from '~/theme'
 import { ViewHex, ViewText } from './components'
 
-let count: number = 0
-
 export const RequestDetails = (): React.JSX.Element => {
-  console.debug(`🖌 RequestDetails rendering (${++count})`)
-
   const { session, request, requestLoading } = useData()
   const { showRequestDetails } = useSettings()
 

@@ -6,27 +6,14 @@ import { notifications as notify } from '@mantine/notifications'
 import { useData } from '~/shared'
 import { pathTo, RouteIDs } from '~/routing'
 
-let count: number = 0
-
 export const SessionSwitch = (): React.JSX.Element => {
-  console.debug(`🖌 SessionSwitch rendering (${++count})`)
-
   const navigate = useNavigate()
-  const { allSessionIDs, session, switchToSession, destroySession } = useData()
+  const { allSessionIDs, session, destroySession } = useData()
 
   /** Switch to another session */
   const handleSwitchTo = (switchTo: string | null) => {
     if (switchTo) {
-      switchToSession(switchTo)
-        .then(() => navigate(pathTo(RouteIDs.Home)))
-        .catch(() => {
-          notify.show({
-            title: 'Failed to switch to the selected webhook',
-            message: 'Please try again or reload the page',
-            color: 'red',
-            autoClose: 5000,
-          })
-        })
+      navigate(pathTo(RouteIDs.Home))
     } else {
       throw new Error('No webhook ID to switch to')
     }
@@ -42,16 +29,7 @@ export const SessionSwitch = (): React.JSX.Element => {
         .then(() => notify.show({ title: 'WebHook deleted', message: null, color: 'lime', autoClose: 3000 }))
         .then(() => {
           if (switchTo) {
-            switchToSession(switchTo)
-              .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, switchTo)))
-              .catch((err) => {
-                notify.show({
-                  title: 'Failed to switch to the next webhook',
-                  message: String(err),
-                  color: 'red',
-                  autoClose: 5000,
-                })
-              })
+            navigate(pathTo(RouteIDs.SessionAndRequest, switchTo))
           } else {
             navigate(pathTo(RouteIDs.Home))
           }

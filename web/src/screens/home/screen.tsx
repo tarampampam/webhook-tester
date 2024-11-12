@@ -5,13 +5,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
 import { useData } from '~/shared'
 
-let count: number = 0
-
 export function HomeScreen(): React.JSX.Element {
-  console.debug(`🖌 HomeScreen rendering (${++count})`)
-
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { switchToRequest, switchToSession, lastUsedSID, allSessionIDs, newSession } = useData()
+  const { lastUsedSID, allSessionIDs, newSession } = useData()
 
   useEffect(() => {
     if (hash) {
@@ -26,29 +22,11 @@ export function HomeScreen(): React.JSX.Element {
         .filter((v) => v && v.length === 36) // 36 characters is the length of a UUID
 
       if (sID && rID) {
-        switchToRequest(sID, rID)
-          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID, rID)))
-          .catch(() => {
-            notify.show({ title: 'Failed to redirect to the request', message: null })
-
-            switchToSession(sID)
-              .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID)))
-              .catch(() => {
-                notify.show({ title: 'Failed to redirect to the WebHook', message: null, color: 'red' })
-
-                navigate(pathTo(RouteIDs.Home))
-              })
-          })
+        navigate(pathTo(RouteIDs.SessionAndRequest, sID, rID))
 
         return
       } else if (sID) {
-        switchToSession(sID)
-          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sID)))
-          .catch(() => {
-            notify.show({ title: 'Failed to redirect to the WebHook', message: null, color: 'red' })
-
-            navigate(pathTo(RouteIDs.Home))
-          })
+        navigate(pathTo(RouteIDs.SessionAndRequest, sID))
 
         return
       }
@@ -58,11 +36,7 @@ export function HomeScreen(): React.JSX.Element {
     if (lastUsedSID) {
       notify.show({ title: 'Redirected to the last used WebHook', message: null })
 
-      switchToSession(lastUsedSID)
-        .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID)))
-        .catch(() => {
-          notify.show({ title: 'Failed to redirect to the last used WebHook', message: null, color: 'red' })
-        })
+      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID))
 
       return
     }
@@ -73,11 +47,7 @@ export function HomeScreen(): React.JSX.Element {
 
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      switchToSession(lastCreated)
-        .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, allSessionIDs[allSessionIDs.length - 1])))
-        .catch(() => {
-          notify.show({ title: 'Failed to redirect to the last created WebHook', message: null, color: 'red' })
-        })
+      navigate(pathTo(RouteIDs.SessionAndRequest, lastCreated))
 
       return
     }
@@ -101,9 +71,7 @@ export function HomeScreen(): React.JSX.Element {
           loading: false,
         })
 
-        switchToSession(sInfo.sID)
-          .then(() => navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.sID)))
-          .catch(() => notify.show({ title: 'Failed to redirect to the new WebHook', message: null, color: 'red' }))
+        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.sID))
       })
       .catch(() => {
         notify.update({
@@ -114,7 +82,7 @@ export function HomeScreen(): React.JSX.Element {
           loading: false,
         })
       })
-  }, [allSessionIDs, hash, lastUsedSID, navigate, newSession, switchToRequest, switchToSession])
+  }, [allSessionIDs, hash, lastUsedSID, navigate, newSession])
 
   return (
     <>

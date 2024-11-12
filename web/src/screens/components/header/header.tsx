@@ -18,16 +18,12 @@ import LogoTextSvg from '~/assets/logo-text.svg'
 import { useData, useSettings } from '~/shared'
 import { HelpModal, NewSessionModal, SessionSwitch, UISettings } from './components'
 
-let count: number = 0
-
 export const Header: React.FC<{
   currentVersion: SemVer | null
   latestVersion: SemVer | null
   isBurgerOpened: boolean
   onBurgerClick: () => void
 }> = ({ currentVersion, latestVersion, isBurgerOpened = false, onBurgerClick = () => {} }) => {
-  console.debug(`🖌 Header rendering (${++count})`)
-
   const clipboard = useClipboard({ timeout: 500 })
   const { webHookUrl, allSessionIDs } = useData()
   const { tunnelEnabled, tunnelUrl } = useSettings()
