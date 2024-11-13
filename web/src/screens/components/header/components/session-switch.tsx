@@ -1,4 +1,4 @@
-import type React from 'react'
+import React, { useCallback } from 'react'
 import { Button, Select, Stack } from '@mantine/core'
 import { useNavigate } from 'react-router-dom'
 import { IconGrave2 } from '@tabler/icons-react'
@@ -13,14 +13,14 @@ export const SessionSwitch = (): React.JSX.Element => {
   /** Switch to another session */
   const handleSwitchTo = (switchTo: string | null) => {
     if (switchTo) {
-      navigate(pathTo(RouteIDs.Home))
+      navigate(pathTo(RouteIDs.SessionAndRequest, switchTo))
     } else {
       throw new Error('No webhook ID to switch to')
     }
   }
 
   /** Destroy the current session */
-  const handleDestroy = () => {
+  const handleDestroy = useCallback(() => {
     if (session) {
       const thisSessionIdx: number | -1 = allSessionIDs.indexOf(session.sID)
       const switchTo: string | null = allSessionIDs[thisSessionIdx + 1] || allSessionIDs[thisSessionIdx - 1] || null
@@ -45,7 +45,7 @@ export const SessionSwitch = (): React.JSX.Element => {
     } else {
       throw new Error('No active session')
     }
-  }
+  }, [allSessionIDs, destroySession, navigate, session])
 
   return (
     <Stack gap="xs" pb="0.25em">

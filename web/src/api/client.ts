@@ -88,7 +88,7 @@ export class Client {
       return this.cache.currentVersion
     }
 
-    const { data, response } = await this.api.GET('/api/version')
+    const { data, response } = await this.api.GET('/api/version', { priority: 'low' })
 
     if (data) {
       const version = semverParse(semverCoerce(data.version.replace('@', '-')))
@@ -115,7 +115,7 @@ export class Client {
       return this.cache.latestVersion
     }
 
-    const { data, response } = await this.api.GET('/api/version/latest')
+    const { data, response } = await this.api.GET('/api/version/latest', { priority: 'low' })
 
     if (data) {
       const version = semverParse(semverCoerce(data.version))

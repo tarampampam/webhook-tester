@@ -1,11 +1,14 @@
 import type React from 'react'
 import { Button, Center, Image, Loader, Stack, Text } from '@mantine/core'
 import { IconTrash } from '@tabler/icons-react'
+import { useNavigate } from 'react-router-dom'
+import { pathTo, RouteIDs } from '~/routing'
 import { Request, Navigator } from './components'
 import PandaSvg from '~/assets/panda.svg'
 import { useData } from '~/shared'
 
 export const SideBar = (): React.JSX.Element => {
+  const navigate = useNavigate()
   const { session, request, requests, removeAllRequests } = useData()
 
   return (
@@ -30,7 +33,12 @@ export const SideBar = (): React.JSX.Element => {
                   mb="sm"
                   radius="xl"
                   opacity={0.7}
-                  onClick={() => removeAllRequests(session.sID)}
+                  onClick={() => {
+                    removeAllRequests(session.sID).then(() =>
+                      // navigate to the session screen
+                      navigate(pathTo(RouteIDs.SessionAndRequest, session.sID))
+                    )
+                  }}
                 >
                   Delete all requests
                 </Button>

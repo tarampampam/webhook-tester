@@ -2,7 +2,6 @@ import { Table } from 'dexie'
 
 export type Session = {
   sID: string
-  humanReadableName: string
   responseCode: number
   responseHeaders: Array<{ name: string; value: string }>
   responseDelay: number

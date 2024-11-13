@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea } from '@mantine/core'
 import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import { notifications as notify } from '@mantine/notifications'
@@ -51,15 +51,19 @@ const validate: { [K in keyof typeof controls]: (v: unknown) => boolean } = {
       return false
     }
 
-    const converted = headersTextToHeaders(v) // convert the text to headers
+    const raw = headersTextToHeaders(v) // convert the text to headers
 
     return (
-      converted.length <= controls.head.limits.maxCount && // check the count of headers
-      converted.every(
-        (header) =>
-          header.name.length >= controls.head.limits.minNameLen && // check the name length (min)
-          header.name.length <= controls.head.limits.maxNameLen && // check the name length (max)
-          header.value.length <= controls.head.limits.maxValueLen // check the value length (max)
+      raw.length <= controls.head.limits.maxCount && // check the count of headers
+      raw.every(
+        (h) =>
+          h.name.length >= controls.head.limits.minNameLen && // check the name length (min)
+          h.name.length <= controls.head.limits.maxNameLen && // check the name length (max)
+          h.value.length <= controls.head.limits.maxValueLen && // check the value length (max)
+          /^[a-zA-Z0-9-]+$/i.test(h.name) &&
+          /^[^\r\n]*$/i.test(h.value) && // check the header name and value format
+          h.name.trim().length > 0 &&
+          h.value.trim().length > 0 // check the header name and value are not empty
       )
     )
   },
@@ -87,26 +91,35 @@ export const NewSessionModal: React.FC<{
   const [wrongHeaders, setWrongHeaders] = useState<boolean>(false)
   const [wrongDelay, setWrongDelay] = useState<boolean>(false)
   const [wrongResponseBody, setWrongResponseBody] = useState<boolean>(false)
+  const [createDisabled, setCreateDisabled] = useState<boolean>(
+    wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody
+  )
+
+  // watch the values and set the "wrong" state when the value changes
+  useEffect(() => setWrongStatusCode(!validate.code(status)), [status])
+  useEffect(() => setWrongHeaders(!validate.head(headers)), [headers])
+  useEffect(() => setWrongDelay(!validate.delay(delay)), [delay])
+  useEffect(() => {
+    let bodyIsValid = validate.body(body) // validate the body
+
+    // if max body size is set and the body is valid
+    if (!!maxBodySize && bodyIsValid) {
+      bodyIsValid = body.length <= maxBodySize // check the body length
+    }
+
+    setWrongResponseBody(!bodyIsValid)
+  }, [body, maxBodySize])
+
+  // disable the create button if any of the fields are invalid
+  useEffect(
+    () => setCreateDisabled(wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody),
+    [wrongStatusCode, wrongHeaders, wrongDelay, wrongResponseBody]
+  )
 
   /** Handle the creation of a new session */
   const handleCreate = () => {
-    // validate all the fields
-    const validated: { [K in keyof typeof controls]: boolean } = {
-      code: validate.code(status),
-      head: validate.head(headers),
-      delay: validate.delay(delay),
-      body: validate.body(body) && (!maxBodySize || maxBodySize <= 0 || body.length <= maxBodySize),
-      destroy: validate.destroy(destroy),
-    }
-
-    // set the error states
-    setWrongStatusCode(!validated.code)
-    setWrongHeaders(!validated.head)
-    setWrongDelay(!validated.delay)
-    setWrongResponseBody(!validated.body)
-
-    // if any of the fields are invalid, return
-    if (!Object.values(validated).every((v) => v)) {
+    // if any of the fields are invalid, return (kinda fuse)
+    if (wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody) {
       return
     }
 
@@ -114,10 +127,6 @@ export const NewSessionModal: React.FC<{
     const respHeaders: { [k: string]: string } = Object.fromEntries(
       headersTextToHeaders(headers).map((h) => [h.name, h.value])
     )
-
-    if (!session) {
-      throw new Error('No active session')
-    }
 
     // set the loading state
     setLoading(true)
@@ -132,8 +141,6 @@ export const NewSessionModal: React.FC<{
       responseBody: body.trim().length > 0 ? new TextEncoder().encode(body) : undefined,
     })
       .then((opts) => {
-        const [currentSID, newSID] = [session.sID, opts.sID]
-
         notify.update({
           id,
           title: 'A new WebHook has been created!',
@@ -143,8 +150,8 @@ export const NewSessionModal: React.FC<{
           loading: false,
         })
 
-        if (destroy) {
-          destroySession(currentSID).catch((err) => {
+        if (destroy && !!session) {
+          destroySession(session.sID).catch((err) => {
             notify.show({
               title: 'Failed to destroy current WebHook',
               message: String(err),
@@ -156,7 +163,7 @@ export const NewSessionModal: React.FC<{
 
         onClose()
 
-        navigate(pathTo(RouteIDs.SessionAndRequest, newSID))
+        navigate(pathTo(RouteIDs.SessionAndRequest, opts.sID))
       })
       .catch((err) => {
         notify.update({
@@ -260,6 +267,7 @@ export const NewSessionModal: React.FC<{
           size="md"
           radius="xl"
           onClick={handleCreate}
+          disabled={createDisabled}
           loading={loading}
           data-autofocus
         >
@@ -274,10 +282,11 @@ export const NewSessionModal: React.FC<{
 const headersTextToHeaders = (text: string): Array<{ name: string; value: string }> =>
   text
     .split('\n') // split by each line
+    .map((line) => line.trim()) // trim each line
+    .filter((line) => line.length > 0) // filter out empty lines
     .map((line) => {
       const [name, ...valueParts] = line.split(': ')
       const value = valueParts.join(': ') // join in case of additional colons in value
 
       return { name: name.trim(), value: value.trim() }
     })
-    .filter((header) => header.name && header.value) // remove empty headers

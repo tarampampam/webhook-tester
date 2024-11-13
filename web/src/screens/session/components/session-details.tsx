@@ -252,6 +252,7 @@ export const SessionDetails = (): React.JSX.Element => {
                         language: 'bash',
                       },
                     ]}
+                    styles={{ pre: { width: 0 } }}
                     expandCodeLabel="Show all headers"
                     defaultExpanded={false}
                     withHeader={false}

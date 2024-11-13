@@ -48,7 +48,7 @@ export default defineConfig({
     open: false,
     proxy: devServerProxyTo && {
       '^/api/.*': devServerProxyTo,
-      '^/api/.*/subscribe$': { ws: true, rewriteWsOrigin: true, secure: false, target: devServerProxyTo },
+      '^/api/.*/subscribe$': { ws: true, target: devServerProxyTo },
       '/ready': devServerProxyTo,
       '/healthz': devServerProxyTo,
       '^/[0-9a-f-]{36}.*$': devServerProxyTo, // webhook url's

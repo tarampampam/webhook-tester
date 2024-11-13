@@ -13,7 +13,7 @@ export enum RouteIDs {
 export const createRoutes = (apiClient: Client): RouteObject[] => [
   {
     path: '/',
-    element: <DefaultLayout apiClient={apiClient} />,
+    element: <DefaultLayout api={apiClient} />,
     errorElement: <NotFoundScreen />,
     children: [
       {

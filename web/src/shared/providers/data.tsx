@@ -1,12 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { humanId } from 'human-id'
 import { type Client, RequestEventAction } from '~/api'
 import { Database } from '~/db'
 import { UsedStorageKeys, useStorage } from '~/shared'
 
 export type Session = {
   sID: string
-  humanReadableName: string
   responseCode: number
   responseHeaders: Array<{ name: string; value: string }>
   responseDelay: number
@@ -21,6 +19,14 @@ export type Request = {
   url: URL
   payload: Uint8Array | null
   capturedAt: Date
+}
+
+type RequestWithoutPayload = Omit<Request, 'payload'>
+
+type SessionEvents = {
+  onNewRequest: (r: RequestWithoutPayload) => void
+  onRequestDelete: (r: RequestWithoutPayload) => void
+  onRequestsClear: () => void
 }
 
 type DataContext = {
@@ -41,7 +47,7 @@ type DataContext = {
   }): Promise<Session>
 
   /** Switch to a session with the given ID. */
-  switchToSession(sID: string): Promise<void>
+  switchToSession(sID: string, listeners?: Partial<SessionEvents>): Promise<void>
 
   /** Current active session */
   session: Readonly<Session> | null
@@ -56,7 +62,7 @@ type DataContext = {
   request: Readonly<Request> | null
 
   /** The list of requests for the current session, ordered by the captured time (from newest to oldest) */
-  requests: ReadonlyArray<Omit<Request, 'payload'>> // omit the payload to reduce the memory usage
+  requests: ReadonlyArray<RequestWithoutPayload> // omit the payload to reduce the memory usage
 
   /** Switch to a request with the given ID for the current session */
   switchToRequest(sID: string, rID: string | null): Promise<void>
@@ -120,7 +126,7 @@ export const DataProvider: React.FC<{
   const [session, setSession] = useState<Readonly<Session> | null>(null)
   const [allSessionIDs, setAllSessionIDs] = useState<ReadonlyArray<string>>([])
   const [request, setRequest] = useState<Readonly<Request> | null>(null)
-  const [requests, setRequests] = useState<ReadonlyArray<Omit<Request, 'payload'>>>([])
+  const [requests, setRequests] = useState<ReadonlyArray<RequestWithoutPayload>>([])
   const [webHookUrl, setWebHookUrl] = useState<URL | null>(null)
   const [sessionLoading, setSessionLoading] = useState<boolean>(false)
   const [requestLoading, setRequestLoading] = useState<boolean>(false)
@@ -131,7 +137,7 @@ export const DataProvider: React.FC<{
 
   /** Subscribe to the session requests on the server */
   const subscribeToRequestEvents = useCallback(
-    (sID: string) => {
+    (sID: string, listeners?: Partial<SessionEvents>) => {
       // unsubscribe from the previous session requests
       if (closeSubRef.current) {
         closeSubRef.current()
@@ -150,18 +156,17 @@ export const DataProvider: React.FC<{
                   const req = requestEvent.request
 
                   if (req) {
+                    const newReq: RequestWithoutPayload = {
+                      rID: req.uuid,
+                      clientAddress: req.clientAddress,
+                      method: req.method,
+                      headers: [...req.headers],
+                      url: req.url,
+                      capturedAt: req.capturedAt,
+                    }
+
                     // append the new request in front of the list
-                    setRequests((prev) => [
-                      {
-                        rID: req.uuid,
-                        clientAddress: req.clientAddress,
-                        method: req.method,
-                        headers: [...req.headers],
-                        url: req.url,
-                        capturedAt: req.capturedAt,
-                      },
-                      ...prev,
-                    ])
+                    setRequests((prev) => [newReq, ...prev])
 
                     // TODO: add limit for the number of requests per session
                     // TODO: show notifications for new requests
@@ -172,10 +177,12 @@ export const DataProvider: React.FC<{
                       rID: req.uuid,
                       method: req.method,
                       clientAddress: req.clientAddress,
-                      url: new URL(req.url),
+                      url: req.url.toString(),
                       capturedAt: req.capturedAt,
                       headers: [...req.headers],
                     }).catch(errHandler)
+
+                    listeners?.onNewRequest?.(newReq)
                   }
 
                   break
@@ -191,6 +198,15 @@ export const DataProvider: React.FC<{
 
                     // remove the request from the database
                     db.deleteRequest(req.uuid).catch(errHandler)
+
+                    listeners?.onRequestDelete?.({
+                      rID: req.uuid,
+                      clientAddress: req.clientAddress,
+                      method: req.method,
+                      headers: [...req.headers],
+                      url: req.url,
+                      capturedAt: req.capturedAt,
+                    })
                   }
 
                   break
@@ -203,6 +219,8 @@ export const DataProvider: React.FC<{
 
                   // clear the requests from the database
                   db.deleteAllRequests(sID).catch(errHandler)
+
+                  listeners?.onRequestsClear?.()
 
                   break
                 }
@@ -217,7 +235,7 @@ export const DataProvider: React.FC<{
           .catch(reject)
       })
     },
-    [api, db]
+    [api, db, errHandler]
   )
 
   // TODO: remove all useCallbacks - they are **probably** not needed
@@ -240,12 +258,9 @@ export const DataProvider: React.FC<{
         api
           .newSession({ statusCode, headers, delay, responseBody })
           .then((opts) => {
-            const humanReadableName = humanId()
-
             // save the session to the database
             db.createSession({
               sID: opts.uuid,
-              humanReadableName,
               responseCode: statusCode,
               responseDelay: delay,
               responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
@@ -258,7 +273,6 @@ export const DataProvider: React.FC<{
 
                 resolve({
                   sID: opts.uuid,
-                  humanReadableName,
                   responseCode: statusCode,
                   responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
                   responseDelay: delay,
@@ -287,7 +301,7 @@ export const DataProvider: React.FC<{
                 clientAddress: r.clientAddress,
                 method: r.method,
                 headers: [...r.headers],
-                url: r.url,
+                url: new URL(r.url),
                 capturedAt: r.capturedAt,
               }))
               .sort(requestsSorter)
@@ -321,7 +335,7 @@ export const DataProvider: React.FC<{
                     rID: r.uuid,
                     method: r.method,
                     clientAddress: r.clientAddress,
-                    url: new URL(r.url),
+                    url: r.url.toString(),
                     capturedAt: r.capturedAt,
                     headers: [...r.headers],
                   }))
@@ -335,22 +349,21 @@ export const DataProvider: React.FC<{
         })
       })
     },
-    [db, api]
+    [db, api, errHandler]
   )
 
   /** Switch to a session with the given ID. It returns `true` if the session was switched successfully. */
   const switchToSession = useCallback(
-    (sID: string) => {
+    (sID: string, listeners?: Partial<SessionEvents>) => {
       return new Promise<void>((resolve, reject) => {
         // first, try to find out if the session exists in the database
         db.getSession(sID)
           .then((dbSession) => {
             // if the session exists in the database
             if (dbSession) {
-              // set the session as the current session // FIXME: infinite rendering loop occurs here
+              // set the session as the current session
               setSession({
                 sID: dbSession.sID,
-                humanReadableName: dbSession.humanReadableName,
                 responseCode: dbSession.responseCode,
                 responseDelay: dbSession.responseDelay,
                 responseHeaders: dbSession.responseHeaders,
@@ -360,9 +373,9 @@ export const DataProvider: React.FC<{
               // update the last used session ID
               setLastUsedSID(dbSession.sID)
 
-              // load the requests for the session // FIXME: infinite rendering loop occurs here
+              // load the requests for the session
               loadRequests(dbSession.sID)
-                .then(() => subscribeToRequestEvents(dbSession.sID))
+                .then(() => subscribeToRequestEvents(dbSession.sID, listeners))
                 .then(resolve)
                 .catch((err) => {
                   setLastUsedSID(null)
@@ -375,12 +388,9 @@ export const DataProvider: React.FC<{
               api
                 .getSession(sID)
                 .then((apiSession) => {
-                  const humanReadableName = humanId()
-
                   // save the session to the database
                   db.createSession({
                     sID: apiSession.uuid,
-                    humanReadableName,
                     responseCode: apiSession.response.statusCode,
                     responseDelay: apiSession.response.delay,
                     responseHeaders: [...apiSession.response.headers],
@@ -394,7 +404,6 @@ export const DataProvider: React.FC<{
                       // set the session as the current session
                       setSession({
                         sID: apiSession.uuid,
-                        humanReadableName,
                         responseCode: apiSession.response.statusCode,
                         responseDelay: apiSession.response.delay,
                         responseHeaders: [...apiSession.response.headers],
@@ -406,7 +415,7 @@ export const DataProvider: React.FC<{
 
                       // load the requests for the session
                       loadRequests(apiSession.uuid)
-                        .then(() => subscribeToRequestEvents(apiSession.uuid))
+                        .then(() => subscribeToRequestEvents(apiSession.uuid, listeners))
                         .then(resolve)
                         .catch((err) => {
                           setLastUsedSID(null)
@@ -479,7 +488,7 @@ export const DataProvider: React.FC<{
                 clientAddress: req.clientAddress,
                 method: req.method,
                 headers: [...req.headers],
-                url: req.url,
+                url: new URL(req.url),
                 payload: null, // database does not store the payload
                 capturedAt: req.capturedAt,
               })
@@ -525,7 +534,7 @@ export const DataProvider: React.FC<{
                     rID: req.uuid,
                     method: req.method,
                     clientAddress: req.clientAddress,
-                    url: new URL(req.url),
+                    url: req.url.toString(),
                     capturedAt: req.capturedAt,
                     headers: [...req.headers],
                   })
@@ -601,7 +610,7 @@ export const DataProvider: React.FC<{
         }
       })
       .catch(errHandler)
-  }, [api, db])
+  }, [api, db, errHandler])
 
   /** Remove all requests for the session with the given ID */
   const removeAllRequests = useCallback(

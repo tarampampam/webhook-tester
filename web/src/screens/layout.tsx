@@ -9,7 +9,7 @@ import { pathTo, RouteIDs } from '~/routing'
 import { useData, useSettings } from '~/shared'
 import { Header, SideBar } from './components'
 
-export default function DefaultLayout({ apiClient }: { apiClient: Client }): React.JSX.Element {
+export default function DefaultLayout({ api }: { api: Client }): React.JSX.Element {
   const navigate = useNavigate()
   const [scroll, scrollTo] = useWindowScroll()
   const [navBarIsOpened, navBarHandlers] = useDisclosure()
@@ -22,9 +22,9 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
   useEffect(() => {
     const errHandler: (err: Error | unknown) => void = console.error
 
-    apiClient.currentVersion().then(setCurrentVersion).catch(errHandler)
-    apiClient.latestVersion().then(setLatestVersion).catch(errHandler)
-    apiClient
+    api.currentVersion().then(setCurrentVersion).catch(errHandler)
+    api.latestVersion().then(setLatestVersion).catch(errHandler)
+    api
       .getSettings()
       .then((s) =>
         updateSettings({
@@ -36,7 +36,7 @@ export default function DefaultLayout({ apiClient }: { apiClient: Client }): Rea
         })
       )
       .catch(errHandler)
-  }, [updateSettings, apiClient])
+  }, [updateSettings, api])
 
   /** Handles clicking on the navbar */
   const handleNavbarClick = useCallback(

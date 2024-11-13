@@ -1,4 +1,4 @@
-import React, { StrictMode } from 'react'
+import type React from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
@@ -35,8 +35,4 @@ const App = (): React.JSX.Element => {
   )
 }
 
-createRoot(document.getElementById('root') as HTMLElement).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+createRoot(document.getElementById('root') as HTMLElement).render(<App />)

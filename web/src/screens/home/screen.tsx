@@ -1,13 +1,17 @@
 import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
 import { useData } from '~/shared'
 
 export function HomeScreen(): React.JSX.Element {
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { lastUsedSID, allSessionIDs, newSession } = useData()
+  const { lastUsedSID: last, allSessionIDs: all, newSession } = useData()
+
+  // store the last used session ID and all session IDs in refs to prevent unnecessary re-renders
+  const lastUsedSID = useRef<string | null>(last)
+  const allSessionIDs = useRef<ReadonlyArray<string>>(all)
 
   useEffect(() => {
     if (hash) {
@@ -31,23 +35,23 @@ export function HomeScreen(): React.JSX.Element {
         return
       }
     }
+  }, [hash, navigate])
 
+  useEffect(() => {
     // automatically redirect to the last used session, if available
-    if (lastUsedSID) {
+    if (lastUsedSID.current) {
       notify.show({ title: 'Redirected to the last used WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID))
+      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID.current))
 
       return
     }
 
     // automatically redirect to the last created session, if available
-    if (allSessionIDs.length) {
-      const lastCreated = allSessionIDs[allSessionIDs.length - 1]
-
+    if (allSessionIDs.current.length) {
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastCreated))
+      navigate(pathTo(RouteIDs.SessionAndRequest, allSessionIDs.current[allSessionIDs.current.length - 1]))
 
       return
     }
@@ -60,7 +64,11 @@ export function HomeScreen(): React.JSX.Element {
       loading: true,
     })
 
-    newSession({})
+    newSession({
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      responseBody: new TextEncoder().encode('"Hello, world!"'),
+    })
       .then((sInfo) => {
         notify.update({
           id,
@@ -82,7 +90,7 @@ export function HomeScreen(): React.JSX.Element {
           loading: false,
         })
       })
-  }, [allSessionIDs, hash, lastUsedSID, navigate, newSession])
+  }, [navigate, newSession])
 
   return (
     <>
