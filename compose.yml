@@ -62,4 +62,4 @@ volumes:
   app-modules-cache: {}
   app-tmp-data: {}
   redis-data: {}
-  node-modules: {}
+  node_modules: {}
