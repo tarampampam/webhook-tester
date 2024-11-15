@@ -31,6 +31,8 @@ RUN set -x \
 
 WORKDIR /src
 
+RUN chown -R node:node /src
+
 RUN \
     --mount=type=bind,source=web/package.json,target=/src/web/package.json \
     --mount=type=bind,source=web/package-lock.json,target=/src/web/package-lock.json \
