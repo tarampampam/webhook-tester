@@ -14,9 +14,9 @@ services:
     user: node
     volumes:
       - .:/src:rw
-      - node-modules:/src/web/node_modules:rw
+      - node_modules:/src/web/node_modules:rw  # Mount a dedicated volume for node_modules
     working_dir: /src/web
-    command: bash -c "npm ci && npm run watch"
+    command: bash -c "npm ci && npm run watch"  # Ensure dependencies are installed at startup
     healthcheck:
       test: ['CMD', 'test', '-f', './dist/robots.txt']
       start_interval: 1s
