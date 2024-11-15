@@ -31,7 +31,7 @@ RUN set -x \
 
 WORKDIR /src
 
-RUN chown -R node:node /src
+RUN mkdir -p /src/web/node_modules && chmod -R 777 /src/web/node_modules
 
 RUN \
     --mount=type=bind,source=web/package.json,target=/src/web/package.json \
