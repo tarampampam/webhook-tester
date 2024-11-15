@@ -1,2 +1,2 @@
 export { Database } from './database'
-export { DatabaseError } from './errors'
+export * from './tables'

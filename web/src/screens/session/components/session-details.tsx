@@ -18,8 +18,8 @@ import dayjs from 'dayjs'
 import React, { useCallback, useRef } from 'react'
 import { useData, UsedStorageKeys, useStorage } from '~/shared'
 
-export const SessionDetails = (): React.JSX.Element => {
-  const { session, webHookUrl, sessionLoading } = useData()
+export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
+  const { session, webHookUrl } = useData()
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
   const testNotifyID = useRef<string | null>(null)
@@ -84,7 +84,7 @@ export const SessionDetails = (): React.JSX.Element => {
                 component="a"
                 href={webHookUrl.toString()}
                 target="_blank"
-                disabled={sessionLoading}
+                disabled={loading}
               >
                 Open in a new tab
               </Button>
@@ -94,7 +94,7 @@ export const SessionDetails = (): React.JSX.Element => {
                 leftSection={<IconRun size="1.5em" />}
                 onClick={handleSendTestRequest}
                 onAuxClick={handleSendTestRequest}
-                disabled={sessionLoading}
+                disabled={loading}
               >
                 Send a request
               </Button>
@@ -199,7 +199,7 @@ export const SessionDetails = (): React.JSX.Element => {
           />
         </>
       )}
-      {sessionLoading && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
+      {loading && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
       {!!session && (
         <Table my="md" highlightOnHover>
           <Table.Thead>

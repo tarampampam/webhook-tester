@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Button, Select, Stack } from '@mantine/core'
 import { useNavigate } from 'react-router-dom'
 import { IconGrave2 } from '@tabler/icons-react'
@@ -9,6 +9,7 @@ import { pathTo, RouteIDs } from '~/routing'
 export const SessionSwitch = (): React.JSX.Element => {
   const navigate = useNavigate()
   const { allSessionIDs, session, destroySession } = useData()
+  const [loading, setLoading] = useState<boolean>(false)
 
   /** Switch to another session */
   const handleSwitchTo = (switchTo: string | null) => {
@@ -25,6 +26,8 @@ export const SessionSwitch = (): React.JSX.Element => {
       const thisSessionIdx: number | -1 = allSessionIDs.indexOf(session.sID)
       const switchTo: string | null = allSessionIDs[thisSessionIdx + 1] || allSessionIDs[thisSessionIdx - 1] || null
 
+      setLoading(true)
+
       destroySession(session.sID)
         .then(() => notify.show({ title: 'WebHook deleted', message: null, color: 'lime', autoClose: 3000 }))
         .then(() => {
@@ -34,14 +37,16 @@ export const SessionSwitch = (): React.JSX.Element => {
             navigate(pathTo(RouteIDs.Home))
           }
         })
-        .catch(() => {
+        .then((slow) => slow)
+        .catch((err) => {
           notify.show({
             title: 'Failed to destroy the webhook',
-            message: 'Please try again or reload the page',
+            message: String(err),
             color: 'red',
             autoClose: 5000,
           })
         })
+        .finally(() => setLoading(false))
     } else {
       throw new Error('No active session')
     }
@@ -65,7 +70,7 @@ export const SessionSwitch = (): React.JSX.Element => {
         size="compact-sm"
         leftSection={<IconGrave2 size="1.1em" />}
         color="red"
-        disabled={!session}
+        disabled={!session || loading}
         onClick={handleDestroy}
       >
         Destroy this webhook

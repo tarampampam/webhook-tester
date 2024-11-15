@@ -9,18 +9,24 @@ import { useData, UsedStorageKeys, useSettings, useStorage } from '~/shared'
 import { methodToColor } from '~/theme'
 import { ViewHex, ViewText } from './components'
 
-export const RequestDetails = (): React.JSX.Element => {
-  const { session, request, requestLoading } = useData()
+export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
+  const { session, request } = useData()
   const { showRequestDetails } = useSettings()
 
   const [headersExpanded, setHeadersExpanded] = useStorage<boolean>(false, UsedStorageKeys.RequestDetailsHeadersExpand)
   const [elapsedTime, setElapsedTime] = useState<string | null>(null)
   const [contentType, setContentType] = useState<string | null>(null)
+  const [payload, setPayload] = useState<Uint8Array | null>(null)
 
   useEffect(
     () => setContentType(request?.headers.find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? null),
     [request]
   )
+
+  // automatically update the payload
+  useEffect(() => {
+    request?.payload?.then((data) => setPayload(data))
+  }, [request])
 
   // automatically update the elapsed time
   useEffect(
@@ -53,14 +59,14 @@ export const RequestDetails = (): React.JSX.Element => {
                     Path
                   </Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="sm" w="80%" />) ||
+                    {(loading && <Skeleton radius="xl" h="sm" w="80%" />) ||
                       (request.url && <WebHookPath sID={session.sID} url={request.url} />) || <>...</>}
                   </Table.Td>
                 </Table.Tr>
                 <Table.Tr>
                   <Table.Td ta="right">Method</Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="sm" w="15%" />) || (
+                    {(loading && <Skeleton radius="xl" h="sm" w="15%" />) || (
                       <Badge color={methodToColor(request.method ?? '')} mb="0.2em">
                         {request.method}
                       </Badge>
@@ -70,7 +76,7 @@ export const RequestDetails = (): React.JSX.Element => {
                 <Table.Tr>
                   <Table.Td ta="right">From</Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="sm" w="20%" />) || (
+                    {(loading && <Skeleton radius="xl" h="sm" w="20%" />) || (
                       <Flex justify="flex-start" align="center">
                         <Text span>{request.clientAddress}</Text>
                         <Flex align="center" ml="md" gap="sm">
@@ -92,7 +98,7 @@ export const RequestDetails = (): React.JSX.Element => {
                 <Table.Tr>
                   <Table.Td ta="right">When</Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="sm" w="45%" />) || (
+                    {(loading && <Skeleton radius="xl" h="sm" w="45%" />) || (
                       <>
                         {request.capturedAt && <>{dayjs(request.capturedAt).format('YYYY-MM-DD HH:mm:ss.SSS')}</>}
                         {elapsedTime && <span style={{ paddingLeft: '0.3em' }}>({elapsedTime})</span>}
@@ -103,9 +109,7 @@ export const RequestDetails = (): React.JSX.Element => {
                 <Table.Tr>
                   <Table.Td ta="right">Size</Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="sm" w="15%" />) || (
-                      <>{request.payload?.length} bytes</>
-                    )}
+                    {(loading && <Skeleton radius="xl" h="sm" w="15%" />) || <>{payload?.length} bytes</>}
                   </Table.Td>
                 </Table.Tr>
                 <Table.Tr>
@@ -115,7 +119,7 @@ export const RequestDetails = (): React.JSX.Element => {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {(requestLoading && <Skeleton radius="xl" h="xs" w="50%" />) || (
+                    {(loading && <Skeleton radius="xl" h="xs" w="50%" />) || (
                       <Text size="xs" c="dimmed" span>
                         {request.rID}
                       </Text>
@@ -129,7 +133,7 @@ export const RequestDetails = (): React.JSX.Element => {
             <Title order={4} mb="md">
               HTTP headers
             </Title>
-            {(requestLoading && <Skeleton radius="md" h="10em" w="100%" />) ||
+            {(loading && <Skeleton radius="md" h="10em" w="100%" />) ||
               (!!request.headers && (
                 <CodeHighlightTabs
                   code={{
@@ -152,37 +156,37 @@ export const RequestDetails = (): React.JSX.Element => {
       <Grid.Col span={12}>
         <Title order={4} mb="md">
           Request body
-          {!requestLoading && !!request?.payload && request.payload.length > 0 && (
+          {!loading && !!request && !!payload && payload.length > 0 && (
             <Button
               variant="light"
               color="indigo"
               size="compact-sm"
               ml="sm"
               leftSection={<IconDownload size="1.2em" />}
-              onClick={() => (request.payload ? download(request.payload, `${request.rID}.bin`) : undefined)}
+              onClick={() => (payload ? download(payload, `${request.rID}.bin`) : undefined)}
             >
               Download
             </Button>
           )}
         </Title>
-        {(requestLoading && <Skeleton radius="md" h="8em" w="100%" />) || (
+        {(loading && <Skeleton radius="md" h="8em" w="100%" />) || (
           <Tabs variant="default" defaultValue={TabsList.Text} keepMounted={false}>
             <Tabs.List>
               <Tabs.Tab value={TabsList.Text} leftSection={<IconLetterCase />} color="blue">
                 Text
               </Tabs.Tab>
-              {!!request?.payload && request.payload.length > 0 && (
+              {!!payload && payload.length > 0 && (
                 <Tabs.Tab value={TabsList.Binary} leftSection={<IconBinary />} color="teal">
                   Binary
                 </Tabs.Tab>
               )}
             </Tabs.List>
             <Tabs.Panel value={TabsList.Text}>
-              <ViewText input={request?.payload || null} contentType={contentType} />
+              <ViewText input={payload || null} contentType={contentType} />
             </Tabs.Panel>
-            {!!request?.payload && request.payload.length > 0 && (
+            {!!payload && payload.length > 0 && (
               <Tabs.Panel value={TabsList.Binary}>
-                <ViewHex input={request.payload} />
+                <ViewHex input={payload} />
               </Tabs.Panel>
             )}
           </Tabs>
