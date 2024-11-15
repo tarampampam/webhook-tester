@@ -34,10 +34,12 @@ export const SideBar = (): React.JSX.Element => {
                   radius="xl"
                   opacity={0.7}
                   onClick={() => {
-                    removeAllRequests(session.sID).then(() =>
-                      // navigate to the session screen
-                      navigate(pathTo(RouteIDs.SessionAndRequest, session.sID))
-                    )
+                    removeAllRequests(session.sID)
+                      .then((slow) => slow())
+                      .then(() =>
+                        // navigate to the session screen
+                        navigate(pathTo(RouteIDs.SessionAndRequest, session.sID))
+                      )
                   }}
                 >
                   Delete all requests

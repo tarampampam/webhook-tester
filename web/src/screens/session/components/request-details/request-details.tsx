@@ -26,7 +26,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
   // automatically update the payload
   useEffect(() => {
     request?.payload?.then((data) => setPayload(data))
-  }, [request])
+  }, [request, request?.payload])
 
   // automatically update the elapsed time
   useEffect(

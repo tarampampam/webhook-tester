@@ -13,6 +13,10 @@ export function HomeScreen(): React.JSX.Element {
   const lastUsedSID = useRef<string | null>(last)
   const allSessionIDs = useRef<ReadonlyArray<string>>(all)
 
+  // update the refs when the values change
+  useEffect(() => { lastUsedSID.current = last }, [last]) // prettier-ignore
+  useEffect(() => { allSessionIDs.current = all }, [all]) // prettier-ignore
+
   useEffect(() => {
     if (hash) {
       // v1 used url hash (anchor) to store the current state (sID and rID). To improve the user experience, we should

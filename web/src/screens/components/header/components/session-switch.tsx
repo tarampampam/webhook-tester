@@ -29,6 +29,7 @@ export const SessionSwitch = (): React.JSX.Element => {
       setLoading(true)
 
       destroySession(session.sID)
+        .then((slow) => slow())
         .then(() => notify.show({ title: 'WebHook deleted', message: null, color: 'lime', autoClose: 3000 }))
         .then(() => {
           if (switchTo) {

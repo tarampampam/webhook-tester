@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { type Client, RequestEventAction } from '~/api'
+import { APIErrorNotFound, type Client, RequestEventAction } from '~/api'
 import { Database } from '~/db'
 import { UsedStorageKeys, useStorage } from '~/shared'
 
@@ -21,10 +21,11 @@ export type Request = {
   capturedAt: Date
 }
 
-type SessionEvents = {
+export type SessionEvents = {
   onNewRequest: (r: Omit<Request, 'payload'>) => void // server does not send the payload
   onRequestDelete: (r: Omit<Request, 'payload'>) => void // server does not send the payload
   onRequestsClear: () => void
+  onError: (err: Error | unknown) => void
 }
 
 type DataContext = {
@@ -166,99 +167,60 @@ export const DataProvider: React.FC<{
   // the subscription closer function (if not null, it means the subscription is active)
   const closeSubRef = useRef<(() => void) | null>(null)
 
+  /** Unsubscribe from the session requests on the server */
+  const unsubscribe = (): void => {
+    if (closeSubRef.current) {
+      closeSubRef.current()
+    }
+
+    closeSubRef.current = null
+  }
+
   /** Subscribe to the session requests on the server */
   const subscribeToRequestEvents = useCallback(
-    (sID: string, listeners?: Partial<SessionEvents>) => {
-      return new Promise<void>((resolve, reject) => {
-        // unsubscribe from the previous session requests
-        if (closeSubRef.current) {
-          closeSubRef.current()
-        }
+    async (sID: string, listeners?: Partial<SessionEvents>) => {
+      // terminate the previous subscription, if any
+      unsubscribe()
 
-        closeSubRef.current = null
+      // subscribe to the session requests on the server
+      closeSubRef.current = await api.subscribeToSessionRequests(sID, {
+        onUpdate: async (requestEvent): Promise<void> => {
+          try {
+            switch (requestEvent.action) {
+              // a new request was captured
+              case RequestEventAction.create: {
+                const req = requestEvent.request
 
-        // subscribe to the session requests on the server
-        api
-          .subscribeToSessionRequests(sID, {
-            onUpdate: (requestEvent): void => {
-              switch (requestEvent.action) {
-                // a new request was captured
-                case RequestEventAction.create: {
-                  const req = requestEvent.request
+                if (req) {
+                  // save the request to the database (without payload)
+                  await db.putRequest({
+                    sID,
+                    rID: req.uuid,
+                    method: req.method,
+                    clientAddress: req.clientAddress,
+                    url: req.url.toString(),
+                    payload: null, // server does not send the payload
+                    capturedAt: req.capturedAt,
+                    headers: [...req.headers],
+                  })
 
-                  if (req) {
-                    // save the request to the database (without payload)
-                    db.createRequest({
-                      sID: sID,
+                  // append the new request in front of the list (update the state)
+                  setRequests((prev) => [
+                    Object.freeze({
+                      ...payloadGetter(db, req.uuid),
                       rID: req.uuid,
-                      method: req.method,
                       clientAddress: req.clientAddress,
-                      url: req.url.toString(),
-                      payload: null, // server does not send the payload
-                      capturedAt: req.capturedAt,
+                      method: req.method,
                       headers: [...req.headers],
-                    })
-                      .then(() => {
-                        // append the new request in front of the list (update the state)
-                        setRequests((prev) => [
-                          Object.freeze({
-                            ...payloadGetter(db, req.uuid),
-                            rID: req.uuid,
-                            clientAddress: req.clientAddress,
-                            method: req.method,
-                            headers: [...req.headers],
-                            url: req.url,
-                            capturedAt: req.capturedAt,
-                          }),
-                          ...prev,
-                        ])
+                      url: req.url,
+                      capturedAt: req.capturedAt,
+                    }),
+                    ...prev,
+                  ])
 
-                        // invoke the listener callback
-                        listeners?.onNewRequest?.(
-                          Object.freeze({
-                            rID: req.uuid,
-                            clientAddress: req.clientAddress,
-                            method: req.method,
-                            headers: [...req.headers],
-                            url: req.url,
-                            capturedAt: req.capturedAt,
-                          })
-                        )
-
-                        // get the request payload from the server
-                        api
-                          .getSessionRequest(sID, req.uuid)
-                          .then((req) => {
-                            // update the request in the database with the payload
-                            db.createRequest({
-                              sID: sID,
-                              rID: req.uuid,
-                              method: req.method,
-                              clientAddress: req.clientAddress,
-                              url: req.url.toString(),
-                              payload: req.requestPayload,
-                              capturedAt: req.capturedAt,
-                              headers: [...req.headers],
-                            }).catch(errHandler)
-                          })
-                          .catch(errHandler)
-                      })
-                      .catch(errHandler)
-                  }
-
-                  break
-                }
-
-                // a request was deleted
-                case RequestEventAction.delete: {
-                  const req = requestEvent.request
-
-                  if (req) {
-                    // remove the request from the list
-                    setRequests((prev) => prev.filter((r) => r.rID !== req.uuid))
-
-                    // invoke the listener callback
-                    listeners?.onRequestDelete?.({
+                  // invoke the listener callback
+                  listeners?.onNewRequest?.(
+                    Object.freeze({
                       rID: req.uuid,
                       clientAddress: req.clientAddress,
                       method: req.method,
@@ -266,44 +228,76 @@ export const DataProvider: React.FC<{
                       url: req.url,
                       capturedAt: req.capturedAt,
                     })
-
-                    // remove the request from the database
-                    db.deleteRequest(req.uuid).catch(errHandler)
-                  }
-
-                  break
+                  )
                 }
 
-                // all requests were cleared
-                case RequestEventAction.clear: {
-                  // clear the requests list
-                  setRequests([])
+                break
+              }
+
+              // a request was deleted
+              case RequestEventAction.delete: {
+                const req = requestEvent.request
+
+                if (req) {
+                  // remove the request from the list
+                  setRequests((prev) => prev.filter((r) => r.rID !== req.uuid))
 
                   // invoke the listener callback
-                  listeners?.onRequestsClear?.()
+                  listeners?.onRequestDelete?.(
+                    Object.freeze({
+                      rID: req.uuid,
+                      clientAddress: req.clientAddress,
+                      method: req.method,
+                      headers: [...req.headers],
+                      url: req.url,
+                      capturedAt: req.capturedAt,
+                    })
+                  )
 
-                  // clear the requests from the database
-                  db.deleteAllRequests(sID).catch(errHandler)
-
-                  break
+                  // remove the request from the database
+                  await db.deleteRequest(req.uuid)
                 }
+
+                break
               }
-            },
-            onError: (err) => reject(err),
-          })
-          .then((closer) => {
-            closeSubRef.current = closer
-            resolve()
-          })
-          .catch(reject)
+
+              // all requests were cleared
+              case RequestEventAction.clear: {
+                // clear the requests list
+                setRequests(Object.freeze([]))
+
+                // invoke the listener callback
+                listeners?.onRequestsClear?.()
+
+                // clear the requests from the database
+                await db.deleteAllRequests(sID)
+
+                break
+              }
+            }
+          } catch (err) {
+            if (listeners?.onError) {
+              listeners.onError(err)
+            } else {
+              throw err
+            }
+          }
+        },
+        onError: (err) => {
+          if (listeners?.onError) {
+            listeners.onError(err)
+          } else {
+            throw err
+          }
+        },
       })
     },
-    [api, db, errHandler]
+    [api, db]
   )
 
   /** Create a new session */
   const newSession = useCallback(
-    ({
+    async ({
       statusCode = 200, // default session options
       headers = {},
       delay = 0,
@@ -314,37 +308,28 @@ export const DataProvider: React.FC<{
       delay?: number
       responseBody?: Uint8Array
     }): Promise<Readonly<Session>> => {
-      return new Promise((resolve, reject) => {
-        // save the session to the server
-        api
-          .newSession({ statusCode, headers, delay, responseBody })
-          .then((opts) => {
-            // add the session ID to the list of all session IDs (update the state)
-            setAllSessionIDs((prev) => [...prev, opts.uuid])
+      // save the session to the server
+      const opts = await api.newSession({ statusCode, headers, delay, responseBody })
 
-            // save the session to the database
-            db.createSession({
-              sID: opts.uuid,
-              responseCode: statusCode,
-              responseDelay: delay,
-              responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
-              responseBody,
-              createdAt: opts.createdAt,
-            })
-              .then(() => {
-                resolve(
-                  Object.freeze({
-                    sID: opts.uuid,
-                    responseCode: statusCode,
-                    responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
-                    responseDelay: delay,
-                    responseBody,
-                  })
-                )
-              })
-              .catch(reject)
-          })
-          .catch(reject)
+      // add the session ID to the list of all session IDs (update the state)
+      setAllSessionIDs((prev) => [...prev, opts.uuid])
+
+      // save the session to the database
+      await db.putSession({
+        sID: opts.uuid,
+        responseCode: statusCode,
+        responseDelay: delay,
+        responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+        responseBody,
+        createdAt: opts.createdAt,
+      })
+
+      return Object.freeze({
+        sID: opts.uuid,
+        responseCode: statusCode,
+        responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+        responseDelay: delay,
+        responseBody,
       })
     },
     [api, db]
@@ -359,73 +344,69 @@ export const DataProvider: React.FC<{
    * resolves when the requests are loaded from the server (SLOW).
    */
   const loadRequests = useCallback(
-    (sID: string): Promise<() => Promise<void>> => {
-      return new Promise((resolveFast, rejectFast) => {
-        // load requests for the session from the database (fast)
-        db.getSessionRequests(sID)
-          .then((dbList) =>
-            // update the requests list (first state update, to show the data from the database)
-            setRequests(
-              dbList
-                .map((r) =>
-                  Object.freeze({
-                    ...payloadGetter(db, r.rID),
-                    rID: r.rID,
-                    clientAddress: r.clientAddress,
-                    method: r.method,
-                    headers: [...r.headers],
-                    url: new URL(r.url),
-                    capturedAt: r.capturedAt,
-                  })
-                )
-                .sort(requestsSorter)
-            )
-          )
-          // load requests from the server (slow)
-          .then(() =>
-            resolveFast(
-              () =>
-                new Promise<void>((resolveSlow, rejectSlow) => {
-                  api
-                    .getSessionRequests(sID)
-                    .then((reqs) => {
-                      // update the requests list (second state update, to show the fresh data)
-                      setRequests(
-                        reqs
-                          .map((r) => ({
-                            ...payloadGetter(db, r.uuid),
-                            rID: r.uuid,
-                            clientAddress: r.clientAddress,
-                            method: r.method,
-                            headers: [...r.headers],
-                            url: r.url,
-                            capturedAt: r.capturedAt,
-                          }))
-                          .sort(requestsSorter)
-                      )
+    async (sID: string): Promise<() => Promise<void>> => {
+      // load requests for the session from the database (fast)
+      const dbList = await db.getSessionRequests(sID)
 
-                      // update the requests in the database (for the future use)
-                      db.createRequest(
-                        ...reqs.map((r) => ({
-                          sID: sID,
-                          rID: r.uuid,
-                          method: r.method,
-                          clientAddress: r.clientAddress,
-                          url: r.url.toString(),
-                          capturedAt: r.capturedAt,
-                          headers: [...r.headers],
-                          payload: r.requestPayload,
-                        }))
-                      )
-                        .then(resolveSlow)
-                        .catch(rejectSlow)
-                    })
-                    .catch(rejectSlow)
-                })
-            )
+      // update the requests list (first state update, to show the data from the database)
+      setRequests(
+        dbList
+          .map((r) =>
+            Object.freeze({
+              ...payloadGetter(db, r.rID),
+              rID: r.rID,
+              clientAddress: r.clientAddress,
+              method: r.method,
+              headers: [...r.headers],
+              url: new URL(r.url),
+              capturedAt: r.capturedAt,
+            })
           )
-          .catch(rejectFast)
-      })
+          .sort(requestsSorter)
+      )
+
+      // return a function that loads requests from the server (slow)
+      return async () => {
+        const reqs = await api.getSessionRequests(sID)
+
+        // update the requests list (second state update, to show the fresh data)
+        setRequests(
+          reqs
+            .map((r) =>
+              Object.freeze({
+                ...payloadGetter(db, r.uuid),
+                rID: r.uuid,
+                clientAddress: r.clientAddress,
+                method: r.method,
+                headers: [...r.headers],
+                url: r.url,
+                capturedAt: r.capturedAt,
+              })
+            )
+            .sort(requestsSorter)
+        )
+
+        // update the requests in the database (for future use)
+        await db.putRequest(
+          ...reqs.map((r) => ({
+            sID: sID,
+            rID: r.uuid,
+            method: r.method,
+            clientAddress: r.clientAddress,
+            url: r.url.toString(),
+            capturedAt: r.capturedAt,
+            headers: [...r.headers],
+            payload: r.requestPayload,
+          }))
+        )
+
+        // find requests that are not present in the server response but are in the database
+        const toRemove = dbList.filter((r) => !reqs.find((req) => req.uuid === r.rID)).map((r) => r.rID)
+
+        if (toRemove.length) {
+          await db.deleteRequest(...toRemove)
+        }
+      }
     },
     [db, api]
   )
@@ -437,131 +418,92 @@ export const DataProvider: React.FC<{
    * second one resolves when the session and requests are loaded from the server (SLOW).
    */
   const switchToSession = useCallback(
-    (sID: string, listeners?: Partial<SessionEvents>) => {
-      return new Promise<() => Promise<void>>((resolveFast, rejectFast) => {
-        // first, try to find out if the session exists in the database
-        db.getSession(sID)
-          .then((dbSession) => {
-            // if the session exists in the database
-            if (dbSession) {
-              // set the session as the current session (update the state)
-              setSession({
-                sID: dbSession.sID,
-                responseCode: dbSession.responseCode,
-                responseDelay: dbSession.responseDelay,
-                responseHeaders: dbSession.responseHeaders,
-                responseBody: dbSession.responseBody,
+    async (sID: string, listeners?: Partial<SessionEvents>) => {
+      try {
+        // try to find out if the session exists in the database
+        const dbSession = await db.getSession(sID)
+
+        if (dbSession) {
+          // if the session exists in the database
+          setSession(
+            Object.freeze({
+              sID: dbSession.sID,
+              responseCode: dbSession.responseCode,
+              responseDelay: dbSession.responseDelay,
+              responseHeaders: dbSession.responseHeaders,
+              responseBody: dbSession.responseBody,
+            })
+          )
+
+          setLastUsedSID(dbSession.sID)
+
+          // load requests for the session
+          const requestsSlow = await loadRequests(dbSession.sID)
+
+          // return a function that resolves the second (slow) promise
+          return async () => {
+            try {
+              await requestsSlow()
+              await subscribeToRequestEvents(dbSession.sID, listeners)
+            } catch (err) {
+              unsubscribe() // unsubscribe from the session requests if something went wrong
+              setLastUsedSID(null) // unset the last used session ID
+              setSession(null) // clear the session state
+
+              throw err // reject the second (slow) promise
+            }
+          }
+        } else {
+          // otherwise, load the session from the server
+          return async () => {
+            try {
+              const apiSession = await api.getSession(sID)
+
+              // save the session to the database
+              await db.putSession({
+                sID: apiSession.uuid,
+                responseCode: apiSession.response.statusCode,
+                responseDelay: apiSession.response.delay,
+                responseHeaders: [...apiSession.response.headers],
+                responseBody: apiSession.response.body,
+                createdAt: apiSession.createdAt,
               })
 
-              // update the last used session ID
-              setLastUsedSID(dbSession.sID)
+              setAllSessionIDs((prev) => [...prev, apiSession.uuid])
 
-              // load the requests for the session
-              loadRequests(dbSession.sID)
-                // when the requests are loaded from the database
-                .then((requestsSlow) => {
-                  // resolve the first (fast) promise
-                  resolveFast(
-                    // and return the second (slow) promise
-                    () =>
-                      new Promise<void>((resolveSlow, rejectSlow) => {
-                        // load the requests from the server
-                        requestsSlow()
-                          // when requests are loaded from the server, subscribe to the session requests
-                          .then(() => subscribeToRequestEvents(dbSession.sID, listeners))
-                          // and resolve the second (slow) promise
-                          .then(resolveSlow)
-                          // on error loading the requests from the server
-                          .catch((err) => {
-                            setLastUsedSID(null) // unset the last used session ID
-                            rejectSlow(err) // reject the second (slow) promise
-                          })
-                      })
-                  )
+              setSession(
+                Object.freeze({
+                  sID: apiSession.uuid,
+                  responseCode: apiSession.response.statusCode,
+                  responseDelay: apiSession.response.delay,
+                  responseHeaders: [...apiSession.response.headers],
+                  responseBody: apiSession.response.body,
                 })
-                // on requests load error (from the database)
-                .catch((err) => {
-                  setLastUsedSID(null) // unset the last used session ID
-                  rejectFast(err) // reject the first (fast) promise
-                })
-            } else {
-              // otherwise, try to get it from the server (since we need to load from the server, we should resolve
-              // the first (fast) promise with the second one (slow))
-              resolveFast(
-                () =>
-                  new Promise<void>((resolveSlow, rejectSlow) => {
-                    // load the session from the server
-                    api
-                      .getSession(sID)
-                      .then((apiSession) => {
-                        // save the session to the database
-                        db.createSession({
-                          sID: apiSession.uuid,
-                          responseCode: apiSession.response.statusCode,
-                          responseDelay: apiSession.response.delay,
-                          responseHeaders: [...apiSession.response.headers],
-                          responseBody: apiSession.response.body,
-                          createdAt: apiSession.createdAt,
-                        })
-                          // when the session is saved to the database
-                          .then(() => {
-                            // add the session ID to the list of all session IDs (at the end)
-                            setAllSessionIDs((prev) => [...prev, apiSession.uuid])
-
-                            // set the session as the current session (update the state)
-                            setSession({
-                              sID: apiSession.uuid,
-                              responseCode: apiSession.response.statusCode,
-                              responseDelay: apiSession.response.delay,
-                              responseHeaders: [...apiSession.response.headers],
-                              responseBody: apiSession.response.body,
-                            })
-
-                            // update the last used session ID
-                            setLastUsedSID(apiSession.uuid)
-
-                            // and load the requests for the session
-                            loadRequests(apiSession.uuid)
-                              // when the requests are loaded from the database
-                              .then((requestsSlow) => {
-                                // load the requests from the server
-                                requestsSlow()
-                                  // when requests are loaded from the server, subscribe to the session requests
-                                  .then(() => subscribeToRequestEvents(apiSession.uuid, listeners))
-                                  // and resolve the second (slow) promise
-                                  .then(resolveSlow)
-                                  // on error loading the requests from the server
-                                  .catch((err) => {
-                                    setLastUsedSID(null) // unset the last used session ID
-                                    rejectSlow(err) // reject the second (slow) promise
-                                  })
-                              })
-                              // on error loading the requests from the database
-                              .catch((err) => {
-                                setLastUsedSID(null) // unset the last used session ID
-                                rejectSlow(err) // reject the second (slow) promise
-                              })
-                          })
-                          // on error saving the session to the database
-                          .catch((err) => {
-                            setLastUsedSID(null) // unset the last used session ID
-                            rejectSlow(err) // reject the second (slow) promise
-                          })
-                      })
-                      // on error loading the session from the server
-                      .catch((err) => {
-                        setLastUsedSID(null) // unset the last used session ID
-                        rejectSlow(err) // reject the second (slow) promise
-                      })
-                  })
               )
+
+              setLastUsedSID(apiSession.uuid)
+
+              // load requests for the session
+              const requestsSlow = await loadRequests(apiSession.uuid)
+
+              // load requests from the server and subscribe to the session requests
+              await requestsSlow()
+              await subscribeToRequestEvents(apiSession.uuid, listeners)
+            } catch (err) {
+              unsubscribe() // unsubscribe from the session requests if something went wrong
+              setLastUsedSID(null) // unset the last used session ID
+              setSession(null) // clear the session state
+
+              throw err // reject the second (slow) promise
             }
-          })
-          .catch((err) => {
-            setLastUsedSID(null)
-            rejectFast(err)
-          })
-      })
+          }
+        }
+      } catch (err) {
+        setLastUsedSID(null) // unset the last used session ID
+        setSession(null) // clear the session state
+
+        throw err // reject the first (fast) promise
+      }
     },
     [api, db, loadRequests, subscribeToRequestEvents, setLastUsedSID]
   )
@@ -573,162 +515,21 @@ export const DataProvider: React.FC<{
    * resolves when the session is removed from the server (SLOW).
    */
   const destroySession = useCallback(
-    (sID: string): Promise<() => Promise<void>> => {
-      return new Promise((resolveFast, rejectFast) => {
-        // remove the session from the database first (fast)
-        db.deleteSession(sID)
-          .then(() => {
-            // remove the session from the list of all session IDs (update the state)
-            setAllSessionIDs((prev) => prev.filter((id) => id !== sID))
+    async (sID: string): Promise<() => Promise<void>> => {
+      // remove the session from the database first (fast)
+      await db.deleteSession(sID)
 
-            // remove the session from the server (slow)
-            resolveFast(
-              () =>
-                new Promise<void>((resolveSlow, rejectSlow) => {
-                  // remove from the server too
-                  api
-                    .deleteSession(sID)
-                    .then((ok) => {
-                      if (ok) {
-                        resolveSlow()
-                      } else {
-                        rejectSlow(new Error('Failed to delete the session on the server'))
-                      }
-                    })
-                    .catch(rejectSlow)
-                })
-            )
-          })
-          .catch(rejectFast)
-      })
-    },
-    [api, db]
-  )
+      // update the session list state
+      setAllSessionIDs((prev) => prev.filter((id) => id !== sID))
 
-  /**
-   * Switch to a request with the given session and request ID.
-   *
-   * NOTE: The first promise resolves when the request is loaded from the database (FAST), and the second one
-   * resolves when the request is loaded from the server (SLOW).
-   */
-  const switchToRequest2 = useCallback(
-    (sID: string, rID: string | null): Promise<() => Promise<void>> => {
-      if (!rID) {
-        setRequest(null)
+      // return a function to remove the session from the server (slow)
+      return async () => {
+        const ok = await api.deleteSession(sID)
 
-        return new Promise(() => Promise.resolve())
+        if (!ok) {
+          throw new Error('Failed to delete the session on the server')
+        }
       }
-      // TODO: remove request from the database if API returns 404
-      return new Promise<() => Promise<void>>((resolveFast, rejectFast) => {
-        // get the request from the database (fast)
-        db.getRequest(rID)
-          .then((req) => {
-            // if the request exists in the database
-            if (req) {
-              // set the current request with the data from the database
-              setRequest({
-                rID: req.rID,
-                clientAddress: req.clientAddress,
-                method: req.method,
-                headers: [...req.headers],
-                url: new URL(req.url),
-                capturedAt: req.capturedAt,
-                get payload() {
-                  return Promise.resolve(req.payload)
-                },
-              })
-
-              // is the payload already here, just resolve the first (fast) promise with the empty second one
-              if (req.payload !== null) {
-                resolveFast(() => Promise.resolve())
-              } else {
-                // if the payload is not loaded yet, try to get it from the server (slow)
-                resolveFast(
-                  () =>
-                    new Promise<void>((resolveSlow, rejectSlow) => {
-                      api
-                        .getSessionRequest(sID, rID)
-                        .then((req) => {
-                          // update the current request state with the payload
-                          setRequest((prev) => {
-                            if (prev) {
-                              return {
-                                rID: rID,
-                                clientAddress: req.clientAddress,
-                                method: req.method,
-                                headers: [...req.headers],
-                                url: new URL(req.url),
-                                capturedAt: req.capturedAt,
-                                get payload() {
-                                  return Promise.resolve(req.requestPayload)
-                                },
-                              }
-                            }
-
-                            return prev
-                          })
-
-                          // save the request to the database (with the payload, for the future use)
-                          db.createRequest({
-                            sID,
-                            rID: req.uuid,
-                            method: req.method,
-                            clientAddress: req.clientAddress,
-                            url: req.url.toString(),
-                            capturedAt: req.capturedAt,
-                            headers: [...req.headers],
-                            payload: req.requestPayload,
-                          })
-                            .then(resolveSlow)
-                            .catch(rejectSlow)
-                        })
-                        .catch(rejectSlow)
-                    })
-                )
-              }
-            } else {
-              // if the request does not exist in the database, resolve the first (fast) promise with the second one (slow)
-              resolveFast(
-                // try to get the request from the server
-                () =>
-                  new Promise<void>((resolveSlow, rejectSlow) => {
-                    api
-                      .getSessionRequest(sID, rID)
-                      .then((req) => {
-                        // set the current request with the data from the server (update the state)
-                        setRequest({
-                          rID: req.uuid,
-                          clientAddress: req.clientAddress,
-                          method: req.method,
-                          headers: [...req.headers],
-                          url: req.url,
-                          capturedAt: req.capturedAt,
-                          get payload() {
-                            return Promise.resolve(req.requestPayload)
-                          },
-                        })
-
-                        // save the request to the database (with the payload, for the future use)
-                        db.createRequest({
-                          sID,
-                          rID: req.uuid,
-                          method: req.method,
-                          clientAddress: req.clientAddress,
-                          url: req.url.toString(),
-                          capturedAt: req.capturedAt,
-                          headers: [...req.headers],
-                          payload: req.requestPayload,
-                        })
-                          .then(resolveSlow)
-                          .catch(rejectSlow)
-                      })
-                      .catch(rejectSlow)
-                  })
-              )
-            }
-          })
-          .catch(rejectFast)
-      })
     },
     [api, db]
   )
@@ -743,6 +544,7 @@ export const DataProvider: React.FC<{
     async (sID: string, rID: string | null): Promise<() => Promise<void>> => {
       if (!rID) {
         setRequest(null)
+
         return async () => Promise.resolve()
       }
 
@@ -752,69 +554,94 @@ export const DataProvider: React.FC<{
       const req = await db.getRequest(rID)
 
       if (req) {
-        // If the request exists in the database
-        setRequest({
-          rID: req.rID,
-          clientAddress: req.clientAddress,
-          method: req.method,
-          headers: [...req.headers],
-          url: new URL(req.url),
-          capturedAt: req.capturedAt,
-          get payload() {
-            return Promise.resolve(req.payload)
-          },
-        })
+        // if the request exists in the database
+        setRequest(
+          Object.freeze({
+            rID: req.rID,
+            clientAddress: req.clientAddress,
+            method: req.method,
+            headers: [...req.headers],
+            url: new URL(req.url),
+            capturedAt: req.capturedAt,
+            get payload() {
+              return Promise.resolve(req.payload)
+            },
+          })
+        )
 
-        // If the payload is already present
+        // if the payload is already present
         if (req.payload !== null) {
           return async () => Promise.resolve()
         }
 
-        // If the payload is not loaded, get it from the server (slow)
+        // if the payload is not loaded, get it from the server (slow)
         return async () => {
-          const serverReq = await api.getSessionRequest(sID, rID)
-          setRequest((prev) =>
-            prev
-              ? {
-                  rID: rID,
-                  clientAddress: serverReq.clientAddress,
-                  method: serverReq.method,
-                  headers: [...serverReq.headers],
-                  url: new URL(serverReq.url),
-                  capturedAt: serverReq.capturedAt,
-                  get payload() {
-                    return Promise.resolve(serverReq.requestPayload)
-                  },
-                }
-              : prev
-          )
-          await db.createRequest({
-            sID,
-            rID: serverReq.uuid,
-            method: serverReq.method,
-            clientAddress: serverReq.clientAddress,
-            url: serverReq.url.toString(),
-            capturedAt: serverReq.capturedAt,
-            headers: [...serverReq.headers],
-            payload: serverReq.requestPayload,
-          })
+          try {
+            const serverReq = await api.getSessionRequest(sID, rID)
+
+            // update the state with the actual data from the server including the payload
+            setRequest((prev) =>
+              prev
+                ? Object.freeze({
+                    rID: rID,
+                    clientAddress: serverReq.clientAddress,
+                    method: serverReq.method,
+                    headers: [...serverReq.headers],
+                    url: new URL(serverReq.url),
+                    capturedAt: serverReq.capturedAt,
+                    get payload() {
+                      return Promise.resolve(serverReq.requestPayload)
+                    },
+                  })
+                : prev
+            )
+
+            await db.putRequest({
+              sID,
+              rID: serverReq.uuid,
+              method: serverReq.method,
+              clientAddress: serverReq.clientAddress,
+              url: serverReq.url.toString(),
+              capturedAt: serverReq.capturedAt,
+              headers: [...serverReq.headers],
+              payload: serverReq.requestPayload,
+            })
+          } catch (err) {
+            // if the request is not found on the server
+            if (err instanceof APIErrorNotFound) {
+              // remove it from the database
+              await db.deleteRequest(rID)
+
+              // update the requests list (update the state)
+              setRequests((prev) => prev.filter((r) => r.rID !== rID).sort(requestsSorter))
+
+              // clear the request state
+              setRequest(null)
+            } else {
+              throw err
+            }
+          }
         }
       } else {
-        // If the request is not in the database, load it from the server (slow)
+        // if the request is not in the database, load it from the server (slow)
         return async () => {
           const serverReq = await api.getSessionRequest(sID, rID)
-          setRequest({
-            rID: serverReq.uuid,
-            clientAddress: serverReq.clientAddress,
-            method: serverReq.method,
-            headers: [...serverReq.headers],
-            url: serverReq.url,
-            capturedAt: serverReq.capturedAt,
-            get payload() {
-              return Promise.resolve(serverReq.requestPayload)
-            },
-          })
-          await db.createRequest({
+
+          setRequest(
+            Object.freeze({
+              rID: serverReq.uuid,
+              clientAddress: serverReq.clientAddress,
+              method: serverReq.method,
+              headers: [...serverReq.headers],
+              url: serverReq.url,
+              capturedAt: serverReq.capturedAt,
+              get payload() {
+                return Promise.resolve(serverReq.requestPayload)
+              },
+            })
+          )
+
+          await db.putRequest({
             sID,
             rID: serverReq.uuid,
             method: serverReq.method,
@@ -837,33 +664,21 @@ export const DataProvider: React.FC<{
    * resolves when the request is removed from the server (SLOW).
    */
   const removeRequest = useCallback(
-    (sID: string, rID: string): Promise<() => Promise<void>> => {
-      return new Promise<() => Promise<void>>((resolveFast, rejectFast) => {
-        // remove the request from the database (fast)
-        db.deleteRequest(rID)
-          .then(() => {
-            // update the requests list (update the state)
-            setRequests((prev) => prev.filter((r) => r.rID !== rID).sort(requestsSorter))
+    async (sID: string, rID: string): Promise<() => Promise<void>> => {
+      // remove the request from the database (fast)
+      await db.deleteRequest(rID)
 
-            // remove from the server (slow)
-            resolveFast(
-              () =>
-                new Promise<void>((resolveSlow, rejectSlow) => {
-                  api
-                    .deleteSessionRequest(sID, rID)
-                    .then((ok) => {
-                      if (ok) {
-                        resolveSlow()
-                      } else {
-                        rejectSlow(new Error('Failed to delete the request for the session on the server'))
-                      }
-                    })
-                    .catch(rejectSlow)
-                })
-            )
-          })
-          .catch(rejectFast)
-      })
+      // update the requests list (update the state)
+      setRequests((prev) => prev.filter((r) => r.rID !== rID).sort(requestsSorter))
+
+      // return a function to remove from the server (slow)
+      return async () => {
+        const ok = await api.deleteSessionRequest(sID, rID)
+
+        if (!ok) {
+          throw new Error('Failed to delete the request for the session on the server')
+        }
+      }
     },
     [api, db]
   )
@@ -871,37 +686,25 @@ export const DataProvider: React.FC<{
   /**
    * Remove all requests for the session with the given ID.
    *
-   * NOTE: The first promise resolves when the requests are removed from the database (FAST), and the second one
+   * NOTE: The first operation resolves when the requests are removed from the database (FAST), and the second one
    * resolves when the requests are removed from the server (SLOW).
    */
   const removeAllRequests = useCallback(
-    (sID: string): Promise<() => Promise<void>> => {
-      return new Promise<() => Promise<void>>((resolveFast, rejectFast) => {
-        // remove all requests from the database
-        db.deleteAllRequests(sID)
-          .then(() => {
-            // clear the requests list (update the state)
-            setRequests([])
+    async (sID: string): Promise<() => Promise<void>> => {
+      // remove all requests from the database
+      await db.deleteAllRequests(sID)
 
-            resolveFast(
-              () =>
-                new Promise<void>((resolveSlow, rejectSlow) => {
-                  // clear the requests on the server
-                  api
-                    .deleteAllSessionRequests(sID)
-                    .then((ok) => {
-                      if (ok) {
-                        resolveSlow()
-                      } else {
-                        rejectSlow(new Error('Failed to delete all requests for the session on the server'))
-                      }
-                    })
-                    .catch(rejectSlow)
-                })
-            )
-          })
-          .catch(rejectFast)
-      })
+      // clear the requests list (update the state)
+      setRequests(Object.freeze([]))
+
+      // return the function that removes requests from the server
+      return async (): Promise<void> => {
+        const ok = await api.deleteAllSessionRequests(sID)
+
+        if (!ok) {
+          throw new Error('Failed to delete all requests for the session on the server')
+        }
+      }
     },
     [api, db]
   )
@@ -911,7 +714,7 @@ export const DataProvider: React.FC<{
     setRequests((prev) => prev.slice(0, limit))
   }, [])
 
-  // on provider mount // TODO: make a separate function and call it somewhere close to app initialization
+  // on provider mount
   useEffect(() => {
     // load all session IDs from the database
     db.getSessionIDs()
@@ -929,12 +732,18 @@ export const DataProvider: React.FC<{
 
               // if we have any IDs to remove
               if (toRemove.length) {
+                // if all sessions from the database are to be removed (we have no any sessions left)
+                if (dbSessionIDs.filter((id) => !toRemove.includes(id)).length === 0) {
+                  // clear the state
+                  setSession(null)
+                  setRequest(null)
+                  setLastUsedSID(null)
+                }
+
                 // cleanup the database
                 db.deleteSession(...toRemove)
-                  .then(() => {
-                    // update the list of session IDs (slow)
-                    setAllSessionIDs((prev) => prev.filter((id) => !toRemove.includes(id)))
-                  })
+                  // update the list of session IDs (slow)
+                  .then(() => setAllSessionIDs((prev) => prev.filter((id) => !toRemove.includes(id))))
                   .catch(errHandler)
               }
             })
@@ -942,7 +751,7 @@ export const DataProvider: React.FC<{
         }
       })
       .catch(errHandler)
-  }, [api, db, errHandler])
+  }, [api, db, errHandler, setLastUsedSID])
 
   // watch for the session changes and update the webhook URL
   useEffect(() => {

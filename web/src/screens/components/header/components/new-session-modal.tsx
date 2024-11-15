@@ -151,14 +151,16 @@ export const NewSessionModal: React.FC<{
         })
 
         if (destroy && !!session) {
-          destroySession(session.sID).catch((err) => {
-            notify.show({
-              title: 'Failed to destroy current WebHook',
-              message: String(err),
-              color: 'red',
-              autoClose: 5000,
+          destroySession(session.sID)
+            .then((slow) => slow())
+            .catch((err) => {
+              notify.show({
+                title: 'Failed to destroy current WebHook',
+                message: String(err),
+                color: 'red',
+                autoClose: 5000,
+              })
             })
-          })
         }
 
         onClose()

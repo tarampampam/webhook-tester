@@ -19,7 +19,11 @@ export class Database {
   /**
    * Insert a new session (the existing session with the same sID will be replaced).
    */
-  async createSession(...data: Array<Session>): Promise<void> {
+  async putSession(...data: Array<Session>): Promise<void> {
+    if (data.length === 0) {
+      return
+    }
+
     await this.dexie.transaction('rw', this.sessions, async () => {
       await this.sessions.bulkPut(data)
     })
@@ -44,35 +48,6 @@ export class Database {
   }
 
   /**
-   * Get many sessions by its sID.
-   */
-  async getSessions<T extends string>(...sID: Array<T>): Promise<{ [K in T]: Session | null }> {
-    return this.dexie.transaction('r', this.sessions, async () => {
-      const sessions = await this.sessions.where('sID').anyOf(sID).toArray()
-
-      return sID.reduce(
-        (acc, sID_1) => {
-          acc[sID_1] = sessions.find((session) => session.sID === sID_1) || null
-
-          return acc
-        },
-        {} as {
-          [K in T]: Session | null
-        }
-      )
-    })
-  }
-
-  /**
-   * Check if a session exists.
-   */
-  async sessionExists(sID: string): Promise<boolean> {
-    return this.dexie.transaction('r', this.sessions, async () => {
-      return (await this.sessions.where('sID').equals(sID).count()) > 0
-    })
-  }
-
-  /**
    * Get all session requests, ordered by creation date from the newest to the oldest.
    */
   async getSessionRequests(sID: string): Promise<Array<Request>> {
@@ -85,6 +60,10 @@ export class Database {
    * Delete session (and all requests associated with it).
    */
   async deleteSession(...sID: Array<string>): Promise<void> {
+    if (sID.length === 0) {
+      return
+    }
+
     await this.dexie.transaction('rw', this.sessions, this.requests, async () => {
       await this.sessions.bulkDelete(sID)
       await this.requests.where('sID').anyOf(sID).delete()
@@ -94,7 +73,11 @@ export class Database {
   /**
    * Insert a new request (the existing request with the same rID will be replaced).
    */
-  async createRequest(...data: Array<Request>): Promise<void> {
+  async putRequest(...data: Array<Request>): Promise<void> {
+    if (data.length === 0) {
+      return
+    }
+
     await this.dexie.transaction('rw', this.requests, async () => {
       await this.requests.bulkPut(data)
     })
@@ -113,6 +96,10 @@ export class Database {
    * Delete requests by rID.
    */
   async deleteRequest(...rID: Array<string>): Promise<void> {
+    if (rID.length === 0) {
+      return
+    }
+
     await this.dexie.transaction('rw', this.requests, async () => {
       await this.requests.bulkDelete(rID)
     })

@@ -5,7 +5,6 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
  */
 export enum UsedStorageKeys {
   UISettings = 'ui-settings',
-  SessionsList = 'sessions-list',
   SessionsLastUsed = 'sessions-last-used',
   NewSessionStatusCode = 'ns-status-code',
   NewSessionHeadersList = 'ns-headers-list',

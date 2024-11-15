@@ -11,6 +11,7 @@ services:
 
   app-http:
     build: *app-build
+    env_file: [{path: .env, required: false}]
     entrypoint: sh -c 'go build -buildvcs=false -o /var/tmp/app ./cmd/webhook-tester/ && exec $0 "$@"'
     command: /var/tmp/app start --use-live-frontend --auto-create-sessions --max-requests 8
     volumes: [.:/src:rw]

@@ -31,9 +31,11 @@ export const Request: React.FC<{
       requestIdx !== -1 ? requests[requestIdx - 1] : undefined,
     ]
 
-    removeRequest(sID, request.rID).catch((err) => {
-      notify.show({ title: 'Failed to delete request', message: String(err), color: 'red', autoClose: 5000 })
-    })
+    removeRequest(sID, request.rID)
+      .then((slow) => slow())
+      .catch((err) => {
+        notify.show({ title: 'Failed to delete request', message: String(err), color: 'red', autoClose: 5000 })
+      })
 
     // if the request is currently opened, navigate to the next one
     if (nextRequest) {

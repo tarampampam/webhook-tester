@@ -199,7 +199,7 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
           />
         </>
       )}
-      {loading && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
+      {loading && !session && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
       {!!session && (
         <Table my="md" highlightOnHover>
           <Table.Thead>
