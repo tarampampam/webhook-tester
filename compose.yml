@@ -14,6 +14,7 @@ services:
     user: node
     volumes:
       - .:/src:rw
+      - node-modules:/src/web/node_modules:rw
     working_dir: /src/web
     command: bash -c "npm ci && npm run watch"
     healthcheck:
@@ -22,7 +23,7 @@ services:
       interval: 10s
       start_period: 20s
     security_opt: [no-new-privileges:true]
-
+  
   app-http:
     build: *app-build
     entrypoint: sh -c 'go build -buildvcs=false -o /var/tmp/app ./cmd/webhook-tester/ && exec $0 "$@"'
@@ -61,3 +62,4 @@ volumes:
   app-modules-cache: {}
   app-tmp-data: {}
   redis-data: {}
+  node-modules: {}
