@@ -12,10 +12,15 @@ services:
   app-web-dist:
     build: *app-build
     user: node
-    volumes: [.:/src:rw]
+    volumes:
+      - .:/src:rw
     working_dir: /src/web
-    command: npm run watch
-    healthcheck: {test: ['CMD', 'test', '-f', './dist/robots.txt'], start_interval: 1s, interval: 10s, start_period: 20s}
+    command: bash -c "npm ci && npm run watch"
+    healthcheck:
+      test: ['CMD', 'test', '-f', './dist/robots.txt']
+      start_interval: 1s
+      interval: 10s
+      start_period: 20s
     security_opt: [no-new-privileges:true]
 
   app-http:
