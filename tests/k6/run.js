@@ -53,7 +53,7 @@ export default (ctx) => {
 
         const sID = testApiCreateSession(baseUrl, statusCode, [{name: headerName, value: headerValue}], responseBody)
 
-        testApiSessionGet(baseUrl, sID, {statusCode: status, head: [{name: headerName, value: headerValue}], responseBody: body})
+        testApiSessionGet(baseUrl, sID, {statusCode, headers: [{name: headerName, value: headerValue}], responseBody})
 
         group('requests', () => {
           testApiSessionHasNoRequests(baseUrl, sID) // initially, there are no requests
@@ -195,7 +195,7 @@ const testApiCreateSessionNegative = (baseUrl) => group('create', () => {
  * @param {String} sID
  * @param {{statusCode: Number, headers: Array<{name: String, value: String}>, responseBody: string}} want
  */
-const testApiSessionGet = (baseUrl, sID, want) => group('create', () =>
+const testApiSessionGet = (baseUrl, sID, want) => group('create', () => {
   check(http.get(`${baseUrl}/api/session/${sID}`), {
     'status is 200': (r) => r.status === 200,
     'is json': (r) => isJson(r),
@@ -206,7 +206,7 @@ const testApiSessionGet = (baseUrl, sID, want) => group('create', () =>
     'response delay': (r) => r.json('response.delay') === 0,
     'response response body (base64)': (r) => r.json('response.response_body_base64') === b64encode(want.responseBody),
   })
-)
+})
 
 /** @param {String} baseUrl */
 const testApiSessionGetNegative = (baseUrl) => group('negative', () => {
