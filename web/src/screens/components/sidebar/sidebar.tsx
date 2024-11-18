@@ -1,4 +1,4 @@
-import type React from 'react'
+import React, { useRef } from 'react'
 import { Button, Center, Image, Loader, Stack, Text } from '@mantine/core'
 import { IconTrash } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { useData } from '~/shared'
 export const SideBar = (): React.JSX.Element => {
   const navigate = useNavigate()
   const { session, request, requests, removeAllRequests } = useData()
+  const activeRequestRef = useRef<HTMLDivElement>(null)
 
   return (
     <Stack align="stretch" justify="flex-start" gap="xs">
@@ -18,9 +19,19 @@ export const SideBar = (): React.JSX.Element => {
           <>
             <Navigator />
 
-            {requests.map((rq) => (
-              <Request sID={session.sID} request={rq} key={rq.rID} isActive={!!request && request.rID === rq.rID} />
-            ))}
+            {requests.map((rq) => {
+              const isActive = request?.rID === rq.rID
+
+              return (
+                <Request
+                  sID={session.sID}
+                  request={rq}
+                  key={rq.rID}
+                  isActive={isActive}
+                  componentRef={isActive ? activeRequestRef : null}
+                />
+              )
+            })}
 
             {requests.length > 1 && (
               <Center>

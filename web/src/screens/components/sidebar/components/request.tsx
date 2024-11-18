@@ -1,5 +1,5 @@
+import React, { useCallback, useEffect, useState, type ForwardedRef } from 'react'
 import { notifications as notify } from '@mantine/notifications'
-import React, { useCallback, useEffect, useState } from 'react'
 import { Badge, CloseButton, Flex, Text, UnstyledButton } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import dayjs from 'dayjs'
@@ -15,7 +15,8 @@ export const Request: React.FC<{
   sID: string
   request: TinyRequest
   isActive?: boolean
-}> = ({ sID, request, isActive = false }) => {
+  componentRef?: ForwardedRef<HTMLDivElement>
+}> = ({ sID, request, isActive = false, componentRef }) => {
   const navigate = useNavigate()
   const { removeRequest, requests } = useData()
 
@@ -73,6 +74,7 @@ export const Request: React.FC<{
         },
         label: { width: '100%' },
       }}
+      ref={componentRef}
       fullWidth
     >
       <Flex justify="space-between">

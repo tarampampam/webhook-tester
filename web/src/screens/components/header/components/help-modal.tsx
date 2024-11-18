@@ -14,7 +14,7 @@ export const HelpModal: React.FC<{
     <Modal
       opened={opened}
       onClose={onClose}
-      size="lg"
+      size="xl"
       overlayProps={{
         backgroundOpacity: 0.55,
         blur: 3,

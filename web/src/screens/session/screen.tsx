@@ -1,6 +1,7 @@
 import { Blockquote } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
+import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
@@ -15,7 +16,8 @@ export function SessionAndRequestScreen(): React.JSX.Element {
   ]
   const [sessionLoading, setSessionLoading] = useState<boolean>(false)
   const [requestLoading, setRequestLoading] = useState<boolean>(false)
-  const { session, request, switchToSession, switchToRequest, setRequestsCount } = useData()
+  const { session, request, switchToSession, switchToRequest, setRequestsCount, removeRequest, removeAllRequests } =
+    useData()
   const {
     showNativeRequestNotifications: useNative,
     autoNavigateToNewRequest: autoNavigate,
@@ -54,8 +56,9 @@ export function SessionAndRequestScreen(): React.JSX.Element {
         // show a notification about the new request using the browser's native notification API,
         // if the permission is granted and the setting is enabled
         if (bnGrantedRef.current && useNativeRef.current) {
-          bnShow('New request received', {
+          bnShow(`New request received (${dayjs(req.capturedAt).format('HH:mm:ss.SSS')})`, {
             body: `From ${req.clientAddress} with method ${req.method}`,
+            tag: 'new-request', // to show only one notification (but update it)
             autoClose: 5000,
           })
             // in case the notification is not shown, show the in-app notification
@@ -80,7 +83,34 @@ export function SessionAndRequestScreen(): React.JSX.Element {
           navigate(pathTo(RouteIDs.SessionAndRequest, sID, req.rID)) // navigate to the new request
         }
       },
-      // TODO: add another event handles
+      onRequestDelete: (req): void => {
+        if (stateSID.current) {
+          // since the request is already deleted from the server, we can remove it from the client only
+          removeRequest(stateSID.current, req.rID, false)
+            .then((slow) => slow())
+            .catch((err) => {
+              notify.show({
+                title: 'An error occurred during the request deletion',
+                message: String(err),
+                color: 'red',
+              })
+            })
+        }
+      },
+      onRequestsClear: (): void => {
+        if (stateSID.current) {
+          // since the requests are already cleared from the server, we can remove them from the client only
+          removeAllRequests(stateSID.current, false)
+            .then((slow) => slow())
+            .catch((err) => {
+              notify.show({
+                title: 'An error occurred during the requests clearing',
+                message: String(err),
+                color: 'red',
+              })
+            })
+        }
+      },
       onError: (err): void => {
         notify.show({
           title: 'An error occurred during the subscription to the new requests',
@@ -89,7 +119,7 @@ export function SessionAndRequestScreen(): React.JSX.Element {
         })
       },
     }),
-    [bnShow, navigate, sID, maxRequests, setRequestsCount]
+    [bnShow, navigate, sID, maxRequests, setRequestsCount, removeAllRequests, removeRequest]
   )
 
   /** The effect to switch to the session and request */

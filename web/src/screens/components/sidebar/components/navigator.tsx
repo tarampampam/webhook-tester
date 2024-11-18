@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button, type ButtonProps, Group } from '@mantine/core'
 import { IconChevronDown, IconChevronsDown, IconChevronsUp, IconChevronUp } from '@tabler/icons-react'
-import { Link } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
 import { useData } from '~/shared'
 
 export const Navigator = (): React.JSX.Element => {
   const { session, request, requests } = useData()
+  const navigate = useNavigate()
 
   const [jumpFirstEnabled, setJumpFirstEnabled] = useState<boolean>(false)
   const [jumpPrevEnabled, setJumpPrevEnabled] = useState<boolean>(false)
@@ -53,15 +54,23 @@ export const Navigator = (): React.JSX.Element => {
     )
   }, [request, requests, session])
 
-  const shortJumpButtonProps: Partial<ButtonProps> = {
-    variant: 'default',
-    size: 'compact-xs',
-  }
+  // listen for arrow keys to navigate between requests
+  useEffect(() => {
+    const eventsHandler = (e: KeyboardEvent) => {
+      if ((e.code === 'ArrowDown' || e.code === 'ArrowRight') && jumpPrevEnabled && pathToPrev) {
+        navigate(pathToPrev)
+      } else if ((e.code === 'ArrowUp' || e.code === 'ArrowLeft') && jumpNextEnabled && pathToNext) {
+        navigate(pathToNext)
+      }
+    }
 
-  const longJumpButtonProps: Partial<ButtonProps> = {
-    ...shortJumpButtonProps,
-    styles: { section: { margin: 0 } },
-  }
+    window.addEventListener('keydown', eventsHandler)
+
+    return () => window.removeEventListener('keydown', eventsHandler)
+  })
+
+  const shortJumpButtonProps: Partial<ButtonProps> = { variant: 'default', size: 'compact-xs' }
+  const longJumpButtonProps: Partial<ButtonProps> = { ...shortJumpButtonProps, styles: { section: { margin: 0 } } }
 
   return (
     <Group justify="space-between">

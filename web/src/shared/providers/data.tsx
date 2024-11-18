@@ -87,7 +87,7 @@ type DataContext = {
    * NOTE: The first promise resolves when the request is removed from the database (FAST), and the second one
    * resolves when the request is removed from the server (SLOW).
    */
-  removeRequest(sID: string, rID: string): Promise<() => Promise<void>>
+  removeRequest(sID: string, rID: string, andFromServer?: boolean): Promise<() => Promise<void>>
 
   /**
    * Remove all requests for the session with the given ID.
@@ -95,7 +95,7 @@ type DataContext = {
    * NOTE: The first promise resolves when the requests are removed from the database (FAST), and the second one
    * resolves when the requests are removed from the server (SLOW).
    */
-  removeAllRequests(sID: string): Promise<() => Promise<void>>
+  removeAllRequests(sID: string, andFromServer?: boolean): Promise<() => Promise<void>>
 
   /** Limit the number of requests by removing the oldest ones, if the count exceeds the limit */
   setRequestsCount(limit: number): void
@@ -664,12 +664,17 @@ export const DataProvider: React.FC<{
    * resolves when the request is removed from the server (SLOW).
    */
   const removeRequest = useCallback(
-    async (sID: string, rID: string): Promise<() => Promise<void>> => {
+    async (sID: string, rID: string, andFromServer: boolean = true): Promise<() => Promise<void>> => {
       // remove the request from the database (fast)
       await db.deleteRequest(rID)
 
       // update the requests list (update the state)
       setRequests((prev) => prev.filter((r) => r.rID !== rID).sort(requestsSorter))
+
+      // skip the slow operation if we don't need to remove the request from the server
+      if (!andFromServer) {
+        return async () => Promise.resolve()
+      }
 
       // return a function to remove from the server (slow)
       return async () => {
@@ -690,12 +695,17 @@ export const DataProvider: React.FC<{
    * resolves when the requests are removed from the server (SLOW).
    */
   const removeAllRequests = useCallback(
-    async (sID: string): Promise<() => Promise<void>> => {
+    async (sID: string, andFromServer: boolean = true): Promise<() => Promise<void>> => {
       // remove all requests from the database
       await db.deleteAllRequests(sID)
 
       // clear the requests list (update the state)
       setRequests(Object.freeze([]))
+
+      // skip the slow operation if we don't need to remove the request from the server
+      if (!andFromServer) {
+        return async () => Promise.resolve()
+      }
 
       // return the function that removes requests from the server
       return async (): Promise<void> => {

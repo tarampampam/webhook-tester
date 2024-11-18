@@ -273,6 +273,7 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                         language: 'json',
                       },
                     ]}
+                    styles={{ pre: { whiteSpace: 'pre-line' } }}
                     expandCodeLabel="Show full response"
                     defaultExpanded={false}
                     withHeader={false}
