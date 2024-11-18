@@ -32,7 +32,10 @@ e2e: ## Run end-to-end tests
 
 up: ## Start the application in watch mode
 	#docker compose build
-	docker compose kill app-http --remove-orphans 2>/dev/null || true
+	docker compose kill app-http app-web-serve --remove-orphans 2>/dev/null || true
+	docker compose up -d app-web-serve --wait # start the web dev server (vite)
+	@printf "\n\t\033[33m%s\033[0m\n" "Open http://127.0.0.1:8080 in your browser to view the app in production mode (go server)"
+	@printf "\t\033[33m%s\033[0m\n\n" "  or http://127.0.0.1:8081 to view the app web in development mode (vite, nodejs server)"
 	docker compose up app-http
 
 down: ## Stop the application

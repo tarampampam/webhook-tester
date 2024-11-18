@@ -6,15 +6,15 @@ import React, { useEffect, useState } from 'react'
 const decoder = new TextDecoder('utf-8')
 const cutMessage = '\n\n[...content truncated (to view the full content, please download the binary file)...]\n\n'
 
-export default function ViewText({
-  input,
-  contentType = null,
-  lengthLimit = 1024 * 128, // 128KB
-}: {
+export const ViewText: React.FC<{
   input: Uint8Array | null
   contentType: string | null
   lengthLimit?: number
-}): React.JSX.Element {
+}> = ({
+  input,
+  contentType = null,
+  lengthLimit = 1024 * 128, // 128KB
+}) => {
   const [content, setContent] = useState<string | null>(null)
   const [language, setLanguage] = useState<'json' | 'xml' | null>(null)
   const [trimmed, setTrimmed] = useState<boolean>(false)

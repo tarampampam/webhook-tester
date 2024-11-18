@@ -1,32 +1,29 @@
+import type React from 'react'
 import { CodeHighlight } from '@mantine/code-highlight'
-import { Divider, Modal, Text, Title } from '@mantine/core'
-import React from 'react'
+import { Divider, Modal, Text } from '@mantine/core'
+import { useData, useSettings } from '~/shared'
 
-export default function HeaderHelpModal({
-  opened,
-  onClose,
-  webHookUrl = null,
-  sessionTTLSec = 0,
-  maxBodySizeBytes = 0,
-  maxRequestsPerSession = 0,
-}: {
+export const HelpModal: React.FC<{
   opened: boolean
   onClose: () => void
-  webHookUrl: URL | null
-  sessionTTLSec: number | null
-  maxBodySizeBytes: number | null
-  maxRequestsPerSession: number | null
-}): React.JSX.Element {
+}> = ({ opened, onClose }) => {
+  const { webHookUrl } = useData()
+  const { sessionTTLSec, maxRequestBodySize, maxRequestsPerSession } = useSettings()
+
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      size="lg"
+      size="xl"
       overlayProps={{
         backgroundOpacity: 0.55,
         blur: 3,
       }}
-      title={<Title size="h3">What is Webhook Tester?</Title>}
+      title={
+        <Text size="lg" fw={700}>
+          What is Webhook Tester?
+        </Text>
+      }
       centered
     >
       <Text my="md">
@@ -50,9 +47,9 @@ export default function HeaderHelpModal({
         {!!sessionTTLSec &&
           sessionTTLSec > 0 &&
           ` Requests and tokens for this URL expire after ${sessionTTLSec / 60 / 60 / 24} days of inactivity.`}
-        {!!maxBodySizeBytes &&
-          maxBodySizeBytes > 0 &&
-          ` The maximum size for incoming requests is ${bytesToKilobytes(maxBodySizeBytes)} KiB.`}
+        {!!maxRequestBodySize &&
+          maxRequestBodySize > 0 &&
+          ` The maximum size for incoming requests is ${bytesToKilobytes(maxRequestBodySize)} KiB.`}
         {!!maxRequestsPerSession &&
           maxRequestsPerSession > 0 &&
           ` The maximum number of requests per session is ${maxRequestsPerSession}.`}

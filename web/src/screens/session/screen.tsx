@@ -1,211 +1,198 @@
 import { Blockquote } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
+import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { APIErrorCommon, APIErrorNotFound, type Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { sessionToUrl, useBrowserNotifications, useSessions, useUISettings } from '~/shared'
-import { useLayoutOutletContext } from '../layout'
-import { RequestDetails, SessionDetails, type SessionProps } from './components'
+import { type SessionEvents, useBrowserNotifications, useData, useSettings } from '~/shared'
+import { RequestDetails, SessionDetails } from './components'
 
-export default function SessionAndRequestScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
+export function SessionAndRequestScreen(): React.JSX.Element {
+  const navigate = useNavigate()
   const [{ sID }, { rID }] = [
     useParams<{ sID: string }>() as Readonly<{ sID: string }>, // I'm sure that sID is always present here because it's required in the route
-    useParams<Readonly<{ rID?: string }>>(), // rID is optional for this layout
+    useParams<Readonly<{ rID?: string }>>(), // rID is optional for this screen
   ]
-  const navigate = useNavigate()
-  const { setLastUsed, removeSession } = useSessions()
-  const [loading, setLoading] = useState<boolean>(false)
-  const [sessionProps, setSessionProps] = useState<SessionProps | null>(null)
-  const { ref: uiSettings } = useUISettings()
+  const [sessionLoading, setSessionLoading] = useState<boolean>(false)
+  const [requestLoading, setRequestLoading] = useState<boolean>(false)
+  const { session, request, switchToSession, switchToRequest, setRequestsCount, removeRequest, removeAllRequests } =
+    useData()
   const {
-    setListedRequests,
-    setSID: setParentSID,
-    setRID: setParentRID,
-    appSettings: __appSettings,
-  } = useLayoutOutletContext()
-  const { granted: __browserNotificationsGranted, show: showBrowserNotification } = useBrowserNotifications()
-  const closeSubRef = useRef<(() => void) | null>(null)
-  const appSettingsRef = useRef<typeof __appSettings | null>(__appSettings)
-  const browserNotificationsGrantedRef = useRef<boolean>(__browserNotificationsGranted)
+    showNativeRequestNotifications: useNative,
+    autoNavigateToNewRequest: autoNavigate,
+    maxRequestsPerSession: maxRequests,
+  } = useSettings()
+  const { granted: bnGranted, show: bnShow } = useBrowserNotifications()
 
   // store some values in the ref to avoid unnecessary re-renders
-  useEffect(() => {
-    appSettingsRef.current = __appSettings
-    browserNotificationsGrantedRef.current = __browserNotificationsGranted
-  }, [__appSettings, __browserNotificationsGranted])
+  const bnGrantedRef = useRef<boolean>(bnGranted) // is native browser notifications granted?
+  const useNativeRef = useRef<boolean>(useNative) // should use native browser notifications?
+  const autoNavigateRef = useRef<boolean>(autoNavigate) // should auto-navigate to the new request?
+  const stateSID = useRef<string | null>(session?.sID || null)
+  const stateRID = useRef<string | null>(request?.rID || null)
 
-  /** Subscribe to the session requests via WebSocket */
-  const subscribe = useCallback(
-    (sID: string) => {
-      unsubscribe() // unsubscribe from the previous session requests
+  // auto-update the ref values
+  useEffect(() => { bnGrantedRef.current = bnGranted }, [bnGranted]) // prettier-ignore
+  useEffect(() => { useNativeRef.current = useNative }, [useNative]) // prettier-ignore
+  useEffect(() => { autoNavigateRef.current = autoNavigate }, [autoNavigate]) // prettier-ignore
+  useEffect(() => { stateSID.current = session?.sID || null }, [session]) // prettier-ignore
+  useEffect(() => { stateRID.current = request?.rID || null }, [request]) // prettier-ignore
 
-      apiClient
-        .subscribeToSessionRequests(sID, {
-          onUpdate: (request): void => {
-            // append the new request in front of the list
-            setListedRequests((prev) => {
-              let newList = [
-                Object.freeze({
-                  id: request.uuid,
-                  method: request.method,
-                  clientAddress: request.clientAddress,
-                  capturedAt: request.capturedAt,
-                }),
-                ...prev,
-              ]
+  /** The event listeners for the session */
+  const listeners = useCallback(
+    (): Partial<SessionEvents> => ({
+      onNewRequest: (req): void => {
+        // the in-app notification function to show the new request notification
+        const showInAppNotification = (): void => {
+          notify.show({
+            title: 'New request received',
+            message: `From ${req.clientAddress} with method ${req.method}`,
+            icon: <IconRocket />,
+            color: 'blue',
+          })
+        }
 
-              // limit the number of shown requests per session if the setting is set and the list is too long
-              if (
-                !!appSettingsRef.current &&
-                appSettingsRef.current.setMaxRequestsPerSession &&
-                newList.length > appSettingsRef.current.setMaxRequestsPerSession
-              ) {
-                newList = newList.slice(0, appSettingsRef.current.setMaxRequestsPerSession)
+        // show a notification about the new request using the browser's native notification API,
+        // if the permission is granted and the setting is enabled
+        if (bnGrantedRef.current && useNativeRef.current) {
+          bnShow(`New request received (${dayjs(req.capturedAt).format('HH:mm:ss.SSS')})`, {
+            body: `From ${req.clientAddress} with method ${req.method}`,
+            tag: 'new-request', // to show only one notification (but update it)
+            autoClose: 5000,
+          })
+            // in case the notification is not shown, show the in-app notification
+            .then((n) => {
+              if (!n) {
+                showInAppNotification()
               }
-
-              return newList
             })
+            // do the same in case of an error
+            .catch(showInAppNotification)
+        } else {
+          // otherwise, show the in-app notification
+          showInAppNotification()
+        }
 
-            // the in-app notification function to show the new request notification
-            const showInAppNotification = (): void => {
+        if (maxRequests && maxRequests > 0) {
+          setRequestsCount(maxRequests)
+        }
+
+        // navigate to the new request if the setting is enabled
+        if (autoNavigateRef.current) {
+          navigate(pathTo(RouteIDs.SessionAndRequest, sID, req.rID)) // navigate to the new request
+        }
+      },
+      onRequestDelete: (req): void => {
+        if (stateSID.current) {
+          // since the request is already deleted from the server, we can remove it from the client only
+          removeRequest(stateSID.current, req.rID, false)
+            .then((slow) => slow())
+            .catch((err) => {
               notify.show({
-                title: 'New request received',
-                message: `From ${request.clientAddress} with method ${request.method}`,
-                icon: <IconRocket />,
-                color: 'blue',
+                title: 'An error occurred during the request deletion',
+                message: String(err),
+                color: 'red',
               })
-            }
-
-            // show a notification about the new request using the browser's native notification API,
-            // if the permission is granted and the setting is enabled
-            if (browserNotificationsGrantedRef.current && uiSettings.current.showNativeRequestNotifications) {
-              showBrowserNotification('New request received', {
-                body: `From ${request.clientAddress} with method ${request.method}`,
-                autoClose: 5000,
+            })
+        }
+      },
+      onRequestsClear: (): void => {
+        if (stateSID.current) {
+          // since the requests are already cleared from the server, we can remove them from the client only
+          removeAllRequests(stateSID.current, false)
+            .then((slow) => slow())
+            .catch((err) => {
+              notify.show({
+                title: 'An error occurred during the requests clearing',
+                message: String(err),
+                color: 'red',
               })
-                // in case the notification is not shown, show the in-app notification
-                .then((n) => {
-                  if (!n) {
-                    showInAppNotification()
-                  }
-                })
-                // do the same in case of an error
-                .catch(showInAppNotification)
-            } else {
-              // otherwise, show the in-app notification
-              showInAppNotification()
-            }
-
-            // navigate to the new request if the setting is enabled
-            if (uiSettings.current.autoNavigateToNewRequest) {
-              navigate(pathTo(RouteIDs.SessionAndRequest, sID, request.uuid)) // navigate to the new request
-            }
-          },
-          onError: (error): void => {
-            notify.show({ title: 'An error occurred with websocket', message: String(error), color: 'orange' })
-          },
+            })
+        }
+      },
+      onError: (err): void => {
+        notify.show({
+          title: 'An error occurred during the subscription to the new requests',
+          message: String(err),
+          color: 'red',
         })
-        .then((closer): void => {
-          closeSubRef.current = closer // save the closer function to call it when the component unmounts
-        })
-        .catch(console.error)
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [apiClient, navigate, setListedRequests, uiSettings, showBrowserNotification]
+      },
+    }),
+    [bnShow, navigate, sID, maxRequests, setRequestsCount, removeAllRequests, removeRequest]
   )
 
-  /** Unsubscribe from the session requests */
-  const unsubscribe = useCallback((): void => {
-    if (closeSubRef.current) {
-      closeSubRef.current() // close the subscription
-    }
+  /** The effect to switch to the session and request */
+  useEffect(() => {
+    Promise.allSettled([
+      // if the session ID has changed, switch to the session
+      stateSID.current !== sID
+        ? (async (): Promise<void> => {
+            try {
+              // invoke the fast switching to the session (usually with the data from the database) and
+              // get the slow operation
+              const sessionSwitchSlow = await switchToSession(sID, listeners())
 
-    closeSubRef.current = null // reset the closer function
-  }, [])
+              setSessionLoading(true) // set the session loading state to true
 
-  /** Load the session details and the list of requests */
-  const loadSessionAndRequests = useCallback(
-    (sID: string): void => {
-      setLoading(true)
+              // start the slow operation (usually with the data from the server)
+              await sessionSwitchSlow()
+            } finally {
+              setSessionLoading(false) // unset the session loading state
+            }
+          })()
+        : Promise.resolve(),
 
-      Promise.all([
-        apiClient.getSession(sID), // 🚀 get the session details
-        apiClient.getSessionRequests(sID), // 🚀 get the session requests
-      ])
-        .then(([session, requests]) => {
-          setParentSID(session.uuid) // notify the parent layout about the session ID change
-          setLastUsed(session.uuid) // store current session ID as the last used one
-          subscribe(session.uuid) // subscribe to the session requests
+      // if the request ID has changed, switch to the request
+      stateRID.current !== rID
+        ? (async (): Promise<void> => {
+            try {
+              // invoke the fast switching to the request (usually with the data from the database) and
+              // get the slow operation
+              const requestSwitchSlow = await switchToRequest(sID, rID ?? null)
 
-          setSessionProps(
-            Object.freeze({
-              statusCode: session.response.statusCode,
-              headers: session.response.headers,
-              delay: session.response.delay,
-              body: session.response.body,
-              createdAt: session.createdAt,
-            })
-          )
+              setRequestLoading(true) // set the request loading state to true
 
-          // update the list of requests
-          setListedRequests(
-            requests.map((request) =>
-              Object.freeze({
-                id: request.uuid,
-                method: request.method,
-                clientAddress: request.clientAddress,
-                capturedAt: request.capturedAt,
-              })
-            )
-          )
+              // start the slow operation (usually with the data from the server)
+              await requestSwitchSlow()
+            } finally {
+              setRequestLoading(false) // unset the request loading state
+            }
+          })()
+        : Promise.resolve(),
+    ] satisfies Array<Promise<void>>).then(([sessionSwitchResult, requestSwitchResult]) => {
+      // if switching to the session failed
+      if (sessionSwitchResult.status === 'rejected') {
+        notify.show({
+          title: 'Switching to the session failed',
+          message: String(sessionSwitchResult.reason),
+          color: 'red',
         })
-        .catch((err: Error | unknown) => {
-          // if the session does not exist, show an error message and redirect to the home screen
-          if (err instanceof APIErrorNotFound || err instanceof APIErrorCommon) {
-            setLastUsed(null) // reset the last used session ID
-            removeSession(sID) // remove the session from the list
 
-            notify.show({
-              title: 'WebHook not found',
-              message: err instanceof APIErrorNotFound ? `The WebHook with ID ${sID} does not exist` : String(err),
-              color: 'orange',
-            })
-          } else {
-            notify.show({ title: 'An error occurred', message: String(err), color: 'red' })
+        navigate(pathTo(RouteIDs.Home)) // navigate to the home screen
 
-            console.error(err)
-          }
+        return
+      }
 
-          navigate(pathTo(RouteIDs.Home)) // redirect to the home screen
+      // if switching to the request failed
+      if (requestSwitchResult.status === 'rejected') {
+        notify.show({
+          title: 'Switching to the request failed',
+          message: String(requestSwitchResult.reason),
+          color: 'red',
         })
-        .finally(() => setLoading(false))
-    },
-    [apiClient, navigate, setLastUsed, removeSession, setListedRequests, setParentSID, subscribe]
-  )
 
-  useEffect((): (() => void) => {
-    // on mount
-    loadSessionAndRequests(sID)
+        navigate(pathTo(RouteIDs.SessionAndRequest, sID)) // navigate to the session screen
 
-    // on unmount
-    return (): void => {
-      setParentSID(null)
-
-      unsubscribe()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sID, setParentSID, unsubscribe])
-
-  // notify the parent layout about the request ID change
-  useEffect((): void => setParentRID(rID || null), [setParentRID, rID])
+        return
+      }
+    })
+  }, [sID, rID, listeners, navigate, switchToRequest, switchToSession])
 
   return (
-    (!!rID && <RequestDetails apiClient={apiClient} sID={sID} rID={rID} />) || (
+    (!!request && <RequestDetails loading={requestLoading} />) || (
       <>
-        <SessionDetails webHookUrl={sessionToUrl(sID)} loading={loading} sessionProps={sessionProps} />
-
+        <SessionDetails loading={sessionLoading} />
         <Blockquote my="lg" color="blue" icon={<IconInfoCircle />}>
           Click &quot;New URL&quot; (in the top right corner) to create a new url with the ability to customize status
           code, response body, etc.

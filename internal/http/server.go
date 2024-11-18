@@ -65,13 +65,13 @@ func (s *Server) Register(
 	lastAppVer func(context.Context) (string, error),
 	cfg *config.AppSettings,
 	db storage.Storage,
-	pubSub pubsub.PubSub[pubsub.CapturedRequest],
+	pubSub pubsub.PubSub[pubsub.RequestEvent],
 	useLiveFrontend bool,
 ) *Server {
 	var (
-		oAPI    = NewOpenAPI(log, rdyChk, lastAppVer, cfg, db, pubSub) // OpenAPI server implementation
-		spa     = frontend.New(web.Dist(useLiveFrontend))              // file server for SPA (also handles 404 errors)
-		mux     = http.NewServeMux()                                   // base router for the OpenAPI server
+		oAPI    = NewOpenAPI(ctx, log, rdyChk, lastAppVer, cfg, db, pubSub) // OpenAPI server implementation
+		spa     = frontend.New(web.Dist(useLiveFrontend))                   // file server for SPA (also handles 404 errors)
+		mux     = http.NewServeMux()                                        // base router for the OpenAPI server
 		handler = openapi.HandlerWithOptions(oAPI, openapi.StdHTTPServerOptions{
 			ErrorHandlerFunc: oAPI.HandleInternalError, // set error handler for internal server errors
 			BaseRouter:       mux,

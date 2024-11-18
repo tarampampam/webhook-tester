@@ -5,17 +5,17 @@ export const methodToColor = (
 ): MantineColor => {
   switch (method.trim().toUpperCase()) {
     case 'GET':
-      return 'blue'
-    case 'POST':
       return 'green'
-    case 'PUT':
+    case 'POST':
       return 'yellow'
+    case 'PUT':
+      return 'blue'
     case 'PATCH':
-      return 'purple'
+      return 'violet'
     case 'DELETE':
       return 'red'
     case 'HEAD':
-      return 'teal'
+      return 'green'
     case 'OPTIONS':
       return 'orange'
     case 'TRACE':

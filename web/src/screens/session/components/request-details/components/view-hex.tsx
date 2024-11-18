@@ -1,17 +1,17 @@
+import React, { useEffect, useState, type CSSProperties } from 'react'
 import { Alert, Box, Divider, Grid, NativeSelect } from '@mantine/core'
 import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
-import React, { useEffect, useState, type CSSProperties } from 'react'
 
 type DataItem = [string /* representation */, string | undefined /* ascii */]
 type DataLine = Array<DataItem>
 
-export default function ViewHex({
-  input,
-  lengthLimit = 1024 * 24, // 24KB
-}: {
+export const ViewHex: React.FC<{
   input: Uint8Array
   lengthLimit?: number
-}): React.JSX.Element {
+}> = ({
+  input,
+  lengthLimit = 1024 * 24, // 24KB
+}) => {
   const [lineNumberType, setLineNumberType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [displayType, setDisplayType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [lineSize, setLineSize] = useState<number>(16)

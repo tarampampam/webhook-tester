@@ -13,12 +13,12 @@ export enum RouteIDs {
 export const createRoutes = (apiClient: Client): RouteObject[] => [
   {
     path: '/',
-    element: <DefaultLayout apiClient={apiClient} />,
+    element: <DefaultLayout api={apiClient} />,
     errorElement: <NotFoundScreen />,
     children: [
       {
         index: true,
-        element: <HomeScreen apiClient={apiClient} />,
+        element: <HomeScreen />,
         id: RouteIDs.Home,
       },
       {
@@ -30,7 +30,7 @@ export const createRoutes = (apiClient: Client): RouteObject[] => [
         // please note that `sID` and `rID` accessed via `useParams` hook, and changing this will break the app
         path: 's/:sID/:rID?',
         id: RouteIDs.SessionAndRequest,
-        element: <SessionAndRequestScreen apiClient={apiClient} />,
+        element: <SessionAndRequestScreen />,
       },
     ],
   },

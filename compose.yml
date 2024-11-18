@@ -9,6 +9,21 @@ services:
     volumes: [.:/src:rw, app-tmp-data:/tmp:rw, app-modules-cache:/var/tmp/go:rw]
     security_opt: [no-new-privileges:true]
 
+  app-http:
+    build: *app-build
+    env_file: [{path: .env, required: false}]
+    entrypoint: sh -c 'go build -buildvcs=false -o /var/tmp/app ./cmd/webhook-tester/ && exec $0 "$@"'
+    command: /var/tmp/app start --use-live-frontend --auto-create-sessions --max-requests 16
+    volumes: [.:/src:rw]
+    ports: ['8080:8080/tcp'] # open http://127.0.0.1:8080
+    healthcheck:
+      test: ['CMD', '/var/tmp/app', 'start', 'healthcheck']
+      start_interval: 1s
+      interval: 10s
+      start_period: 10s
+    depends_on: {app-web-dist: {condition: service_healthy}}
+    security_opt: [no-new-privileges:true]
+
   app-web-dist:
     build: *app-build
     user: node
@@ -18,18 +33,15 @@ services:
     healthcheck: {test: ['CMD', 'test', '-f', './dist/robots.txt'], start_interval: 1s, interval: 10s, start_period: 20s}
     security_opt: [no-new-privileges:true]
 
-  app-http:
+  app-web-serve:
     build: *app-build
-    entrypoint: sh -c 'go build -buildvcs=false -o /var/tmp/app ./cmd/webhook-tester/ && exec $0 "$@"'
-    command: /var/tmp/app start --use-live-frontend --auto-create-sessions --max-requests 8
+    user: node
     volumes: [.:/src:rw]
-    ports: ['8080:8080/tcp']
-    healthcheck:
-      test: ['CMD', '/var/tmp/app', 'start', 'healthcheck']
-      start_interval: 1s
-      interval: 10s
-      start_period: 10s
-    depends_on: {app-web-dist: {condition: service_healthy}}
+    working_dir: /src/web
+    environment: {DEV_SERVER_PROXY_TO: http://app-http:8080} # tell to vite dev server "where is the API"
+    command: npm run serve -- --host 0.0.0.0 --port 8080
+    ports: ['8081:8080/tcp'] # open http://127.0.0.1:8081
+    healthcheck: {test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8080'], start_interval: 1s, interval: 3s, start_period: 10s}
     security_opt: [no-new-privileges:true]
 
   redis:

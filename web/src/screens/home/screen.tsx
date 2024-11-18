@@ -1,15 +1,21 @@
 import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { Client } from '~/api'
 import { pathTo, RouteIDs } from '~/routing'
-import { useSessions } from '~/shared'
+import { useData } from '~/shared'
 
-export default function HomeScreen({ apiClient }: { apiClient: Client }): React.JSX.Element {
+export function HomeScreen(): React.JSX.Element {
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { addSession } = useSessions()
-  const { sessions, lastUsed, setLastUsed } = useSessions()
+  const { lastUsedSID: last, allSessionIDs: all, newSession } = useData()
+
+  // store the last used session ID and all session IDs in refs to prevent unnecessary re-renders
+  const lastUsedSID = useRef<string | null>(last)
+  const allSessionIDs = useRef<ReadonlyArray<string>>(all)
+
+  // update the refs when the values change
+  useEffect(() => { lastUsedSID.current = last }, [last]) // prettier-ignore
+  useEffect(() => { allSessionIDs.current = all }, [all]) // prettier-ignore
 
   useEffect(() => {
     if (hash) {
@@ -33,21 +39,23 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
         return
       }
     }
+  }, [hash, navigate])
 
+  useEffect(() => {
     // automatically redirect to the last used session, if available
-    if (lastUsed) {
+    if (lastUsedSID.current) {
       notify.show({ title: 'Redirected to the last used WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsed))
+      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID.current))
 
       return
     }
 
     // automatically redirect to the last created session, if available
-    if (sessions.length) {
+    if (allSessionIDs.current.length) {
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, sessions[sessions.length - 1]))
+      navigate(pathTo(RouteIDs.SessionAndRequest, allSessionIDs.current[allSessionIDs.current.length - 1]))
 
       return
     }
@@ -60,22 +68,22 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
       loading: true,
     })
 
-    apiClient
-      .newSession({})
+    newSession({
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      responseBody: new TextEncoder().encode('"Hello, world!"'),
+    })
       .then((sInfo) => {
         notify.update({
           id,
           title: 'A new WebHook has been created',
-          message: `Session ID: ${sInfo.uuid}`,
+          message: `Session ID: ${sInfo.sID}`,
           color: 'green',
           autoClose: 5000,
           loading: false,
         })
 
-        addSession(sInfo.uuid)
-        setLastUsed(sInfo.uuid)
-
-        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.uuid))
+        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.sID))
       })
       .catch(() => {
         notify.update({
@@ -86,7 +94,7 @@ export default function HomeScreen({ apiClient }: { apiClient: Client }): React.
           loading: false,
         })
       })
-  }, [apiClient, addSession, hash, lastUsed, navigate, sessions, setLastUsed])
+  }, [navigate, newSession])
 
   return (
     <>

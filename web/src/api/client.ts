@@ -3,7 +3,7 @@ import { coerce as semverCoerce, parse as semverParse, type SemVer } from 'semve
 import { base64ToUint8Array, uint8ArrayToBase64 } from '~/shared'
 import { APIErrorUnknown } from './errors'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
-import { components, paths } from './schema.gen'
+import { components, paths, type RequestEventAction } from './schema.gen'
 
 type AppSettings = Readonly<{
   limits: Readonly<{
@@ -28,17 +28,29 @@ type SessionOptions = Readonly<{
   createdAt: Readonly<Date>
 }>
 
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
+
 type CapturedRequest = Readonly<{
   uuid: string
   clientAddress: string
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
+  method: HttpMethod
   requestPayload: Uint8Array
   headers: ReadonlyArray<{ name: string; value: string }>
   url: Readonly<URL>
   capturedAt: Readonly<Date>
 }>
 
-type CapturedRequestShort = Omit<CapturedRequest, 'requestPayload'>
+type RequestEvent = Readonly<{
+  action: RequestEventAction
+  request: {
+    uuid: string
+    clientAddress: string
+    method: HttpMethod
+    headers: ReadonlyArray<{ name: string; value: string }>
+    url: Readonly<URL>
+    capturedAt: Readonly<Date>
+  } | null
+}>
 
 export class Client {
   private readonly baseUrl: URL
@@ -76,7 +88,7 @@ export class Client {
       return this.cache.currentVersion
     }
 
-    const { data, response } = await this.api.GET('/api/version')
+    const { data, response } = await this.api.GET('/api/version', { priority: 'low' })
 
     if (data) {
       const version = semverParse(semverCoerce(data.version.replace('@', '-')))
@@ -103,7 +115,7 @@ export class Client {
       return this.cache.latestVersion
     }
 
-    const { data, response } = await this.api.GET('/api/version/latest')
+    const { data, response } = await this.api.GET('/api/version/latest', { priority: 'low' })
 
     if (data) {
       const version = semverParse(semverCoerce(data.version))
@@ -221,6 +233,33 @@ export class Client {
   }
 
   /**
+   * Batch checking the existence of the sessions by their IDs.
+   *
+   * @throws {APIError}
+   */
+  async checkSessionExists<T extends string>(...ids: Array<T>): Promise<{ [K in T]: boolean }> {
+    const { data, response } = await this.api.POST('/api/session/check/exists', {
+      body: ids,
+    })
+
+    if (data) {
+      // first, create an object with keys from the input array and values as `false`
+      const result = Object.fromEntries(ids.map((id) => [id, false])) as { [K in T]: boolean }
+
+      // next, iterate over the response data and set the value to `true` if the ID exists and is `true`
+      for (const id in data) {
+        if (data[id] === true) {
+          result[id as T] = true
+        }
+      }
+
+      return Object.freeze(result)
+    }
+
+    throw new APIErrorUnknown({ message: response.statusText, response })
+  }
+
+  /**
    * Deletes the session by its ID.
    *
    * @throws {APIError}
@@ -300,7 +339,7 @@ export class Client {
       onError,
     }: {
       onConnected?: () => void // called when the WebSocket connection is established
-      onUpdate: (request: CapturedRequestShort) => void // called when the update is received
+      onUpdate: (request: RequestEvent) => void // called when the update is received
       onError?: (err: Error) => void // called when an error occurs on alive connection
     }
   ): Promise</* closer */ () => void> {
@@ -332,18 +371,22 @@ export class Client {
 
         ws.onmessage = (event): void => {
           if (event.data) {
-            const req = JSON.parse(event.data) as components['schemas']['CapturedRequestShort']
+            const req = JSON.parse(event.data) as components['schemas']['RequestEvent']
+            const payload: RequestEvent = {
+              action: req.action,
+              request: req.request
+                ? Object.freeze({
+                    uuid: req.request.uuid,
+                    clientAddress: req.request.client_address,
+                    method: req.request.method,
+                    headers: Object.freeze(req.request.headers),
+                    url: Object.freeze(new URL(req.request.url)),
+                    capturedAt: Object.freeze(new Date(req.request.captured_at_unix_milli)),
+                  })
+                : null,
+            }
 
-            onUpdate(
-              Object.freeze({
-                uuid: req.uuid,
-                clientAddress: req.client_address,
-                method: req.method,
-                headers: Object.freeze(req.headers),
-                url: Object.freeze(new URL(req.url)),
-                capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
-              })
-            )
+            onUpdate(Object.freeze(payload))
           }
         }
       } catch (e) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/requests_delete_all"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/requests_list"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/requests_subscribe"
+	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/session_check_exists"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/session_create"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/session_delete"
 	"gh.tarampamp.am/webhook-tester/v2/internal/http/handlers/session_get"
@@ -39,43 +41,46 @@ type OpenAPI struct {
 	log *zap.Logger
 
 	handlers struct {
-		settingsGet       func() openapi.SettingsResponse
-		sessionCreate     func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
-		sessionGet        func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
-		sessionDelete     func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsList      func(context.Context, sID) (*openapi.CapturedRequestsListResponse, error)
-		requestsDelete    func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
-		requestsSubscribe func(context.Context, http.ResponseWriter, *http.Request, sID) error
-		requestGet        func(context.Context, sID, rID) (*openapi.CapturedRequestsResponse, error)
-		requestDelete     func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
-		appVersion        func() openapi.VersionResponse
-		appVersionLatest  func(context.Context, http.ResponseWriter) (*openapi.VersionResponse, error)
-		readinessProbe    func(context.Context, http.ResponseWriter, string)
-		livenessProbe     func(http.ResponseWriter, string)
+		settingsGet        func() openapi.SettingsResponse
+		sessionCreate      func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
+		sessionCheckExists func(ctx context.Context, ids []openapi.UUID) (*openapi.CheckSessionExistsResponse, error)
+		sessionGet         func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
+		sessionDelete      func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsList       func(context.Context, sID) (*openapi.CapturedRequestsListResponse, error)
+		requestsDelete     func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
+		requestsSubscribe  func(context.Context, http.ResponseWriter, *http.Request, sID) error
+		requestGet         func(context.Context, sID, rID) (*openapi.CapturedRequestsResponse, error)
+		requestDelete      func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
+		appVersion         func() openapi.VersionResponse
+		appVersionLatest   func(context.Context, http.ResponseWriter) (*openapi.VersionResponse, error)
+		readinessProbe     func(context.Context, http.ResponseWriter, string)
+		livenessProbe      func(http.ResponseWriter, string)
 	}
 }
 
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // verify interface implementation
 
 func NewOpenAPI(
+	appCtx context.Context,
 	log *zap.Logger,
 	rdyChecker func(context.Context) error,
 	lastAppVer func(context.Context) (string, error),
 	cfg *config.AppSettings,
 	db storage.Storage,
-	pubSub pubsub.PubSub[pubsub.CapturedRequest],
+	pubSub pubsub.PubSub[pubsub.RequestEvent],
 ) *OpenAPI {
 	var si = &OpenAPI{log: log}
 
 	si.handlers.settingsGet = settings_get.New(cfg).Handle
 	si.handlers.sessionCreate = session_create.New(db).Handle
+	si.handlers.sessionCheckExists = session_check_exists.New(db).Handle
 	si.handlers.sessionGet = session_get.New(db).Handle
 	si.handlers.sessionDelete = session_delete.New(db).Handle
 	si.handlers.requestsList = requests_list.New(db).Handle
-	si.handlers.requestsDelete = requests_delete_all.New(db).Handle
+	si.handlers.requestsDelete = requests_delete_all.New(appCtx, db, pubSub).Handle
 	si.handlers.requestsSubscribe = requests_subscribe.New(db, pubSub).Handle
 	si.handlers.requestGet = request_get.New(db).Handle
-	si.handlers.requestDelete = request_delete.New(db).Handle
+	si.handlers.requestDelete = request_delete.New(appCtx, db, pubSub).Handle
 	si.handlers.appVersion = version.New(appVersion.Version()).Handle
 	si.handlers.appVersionLatest = version_latest.New(lastAppVer).Handle
 	si.handlers.readinessProbe = ready.New(rdyChecker).Handle
@@ -104,6 +109,33 @@ func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if resp, err := o.handlers.sessionCreate(r.Context(), payload); err != nil {
+		o.errorToJson(w, err, http.StatusInternalServerError)
+	} else {
+		o.respToJson(w, resp)
+	}
+}
+
+func (o *OpenAPI) ApiSessionCheckExists(w http.ResponseWriter, r *http.Request) {
+	var payload openapi.CheckSessionExistsRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		o.errorToJson(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	const minIDsCount, maxIDsCount = 1, 100
+
+	if len(payload) < minIDsCount || len(payload) > maxIDsCount {
+		o.errorToJson(w,
+			fmt.Errorf("wrong IDs count (should be between %d and %d)", minIDsCount, maxIDsCount),
+			http.StatusBadRequest,
+		)
+
+		return
+	}
+
+	if resp, err := o.handlers.sessionCheckExists(r.Context(), payload); err != nil {
 		o.errorToJson(w, err, http.StatusInternalServerError)
 	} else {
 		o.respToJson(w, resp)

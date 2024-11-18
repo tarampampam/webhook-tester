@@ -12,6 +12,7 @@
 *.pb.go
 
 # Temp dirs & trash
+*.env
 /__old__
 /temp
 /tmp

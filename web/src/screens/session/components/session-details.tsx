@@ -2,7 +2,6 @@ import { CodeHighlight, CodeHighlightTabs } from '@mantine/code-highlight'
 import { Badge, Button, Flex, type MantineColor, Skeleton, Table, Text } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import {
-  IconBrandCSharp,
   IconBrandDebian,
   IconBrandGolang,
   IconBrandJavascript,
@@ -17,31 +16,20 @@ import {
 } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import React, { useCallback, useRef } from 'react'
-import { UsedStorageKeys, useStorage } from '~/shared'
+import { useData, UsedStorageKeys, useStorage } from '~/shared'
 
-export type SessionProps = {
-  statusCode: number
-  headers: ReadonlyArray<{ name: string; value: string }>
-  delay: number
-  body: Readonly<Uint8Array>
-  createdAt: Readonly<Date>
-}
-
-export default function SessionDetails({
-  webHookUrl,
-  loading = false,
-  sessionProps = null,
-}: {
-  webHookUrl: URL
-  loading?: boolean
-  sessionProps: Readonly<SessionProps> | null
-}): React.JSX.Element {
+export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
+  const { session, webHookUrl } = useData()
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
   const testNotifyID = useRef<string | null>(null)
 
   /** Sends a test request to the generated URL */
   const handleSendTestRequest = useCallback((): void => {
+    if (!webHookUrl) {
+      return
+    }
+
     if (testNotifyID.current === null) {
       testNotifyID.current = notify.show({
         title: 'Sending request',
@@ -83,132 +71,136 @@ export default function SessionDetails({
 
   return (
     <>
-      <Text>Here&apos;s your unique URL:</Text>
-      <Flex my="md" align="center" justify="space-between" gap="xs" direction={{ base: 'column', lg: 'row' }}>
-        <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" pr="lg" />
-        <Button.Group w={{ base: '100%', lg: 'auto' }}>
-          <Button
-            variant="gradient"
-            gradient={{ from: 'cyan', to: 'teal', deg: 90 }}
-            leftSection={<IconExternalLink size="1.4em" />}
-            component="a"
-            href={webHookUrl.toString()}
-            target="_blank"
-            disabled={loading}
-          >
-            Open in a new tab
-          </Button>
-          <Button
-            variant="gradient"
-            gradient={{ from: 'teal', to: 'cyan', deg: 90 }}
-            leftSection={<IconRun size="1.5em" />}
-            onClick={handleSendTestRequest}
-            onAuxClick={handleSendTestRequest}
-            disabled={loading}
-          >
-            Send a request
-          </Button>
-        </Button.Group>
-      </Flex>
-      <Text>Send simple POST request (execute next command in your terminal without leaving this page):</Text>
-      <CodeHighlightTabs
-        code={[
-          {
-            fileName: 'curl',
-            language: 'bash',
-            code: `curl -v -X POST --data '{"foo": "bar"}' ${webHookUrl.toString()}`,
-            icon: <IconBrandDebian size="1.2em" />,
-          },
-          {
-            fileName: 'wget',
-            language: 'bash',
-            code: `wget -O- --post-data '{"foo": "bar"}' ${webHookUrl.toString()}`,
-            icon: <IconBrandDebian size="1.2em" />,
-          },
-          {
-            fileName: 'HTTPie',
-            language: 'bash',
-            code: `http POST ${webHookUrl.toString()} foo=bar --verbose`,
-            icon: <IconBrandDebian size="1.2em" />,
-          },
-          {
-            fileName: 'get',
-            language: 'bash',
-            code: `get --data '{"foo": "bar"}' ${webHookUrl.toString()} --method=post --verbose`,
-            icon: <IconBrandDebian size="1.2em" />,
-          },
-          {
-            fileName: 'PowerShell',
-            language: 'bash',
-            code: `Invoke-RestMethod -Uri ${webHookUrl.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
-            icon: <IconBrandWindows size="1.2em" />,
-          },
-        ]}
-        onTabChange={(index) => setSelectedShellTab(index)}
-        activeTab={selectedShellTab}
-        w="100%"
-        my="md"
-      />
-      <Text>Code examples in different languages:</Text>
-      <CodeHighlightTabs
-        code={[
-          {
-            fileName: 'JavaScript',
-            language: 'javascript',
-            code: snippet('js', webHookUrl),
-            icon: <IconBrandJavascript size="1.2em" />,
-          },
-          {
-            fileName: 'Node.js',
-            language: 'javascript',
-            code: snippet('node', webHookUrl),
-            icon: <IconBrandNodejs size="1.2em" />,
-          },
-          {
-            fileName: 'Go',
-            language: 'go',
-            code: snippet('go', webHookUrl),
-            icon: <IconBrandGolang size="1.2em" />,
-          },
-          {
-            fileName: 'Java',
-            language: 'java',
-            code: snippet('java', webHookUrl),
-            icon: <IconCup size="1.2em" />,
-          },
-          {
-            fileName: 'Python',
-            language: 'python',
-            code: snippet('python', webHookUrl),
-            icon: <IconBrandPython size="1.2em" />,
-          },
-          {
-            fileName: 'PHP',
-            language: 'php',
-            code: snippet('php', webHookUrl),
-            icon: <IconBrandPhp size="1.2em" />,
-          },
-          {
-            fileName: 'Ruby',
-            language: 'ruby',
-            code: snippet('ruby', webHookUrl),
-            icon: <IconDiamond size="1.2em" />,
-          },
-          {
-            language: 'csharp',
-            code: snippet('csharp', webHookUrl),
-            icon: <IconBrandCSharp size="1.2em" />,
-          },
-        ]}
-        onTabChange={(index) => setSelectedCodeTab(index)}
-        activeTab={selectedCodeTab}
-        w="100%"
-        my="md"
-        defaultExpanded={false}
-        withExpandButton
-      />
-      {loading && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
-      {!!sessionProps && (
+      {!!webHookUrl && (
+        <>
+          <Text>Here&apos;s your unique URL:</Text>
+          <Flex my="md" align="center" justify="space-between" gap="xs" direction={{ base: 'column', lg: 'row' }}>
+            <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" pr="lg" />
+            <Button.Group w={{ base: '100%', lg: 'auto' }}>
+              <Button
+                variant="gradient"
+                gradient={{ from: 'cyan', to: 'teal', deg: 90 }}
+                leftSection={<IconExternalLink size="1.4em" />}
+                component="a"
+                href={webHookUrl.toString()}
+                target="_blank"
+                disabled={loading}
+              >
+                Open in a new tab
+              </Button>
+              <Button
+                variant="gradient"
+                gradient={{ from: 'teal', to: 'cyan', deg: 90 }}
+                leftSection={<IconRun size="1.5em" />}
+                onClick={handleSendTestRequest}
+                onAuxClick={handleSendTestRequest}
+                disabled={loading}
+              >
+                Send a request
+              </Button>
+            </Button.Group>
+          </Flex>
+          <Text>Send simple POST request (execute next command in your terminal without leaving this page):</Text>
+          <CodeHighlightTabs
+            code={[
+              {
+                fileName: 'curl',
+                language: 'bash',
+                code: `curl -v -X POST --data '{"foo": "bar"}' ${webHookUrl.toString()}`,
+                icon: <IconBrandDebian size="1.2em" />,
+              },
+              {
+                fileName: 'wget',
+                language: 'bash',
+                code: `wget -O- --post-data '{"foo": "bar"}' ${webHookUrl.toString()}`,
+                icon: <IconBrandDebian size="1.2em" />,
+              },
+              {
+                fileName: 'HTTPie',
+                language: 'bash',
+                code: `http POST ${webHookUrl.toString()} foo=bar --verbose`,
+                icon: <IconBrandDebian size="1.2em" />,
+              },
+              {
+                fileName: 'get',
+                language: 'bash',
+                code: `get --data '{"foo": "bar"}' ${webHookUrl.toString()} --method=post --verbose`,
+                icon: <IconBrandDebian size="1.2em" />,
+              },
+              {
+                fileName: 'PowerShell',
+                language: 'bash',
+                code: `Invoke-RestMethod -Uri ${webHookUrl.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
+                icon: <IconBrandWindows size="1.2em" />,
+              },
+            ]}
+            onTabChange={(index) => setSelectedShellTab(index)}
+            activeTab={selectedShellTab}
+            w="100%"
+            my="md"
+          />
+          <Text>Code examples in different languages:</Text>
+          <CodeHighlightTabs
+            code={[
+              {
+                fileName: 'JavaScript',
+                language: 'javascript',
+                code: snippet('js', webHookUrl),
+                icon: <IconBrandJavascript size="1.2em" />,
+              },
+              {
+                fileName: 'Node.js',
+                language: 'javascript',
+                code: snippet('node', webHookUrl),
+                icon: <IconBrandNodejs size="1.2em" />,
+              },
+              {
+                fileName: 'Go',
+                language: 'go',
+                code: snippet('go', webHookUrl),
+                icon: <IconBrandGolang size="1.2em" />,
+              },
+              {
+                fileName: 'Java',
+                language: 'java',
+                code: snippet('java', webHookUrl),
+                icon: <IconCup size="1.2em" />,
+              },
+              {
+                fileName: 'Python',
+                language: 'python',
+                code: snippet('python', webHookUrl),
+                icon: <IconBrandPython size="1.2em" />,
+              },
+              {
+                fileName: 'PHP',
+                language: 'php',
+                code: snippet('php', webHookUrl),
+                icon: <IconBrandPhp size="1.2em" />,
+              },
+              {
+                fileName: 'Ruby',
+                language: 'ruby',
+                code: snippet('ruby', webHookUrl),
+                icon: <IconDiamond size="1.2em" />,
+              },
+              {
+                fileName: 'C#',
+                language: 'csharp',
+                code: snippet('csharp', webHookUrl),
+              },
+            ]}
+            onTabChange={(index) => setSelectedCodeTab(index)}
+            activeTab={selectedCodeTab}
+            w="100%"
+            my="md"
+            defaultExpanded={false}
+            withExpandButton
+          />
+        </>
+      )}
+      {loading && !session && [...Array(4)].map((_, i) => <Skeleton height={50} radius="xl" my="md" key={i} />)}
+      {!!session && (
         <Table my="md" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -219,46 +211,48 @@ export default function SessionDetails({
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {!!sessionProps.statusCode && (
+            {!!session.responseCode && (
               <Table.Tr>
                 <Table.Td ta="right">Status code</Table.Td>
                 <Table.Td>
                   <Badge
                     color={((): MantineColor => {
                       switch (true) {
-                        case sessionProps.statusCode <= 299:
+                        case session.responseCode <= 299:
                           return 'teal'
-                        case sessionProps.statusCode <= 399:
+                        case session.responseCode <= 399:
                           return 'orange'
-                        case sessionProps.statusCode <= 499:
+                        case session.responseCode <= 499:
                           return 'red'
                         default:
                           return 'cyan'
                       }
                     })()}
                   >
-                    {sessionProps.statusCode}
+                    {session.responseCode}
                   </Badge>
                 </Table.Td>
               </Table.Tr>
             )}
-            {!!sessionProps.delay && (
+            {!!session.responseDelay && (
               <Table.Tr>
                 <Table.Td ta="right">Delay</Table.Td>
-                <Table.Td>{sessionProps.delay} sec</Table.Td>
+                <Table.Td>{session.responseDelay} sec</Table.Td>
               </Table.Tr>
             )}
-            {!!sessionProps.headers.length && (
+            {!!session.responseHeaders.length && (
               <Table.Tr>
                 <Table.Td ta="right">Response headers</Table.Td>
                 <Table.Td>
                   <CodeHighlightTabs
                     code={[
                       {
-                        code: sessionProps.headers.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                        code: session.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                        fileName: 'response-headers',
                         language: 'bash',
                       },
                     ]}
+                    styles={{ pre: { width: 0 } }}
                     expandCodeLabel="Show all headers"
                     defaultExpanded={false}
                     withHeader={false}
@@ -267,12 +261,19 @@ export default function SessionDetails({
                 </Table.Td>
               </Table.Tr>
             )}
-            {!!sessionProps.body.length && (
+            {!!session.responseBody.length && (
               <Table.Tr>
                 <Table.Td ta="right">Response body</Table.Td>
                 <Table.Td>
                   <CodeHighlightTabs
-                    code={[{ code: String.fromCharCode(...sessionProps.body), language: 'json' }]}
+                    code={[
+                      {
+                        code: String.fromCharCode(...session.responseBody),
+                        fileName: 'response-body',
+                        language: 'json',
+                      },
+                    ]}
+                    styles={{ pre: { whiteSpace: 'pre-line' } }}
                     expandCodeLabel="Show full response"
                     defaultExpanded={false}
                     withHeader={false}
@@ -297,7 +298,7 @@ const sendTestRequest = async (url: URL): Promise<Response> => {
   const methods: Readonly<Array<string>> = ['post', 'put', 'delete', 'patch']
 
   if (Math.random() > 0.5) {
-    url.pathname += '/any/path' // add random path
+    url.pathname += '/any/path' // add random path, 50% chance
   }
 
   url.searchParams.set('test', 'true')
