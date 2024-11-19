@@ -24,13 +24,15 @@ var ( // ensure interface implementation
 	_ Subscriber[any] = (*Redis[any])(nil)
 )
 
+const redisTopicPrefix = "webhook-tester-v2:pubsub:"
+
 func NewRedis[T any](c redisClient, encDec encoding.EncoderDecoder) *Redis[T] {
 	return &Redis[T]{client: c, encDec: encDec}
 }
 
 func (ps *Redis[T]) Subscribe(ctx context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error) {
 	var (
-		pubSub        = ps.client.Subscribe(ctx, topic)
+		pubSub        = ps.client.Subscribe(ctx, redisTopicPrefix+topic)
 		sub           = make(chan T)
 		stop, stopped = make(chan struct{}), make(chan struct{})
 	)
@@ -87,5 +89,5 @@ func (ps *Redis[T]) Publish(ctx context.Context, topic string, event T) error {
 		return mErr
 	}
 
-	return ps.client.Publish(ctx, topic, data).Err()
+	return ps.client.Publish(ctx, redisTopicPrefix+topic, data).Err()
 }
