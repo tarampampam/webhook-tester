@@ -14,7 +14,7 @@ import (
 )
 
 type (
-	InMemory struct {
+	InMemory struct { // TODO: add session expiring check on every operation?
 		sessionTTL      time.Duration
 		maxRequests     uint32
 		sessions        syncMap[ /* sID */ string, *sessionData]
