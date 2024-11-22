@@ -25,8 +25,7 @@ func TestSQLite_Session_CreateReadDelete(t *testing.T) {
 
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
 
-			s, err := storage.NewSQLite(db, sTTL, maxReq)
-			require.NoError(t, err)
+			s := storage.NewSQLite(db, sTTL, maxReq)
 
 			require.NoError(t, s.Migrate(context.Background()))
 
@@ -48,8 +47,7 @@ func TestSQLite_Request_CreateReadDelete(t *testing.T) {
 
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
 
-			s, err := storage.NewSQLite(db, sTTL, maxReq)
-			require.NoError(t, err)
+			s := storage.NewSQLite(db, sTTL, maxReq)
 
 			require.NoError(t, s.Migrate(context.Background()))
 
@@ -58,3 +56,22 @@ func TestSQLite_Request_CreateReadDelete(t *testing.T) {
 		func(t time.Duration) { <-time.After(t) },
 	)
 }
+
+//	func TestSQLite_RaceProvocation(t *testing.T) {
+//		t.Parallel()
+//
+//		testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
+//			var sbFile = path.Join(t.TempDir(), "sqlite.db")
+//
+//			db, dbErr := sql.Open("sqlite3", fmt.Sprintf("file:%s", sbFile))
+//			require.NoError(t, dbErr)
+//
+//			t.Cleanup(func() { require.NoError(t, db.Close()) })
+//
+//			s := storage.NewSQLite(db, sTTL, maxReq, storage.WithSQLiteCleanupInterval(10*time.Nanosecond))
+//
+//			require.NoError(t, s.Migrate(context.Background()))
+//
+//			return s
+//		})
+//	}

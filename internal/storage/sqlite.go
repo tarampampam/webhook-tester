@@ -43,13 +43,20 @@ var ( // ensure interface implementation
 	_ io.Closer = (*SQLite)(nil)
 )
 
+// SQLiteOption is a functional option type for the SQLite storage.
 type SQLiteOption func(*SQLite)
 
+// WithSQLiteCleanupInterval sets the cleanup interval for the SQLite storage.
 func WithSQLiteCleanupInterval(v time.Duration) SQLiteOption {
 	return func(s *SQLite) { s.cleanupInterval = v }
 }
 
-func NewSQLite(db *sql.DB, sessionTTL time.Duration, maxRequests uint32, opts ...SQLiteOption) (*SQLite, error) {
+// NewSQLite creates a new SQLite storage instance.
+//
+// You need to call the [SQLite.Migrate] method to apply the migrations before using the storage.
+// [SQLite.Close] should be called once you're done with the storage to stop the cleanup goroutine and make storage
+// inaccessible.
+func NewSQLite(db *sql.DB, sessionTTL time.Duration, maxRequests uint32, opts ...SQLiteOption) *SQLite {
 	var s = SQLite{
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
@@ -67,9 +74,14 @@ func NewSQLite(db *sql.DB, sessionTTL time.Duration, maxRequests uint32, opts ..
 		go s.cleanup(context.Background()) // start cleanup goroutine
 	}
 
-	return &s, nil
+	return &s
 }
 
+// newTxCreator creates a new transaction creator function for the SQLite storage. Every transaction is executed with
+// the serializable isolation level.
+//
+// Once you're done with the transaction, you should call the returned commit function to commit or rollback the
+// transaction. It's safe to call it multiple times, but only the first call will be used.
 func (*SQLite) newTxCreator(db *sql.DB) sqliteNewTx {
 	// protects SQLite from concurrent access, to avoid "database is locked" errors
 	var mu sync.RWMutex
@@ -118,6 +130,7 @@ func (*SQLite) newTxCreator(db *sql.DB) sqliteNewTx {
 // newID generates a new (unique) ID.
 func (*SQLite) newID() string { return uuid.New().String() }
 
+// Migrate the SQLite storage by applying the migrations. Can be called multiple times, it's safe.
 func (s *SQLite) Migrate(ctx context.Context) error {
 	return fs.WalkDir(sqliteMigrations, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -157,6 +170,7 @@ func (s *SQLite) Migrate(ctx context.Context) error {
 	})
 }
 
+// cleanup is a goroutine that cleans up the expired sessions.
 func (s *SQLite) cleanup(ctx context.Context) {
 	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
@@ -167,7 +181,7 @@ func (s *SQLite) cleanup(ctx context.Context) {
 			return
 		case <-timer.C:
 			if tx, commit, txErr := s.newTx(ctx, false); txErr == nil {
-				_, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `expires_at` < CURRENT_TIMESTAMP")
+				_, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `expires_at_millis` < ?", time.Now().UnixMilli())
 				_ = commit(err == nil)
 			}
 
@@ -176,13 +190,14 @@ func (s *SQLite) cleanup(ctx context.Context) {
 	}
 }
 
+// isSessionExists checks if the session with the specified ID exists and is not expired.
 func (*SQLite) isSessionExists(ctx context.Context, db interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }, sID string) (exists bool, _ error) {
 	if err := db.QueryRowContext(
 		ctx,
-		"SELECT EXISTS(SELECT 1 FROM `sessions` WHERE `id` = ? AND `expires_at` >= CURRENT_TIMESTAMP)",
-		sID,
+		"SELECT EXISTS(SELECT 1 FROM `sessions` WHERE `id` = ? AND `expires_at_millis` >= ?)",
+		sID, time.Now().UnixMilli(),
 	).Scan(&exists); err != nil {
 		return false, err
 	}
@@ -190,6 +205,7 @@ func (*SQLite) isSessionExists(ctx context.Context, db interface {
 	return
 }
 
+// isOpenAndNotDone checks if the storage is open and the context is not done.
 func (*SQLite) isOpenAndNotDone(ctx context.Context, s *SQLite) error {
 	if err := ctx.Err(); err != nil {
 		return err // context is done
@@ -232,8 +248,13 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 	{ // store the session
 		_, err := tx.ExecContext(
 			ctx,
-			"INSERT INTO `sessions` (`id`, `code`, `delay_millis`, `body`, `expires_at`) VALUES (?, ?, ?, ?, ?)",
-			sID, session.Code, session.Delay.Milliseconds(), session.ResponseBody, time.Now().Add(s.sessionTTL),
+			"INSERT INTO `sessions` (`id`, `code`, `delay_millis`, `body`, `created_at_millis`, `expires_at_millis`) VALUES (?, ?, ?, ?, ?, ?)", //nolint:lll
+			sID,
+			session.Code,
+			session.Delay.Milliseconds(),
+			session.ResponseBody,
+			time.Now().UnixMilli(),
+			time.Now().Add(s.sessionTTL).UnixMilli(),
 		)
 		if err != nil {
 			return "", err
@@ -277,16 +298,16 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
 
 	var (
-		session  Session
-		createAt time.Time
-		delay    int64
+		session         Session
+		expiresAtMillis int64
+		delay           int64
 	)
 
 	if err := tx.QueryRowContext(
 		ctx,
-		"SELECT `code`, `delay_millis`, `body`, `created_at`, `expires_at` FROM `sessions` WHERE `id` = ?",
+		"SELECT `code`, `delay_millis`, `body`, `created_at_millis`, `expires_at_millis` FROM `sessions` WHERE `id` = ?",
 		sID,
-	).Scan(&session.Code, &delay, &session.ResponseBody, &createAt, &session.ExpiresAt); err != nil {
+	).Scan(&session.Code, &delay, &session.ResponseBody, &session.CreatedAtUnixMilli, &expiresAtMillis); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSessionNotFound
 		}
@@ -294,7 +315,7 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, err
 	}
 
-	session.CreatedAtUnixMilli, session.Delay = createAt.UnixMilli(), time.Millisecond*time.Duration(delay)
+	session.Delay, session.ExpiresAt = time.Millisecond*time.Duration(delay), time.UnixMilli(expiresAtMillis)
 
 	if session.ExpiresAt.Before(time.Now()) {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `id` = ?", sID); err != nil {
@@ -309,7 +330,7 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 	}
 
 	// load session headers
-	rows, qErr := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `response_headers` WHERE `session_id` = ?", sID)
+	rows, qErr := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `response_headers` WHERE `session_id` = ? ORDER BY `sequence` ASC", sID) //nolint:lll
 	if qErr != nil {
 		return nil, qErr
 	}
@@ -347,8 +368,8 @@ func (s *SQLite) AddSessionTTL(ctx context.Context, sID string, howMuch time.Dur
 
 	if _, err := tx.ExecContext(
 		ctx,
-		"UPDATE `sessions` SET `expires_at` = (`expires_at` + ?) WHERE `id` = ?",
-		howMuch, sID,
+		"UPDATE `sessions` SET `expires_at_millis` = (`expires_at_millis` + ?) WHERE `id` = ?",
+		howMuch.Milliseconds(), sID,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrSessionNotFound
@@ -417,8 +438,14 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 
 	if _, err := tx.ExecContext(
 		ctx,
-		"INSERT INTO `requests` (`id`, `session_id`, `method`, `client_address`, `url`, `payload`) VALUES (?, ?, ?, ?, ?, ?)",
-		rID, sID, r.Method, r.ClientAddr, r.URL, r.Body,
+		"INSERT INTO `requests` (`id`, `session_id`, `method`, `client_address`, `url`, `payload`, `created_at_millis`) VALUES (?, ?, ?, ?, ?, ?, ?)", //nolint:lll
+		rID,
+		sID,
+		r.Method,
+		r.ClientAddr,
+		r.URL,
+		r.Body,
+		time.Now().UnixMilli(),
 	); err != nil {
 		return "", err
 	}
@@ -488,16 +515,13 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 		return nil, ErrSessionNotFound
 	}
 
-	var (
-		request   Request
-		createdAt time.Time
-	)
+	var request Request
 
 	if err := tx.QueryRowContext(
 		ctx,
-		"SELECT `method`, `client_address`, `url`, `payload`, `created_at` FROM `requests` WHERE `id` = ? AND `session_id` = ?", //nolint:lll
+		"SELECT `method`, `client_address`, `url`, `payload`, `created_at_millis` FROM `requests` WHERE `id` = ? AND `session_id` = ?", //nolint:lll
 		rID, sID,
-	).Scan(&request.Method, &request.ClientAddr, &request.URL, &request.Body, &createdAt); err != nil {
+	).Scan(&request.Method, &request.ClientAddr, &request.URL, &request.Body, &request.CreatedAtUnixMilli); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrRequestNotFound
 		}
@@ -505,10 +529,8 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 		return nil, err
 	}
 
-	request.CreatedAtUnixMilli = createdAt.UnixMilli()
-
 	// load request headers
-	rows, err := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `request_headers` WHERE `request_id` = ?", rID)
+	rows, err := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `request_headers` WHERE `request_id` = ? ORDER BY `sequence` ASC", rID) //nolint:lll
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +576,7 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 	// read all stored request IDs
 	rRows, rErr := tx.QueryContext(
 		ctx,
-		"SELECT `id`, `method`, `client_address`, `url`, `payload`, `created_at` FROM `requests` WHERE `session_id` = ?",
+		"SELECT `id`, `method`, `client_address`, `url`, `payload`, `created_at_millis` FROM `requests` WHERE `session_id` = ?", //nolint:lll
 		sID,
 	)
 	if rErr != nil {
@@ -567,9 +589,8 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 
 	for rRows.Next() {
 		var (
-			request   Request
-			rID       string
-			createdAt time.Time
+			request Request
+			rID     string
 		)
 
 		if sErr := rRows.Scan(
@@ -578,12 +599,10 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 			&request.ClientAddr,
 			&request.URL,
 			&request.Body,
-			&createdAt,
+			&request.CreatedAtUnixMilli,
 		); sErr != nil {
 			return nil, sErr
 		}
-
-		request.CreatedAtUnixMilli = createdAt.UnixMilli()
 
 		all[rID] = request
 	}
@@ -597,7 +616,7 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 	// load all the request headers in a single query
 	hRows, hErr := tx.QueryContext(
 		ctx,
-		"SELECT `request_id`, `name`, `value` FROM `request_headers` WHERE `request_id` IN (SELECT `id` FROM `requests` WHERE `session_id` = ?)", //nolint:lll
+		"SELECT `request_id`, `name`, `value` FROM `request_headers` WHERE `request_id` IN (SELECT `id` FROM `requests` WHERE `session_id` = ?) ORDER BY `sequence` ASC", //nolint:lll
 		sID,
 	)
 	if hErr != nil {

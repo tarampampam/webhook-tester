@@ -2,11 +2,13 @@ package start
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -55,6 +57,9 @@ type (
 			redis struct {
 				dsn string // redis-like server DSN
 			}
+			sqlite struct {
+				filePath string // path to the SQLite database file
+			}
 			frontend struct {
 				useLive bool // false to use embedded frontend, true to use live (local)
 			}
@@ -65,9 +70,9 @@ type (
 )
 
 const (
-	pubSubDriverMemory, pubSubDriverRedis   = "memory", "redis"
-	storageDriverMemory, storageDriverRedis = "memory", "redis"
-	tunnelDriverNgrok                       = "ngrok"
+	pubSubDriverMemory, pubSubDriverRedis                        = "memory", "redis"
+	storageDriverMemory, storageDriverRedis, storageDriverSQLite = "memory", "redis", "sqlite"
+	tunnelDriverNgrok                                            = "ngrok"
 )
 
 // NewCommand creates new `start` command.
@@ -140,15 +145,19 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Validator: validateDuration("idle timeout", time.Millisecond, time.Hour),
 		}
 		storageDriverFlag = cli.StringFlag{
-			Name:     "storage-driver",
-			Value:    storageDriverMemory,
-			Usage:    "storage driver (" + strings.Join([]string{storageDriverMemory, storageDriverRedis}, "/") + ")",
+			Name:  "storage-driver",
+			Value: storageDriverMemory,
+			Usage: "storage driver (" + strings.Join([]string{
+				storageDriverMemory,
+				storageDriverRedis,
+				storageDriverSQLite,
+			}, "/") + ")",
 			Sources:  cli.EnvVars("STORAGE_DRIVER"),
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
 			Validator: func(s string) error {
 				switch s {
-				case storageDriverMemory, storageDriverRedis:
+				case storageDriverMemory, storageDriverRedis, storageDriverSQLite:
 					return nil
 				default:
 					return fmt.Errorf("wrong storage driver [%s]", s)
@@ -252,6 +261,20 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Config:    cli.StringConfig{TrimSpace: true},
 			Validator: func(s string) (err error) { _, err = redis.ParseURL(s); return }, //nolint:nlreturn
 		}
+		sqliteFilePathFlag = cli.StringFlag{
+			Name:     "sqlite-file",
+			Usage:    "path to the SQLite database file (required for the SQLite storage driver)",
+			Value:    "webhook-tester.sqlite",
+			Sources:  cli.EnvVars("SQLITE_FILE"),
+			OnlyOnce: true,
+			Validator: func(s string) error {
+				if stat, err := os.Stat(s); err == nil && stat.IsDir() {
+					return fmt.Errorf("SQLite file [%s] is a directory", s)
+				}
+
+				return nil
+			},
+		}
 		shutdownTimeoutFlag = cli.DurationFlag{
 			Name:      "shutdown-timeout",
 			Usage:     "maximum duration for graceful shutdown",
@@ -289,6 +312,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			opt.tunnel.driver = c.String(tunnelDriverFlag.Name)
 			opt.ngrok.authToken = c.String(ngrokAuthTokenFlag.Name)
 			opt.redis.dsn = c.String(redisServerDsnFlag.Name)
+			opt.sqlite.filePath = c.String(sqliteFilePathFlag.Name)
 			opt.timeouts.shutdown = c.Duration(shutdownTimeoutFlag.Name)
 			opt.frontend.useLive = c.Bool(useLiveFrontendFlag.Name)
 
@@ -315,6 +339,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			&tunnelDriverFlag,
 			&ngrokAuthTokenFlag,
 			&redisServerDsnFlag,
+			&sqliteFilePathFlag,
 			&shutdownTimeoutFlag,
 			&useLiveFrontendFlag,
 		},
@@ -343,7 +368,7 @@ func validateDuration(name string, minValue, maxValue time.Duration) func(d time
 }
 
 // Run current command.
-func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen,gocyclo
+func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen,gocyclo,gocognit
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -376,6 +401,21 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		db = inMemory //nolint:wsl
 	case storageDriverRedis:
 		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
+	case storageDriverSQLite:
+		sqliteDb, sqliteErr := sql.Open("sqlite3", fmt.Sprintf("file:%s?_journal_mode=WAL&_txlock=immediate", cmd.options.sqlite.filePath)) //nolint:lll
+		if sqliteErr != nil {
+			return fmt.Errorf("failed to open SQLite database: %w", sqliteErr)
+		}
+
+		defer func() { _ = sqliteDb.Close() }()
+
+		sqlite := storage.NewSQLite(sqliteDb, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests)) //nolint:contextcheck,lll
+		if err := sqlite.Migrate(ctx); err != nil {
+			return fmt.Errorf("failed to migrate SQLite database: %w", err)
+		}
+
+		defer func() { _ = sqlite.Close() }()
+		db = sqlite //nolint:wsl
 	default:
 		return fmt.Errorf("unknown storage driver [%s]", cmd.options.storage.driver)
 	}
