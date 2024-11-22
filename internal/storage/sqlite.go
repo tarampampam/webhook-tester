@@ -3,10 +3,13 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,15 +17,26 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 )
 
-type SQLite struct { // TODO: use transactions?
-	sessionTTL      time.Duration
-	maxRequests     uint32
-	db              *sql.DB
-	cleanupInterval time.Duration
+//go:embed sqlite_migrations/*.sql
+var sqliteMigrations embed.FS
 
-	close  chan struct{}
-	closed atomic.Bool
-}
+type (
+	SQLite struct { // TODO: use transactions?
+		sessionTTL      time.Duration
+		maxRequests     uint32
+		cleanupInterval time.Duration
+
+		// every operation with the database should be wrapped in a transaction to avoid "database is locked" errors,
+		// which are common for SQLite when multiple operations are performed simultaneously. that's why we don't use
+		// the db directly
+		newTx sqliteNewTx
+
+		close  chan struct{}
+		closed atomic.Bool
+	}
+
+	sqliteNewTx func(_ context.Context, readOnly bool) (*sql.Tx, func(commit bool) error, error)
+)
 
 var ( // ensure interface implementation
 	_ Storage   = (*SQLite)(nil)
@@ -35,19 +49,15 @@ func WithSQLiteCleanupInterval(v time.Duration) SQLiteOption {
 	return func(s *SQLite) { s.cleanupInterval = v }
 }
 
-func NewSQLite(
-	db *sql.DB,
-	sessionTTL time.Duration,
-	maxRequests uint32,
-	opts ...SQLiteOption,
-) (*SQLite, error) {
+func NewSQLite(db *sql.DB, sessionTTL time.Duration, maxRequests uint32, opts ...SQLiteOption) (*SQLite, error) {
 	var s = SQLite{
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
-		db:              db,
-		close:           make(chan struct{}),
 		cleanupInterval: time.Second, // default cleanup interval
+		close:           make(chan struct{}),
 	}
+
+	s.newTx = s.newTxCreator(db) // set the transaction creator function
 
 	for _, opt := range opts {
 		opt(&s)
@@ -60,56 +70,91 @@ func NewSQLite(
 	return &s, nil
 }
 
+func (*SQLite) newTxCreator(db *sql.DB) sqliteNewTx {
+	// protects SQLite from concurrent access, to avoid "database is locked" errors
+	var mu sync.RWMutex
+
+	return func(ctx context.Context, readOnly bool) (*sql.Tx, func(bool) error, error) {
+		// lock the database
+		if readOnly {
+			mu.RLock()
+		} else {
+			mu.Lock()
+		}
+
+		// https://www.sqlite.org/isolation.html
+		var tx, txErr = db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: readOnly})
+		if txErr != nil {
+			return nil, func(bool) error { return txErr }, fmt.Errorf("failed to start a new transaction: %w", txErr)
+		}
+
+		var once sync.Once
+
+		return tx, func(commit bool) (err error) {
+			once.Do(func() {
+				if commit {
+					if err = tx.Commit(); err != nil {
+						err = fmt.Errorf("failed to commit the transaction: %w", err)
+					}
+				} else {
+					if err = tx.Rollback(); err != nil {
+						err = fmt.Errorf("failed to rollback the transaction: %w", err)
+					}
+				}
+
+				// unlock the database
+				if readOnly {
+					mu.RUnlock()
+				} else {
+					mu.Unlock()
+				}
+			})
+
+			return
+		}, nil
+	}
+}
+
 // newID generates a new (unique) ID.
 func (*SQLite) newID() string { return uuid.New().String() }
 
-func (s *SQLite) Init(ctx context.Context) error {
-	for _, query := range []string{
-		`CREATE TABLE IF NOT EXISTS sessions (
-				id           VARCHAR(36)      NOT NULL,
-				code         UNSIGNED INTEGER NOT NULL,
-				delay_millis UNSIGNED INTEGER NOT NULL,
-				body         BLOB             NULL,
-				created_at   DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-				expires_at   DATETIME         NOT NULL,
-				CONSTRAINT chk_sessions_response_code CHECK (code >= 0 AND code <= 65535),
-				CONSTRAINT chk_sessions_expires_at    CHECK (expires_at >= CURRENT_TIMESTAMP)
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS unq_sessions_id ON sessions(id)`,
-		`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
-		`CREATE TABLE IF NOT EXISTS response_headers (
-				session_id VARCHAR(36)   NOT NULL,
-				name       VARCHAR(1024) NOT NULL,
-				value      TEXT          NOT NULL,
-				FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE ON UPDATE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_response_headers_session_id ON response_headers(session_id)`,
-		`CREATE TABLE IF NOT EXISTS requests (
-				id             VARCHAR(36)   NOT NULL,
-				session_id     VARCHAR(36)   NOT NULL,
-				method         VARCHAR(10)   NOT NULL,
-				client_address VARCHAR(39)   NOT NULL,
-				url            VARCHAR(4096) NOT NULL,
-				payload        BLOB          NULL,
-				created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-				FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE ON UPDATE CASCADE
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS unq_requests_id ON requests(id)`,
-		`CREATE INDEX IF NOT EXISTS idx_requests_session_id ON requests(session_id)`,
-		`CREATE TABLE IF NOT EXISTS request_headers (
-				request_id VARCHAR(36)   NOT NULL,
-				name       VARCHAR(1024) NOT NULL,
-				value      TEXT          NOT NULL,
-				FOREIGN KEY(request_id) REFERENCES requests(id) ON DELETE CASCADE ON UPDATE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_headers_request_id ON request_headers(request_id)`,
-	} {
-		if _, err := s.db.ExecContext(ctx, query); err != nil {
+func (s *SQLite) Migrate(ctx context.Context) error {
+	return fs.WalkDir(sqliteMigrations, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
 			return err
+		} else if d.IsDir() {
+			return nil
 		}
-	}
 
-	return nil
+		var file, fErr = sqliteMigrations.Open(path) // open the file
+		if fErr != nil {
+			return fErr
+		}
+
+		defer func() { _ = file.Close() }()
+
+		var data, rErr = io.ReadAll(file) // read the file content
+		if rErr != nil {
+			return rErr
+		}
+
+		tx, commit, txErr := s.newTx(ctx, false)
+		if txErr != nil {
+			return txErr
+		}
+
+		defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
+		if _, eErr := tx.ExecContext(ctx, string(data)); eErr != nil { // execute the query from the file
+			return eErr
+		}
+
+		if cErr := commit(true); cErr != nil { // commit the transaction
+			return cErr
+		}
+
+		return nil
+	})
 }
 
 func (s *SQLite) cleanup(ctx context.Context) {
@@ -121,16 +166,22 @@ func (s *SQLite) cleanup(ctx context.Context) {
 		case <-s.close: // close signal received
 			return
 		case <-timer.C:
-			_, _ = s.db.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP")
+			if tx, commit, txErr := s.newTx(ctx, false); txErr == nil {
+				_, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `expires_at` < CURRENT_TIMESTAMP")
+				_ = commit(err == nil)
+			}
+
 			timer.Reset(s.cleanupInterval)
 		}
 	}
 }
 
-func (s *SQLite) isSessionExists(ctx context.Context, sID string) (exists bool, _ error) {
-	if err := s.db.QueryRowContext(
+func (*SQLite) isSessionExists(ctx context.Context, db interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, sID string) (exists bool, _ error) {
+	if err := db.QueryRowContext(
 		ctx,
-		`SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ? AND expires_at >= CURRENT_TIMESTAMP)`,
+		"SELECT EXISTS(SELECT 1 FROM `sessions` WHERE `id` = ? AND `expires_at` >= CURRENT_TIMESTAMP)",
 		sID,
 	).Scan(&exists); err != nil {
 		return false, err
@@ -139,12 +190,27 @@ func (s *SQLite) isSessionExists(ctx context.Context, sID string) (exists bool, 
 	return
 }
 
-func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+func (*SQLite) isOpenAndNotDone(ctx context.Context, s *SQLite) error {
 	if err := ctx.Err(); err != nil {
-		return "", err // context is done
+		return err // context is done
 	} else if s.closed.Load() {
-		return "", ErrClosed // storage is closed
+		return ErrClosed // storage is closed
 	}
+
+	return nil
+}
+
+func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) { //nolint:funlen
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return "", err
+	}
+
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return "", txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
 
 	if len(id) > 0 { // use the specified ID
 		if len(id[0]) == 0 {
@@ -154,7 +220,7 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 		sID = id[0]
 
 		// check if the session with the specified ID already exists
-		if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 			return "", err
 		} else if exists {
 			return "", fmt.Errorf("session %s already exists", sID)
@@ -164,10 +230,9 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 	}
 
 	{ // store the session
-		_, err := s.db.ExecContext(
+		_, err := tx.ExecContext(
 			ctx,
-			`INSERT INTO sessions (id, code, delay_millis, body, expires_at)
-		VALUES (?, ?, ?, ?, ?)`,
+			"INSERT INTO `sessions` (`id`, `code`, `delay_millis`, `body`, `expires_at`) VALUES (?, ?, ?, ?, ?)",
 			sID, session.Code, session.Delay.Milliseconds(), session.ResponseBody, time.Now().Add(s.sessionTTL),
 		)
 		if err != nil {
@@ -177,16 +242,14 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 
 	{ // store headers using insert batch
 		var args, values = make([]any, 0, len(session.Headers)*3), make([]string, 0, len(session.Headers)*3) //nolint:mnd
-
 		for _, h := range session.Headers {
-			args = append(args, sID, h.Name, h.Value)
-			values = append(values, "(?, ?, ?)")
+			args, values = append(args, sID, h.Name, h.Value), append(values, "(?, ?, ?)")
 		}
 
 		if len(args) > 0 {
-			if _, err := s.db.ExecContext(
+			if _, err := tx.ExecContext(
 				ctx,
-				`INSERT INTO response_headers (session_id, name, value) VALUES `+strings.Join(values, ", "), //nolint:gosec
+				"INSERT INTO `response_headers` (`session_id`, `name`, `value`) VALUES "+strings.Join(values, ", "), //nolint:gosec
 				args...,
 			); err != nil {
 				return "", err
@@ -194,15 +257,24 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 		}
 	}
 
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return "", commitErr
+	}
+
 	return sID, nil
 }
 
-func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) { //nolint:funlen
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return nil, err
 	}
+
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
 
 	var (
 		session  Session
@@ -210,9 +282,9 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 		delay    int64
 	)
 
-	if err := s.db.QueryRowContext(
+	if err := tx.QueryRowContext(
 		ctx,
-		`SELECT code, delay_millis, body, created_at, expires_at FROM sessions WHERE id = ?`,
+		"SELECT `code`, `delay_millis`, `body`, `created_at`, `expires_at` FROM `sessions` WHERE `id` = ?",
 		sID,
 	).Scan(&session.Code, &delay, &session.ResponseBody, &createAt, &session.ExpiresAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -222,23 +294,24 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, err
 	}
 
-	session.CreatedAtUnixMilli = createAt.UnixMilli()
-	session.Delay = time.Millisecond * time.Duration(delay)
+	session.CreatedAtUnixMilli, session.Delay = createAt.UnixMilli(), time.Millisecond*time.Duration(delay)
 
 	if session.ExpiresAt.Before(time.Now()) {
-		_, _ = s.db.ExecContext(ctx, "DELETE FROM sessions WHERE id = ?", sID)
+		if _, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `id` = ?", sID); err != nil {
+			return nil, err
+		}
+
+		if commitErr := commit(true); commitErr != nil { // commit the transaction
+			return nil, commitErr
+		}
 
 		return nil, ErrSessionNotFound // session has been expired
 	}
 
 	// load session headers
-	rows, err := s.db.QueryContext(
-		ctx,
-		`SELECT name, value FROM response_headers WHERE session_id = ?`,
-		sID,
-	)
-	if err != nil {
-		return nil, err
+	rows, qErr := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `response_headers` WHERE `session_id` = ?", sID)
+	if qErr != nil {
+		return nil, qErr
 	}
 
 	defer func() { _ = rows.Close() }()
@@ -246,42 +319,64 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 	for rows.Next() {
 		var h HttpHeader
 
-		if err = rows.Scan(&h.Name, &h.Value); err != nil {
-			return nil, err
+		if sErr := rows.Scan(&h.Name, &h.Value); sErr != nil {
+			return nil, sErr
 		}
 
 		session.Headers = append(session.Headers, h)
+	}
+
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return nil, commitErr
 	}
 
 	return &session, rows.Err()
 }
 
 func (s *SQLite) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return err
 	}
 
-	if _, err := s.db.ExecContext(
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
+	if _, err := tx.ExecContext(
 		ctx,
-		`UPDATE sessions SET expires_at = expires_at + ? WHERE id = ?`,
+		"UPDATE `sessions` SET `expires_at` = (`expires_at` + ?) WHERE `id` = ?",
 		howMuch, sID,
 	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrSessionNotFound
+		}
+
 		return err
+	}
+
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return commitErr
 	}
 
 	return nil
 }
 
 func (s *SQLite) DeleteSession(ctx context.Context, sID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return err
 	}
 
-	if res, execErr := s.db.ExecContext(ctx, "DELETE FROM sessions WHERE id = ?", sID); execErr != nil {
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
+	if res, execErr := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `id` = ?", sID); execErr != nil {
 		if errors.Is(execErr, sql.ErrNoRows) {
 			return ErrSessionNotFound
 		}
@@ -293,17 +388,26 @@ func (s *SQLite) DeleteSession(ctx context.Context, sID string) error {
 		return ErrSessionNotFound
 	}
 
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return commitErr
+	}
+
 	return nil
 }
 
 func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen
-	if err := ctx.Err(); err != nil {
-		return "", err // context is done
-	} else if s.closed.Load() {
-		return "", ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return "", err
 	}
 
-	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return "", txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
+	if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 		return "", err
 	} else if !exists {
 		return "", ErrSessionNotFound
@@ -311,10 +415,9 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 
 	rID = s.newID() // generate a new ID
 
-	if _, err := s.db.ExecContext(
+	if _, err := tx.ExecContext(
 		ctx,
-		`INSERT INTO requests (id, session_id, method, client_address, url, payload)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		"INSERT INTO `requests` (`id`, `session_id`, `method`, `client_address`, `url`, `payload`) VALUES (?, ?, ?, ?, ?, ?)",
 		rID, sID, r.Method, r.ClientAddr, r.URL, r.Body,
 	); err != nil {
 		return "", err
@@ -322,16 +425,14 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 
 	// store request headers using insert batch
 	var args, values = make([]any, 0, len(r.Headers)*3), make([]string, 0, len(r.Headers)*3) //nolint:mnd
-
 	for _, h := range r.Headers {
-		args = append(args, rID, h.Name, h.Value)
-		values = append(values, "(?, ?, ?)")
+		args, values = append(args, rID, h.Name, h.Value), append(values, "(?, ?, ?)")
 	}
 
 	if len(args) > 0 {
-		if _, err := s.db.ExecContext(
+		if _, err := tx.ExecContext(
 			ctx,
-			`INSERT INTO request_headers (request_id, name, value) VALUES `+strings.Join(values, ", "), //nolint:gosec
+			"INSERT INTO `request_headers` (`request_id`, `name`, `value`) VALUES "+strings.Join(values, ", "), //nolint:gosec
 			args...,
 		); err != nil {
 			return "", err
@@ -341,9 +442,9 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 	{ // limit stored requests count
 		var count int
 
-		if err := s.db.QueryRowContext(
+		if err := tx.QueryRowContext(
 			ctx,
-			`SELECT COUNT(id) FROM requests WHERE session_id = ?`,
+			"SELECT COUNT(`id`) FROM `requests` WHERE `session_id` = ?",
 			sID,
 		).Scan(&count); err != nil {
 			return "", err
@@ -351,30 +452,37 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 
 		if count > int(s.maxRequests) {
 			// delete all requests from the requests table that are not in the last N requests, ordered by creation time
-			if _, err := s.db.ExecContext(
+			if _, execErr := tx.ExecContext(
 				ctx,
-				`DELETE FROM requests WHERE session_id = ? AND id NOT IN (
-					SELECT id FROM requests WHERE session_id = ? ORDER BY created_at DESC LIMIT ?
-				)`,
+				"DELETE FROM `requests` WHERE `session_id` = ? AND `id` NOT IN (SELECT `id` FROM `requests` WHERE `session_id` = ? ORDER BY `sequence` DESC LIMIT ?)", //nolint:lll
 				sID, sID, s.maxRequests,
-			); err != nil {
-				return "", err
+			); execErr != nil {
+				return "", execErr
 			}
 		}
+	}
+
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return "", commitErr
 	}
 
 	return rID, nil
 }
 
 func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return nil, err
 	}
 
+	var tx, commit, txErr = s.newTx(ctx, true)
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
 	// check the session existence
-	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 		return nil, err
 	} else if !exists {
 		return nil, ErrSessionNotFound
@@ -385,9 +493,9 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 		createdAt time.Time
 	)
 
-	if err := s.db.QueryRowContext(
+	if err := tx.QueryRowContext(
 		ctx,
-		`SELECT method, client_address, url, payload, created_at FROM requests WHERE id = ? AND session_id = ?`,
+		"SELECT `method`, `client_address`, `url`, `payload`, `created_at` FROM `requests` WHERE `id` = ? AND `session_id` = ?", //nolint:lll
 		rID, sID,
 	).Scan(&request.Method, &request.ClientAddr, &request.URL, &request.Body, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -400,11 +508,7 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 	request.CreatedAtUnixMilli = createdAt.UnixMilli()
 
 	// load request headers
-	rows, err := s.db.QueryContext(
-		ctx,
-		`SELECT name, value FROM request_headers WHERE request_id = ?`,
-		rID,
-	)
+	rows, err := tx.QueryContext(ctx, "SELECT `name`, `value` FROM `request_headers` WHERE `request_id` = ?", rID)
 	if err != nil {
 		return nil, err
 	}
@@ -421,27 +525,36 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 		request.Headers = append(request.Headers, h)
 	}
 
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return nil, commitErr
+	}
+
 	return &request, rows.Err()
 }
 
 func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) { //nolint:funlen
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return nil, err
 	}
 
+	var tx, commit, txErr = s.newTx(ctx, true)
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
 	// check the session existence
-	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 		return nil, err
 	} else if !exists {
 		return nil, ErrSessionNotFound
 	}
 
 	// read all stored request IDs
-	rRows, rErr := s.db.QueryContext(
+	rRows, rErr := tx.QueryContext(
 		ctx,
-		`SELECT id, method, client_address, url, payload, created_at FROM requests WHERE session_id = ?`,
+		"SELECT `id`, `method`, `client_address`, `url`, `payload`, `created_at` FROM `requests` WHERE `session_id` = ?",
 		sID,
 	)
 	if rErr != nil {
@@ -482,11 +595,9 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 	_ = rRows.Close() // close the rows asap
 
 	// load all the request headers in a single query
-	hRows, hErr := s.db.QueryContext(
+	hRows, hErr := tx.QueryContext(
 		ctx,
-		`SELECT request_id, name, value FROM request_headers WHERE request_id IN (
-			SELECT id FROM requests WHERE session_id = ?
-		)`,
+		"SELECT `request_id`, `name`, `value` FROM `request_headers` WHERE `request_id` IN (SELECT `id` FROM `requests` WHERE `session_id` = ?)", //nolint:lll
 		sID,
 	)
 	if hErr != nil {
@@ -511,28 +622,33 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 		}
 	}
 
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return nil, commitErr
+	}
+
 	return all, hRows.Err()
 }
 
 func (s *SQLite) DeleteRequest(ctx context.Context, sID, rID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return err
 	}
 
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
 	// check the session existence first
-	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 		return err
 	} else if !exists {
 		return ErrSessionNotFound
 	}
 
-	if res, execErr := s.db.ExecContext(
-		ctx,
-		"DELETE FROM requests WHERE id = ? AND session_id = ?",
-		rID, sID,
-	); execErr != nil {
+	if res, execErr := tx.ExecContext(ctx, "DELETE FROM `requests` WHERE `id` = ? AND `session_id` = ?", rID, sID); execErr != nil { //nolint:lll
 		if errors.Is(execErr, sql.ErrNoRows) {
 			return ErrRequestNotFound
 		}
@@ -544,30 +660,39 @@ func (s *SQLite) DeleteRequest(ctx context.Context, sID, rID string) error {
 		return ErrRequestNotFound
 	}
 
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return commitErr
+	}
+
 	return nil
 }
 
 func (s *SQLite) DeleteAllRequests(ctx context.Context, sID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+		return err
 	}
 
+	var tx, commit, txErr = s.newTx(ctx, false)
+	if txErr != nil {
+		return txErr
+	}
+
+	defer func() { _ = commit(false) }() // rollback the transaction in case of an error
+
 	// check the session existence
-	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+	if exists, err := s.isSessionExists(ctx, tx, sID); err != nil {
 		return err
 	} else if !exists {
 		return ErrSessionNotFound
 	}
 
 	// delete all requests
-	if _, err := s.db.ExecContext(
-		ctx,
-		`DELETE FROM requests WHERE session_id = ?`,
-		sID,
-	); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM `requests` WHERE `session_id` = ?", sID); err != nil {
 		return err
+	}
+
+	if commitErr := commit(true); commitErr != nil { // commit the transaction
+		return commitErr
 	}
 
 	return nil

@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	Redis struct { // TODO: add session expiring check on every operation?
+	Redis struct { // TODO: add session expiring check on every operation? Plus check the context on every operation?
 		sessionTTL  time.Duration
 		maxRequests uint32
 		client      redis.Cmdable

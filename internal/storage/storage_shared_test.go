@@ -255,14 +255,14 @@ func testRequestCreateReadDelete(
 		require.NotEmpty(t, sID)
 
 		// create request #1
-		rID1, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID1, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req1"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID1)
 
 		sleep(time.Millisecond) // the accuracy is one millisecond
 
 		// create request #2
-		rID2, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID2, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req2"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID2)
 
@@ -271,6 +271,10 @@ func testRequestCreateReadDelete(
 		{ // check made requests
 			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2)
+			_, ok := requests[rID1]
+			require.True(t, ok)
+			_, ok = requests[rID2]
+			require.True(t, ok)
 
 			req, _ := impl.GetRequest(ctx, sID, rID1)
 			require.NotNil(t, req)
@@ -282,7 +286,7 @@ func testRequestCreateReadDelete(
 		sleep(time.Millisecond)
 
 		// create request #3
-		rID3, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID3, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req3"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID3)
 
@@ -292,6 +296,10 @@ func testRequestCreateReadDelete(
 		{ // check made requests again
 			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2) // still 2
+			_, ok := requests[rID2]
+			require.True(t, ok)
+			_, ok = requests[rID3]
+			require.True(t, ok)
 
 			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
 			require.Nil(t, req)

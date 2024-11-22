@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ func TestSQLite_Session_CreateReadDelete(t *testing.T) {
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			var sbFile = path.Join(t.TempDir(), "sqlite.db")
 
-			db, dbErr := sql.Open("sqlite3", sbFile)
+			db, dbErr := sql.Open("sqlite3", fmt.Sprintf("file:%s", sbFile))
 			require.NoError(t, dbErr)
 
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
@@ -27,7 +28,7 @@ func TestSQLite_Session_CreateReadDelete(t *testing.T) {
 			s, err := storage.NewSQLite(db, sTTL, maxReq)
 			require.NoError(t, err)
 
-			require.NoError(t, s.Init(context.Background()))
+			require.NoError(t, s.Migrate(context.Background()))
 
 			return s
 		},
@@ -42,7 +43,7 @@ func TestSQLite_Request_CreateReadDelete(t *testing.T) {
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			var sbFile = path.Join(t.TempDir(), "sqlite.db")
 
-			db, dbErr := sql.Open("sqlite3", sbFile)
+			db, dbErr := sql.Open("sqlite3", fmt.Sprintf("file:%s", sbFile))
 			require.NoError(t, dbErr)
 
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
@@ -50,7 +51,7 @@ func TestSQLite_Request_CreateReadDelete(t *testing.T) {
 			s, err := storage.NewSQLite(db, sTTL, maxReq)
 			require.NoError(t, err)
 
-			require.NoError(t, s.Init(context.Background()))
+			require.NoError(t, s.Migrate(context.Background()))
 
 			return s
 		},
