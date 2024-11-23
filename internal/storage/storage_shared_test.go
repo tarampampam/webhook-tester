@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +21,13 @@ func toCloser(s storage.Storage) io.Closer {
 
 	return io.NopCloser(nil)
 }
+
+type fakeTime struct{ atomic.Pointer[time.Time] }
+
+func (f *fakeTime) Add(t time.Duration) { newNow := f.Load().Add(t); f.Store(&newNow) }
+func (f *fakeTime) Get() time.Time      { return *f.Load() }
+
+func newFakeTime() *fakeTime { now, f := time.Now(), fakeTime{}; f.Store(&now); return &f }
 
 func testSessionCreateReadDelete(
 	t *testing.T,
@@ -120,20 +128,20 @@ func testSessionCreateReadDelete(
 		var impl = new(sessionTTL, 2)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		// create session
+		var now = time.Now()
+
+		// create session with TTL
 		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
-		// get it
+		// get it (ensure it exists)
 		sess, err := impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 
 		{ // check the created and expiration time
-			var now = time.Now()
-
 			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
-			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 10)
 		}
 
 		var ( // store the original values

@@ -402,12 +402,17 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	case storageDriverRedis:
 		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
 	case storageDriverSQLite:
-		sqliteDb, sqliteErr := sql.Open("sqlite3", fmt.Sprintf("file:%s?_journal_mode=WAL&_txlock=immediate", cmd.options.sqlite.filePath)) //nolint:lll
+		sqliteDb, sqliteErr := sql.Open(
+			"sqlite3",
+			fmt.Sprintf("file:%s?_journal_mode=WAL&_txlock=immediate&_auto_vacuum=full", cmd.options.sqlite.filePath),
+		)
 		if sqliteErr != nil {
 			return fmt.Errorf("failed to open SQLite database: %w", sqliteErr)
 		}
 
 		defer func() { _ = sqliteDb.Close() }()
+
+		sqliteDb.SetMaxOpenConns(1) // important for SQLite
 
 		sqlite := storage.NewSQLite(sqliteDb, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests)) //nolint:contextcheck,lll
 		if err := sqlite.Migrate(ctx); err != nil {

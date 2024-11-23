@@ -13,18 +13,26 @@ import (
 func TestInMemory_Session_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
+	var ft = newFakeTime()
+
 	testSessionCreateReadDelete(t,
-		func(sTTL time.Duration, maxReq uint32) storage.Storage { return storage.NewInMemory(sTTL, maxReq) },
-		func(t time.Duration) { <-time.After(t) },
+		func(sTTL time.Duration, maxReq uint32) storage.Storage {
+			return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryTimeNow(ft.Get))
+		},
+		func(t time.Duration) { ft.Add(t) },
 	)
 }
 
 func TestInMemory_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
+	var ft = newFakeTime()
+
 	testRequestCreateReadDelete(t,
-		func(sTTL time.Duration, maxReq uint32) storage.Storage { return storage.NewInMemory(sTTL, maxReq) },
-		func(t time.Duration) { <-time.After(t) },
+		func(sTTL time.Duration, maxReq uint32) storage.Storage {
+			return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryTimeNow(ft.Get))
+		},
+		func(t time.Duration) { ft.Add(t) },
 	)
 }
 

@@ -31,6 +31,9 @@ type (
 		// the db directly
 		newTx sqliteNewTx
 
+		// this function returns the current time, it's used to mock the time in tests
+		timeNow func() time.Time
+
 		close  chan struct{}
 		closed atomic.Bool
 	}
@@ -51,6 +54,11 @@ func WithSQLiteCleanupInterval(v time.Duration) SQLiteOption {
 	return func(s *SQLite) { s.cleanupInterval = v }
 }
 
+// WithSQLiteTimeNow sets the timeNow function for the SQLite storage.
+func WithSQLiteTimeNow(v func() time.Time) SQLiteOption {
+	return func(s *SQLite) { s.timeNow = v }
+}
+
 // NewSQLite creates a new SQLite storage instance.
 //
 // You need to call the [SQLite.Migrate] method to apply the migrations before using the storage.
@@ -61,6 +69,7 @@ func NewSQLite(db *sql.DB, sessionTTL time.Duration, maxRequests uint32, opts ..
 		sessionTTL:      sessionTTL,
 		maxRequests:     maxRequests,
 		cleanupInterval: time.Second, // default cleanup interval
+		timeNow:         time.Now,    // by default use the stdlib time.Now function
 		close:           make(chan struct{}),
 	}
 
@@ -181,7 +190,7 @@ func (s *SQLite) cleanup(ctx context.Context) {
 			return
 		case <-timer.C:
 			if tx, commit, txErr := s.newTx(ctx, false); txErr == nil {
-				_, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `expires_at_millis` < ?", time.Now().UnixMilli())
+				_, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `expires_at_millis` < ?", s.timeNow().UnixMilli())
 				_ = commit(err == nil)
 			}
 
@@ -191,13 +200,13 @@ func (s *SQLite) cleanup(ctx context.Context) {
 }
 
 // isSessionExists checks if the session with the specified ID exists and is not expired.
-func (*SQLite) isSessionExists(ctx context.Context, db interface {
+func (s *SQLite) isSessionExists(ctx context.Context, db interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }, sID string) (exists bool, _ error) {
 	if err := db.QueryRowContext(
 		ctx,
-		"SELECT EXISTS(SELECT 1 FROM `sessions` WHERE `id` = ? AND `expires_at_millis` >= ?)",
-		sID, time.Now().UnixMilli(),
+		"SELECT EXISTS(SELECT 1 FROM `sessions` WHERE `id` = ? AND `expires_at_millis` > ?)",
+		sID, s.timeNow().UnixMilli(),
 	).Scan(&exists); err != nil {
 		return false, err
 	}
@@ -206,7 +215,7 @@ func (*SQLite) isSessionExists(ctx context.Context, db interface {
 }
 
 // isOpenAndNotDone checks if the storage is open and the context is not done.
-func (*SQLite) isOpenAndNotDone(ctx context.Context, s *SQLite) error {
+func (s *SQLite) isOpenAndNotDone(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err // context is done
 	} else if s.closed.Load() {
@@ -217,7 +226,7 @@ func (*SQLite) isOpenAndNotDone(ctx context.Context, s *SQLite) error {
 }
 
 func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) { //nolint:funlen
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err
 	}
 
@@ -246,17 +255,18 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 	}
 
 	{ // store the session
-		_, err := tx.ExecContext(
+		var now = s.timeNow()
+
+		if _, err := tx.ExecContext(
 			ctx,
 			"INSERT INTO `sessions` (`id`, `code`, `delay_millis`, `body`, `created_at_millis`, `expires_at_millis`) VALUES (?, ?, ?, ?, ?, ?)", //nolint:lll
 			sID,
 			session.Code,
 			session.Delay.Milliseconds(),
 			session.ResponseBody,
-			time.Now().UnixMilli(),
-			time.Now().Add(s.sessionTTL).UnixMilli(),
-		)
-		if err != nil {
+			now.UnixMilli(),
+			now.Add(s.sessionTTL).UnixMilli(),
+		); err != nil {
 			return "", err
 		}
 	}
@@ -286,7 +296,7 @@ func (s *SQLite) NewSession(ctx context.Context, session Session, id ...string) 
 }
 
 func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) { //nolint:funlen
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
 
@@ -317,7 +327,7 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 
 	session.Delay, session.ExpiresAt = time.Millisecond*time.Duration(delay), time.UnixMilli(expiresAtMillis)
 
-	if session.ExpiresAt.Before(time.Now()) {
+	if session.ExpiresAt.Before(s.timeNow()) {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM `sessions` WHERE `id` = ?", sID); err != nil {
 			return nil, err
 		}
@@ -355,7 +365,7 @@ func (s *SQLite) GetSession(ctx context.Context, sID string) (*Session, error) {
 }
 
 func (s *SQLite) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return err
 	}
 
@@ -386,7 +396,7 @@ func (s *SQLite) AddSessionTTL(ctx context.Context, sID string, howMuch time.Dur
 }
 
 func (s *SQLite) DeleteSession(ctx context.Context, sID string) error {
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return err
 	}
 
@@ -417,7 +427,7 @@ func (s *SQLite) DeleteSession(ctx context.Context, sID string) error {
 }
 
 func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err
 	}
 
@@ -445,7 +455,7 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 		r.ClientAddr,
 		r.URL,
 		r.Body,
-		time.Now().UnixMilli(),
+		s.timeNow().UnixMilli(),
 	); err != nil {
 		return "", err
 	}
@@ -497,7 +507,7 @@ func (s *SQLite) NewRequest(ctx context.Context, sID string, r Request) (rID str
 }
 
 func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
 
@@ -555,7 +565,7 @@ func (s *SQLite) GetRequest(ctx context.Context, sID, rID string) (*Request, err
 }
 
 func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) { //nolint:funlen
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
 
@@ -649,7 +659,7 @@ func (s *SQLite) GetAllRequests(ctx context.Context, sID string) (map[string]Req
 }
 
 func (s *SQLite) DeleteRequest(ctx context.Context, sID, rID string) error {
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return err
 	}
 
@@ -687,7 +697,7 @@ func (s *SQLite) DeleteRequest(ctx context.Context, sID, rID string) error {
 }
 
 func (s *SQLite) DeleteAllRequests(ctx context.Context, sID string) error {
-	if err := s.isOpenAndNotDone(ctx, s); err != nil {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return err
 	}
 
