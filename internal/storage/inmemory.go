@@ -21,7 +21,7 @@ type (
 		cleanupInterval time.Duration
 
 		// this function returns the current time, it's used to mock the time in tests
-		timeNow func() time.Time
+		timeNow TimeFunc
 
 		close  chan struct{}
 		closed atomic.Bool
@@ -47,9 +47,7 @@ func WithInMemoryCleanupInterval(v time.Duration) InMemoryOption {
 }
 
 // WithInMemoryTimeNow sets the function that returns the current time.
-func WithInMemoryTimeNow(fn func() time.Time) InMemoryOption {
-	return func(s *InMemory) { s.timeNow = fn }
-}
+func WithInMemoryTimeNow(fn TimeFunc) InMemoryOption { return func(s *InMemory) { s.timeNow = fn } }
 
 // NewInMemory creates a new in-memory storage with the given session TTL and the maximum number of stored requests.
 // Note that the cleanup goroutine is started automatically if the cleanup interval is greater than zero.
@@ -60,8 +58,7 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 		maxRequests:     maxRequests,
 		close:           make(chan struct{}),
 		cleanupInterval: time.Second, // default cleanup interval
-
-		timeNow: func() time.Time { return time.Now().Round(time.Millisecond) }, // default time function, rounds to millis
+		timeNow:         defaultTimeFunc,
 	}
 
 	for _, opt := range opts {
@@ -378,40 +375,3 @@ func (s *InMemory) Close() error {
 
 	return ErrClosed
 }
-
-// syncMap is a thread-safe map with strong-typed keys and values.
-type syncMap[K comparable, V any] struct{ m sync.Map }
-
-// Delete deletes the value for a key.
-func (m *syncMap[K, V]) Delete(key K) { m.m.Delete(key) }
-
-// Load returns the value stored in the map for a key, or nil if no value is present.
-// The ok result indicates whether value was found in the map.
-func (m *syncMap[K, V]) Load(key K) (value V, ok bool) {
-	v, ok := m.m.Load(key)
-	if !ok {
-		return value, ok
-	}
-
-	return v.(V), ok
-}
-
-// LoadAndDelete deletes the value for a key, returning the previous value if any.
-// The loaded result reports whether the key was present.
-func (m *syncMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
-	v, loaded := m.m.LoadAndDelete(key)
-	if !loaded {
-		return value, loaded
-	}
-
-	return v.(V), loaded
-}
-
-// Range calls f sequentially for each key and value present in the map.
-// If f returns false, range stops the iteration.
-func (m *syncMap[K, V]) Range(f func(key K, value V) bool) {
-	m.m.Range(func(key, value any) bool { return f(key.(K), value.(V)) })
-}
-
-// Store sets the value for a key.
-func (m *syncMap[K, V]) Store(key K, value V) { m.m.Store(key, value) }

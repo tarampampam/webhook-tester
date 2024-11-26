@@ -19,7 +19,7 @@ func TestFS_Session_CreateReadDelete(t *testing.T) {
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
 		},
-		func(t time.Duration) { ft.Add(t); <-time.After(t) },
+		func(t time.Duration) { ft.Add(t) },
 	)
 }
 
@@ -32,7 +32,7 @@ func TestFS_Request_CreateReadDelete(t *testing.T) {
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
 			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
 		},
-		func(t time.Duration) { ft.Add(t); <-time.After(t) },
+		func(t time.Duration) { ft.Add(t) },
 	)
 }
 

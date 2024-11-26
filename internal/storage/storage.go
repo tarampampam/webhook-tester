@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -83,3 +84,46 @@ type (
 		Value string `json:"value"` // the value of the header, e.g. "application/json"
 	}
 )
+
+// TimeFunc is a function that returns the current time.
+type TimeFunc func() time.Time
+
+// defaultTimeFunc is the default TimeFunc implementation, which returns the current time rounded to milliseconds.
+func defaultTimeFunc() time.Time { return time.Now().Round(time.Millisecond) }
+
+// syncMap is a thread-safe map with strong-typed keys and values.
+type syncMap[K comparable, V any] struct{ m sync.Map }
+
+// Delete deletes the value for a key.
+func (m *syncMap[K, V]) Delete(key K) { m.m.Delete(key) }
+
+// Load returns the value stored in the map for a key, or nil if no value is present.
+// The ok result indicates whether value was found in the map.
+func (m *syncMap[K, V]) Load(key K) (value V, ok bool) {
+	v, ok := m.m.Load(key)
+	if !ok {
+		return value, ok
+	}
+
+	return v.(V), ok
+}
+
+// LoadAndDelete deletes the value for a key, returning the previous value if any.
+// The loaded result reports whether the key was present.
+func (m *syncMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
+	v, loaded := m.m.LoadAndDelete(key)
+	if !loaded {
+		return value, loaded
+	}
+
+	return v.(V), loaded
+}
+
+// Range calls f sequentially for each key and value present in the map.
+// If f returns false, range stops the iteration.
+func (m *syncMap[K, V]) Range(f func(key K, value V) bool) {
+	m.m.Range(func(key, value any) bool { return f(key.(K), value.(V)) })
+}
+
+// Store sets the value for a key.
+func (m *syncMap[K, V]) Store(key K, value V) { m.m.Store(key, value) }

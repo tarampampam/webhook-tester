@@ -18,9 +18,7 @@ type (
 		maxRequests uint32
 		client      redis.Cmdable
 		encDec      encoding.EncoderDecoder
-
-		// this function returns the current time, it's used to mock the time in tests
-		timeNow func() time.Time
+		timeNow     TimeFunc
 	}
 )
 
@@ -29,7 +27,7 @@ var _ Storage = (*Redis)(nil) // ensure interface implementation
 type RedisOption func(*Redis)
 
 // WithRedisTimeNow sets the function that returns the current time.
-func WithRedisTimeNow(fn func() time.Time) RedisOption { return func(s *Redis) { s.timeNow = fn } }
+func WithRedisTimeNow(fn TimeFunc) RedisOption { return func(s *Redis) { s.timeNow = fn } }
 
 // NewRedis creates a new Redis storage.
 // Notes:
@@ -41,8 +39,7 @@ func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisO
 		maxRequests: maxReq,
 		client:      c,
 		encDec:      encoding.JSON{},
-
-		timeNow: func() time.Time { return time.Now().Round(time.Millisecond) }, // default time function, rounds to millis
+		timeNow:     defaultTimeFunc,
 	}
 
 	for _, opt := range opts {

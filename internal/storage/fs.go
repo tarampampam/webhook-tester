@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,24 +19,30 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
+// FS is an implementation of the Storage interface that organizes data on the filesystem using the following structure:
+//
+//	📂 {root}
+//	├── 📂 {session-uuid}
+//	│   ├── 📄 session.<expiration-time-unix-millis>.json
+//	│   ├── 📄 request.<created-time-unix-millis>.{request-uuid}.json
+//	│   └── …
+//	└── …
 type FS struct {
 	sessionTTL      time.Duration
 	maxRequests     uint32
 	root            string
 	cleanupInterval time.Duration
 	encDec          encoding.EncoderDecoder
+	sessionsMu      syncMap[string /* sID */, *sync.RWMutex] // used to protect the session data (expiration time at least)
 
 	// this function returns the current time, it's used to mock the time in tests
 	timeNow func() time.Time
 
 	close  chan struct{}
 	closed atomic.Bool
-}
 
-const (
-	fsDirPerm  = os.FileMode(0755)
-	fsFilePerm = os.FileMode(0644)
-)
+	dirPerm, filePerm os.FileMode
+}
 
 var ( // ensure interface implementation
 	_ Storage   = (*FS)(nil)
@@ -46,6 +53,8 @@ type FSOption func(*FS)
 
 func WithFSCleanupInterval(v time.Duration) FSOption { return func(f *FS) { f.cleanupInterval = v } }
 func WithFSTimeNow(fn func() time.Time) FSOption     { return func(f *FS) { f.timeNow = fn } }
+func WithFSDirPerm(v os.FileMode) FSOption           { return func(f *FS) { f.dirPerm = v } }
+func WithFSFilePerm(v os.FileMode) FSOption          { return func(f *FS) { f.filePerm = v } }
 
 func NewFS(root string, sessionTTL time.Duration, maxRequests uint32, opts ...FSOption) *FS {
 	var s = FS{
@@ -54,10 +63,10 @@ func NewFS(root string, sessionTTL time.Duration, maxRequests uint32, opts ...FS
 		maxRequests:     maxRequests,
 		cleanupInterval: time.Second, // default cleanup interval
 		encDec:          encoding.JSON{},
-
-		timeNow: func() time.Time { return time.Now().Round(time.Millisecond) }, // default time function, rounds to millis
-
-		close: make(chan struct{}),
+		timeNow:         defaultTimeFunc,
+		close:           make(chan struct{}),
+		dirPerm:         os.FileMode(0755), //nolint:mnd
+		filePerm:        os.FileMode(0644), //nolint:mnd
 	}
 
 	for _, opt := range opts {
@@ -74,7 +83,7 @@ func NewFS(root string, sessionTTL time.Duration, maxRequests uint32, opts ...FS
 // newID generates a new (unique) ID.
 func (*FS) newID() string { return uuid.New().String() }
 
-func (*FS) cleanup() {}
+func (*FS) cleanup() {} // TODO: implement the cleanup function
 
 // isOpenAndNotDone checks if the storage is open and the context is not done.
 func (s *FS) isOpenAndNotDone(ctx context.Context) error {
@@ -90,29 +99,126 @@ func (s *FS) isOpenAndNotDone(ctx context.Context) error {
 // sessionDir returns the path to the session directory (e.g. {root}/{sID}).
 func (s *FS) sessionDir(sID string) string { return path.Join(s.root, sID) }
 
-// sessionFile returns the path to the session file (e.g. {root}/{sID}/session.json).
-func (s *FS) sessionFile(sID string) string { return path.Join(s.sessionDir(sID), "session.json") }
-
-// requestFile returns the path to the request file (e.g. {root}/{sID}/request-{rID}.json).
-func (s *FS) requestFile(sID, rID string) string {
-	return path.Join(s.sessionDir(sID), fmt.Sprintf("request-%s.json", rID))
-}
-
 func (s *FS) isSessionExists(sID string) (bool, error) {
-	if stat, err := os.Stat(s.sessionFile(sID)); err != nil {
+	stat, err := os.Stat(s.sessionDir(sID))
+	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 
-		return false, fmt.Errorf("failed to stat session file: %w", err)
-	} else if stat.IsDir() {
-		return false, errors.New("session file is a directory")
+		return false, err
 	}
 
-	return true, nil
+	return stat.Mode().IsDir(), nil
 }
 
-func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+// findSessionFile returns the path to the session file with the expiration time and the expiration time itself.
+// If the session file is not found, the function returns os.ErrNotExist.
+func (s *FS) findSessionFile(sID string) (filePath string, _ *time.Time, _ error) {
+	var dir = s.sessionDir(sID)
+
+	files, rErr := os.ReadDir(dir)
+	if rErr != nil {
+		return "", nil, rErr
+	}
+
+	for _, file := range files {
+		if file.IsDir() || !file.Type().IsRegular() {
+			continue
+		}
+
+		if n := file.Name(); strings.HasPrefix(n, "session.") && strings.HasSuffix(n, ".json") {
+			var ts, err = strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(n, "session."), ".json"), 10, 64)
+			if err != nil {
+				return "", nil, err
+			}
+
+			var t = time.UnixMilli(ts)
+
+			return path.Join(dir, n), &t, nil
+		}
+	}
+
+	return "", nil, os.ErrNotExist
+}
+
+type fsRequestFile struct {
+	rID, path string
+	createdAt time.Time
+}
+
+// listRequestFiles returns a list of request files for the specified session ID. The list is sorted by creation time
+// (newest first).
+func (s *FS) listRequestFiles(sID string) ([]fsRequestFile, error) {
+	var dir = s.sessionDir(sID)
+
+	var files, rErr = os.ReadDir(dir)
+	if rErr != nil {
+		return nil, rErr
+	}
+
+	var list = make([]fsRequestFile, 0, len(files))
+
+	// filter out request files
+	for _, file := range files {
+		if file.IsDir() || !file.Type().IsRegular() {
+			continue
+		}
+
+		// file format: request.<created-time-unix-millis>.{request-uuid}.json
+		if n := file.Name(); strings.HasPrefix(n, "request.") && strings.HasSuffix(n, ".json") {
+			var parts = strings.Split(strings.TrimSuffix(strings.TrimPrefix(n, "request."), ".json"), ".")
+			if len(parts) != 2 { //nolint:mnd
+				continue
+			}
+
+			var ts, tsErr = strconv.ParseInt(parts[0], 10, 64)
+			if tsErr != nil {
+				continue
+			}
+
+			list = append(list, fsRequestFile{
+				rID:       parts[1],
+				path:      path.Join(dir, n),
+				createdAt: time.UnixMilli(ts),
+			})
+		}
+	}
+
+	// sort the list by creation time (newest first)
+	slices.SortFunc(list, func(a, b fsRequestFile) int { return int(b.createdAt.UnixMilli() - a.createdAt.UnixMilli()) })
+
+	return list, nil
+}
+
+// lockSession lazy initializes a mutex for the session (if needed) and locks it, regarding the readOnly flag. The
+// returned function should be called to unlock the mutex.
+func (s *FS) lockSession(sID string, readOnly bool) func() {
+	var mu *sync.RWMutex
+
+	if v, ok := s.sessionsMu.Load(sID); ok { // lazy initialization
+		mu = v
+	} else {
+		mu = new(sync.RWMutex)
+		s.sessionsMu.Store(sID, mu)
+	}
+
+	if readOnly {
+		mu.RLock()
+	} else {
+		mu.Lock()
+	}
+
+	return func() {
+		if readOnly {
+			mu.RUnlock()
+		} else {
+			mu.Unlock()
+		}
+	}
+}
+
+func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) { //nolint:funlen
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err
 	}
@@ -133,18 +239,25 @@ func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID
 		sID = s.newID() // generate a new ID
 	}
 
-	var now = s.timeNow()
+	var (
+		now        = s.timeNow()
+		sessionDir = s.sessionDir(sID)
+	)
 
 	// set the creation time
 	session.CreatedAtUnixMilli = now.UnixMilli()
 
 	// create a session directory
-	if err := os.Mkdir(s.sessionDir(sID), fsDirPerm); err != nil {
+	if err := os.Mkdir(sessionDir, s.dirPerm); err != nil {
 		return "", err
 	}
 
 	// create a session file
-	f, fErr := os.OpenFile(s.sessionFile(sID), os.O_WRONLY|os.O_CREATE, fsFilePerm)
+	f, fErr := os.OpenFile(
+		path.Join(sessionDir, fmt.Sprintf("session.%d.json", now.Add(s.sessionTTL).UnixMilli())),
+		os.O_WRONLY|os.O_CREATE,
+		s.filePerm,
+	)
 	if fErr != nil {
 		return "", fErr
 	}
@@ -166,23 +279,46 @@ func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID
 		return "", err
 	}
 
-	// create a file with the TTL in unix milliseconds in its name
-	if err := s.createTTLFile(s.sessionDir(sID), now.Add(s.sessionTTL)); err != nil {
-		return "", err
-	}
+	// for new sessions, create a mutex without checking if it already exists because it doesn't
+	s.sessionsMu.Store(sID, new(sync.RWMutex))
 
 	return sID, nil
 }
 
-func (s *FS) GetSession(ctx context.Context, sID string) (*Session, error) {
+func (s *FS) GetSession(ctx context.Context, sID string) (*Session, error) { //nolint:funlen
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
 
-	var now = s.timeNow()
+	if exists, err := s.isSessionExists(sID); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
+	}
+
+	defer s.lockSession(sID, false)()
+
+	// find the session file
+	filePath, expiresAt, sErr := s.findSessionFile(sID)
+	if sErr != nil {
+		if errors.Is(sErr, os.ErrNotExist) {
+			return nil, ErrSessionNotFound
+		}
+
+		return nil, sErr
+	}
+
+	// check the session expiration
+	if expiresAt.Before(s.timeNow()) {
+		if err := os.RemoveAll(s.sessionDir(sID)); err != nil {
+			return nil, err
+		}
+
+		return nil, ErrSessionNotFound // session has been expired
+	}
 
 	// open the session file
-	var f, fErr = os.OpenFile(s.sessionFile(sID), os.O_RDONLY, 0)
+	file, fErr := os.OpenFile(filePath, os.O_RDONLY, 0)
 	if fErr != nil {
 		if errors.Is(fErr, os.ErrNotExist) {
 			return nil, ErrSessionNotFound
@@ -191,41 +327,26 @@ func (s *FS) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, fErr
 	}
 
-	defer func() { _ = f.Close() }()
+	defer func() { _ = file.Close() }()
 
-	var ttl, tErr = s.getTTLFile(s.sessionDir(sID))
-	if tErr != nil {
-		return nil, tErr
-	}
-
-	// check the session expiration
-	if ttl.Before(now) {
-		if err := os.RemoveAll(s.sessionDir(sID)); err != nil {
-			return nil, err
-		}
-
-		return nil, ErrSessionNotFound // session has been expired
-	}
-
-	// read the session data
-	var data, rErr = io.ReadAll(f)
+	// read the content
+	data, rErr := io.ReadAll(file)
 	if rErr != nil {
 		return nil, rErr
 	}
 
-	// close the file
-	if err := f.Close(); err != nil {
+	if err := file.Close(); err != nil {
 		return nil, err
 	}
 
-	// decode it
+	// decode
 	var session Session
 	if uErr := s.encDec.Decode(data, &session); uErr != nil {
 		return nil, uErr
 	}
 
 	// set the expiration time
-	session.ExpiresAt = *ttl
+	session.ExpiresAt = *expiresAt
 
 	return &session, nil
 }
@@ -241,13 +362,23 @@ func (s *FS) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duratio
 		return ErrSessionNotFound
 	}
 
-	// delete the old TTL file
-	if err := s.deleteTTLFile(s.sessionDir(sID)); err != nil {
-		return err
+	defer s.lockSession(sID, false)()
+
+	// find the session file
+	filePath, _, sErr := s.findSessionFile(sID)
+	if sErr != nil {
+		if errors.Is(sErr, os.ErrNotExist) {
+			return ErrSessionNotFound
+		}
+
+		return sErr
 	}
 
-	// create a new TTL file
-	return s.createTTLFile(s.sessionDir(sID), s.timeNow().Add(howMuch))
+	// rename the session file, to store the new expiration time
+	return os.Rename(
+		filePath,
+		path.Join(path.Dir(filePath), fmt.Sprintf("session.%d.json", s.timeNow().Add(howMuch).UnixMilli())),
+	)
 }
 
 func (s *FS) DeleteSession(ctx context.Context, sID string) error {
@@ -261,11 +392,15 @@ func (s *FS) DeleteSession(ctx context.Context, sID string) error {
 		return ErrSessionNotFound
 	}
 
+	unlock := s.lockSession(sID, false)
+
+	defer func() { unlock(); s.sessionsMu.Delete(sID) }()
+
 	// delete the session directory
 	return os.RemoveAll(s.sessionDir(sID))
 }
 
-func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen,gocyclo
+func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err
 	}
@@ -276,17 +411,23 @@ func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string,
 		return "", ErrSessionNotFound
 	}
 
-	var now = s.timeNow()
+	defer s.lockSession(sID, false)()
 
-	rID, r.CreatedAtUnixMilli = s.newID(), now.UnixMilli()
+	rID, r.CreatedAtUnixMilli = s.newID(), s.timeNow().UnixMilli()
 
 	data, mErr := s.encDec.Encode(r)
 	if mErr != nil {
 		return "", mErr
 	}
 
+	var dir = s.sessionDir(sID)
+
 	// create a request file
-	f, fErr := os.OpenFile(s.requestFile(sID, rID), os.O_WRONLY|os.O_CREATE, fsFilePerm)
+	f, fErr := os.OpenFile(
+		path.Join(dir, fmt.Sprintf("request.%d.%s.json", r.CreatedAtUnixMilli, rID)),
+		os.O_WRONLY|os.O_CREATE,
+		s.filePerm,
+	)
 	if fErr != nil {
 		return "", fErr
 	}
@@ -298,49 +439,20 @@ func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string,
 		return "", wErr
 	}
 
-	// close the file
 	if err := f.Close(); err != nil {
 		return "", err
 	}
 
 	{ // limit stored requests count
-		var files, rErr = os.ReadDir(s.sessionDir(sID))
-		if rErr != nil {
-			return "", rErr
+		list, lErr := s.listRequestFiles(sID)
+		if lErr != nil {
+			return "", lErr
 		}
 
-		var requestFiles = make([]os.DirEntry, 0, len(files))
-
-		// filter out request files
-		for _, file := range files {
-			if file.IsDir() || !file.Type().IsRegular() {
-				continue
-			}
-
-			if n := file.Name(); strings.HasPrefix(n, "request-") && strings.HasSuffix(n, ".json") {
-				requestFiles = append(requestFiles, file)
-			}
-		}
-
-		if len(requestFiles) > int(s.maxRequests) {
-			// sort list of files by modification time (newest first)
-			slices.SortFunc(requestFiles, func(a, b os.DirEntry) int {
-				aInfo, aErr := a.Info()
-				if aErr != nil {
-					return 0
-				}
-
-				bInfo, bErr := b.Info()
-				if bErr != nil {
-					return 0
-				}
-
-				return int(bInfo.ModTime().UnixMilli() - aInfo.ModTime().UnixMilli())
-			})
-
+		if len(list) > int(s.maxRequests) {
 			// remove unnecessary files
-			for _, file := range requestFiles[s.maxRequests:] {
-				if err := os.Remove(path.Join(s.sessionDir(sID), file.Name())); err != nil {
+			for _, file := range list[s.maxRequests:] {
+				if err := os.Remove(file.path); err != nil {
 					return "", err
 				}
 			}
@@ -361,36 +473,50 @@ func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) 
 		return nil, ErrSessionNotFound
 	}
 
-	// open the request file
-	var f, fErr = os.OpenFile(s.requestFile(sID, rID), os.O_RDONLY, 0)
-	if fErr != nil {
-		if errors.Is(fErr, os.ErrNotExist) {
-			return nil, ErrRequestNotFound
+	defer s.lockSession(sID, true)()
+
+	var dir = s.sessionDir(sID)
+
+	// find the request file
+	var files, rdErr = os.ReadDir(dir)
+	if rdErr != nil {
+		return nil, rdErr
+	}
+
+	for _, file := range files {
+		if file.IsDir() || !file.Type().IsRegular() {
+			continue
 		}
 
-		return nil, fErr
+		if n := file.Name(); strings.HasPrefix(n, "request.") && strings.Contains(n, rID) {
+			f, fErr := os.OpenFile(path.Join(dir, n), os.O_RDONLY, 0)
+			if fErr != nil {
+				return nil, fErr
+			}
+
+			// read the request data
+			data, rErr := io.ReadAll(f)
+			if rErr != nil {
+				_ = f.Close() // do not forget to close the file in case of an error
+
+				return nil, rErr
+			}
+
+			if err := f.Close(); err != nil {
+				return nil, err
+			}
+
+			// decode it
+			var request Request
+			if uErr := s.encDec.Decode(data, &request); uErr != nil {
+				return nil, uErr
+			}
+
+			return &request, nil
+		}
 	}
 
-	defer func() { _ = f.Close() }()
-
-	// read the request data
-	var data, rErr = io.ReadAll(f)
-	if rErr != nil {
-		return nil, rErr
-	}
-
-	// close the file
-	if err := f.Close(); err != nil {
-		return nil, err
-	}
-
-	// decode it
-	var request Request
-	if uErr := s.encDec.Decode(data, &request); uErr != nil {
-		return nil, uErr
-	}
-
-	return &request, nil
+	return nil, ErrRequestNotFound
 }
 
 func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
@@ -404,46 +530,41 @@ func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request
 		return nil, ErrSessionNotFound
 	}
 
-	// read all stored request IDs
-	var files, drErr = os.ReadDir(s.sessionDir(sID))
-	if drErr != nil {
-		return nil, drErr
+	defer s.lockSession(sID, true)()
+
+	// list all request files
+	var list, lErr = s.listRequestFiles(sID)
+	if lErr != nil {
+		return nil, lErr
 	}
 
-	var requests = make(map[string]Request, len(files))
+	var requests = make(map[string]Request, len(list))
 
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue
+	for _, file := range list {
+		f, fErr := os.OpenFile(file.path, os.O_RDONLY, 0)
+		if fErr != nil {
+			return nil, fErr
 		}
 
-		if n := file.Name(); strings.HasPrefix(n, "request-") && strings.HasSuffix(n, ".json") {
-			var rID = strings.TrimSuffix(strings.TrimPrefix(n, "request-"), ".json")
+		// read the request data
+		var data, rErr = io.ReadAll(f)
+		if rErr != nil {
+			_ = f.Close() // do not forget to close the file in case of an error
 
-			var f, fErr = os.OpenFile(path.Join(s.sessionDir(sID), n), os.O_RDONLY, 0)
-			if fErr != nil {
-				return nil, fErr
-			}
-
-			// read the request data
-			var data, rErr = io.ReadAll(f)
-			if rErr != nil {
-				return nil, rErr
-			}
-
-			// close the file
-			if err := f.Close(); err != nil {
-				return nil, err
-			}
-
-			// decode it
-			var request Request
-			if uErr := s.encDec.Decode(data, &request); uErr != nil {
-				return nil, uErr
-			}
-
-			requests[rID] = request
+			return nil, rErr
 		}
+
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+
+		// decode it
+		var request Request
+		if uErr := s.encDec.Decode(data, &request); uErr != nil {
+			return nil, uErr
+		}
+
+		requests[file.rID] = request
 	}
 
 	return requests, nil
@@ -460,16 +581,25 @@ func (s *FS) DeleteRequest(ctx context.Context, sID, rID string) error {
 		return ErrSessionNotFound
 	}
 
-	// delete the request file
-	if err := os.Remove(s.requestFile(sID, rID)); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return ErrRequestNotFound
-		}
+	defer s.lockSession(sID, false)()
 
-		return err
+	// list all request files
+	var list, lErr = s.listRequestFiles(sID)
+	if lErr != nil {
+		return lErr
 	}
 
-	return nil
+	for _, file := range list {
+		if file.rID == rID {
+			if err := os.Remove(file.path); err != nil {
+				return err
+			}
+
+			return nil
+		}
+	}
+
+	return ErrRequestNotFound
 }
 
 func (s *FS) DeleteAllRequests(ctx context.Context, sID string) error {
@@ -483,21 +613,17 @@ func (s *FS) DeleteAllRequests(ctx context.Context, sID string) error {
 		return ErrSessionNotFound
 	}
 
-	// read all stored request IDs
-	var files, drErr = os.ReadDir(s.sessionDir(sID))
-	if drErr != nil {
-		return drErr
+	defer s.lockSession(sID, false)()
+
+	// list all request files
+	var list, lErr = s.listRequestFiles(sID)
+	if lErr != nil {
+		return lErr
 	}
 
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue
-		}
-
-		if n := file.Name(); strings.HasPrefix(n, "request-") && strings.HasSuffix(n, ".json") {
-			if err := os.Remove(path.Join(s.sessionDir(sID), n)); err != nil {
-				return err
-			}
+	for _, file := range list {
+		if err := os.Remove(file.path); err != nil {
+			return err
 		}
 	}
 
@@ -512,71 +638,4 @@ func (s *FS) Close() error {
 	}
 
 	return ErrClosed
-}
-
-const fsTTLFileExt = ".ttl"
-
-// createTTLFile creates a file in the directory with the TTL in its name.
-func (*FS) createTTLFile(dir string, ttl time.Time) error {
-	f, err := os.OpenFile(
-		path.Join(dir, strconv.FormatInt(ttl.UnixMilli(), 10)+fsTTLFileExt),
-		os.O_CREATE,
-		fsFilePerm,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create TTL file: %w", err)
-	}
-
-	return f.Close()
-}
-
-// getTTLFile returns the TTL, stored in the name of the file in the directory.
-func (*FS) getTTLFile(dir string) (*time.Time, error) {
-	// find a file with the TTL in its name
-	var files, rErr = os.ReadDir(dir)
-	if rErr != nil {
-		return nil, rErr
-	}
-
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue
-		}
-
-		if strings.HasSuffix(file.Name(), fsTTLFileExt) {
-			var ttl, pErr = strconv.ParseInt(strings.TrimSuffix(file.Name(), fsTTLFileExt), 10, 64)
-			if pErr != nil {
-				return nil, fmt.Errorf("failed to parse TTL file name: %w", pErr)
-			}
-
-			var t = time.UnixMilli(ttl)
-
-			return &t, nil
-		}
-	}
-
-	return nil, errors.New("ttl file not found")
-}
-
-// deleteTTLFile finds and deletes the TTL file in the directory. If the file is not found, it does nothing.
-func (*FS) deleteTTLFile(dir string) error {
-	// find a file with the TTL in its name
-	var files, rErr = os.ReadDir(dir)
-	if rErr != nil {
-		return fmt.Errorf("failed to read directory: %w", rErr)
-	}
-
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue
-		}
-
-		if strings.HasSuffix(file.Name(), fsTTLFileExt) {
-			if err := os.Remove(path.Join(dir, file.Name())); err != nil {
-				return fmt.Errorf("failed to remove TTL file: %w", err)
-			}
-		}
-	}
-
-	return nil
 }
