@@ -18,12 +18,18 @@ type (
 		maxRequests uint32
 		client      redis.Cmdable
 		encDec      encoding.EncoderDecoder
+
+		// this function returns the current time, it's used to mock the time in tests
+		timeNow func() time.Time
 	}
 )
 
 var _ Storage = (*Redis)(nil) // ensure interface implementation
 
 type RedisOption func(*Redis)
+
+// WithRedisTimeNow sets the function that returns the current time.
+func WithRedisTimeNow(fn func() time.Time) RedisOption { return func(s *Redis) { s.timeNow = fn } }
 
 // NewRedis creates a new Redis storage.
 // Notes:
@@ -35,6 +41,8 @@ func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisO
 		maxRequests: maxReq,
 		client:      c,
 		encDec:      encoding.JSON{},
+
+		timeNow: func() time.Time { return time.Now().Round(time.Millisecond) }, // default time function, rounds to millis
 	}
 
 	for _, opt := range opts {
@@ -87,7 +95,7 @@ func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (
 		sID = s.newID()
 	}
 
-	session.CreatedAtUnixMilli = time.Now().UnixMilli()
+	session.CreatedAtUnixMilli = s.timeNow().UnixMilli()
 
 	data, mErr := s.encDec.Encode(session)
 	if mErr != nil {
@@ -125,7 +133,7 @@ func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, uErr
 	}
 
-	session.ExpiresAt = time.Now().Add(expire)
+	session.ExpiresAt = s.timeNow().Add(expire)
 
 	return &session, nil
 }
@@ -204,7 +212,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 		return "", ErrSessionNotFound
 	}
 
-	var now = time.Now()
+	var now = s.timeNow()
 
 	rID, r.CreatedAtUnixMilli = s.newID(), now.UnixMilli()
 
@@ -215,7 +223,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 	// save the request data
 	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(now.UnixNano()), Member: rID})
+		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(now.UnixMilli()), Member: rID})
 		pipe.Set(ctx, s.requestKey(sID, rID), data, s.sessionTTL)
 
 		return nil

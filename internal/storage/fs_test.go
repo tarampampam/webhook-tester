@@ -10,38 +10,38 @@ import (
 	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
 )
 
-func TestInMemory_Session_CreateReadDelete(t *testing.T) {
+func TestFS_Session_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
 	var ft = newFakeTime()
 
 	testSessionCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
-			return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryTimeNow(ft.Get))
+			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
 		},
-		func(t time.Duration) { ft.Add(t) },
+		func(t time.Duration) { ft.Add(t); <-time.After(t) },
 	)
 }
 
-func TestInMemory_Request_CreateReadDelete(t *testing.T) {
+func TestFS_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
 	var ft = newFakeTime()
 
 	testRequestCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
-			return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryTimeNow(ft.Get))
+			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
 		},
-		func(t time.Duration) { ft.Add(t) },
+		func(t time.Duration) { ft.Add(t); <-time.After(t) },
 	)
 }
 
-func TestInMemory_Close(t *testing.T) {
+func TestFS_Close(t *testing.T) {
 	t.Parallel()
 
 	var ctx = context.Background()
 
-	impl := storage.NewInMemory(time.Minute, 1)
+	impl := storage.NewFS(t.TempDir(), time.Minute, 1)
 	require.NoError(t, impl.Close())
 	require.ErrorIs(t, impl.Close(), storage.ErrClosed) // second close
 
@@ -69,11 +69,3 @@ func TestInMemory_Close(t *testing.T) {
 	err = impl.DeleteAllRequests(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
 }
-
-//func TestInMemory_RaceProvocation(t *testing.T) {
-//	t.Parallel()
-//
-//	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-//		return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryCleanupInterval(10*time.Nanosecond))
-//	})
-//}

@@ -60,7 +60,8 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 		maxRequests:     maxRequests,
 		close:           make(chan struct{}),
 		cleanupInterval: time.Second, // default cleanup interval
-		timeNow:         time.Now,    // by default use the stdlib time.Now function
+
+		timeNow: func() time.Time { return time.Now().Round(time.Millisecond) }, // default time function, rounds to millis
 	}
 
 	for _, opt := range opts {
