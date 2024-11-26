@@ -13,7 +13,7 @@ import (
 func TestInMemory_Session_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var ft = newFakeTime()
+	var ft = newFakeTime(t)
 
 	testSessionCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -26,7 +26,7 @@ func TestInMemory_Session_CreateReadDelete(t *testing.T) {
 func TestInMemory_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var ft = newFakeTime()
+	var ft = newFakeTime(t)
 
 	testRequestCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -70,10 +70,10 @@ func TestInMemory_Close(t *testing.T) {
 	require.ErrorIs(t, err, storage.ErrClosed)
 }
 
-//func TestInMemory_RaceProvocation(t *testing.T) {
-//	t.Parallel()
-//
-//	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-//		return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryCleanupInterval(10*time.Nanosecond))
-//	})
-//}
+func TestInMemory_RaceProvocation(t *testing.T) {
+	t.Parallel()
+
+	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
+		return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryCleanupInterval(10*time.Nanosecond))
+	})
+}

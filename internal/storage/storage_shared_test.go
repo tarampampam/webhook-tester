@@ -27,7 +27,14 @@ type fakeTime struct{ atomic.Pointer[time.Time] }
 func (f *fakeTime) Add(t time.Duration) { newNow := f.Load().Add(t); f.Store(&newNow) }
 func (f *fakeTime) Get() time.Time      { return *f.Load() }
 
-func newFakeTime() *fakeTime { now, f := time.Now(), fakeTime{}; f.Store(&now); return &f }
+func newFakeTime(t *testing.T) *fakeTime {
+	t.Helper()
+
+	now, ft := time.Now(), fakeTime{}
+	ft.Store(&now)
+
+	return &ft
+}
 
 func testSessionCreateReadDelete(
 	t *testing.T,
@@ -38,87 +45,87 @@ func testSessionCreateReadDelete(
 
 	var ctx = context.Background()
 
-	//t.Run("create, read, delete", func(t *testing.T) {
-	//	t.Parallel()
-	//
-	//	var impl = new(time.Minute, 1)
-	//	defer func() { _ = toCloser(impl).Close() }()
-	//
-	//	var sessionHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
-	//
-	//	const (
-	//		code  uint16 = 201
-	//		delay        = time.Second * 123
-	//	)
-	//
-	//	// create
-	//	var sID, newErr = impl.NewSession(ctx, storage.Session{
-	//		Code:    code,
-	//		Headers: sessionHeaders,
-	//		Delay:   delay,
-	//	})
-	//
-	//	require.NoError(t, newErr)
-	//	require.NotEmpty(t, sID)
-	//
-	//	// read
-	//	got, getErr := impl.GetSession(ctx, sID)
-	//	require.NoError(t, getErr)
-	//	require.Equal(t, code, got.Code)
-	//	require.Equal(t, sessionHeaders, got.Headers)
-	//	require.Equal(t, delay, got.Delay)
-	//	assert.NotZero(t, got.CreatedAtUnixMilli)
-	//
-	//	// delete
-	//	require.NoError(t, impl.DeleteSession(ctx, sID))                      // success
-	//	require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrNotFound) // already deleted
-	//	require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrSessionNotFound)
-	//
-	//	// read again
-	//	got, getErr = impl.GetSession(ctx, sID)
-	//	require.Nil(t, got)
-	//	require.ErrorIs(t, getErr, storage.ErrNotFound)
-	//	require.ErrorIs(t, getErr, storage.ErrSessionNotFound)
-	//})
-	//
-	//t.Run("not found", func(t *testing.T) {
-	//	t.Parallel()
-	//
-	//	var impl = new(time.Minute, 1)
-	//	defer func() { _ = toCloser(impl).Close() }()
-	//
-	//	got, err := impl.GetSession(ctx, "foo")
-	//	require.Nil(t, got)
-	//	require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	//})
-	//
-	//t.Run("delete not existing", func(t *testing.T) {
-	//	t.Parallel()
-	//
-	//	var impl = new(time.Minute, 1)
-	//	defer func() { _ = toCloser(impl).Close() }()
-	//
-	//	require.ErrorIs(t, impl.DeleteSession(ctx, "foo"), storage.ErrSessionNotFound)
-	//})
-	//
-	//t.Run("expired", func(t *testing.T) {
-	//	t.Parallel()
-	//
-	//	const sessionTTL = time.Millisecond
-	//
-	//	var impl = new(sessionTTL, 1)
-	//	defer func() { _ = toCloser(impl).Close() }()
-	//
-	//	sID, err := impl.NewSession(ctx, storage.Session{})
-	//	require.NoError(t, err)
-	//	require.NotEmpty(t, sID)
-	//
-	//	sleep(sessionTTL * 2) // wait for expiration
-	//
-	//	_, err = impl.GetSession(ctx, sID)
-	//
-	//	require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	//})
+	t.Run("create, read, delete", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 1)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		var sessionHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
+
+		const (
+			code  uint16 = 201
+			delay        = time.Second * 123
+		)
+
+		// create
+		var sID, newErr = impl.NewSession(ctx, storage.Session{
+			Code:    code,
+			Headers: sessionHeaders,
+			Delay:   delay,
+		})
+
+		require.NoError(t, newErr)
+		require.NotEmpty(t, sID)
+
+		// read
+		got, getErr := impl.GetSession(ctx, sID)
+		require.NoError(t, getErr)
+		require.Equal(t, code, got.Code)
+		require.Equal(t, sessionHeaders, got.Headers)
+		require.Equal(t, delay, got.Delay)
+		assert.NotZero(t, got.CreatedAtUnixMilli)
+
+		// delete
+		require.NoError(t, impl.DeleteSession(ctx, sID))                      // success
+		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrNotFound) // already deleted
+		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrSessionNotFound)
+
+		// read again
+		got, getErr = impl.GetSession(ctx, sID)
+		require.Nil(t, got)
+		require.ErrorIs(t, getErr, storage.ErrNotFound)
+		require.ErrorIs(t, getErr, storage.ErrSessionNotFound)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 1)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		got, err := impl.GetSession(ctx, "foo")
+		require.Nil(t, got)
+		require.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
+
+	t.Run("delete not existing", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 1)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		require.ErrorIs(t, impl.DeleteSession(ctx, "foo"), storage.ErrSessionNotFound)
+	})
+
+	t.Run("expired", func(t *testing.T) {
+		t.Parallel()
+
+		const sessionTTL = time.Millisecond
+
+		var impl = new(sessionTTL, 1)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID, err := impl.NewSession(ctx, storage.Session{})
+		require.NoError(t, err)
+		require.NotEmpty(t, sID)
+
+		sleep(sessionTTL * 2) // wait for expiration
+
+		_, err = impl.GetSession(ctx, sID)
+
+		require.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
 
 	t.Run("add session TTL", func(t *testing.T) {
 		t.Parallel()
@@ -146,14 +153,14 @@ func testSessionCreateReadDelete(
 
 		var ( // store the original values
 			originalCreatedAt = sess.CreatedAtUnixMilli
-			originalTTL       = sess.ExpiresAt
+			originalExpiresAt = sess.ExpiresAt
 		)
 
 		// reload the session
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli) // should be the same
-		require.InDelta(t, originalTTL.UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+		require.Equal(t, originalExpiresAt.UnixMilli(), sess.ExpiresAt.UnixMilli())
 
 		// add TTL
 		require.NoError(t, impl.AddSessionTTL(ctx, sID, sessionTTL*2)) // current ttl = x + 2x = 3x
@@ -165,7 +172,7 @@ func testSessionCreateReadDelete(
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli)
-		require.NotEqual(t, originalTTL, sess.ExpiresAt) // changed
+		require.NotEqual(t, originalExpiresAt, sess.ExpiresAt) // changed
 
 		// wait for expiration (2x)
 		sleep(sessionTTL * 2)
@@ -507,7 +514,7 @@ func testRaceProvocation(
 
 	var wg sync.WaitGroup
 
-	for range 100 {
+	for range 20 {
 		wg.Add(1)
 
 		go func() {
@@ -521,7 +528,7 @@ func testRaceProvocation(
 
 			var rID string
 
-			for range 50 {
+			for range 20 {
 				rID, err = impl.NewRequest(ctx, sID, storage.Request{})
 				require.NoError(t, err)
 

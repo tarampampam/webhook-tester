@@ -13,7 +13,7 @@ import (
 func TestFS_Session_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var ft = newFakeTime()
+	var ft = newFakeTime(t)
 
 	testSessionCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -26,7 +26,7 @@ func TestFS_Session_CreateReadDelete(t *testing.T) {
 func TestFS_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var ft = newFakeTime()
+	var ft = newFakeTime(t)
 
 	testRequestCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -68,4 +68,12 @@ func TestFS_Close(t *testing.T) {
 
 	err = impl.DeleteAllRequests(ctx, "foo")
 	require.ErrorIs(t, err, storage.ErrClosed)
+}
+
+func TestFS_RaceProvocation(t *testing.T) {
+	t.Parallel()
+
+	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
+		return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSCleanupInterval(10*time.Nanosecond))
+	})
 }
