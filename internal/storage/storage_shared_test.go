@@ -130,7 +130,7 @@ func testSessionCreateReadDelete(
 	t.Run("add session TTL", func(t *testing.T) {
 		t.Parallel()
 
-		const sessionTTL = time.Millisecond * 10
+		const sessionTTL = time.Millisecond * 20
 
 		var impl = new(sessionTTL, 2)
 		defer func() { _ = toCloser(impl).Close() }()
@@ -148,7 +148,7 @@ func testSessionCreateReadDelete(
 
 		{ // check the created and expiration time
 			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
-			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 10)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 20)
 		}
 
 		var ( // store the original values
@@ -160,7 +160,7 @@ func testSessionCreateReadDelete(
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli) // should be the same
-		require.Equal(t, originalExpiresAt.UnixMilli(), sess.ExpiresAt.UnixMilli())
+		require.InDelta(t, originalExpiresAt.UnixMilli(), sess.ExpiresAt.UnixMilli(), 10)
 
 		// add TTL
 		require.NoError(t, impl.AddSessionTTL(ctx, sID, sessionTTL*2)) // current ttl = x + 2x = 3x

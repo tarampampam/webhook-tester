@@ -47,8 +47,7 @@ The app supports two storage options: **memory** and **Redis** (configured with 
   upon app shutdown
 - **Redis** driver: Retains data across app restarts, suitable for environments where data persistence is required.
   Redis is also necessary when running multiple instances behind a load balancer
-- **SQLite** driver: A file-based database that's useful when you need persistent storage but don't want to run a
-  separate database server and don't need to scale horizontally
+- **FS** driver: Keep all the data in the local filesystem, useful when you need to store data between app restarts
 
 ### 📢 Pub/Sub
 
@@ -153,16 +152,16 @@ The following flags are supported:
 | `--read-timeout="…"`          | maximum duration for reading the entire request, including the body (zero = no timeout)                                   |           `1m0s`           |     `HTTP_READ_TIMEOUT`      |
 | `--write-timeout="…"`         | maximum duration before timing out writes of the response (zero = no timeout)                                             |           `1m0s`           |     `HTTP_WRITE_TIMEOUT`     |
 | `--idle-timeout="…"`          | maximum amount of time to wait for the next request (keep-alive, zero = no timeout)                                       |           `1m0s`           |     `HTTP_IDLE_TIMEOUT`      |
-| `--storage-driver="…"`        | storage driver (memory/redis/sqlite)                                                                                      |          `memory`          |       `STORAGE_DRIVER`       |
+| `--storage-driver="…"`        | storage driver (memory/redis/fs)                                                                                          |          `memory`          |       `STORAGE_DRIVER`       |
 | `--session-ttl="…"`           | session TTL (time-to-live, lifetime)                                                                                      |         `168h0m0s`         |        `SESSION_TTL`         |
 | `--max-requests="…"`          | maximal number of requests to store in the storage (zero means unlimited)                                                 |           `128`            |        `MAX_REQUESTS`        |
+| `--fs-storage-dir="…"`        | path to the directory for local fs storage (directory must exist)                                                         |                            |       `FS_STORAGE_DIR`       |
 | `--max-request-body-size="…"` | maximal webhook request body size (in bytes), zero means unlimited                                                        |            `0`             |   `MAX_REQUEST_BODY_SIZE`    |
 | `--auto-create-sessions`      | automatically create sessions for incoming requests                                                                       |          `false`           |    `AUTO_CREATE_SESSIONS`    |
 | `--pubsub-driver="…"`         | pub/sub driver (memory/redis)                                                                                             |          `memory`          |       `PUBSUB_DRIVER`        |
 | `--tunnel-driver="…"`         | tunnel driver to expose your locally running app to the internet (ngrok, empty to disable)                                |                            |       `TUNNEL_DRIVER`        |
 | `--ngrok-auth-token="…"`      | ngrok authentication token (required for ngrok tunnel; create a new one at https://dashboard.ngrok.com/authtokens/new)    |                            |      `NGROK_AUTHTOKEN`       |
 | `--redis-dsn="…"`             | redis-like (redis, keydb) server DSN (e.g. redis://user:pwd@127.0.0.1:6379/0 or unix://user:pwd@/path/to/redis.sock?db=0) | `redis://127.0.0.1:6379/0` |         `REDIS_DSN`          |
-| `--sqlite-file="…"`           | path to the SQLite database file (required for the SQLite storage driver)                                                 |  `webhook-tester.sqlite`   |        `SQLITE_FILE`         |
 | `--shutdown-timeout="…"`      | maximum duration for graceful shutdown                                                                                    |           `15s`            |      `SHUTDOWN_TIMEOUT`      |
 | `--use-live-frontend`         | use frontend from the local directory instead of the embedded one (useful for development)                                |          `false`           |            *none*            |
 

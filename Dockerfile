@@ -112,8 +112,8 @@ ENV \
   LOG_FORMAT=json \
   # logging level
   LOG_LEVEL=info \
-  # default sqlite file location
-  SQLITE_FILE=/data/webhook-tester.db
+  # default fs storage directory
+  FS_STORAGE_DIR=/data
 
 #EXPOSE "8080/tcp"
 

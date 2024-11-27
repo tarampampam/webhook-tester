@@ -128,7 +128,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        storage-driver: [memory, redis, sqlite]
+        storage-driver: [memory, redis, fs]
         pubsub-driver: [memory, redis]
     services:
       redis:

@@ -76,7 +76,7 @@ func NewFS(root string, sessionTTL time.Duration, maxRequests uint32, opts ...FS
 	}
 
 	if s.cleanupInterval > time.Duration(0) {
-		go s.cleanup() // start cleanup goroutine
+		go s.cleanup(context.Background()) // start cleanup goroutine
 	}
 
 	return &s
@@ -107,9 +107,53 @@ func (s *FS) withLock(readOnly bool, fn func() error) error {
 	return fn()
 }
 
-func (s *FS) cleanup() {
-	// TODO: implement the cleanup function
-	// clear(s.sessionsMu)
+func (s *FS) cleanup(ctx context.Context) {
+	var timer = time.NewTimer(s.cleanupInterval)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-s.close: // close signal received
+			return
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			var (
+				now  = s.timeNow()
+				dirs []os.DirEntry
+				sIDs []string
+			)
+
+			// list all session directories
+			if err := s.withLock(true, func() (err error) { dirs, err = os.ReadDir(s.root); return }); err == nil { //nolint:nlreturn,lll
+				sIDs = make([]string, 0, len(dirs))
+
+				for _, dir := range dirs {
+					if dir.IsDir() && len(dir.Name()) == 36 { // UUID length
+						sIDs = append(sIDs, dir.Name())
+					}
+				}
+			}
+
+			var wg sync.WaitGroup
+
+			for _, sID := range sIDs {
+				wg.Add(1)
+
+				go func() {
+					defer wg.Done()
+
+					// check the session expiration
+					if _, expiresAt, err := s.findSessionFile(sID); err == nil && expiresAt.Before(now) {
+						_ = s.DeleteSession(ctx, sID) // and delete the expired
+					}
+				}()
+			}
+
+			wg.Wait()
+			timer.Reset(s.cleanupInterval)
+		}
+	}
 }
 
 // isOpenAndNotDone checks if the storage is open and the context is not done.
@@ -471,7 +515,7 @@ func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string,
 	return rID, nil
 }
 
-func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) { //nolint:funlen,gocyclo
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
@@ -546,7 +590,7 @@ func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) 
 	return &request, nil
 }
 
-func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
+func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) { //nolint:funlen
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}

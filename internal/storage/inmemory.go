@@ -66,7 +66,7 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 	}
 
 	if s.cleanupInterval > time.Duration(0) {
-		go s.cleanup() // start cleanup goroutine
+		go s.cleanup(context.Background()) // start cleanup goroutine
 	}
 
 	return &s
@@ -75,11 +75,9 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 // newID generates a new (unique) ID.
 func (*InMemory) newID() string { return uuid.New().String() }
 
-func (s *InMemory) cleanup() {
+func (s *InMemory) cleanup(ctx context.Context) {
 	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
-
-	var ctx = context.Background()
 
 	defer func() { // cleanup on exit
 		s.sessions.Range(func(sID string, _ *sessionData) bool {
@@ -147,7 +145,7 @@ func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string
 
 	var now = s.timeNow()
 
-	if len(id) > 0 { // use the specified ID
+	if len(id) > 0 { //nolint:nestif // use the specified ID
 		if len(id[0]) == 0 {
 			return "", errors.New("empty session ID")
 		}
