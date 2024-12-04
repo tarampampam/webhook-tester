@@ -58,7 +58,7 @@ func NewApp() *cli.Command { //nolint:funlen
 
 	return &cli.Command{
 		Usage: "webhook tester",
-		Before: func(ctx context.Context, c *cli.Command) error {
+		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			_ = log.Sync() // sync previous logger instance
 
 			var (
@@ -68,12 +68,12 @@ func NewApp() *cli.Command { //nolint:funlen
 
 			configured, err := logger.New(logLevel, logFormat) // create new logger instance
 			if err != nil {
-				return err
+				return ctx, err
 			}
 
 			*log = *configured // replace "default" logger with customized
 
-			return nil
+			return ctx, nil
 		},
 		Commands: []*cli.Command{
 			start.NewCommand(log, defaultHttpPort),
