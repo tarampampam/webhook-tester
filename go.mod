@@ -13,7 +13,7 @@ require (
 	github.com/urfave/cli/v3 v3.0.0-beta1
 	go.uber.org/zap v1.27.0
 	golang.ngrok.com/ngrok v1.11.0
-	golang.org/x/sync v0.8.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
