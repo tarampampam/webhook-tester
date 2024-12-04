@@ -22,7 +22,7 @@
     "dayjs": "^1.11.13",
     "dexie": "^4.0.10",
     "dexie-react-hooks": "^1.1.7",
-    "openapi-fetch": "^0.13.1",
+    "openapi-fetch": "^0.13.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.0.2",
