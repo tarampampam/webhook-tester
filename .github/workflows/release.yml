@@ -111,10 +111,12 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           build-args: "APP_VERSION=${{ steps.slug.outputs.version-semantic }}"
-          tags: | # TODO: add `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest` and `docker.io/tarampampam/webhook-tester:latest`
+          tags: |
+            ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:latest
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version }}
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}
             ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}:${{ steps.slug.outputs.version-major }}
+            docker.io/tarampampam/webhook-tester:latest
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version }}
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version-major }}
