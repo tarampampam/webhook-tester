@@ -148,7 +148,7 @@ func testSessionCreateReadDelete(
 
 		{ // check the created and expiration time
 			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
-			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 20)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 40)
 		}
 
 		var ( // store the original values

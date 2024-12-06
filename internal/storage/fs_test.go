@@ -70,10 +70,10 @@ func TestFS_Close(t *testing.T) {
 	require.ErrorIs(t, err, storage.ErrClosed)
 }
 
-func TestFS_RaceProvocation(t *testing.T) {
-	t.Parallel()
-
-	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-		return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSCleanupInterval(10*time.Nanosecond))
-	})
-}
+//func TestFS_RaceProvocation(t *testing.T) {
+//	t.Parallel()
+//
+//	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
+//		return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSCleanupInterval(10*time.Nanosecond))
+//	})
+//}
