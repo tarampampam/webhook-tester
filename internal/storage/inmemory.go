@@ -20,6 +20,9 @@ type (
 		sessions        syncMap[ /* sID */ string, *sessionData]
 		cleanupInterval time.Duration
 
+		// this function returns the current time, it's used to mock the time in tests
+		timeNow TimeFunc
+
 		close  chan struct{}
 		closed atomic.Bool
 	}
@@ -43,6 +46,9 @@ func WithInMemoryCleanupInterval(v time.Duration) InMemoryOption {
 	return func(s *InMemory) { s.cleanupInterval = v }
 }
 
+// WithInMemoryTimeNow sets the function that returns the current time.
+func WithInMemoryTimeNow(fn TimeFunc) InMemoryOption { return func(s *InMemory) { s.timeNow = fn } }
+
 // NewInMemory creates a new in-memory storage with the given session TTL and the maximum number of stored requests.
 // Note that the cleanup goroutine is started automatically if the cleanup interval is greater than zero.
 // To stop the cleanup goroutine and close the storage, call the InMemory.Close method.
@@ -52,6 +58,7 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 		maxRequests:     maxRequests,
 		close:           make(chan struct{}),
 		cleanupInterval: time.Second, // default cleanup interval
+		timeNow:         defaultTimeFunc,
 	}
 
 	for _, opt := range opts {
@@ -59,7 +66,7 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 	}
 
 	if s.cleanupInterval > time.Duration(0) {
-		go s.cleanup() // start cleanup goroutine
+		go s.cleanup(context.Background()) // start cleanup goroutine
 	}
 
 	return &s
@@ -68,11 +75,9 @@ func NewInMemory(sessionTTL time.Duration, maxRequests uint32, opts ...InMemoryO
 // newID generates a new (unique) ID.
 func (*InMemory) newID() string { return uuid.New().String() }
 
-func (s *InMemory) cleanup() {
+func (s *InMemory) cleanup(ctx context.Context) {
 	var timer = time.NewTimer(s.cleanupInterval)
 	defer timer.Stop()
-
-	var ctx = context.Background()
 
 	defer func() { // cleanup on exit
 		s.sessions.Range(func(sID string, _ *sessionData) bool {
@@ -87,7 +92,7 @@ func (s *InMemory) cleanup() {
 		case <-s.close: // close signal received
 			return
 		case <-timer.C:
-			var now = time.Now()
+			var now = s.timeNow()
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
 				data.Lock()
@@ -106,16 +111,41 @@ func (s *InMemory) cleanup() {
 	}
 }
 
-func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
-	if err := ctx.Err(); err != nil {
-		return "", err // context is done
-	} else if s.closed.Load() {
-		return "", ErrClosed // storage is closed
+// isSessionExists checks if the session with the specified ID exists and is not expired.
+func (s *InMemory) isSessionExists(sID string) bool {
+	data, ok := s.sessions.Load(sID)
+	if !ok {
+		return false
 	}
 
-	var now = time.Now()
+	data.Lock()
+	var expiresAt = data.session.ExpiresAt
+	data.Unlock()
 
-	if len(id) > 0 { // use the specified ID
+	// TODO: remove expired sessions automatically?
+
+	return expiresAt.After(s.timeNow())
+}
+
+// isOpenAndNotDone checks if the storage is open and the context is not done.
+func (s *InMemory) isOpenAndNotDone(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	} else if s.closed.Load() {
+		return ErrClosed // storage is closed
+	}
+
+	return nil
+}
+
+func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return "", err // context is done
+	}
+
+	var now = s.timeNow()
+
+	if len(id) > 0 { //nolint:nestif // use the specified ID
 		if len(id[0]) == 0 {
 			return "", errors.New("empty session ID")
 		}
@@ -123,8 +153,19 @@ func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string
 		sID = id[0]
 
 		// check if the session with the specified ID already exists
-		if _, ok := s.sessions.Load(sID); ok {
+		if data, ok := s.sessions.Load(sID); ok {
 			return "", fmt.Errorf("session %s already exists", sID)
+		} else {
+			// check if the session with the specified ID has expired
+			data.Lock()
+			expiresAt := data.session.ExpiresAt
+			data.Unlock()
+
+			if expiresAt.After(now) {
+				if dErr := s.DeleteSession(ctx, sID); dErr != nil {
+					return "", dErr
+				}
+			}
 		}
 	} else {
 		sID = s.newID() // generate a new ID
@@ -138,10 +179,8 @@ func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string
 }
 
 func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return nil, err
 	}
 
 	data, ok := s.sessions.Load(sID)
@@ -153,7 +192,7 @@ func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error)
 	var expiresAt = data.session.ExpiresAt
 	data.Unlock()
 
-	if expiresAt.Before(time.Now()) {
+	if expiresAt.Before(s.timeNow()) {
 		s.sessions.Delete(sID)
 
 		return nil, ErrSessionNotFound // session has been expired
@@ -163,15 +202,17 @@ func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error)
 }
 
 func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return err
+	}
+
+	if !s.isSessionExists(sID) {
+		return ErrSessionNotFound // session not found
 	}
 
 	data, ok := s.sessions.Load(sID)
 	if !ok {
-		return ErrSessionNotFound // session not found
+		return ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
 	data.Lock()
@@ -182,10 +223,8 @@ func (s *InMemory) AddSessionTTL(ctx context.Context, sID string, howMuch time.D
 }
 
 func (s *InMemory) DeleteSession(ctx context.Context, sID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return err
 	}
 
 	if data, ok := s.sessions.LoadAndDelete(sID); !ok {
@@ -202,18 +241,20 @@ func (s *InMemory) DeleteSession(ctx context.Context, sID string) error {
 }
 
 func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
-	if err := ctx.Err(); err != nil {
-		return "", err // context is done
-	} else if s.closed.Load() {
-		return "", ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return "", err
+	}
+
+	if !s.isSessionExists(sID) {
+		return "", ErrSessionNotFound // session not found
 	}
 
 	data, ok := s.sessions.Load(sID)
 	if !ok {
-		return "", ErrSessionNotFound // session not found
+		return "", ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
-	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
+	rID, r.CreatedAtUnixMilli = s.newID(), s.timeNow().UnixMilli()
 
 	data.requests.Store(rID, r)
 
@@ -244,15 +285,17 @@ func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID s
 }
 
 func (s *InMemory) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return nil, err
+	}
+
+	if !s.isSessionExists(sID) {
+		return nil, ErrSessionNotFound // session not found
 	}
 
 	session, sessionOk := s.sessions.Load(sID)
 	if !sessionOk {
-		return nil, ErrSessionNotFound // session not found
+		return nil, ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
 	if request, ok := session.requests.Load(rID); ok {
@@ -263,15 +306,17 @@ func (s *InMemory) GetRequest(ctx context.Context, sID, rID string) (*Request, e
 }
 
 func (s *InMemory) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err // context is done
-	} else if s.closed.Load() {
-		return nil, ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return nil, err
+	}
+
+	if !s.isSessionExists(sID) {
+		return nil, ErrSessionNotFound // session not found
 	}
 
 	session, sessionOk := s.sessions.Load(sID)
 	if !sessionOk {
-		return nil, ErrSessionNotFound // session not found
+		return nil, ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
 	var all = make(map[string]Request)
@@ -286,15 +331,17 @@ func (s *InMemory) GetAllRequests(ctx context.Context, sID string) (map[string]R
 }
 
 func (s *InMemory) DeleteRequest(ctx context.Context, sID, rID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return err
+	}
+
+	if !s.isSessionExists(sID) {
+		return ErrSessionNotFound // session not found
 	}
 
 	session, sessionOk := s.sessions.Load(sID)
 	if !sessionOk {
-		return ErrSessionNotFound // session not found
+		return ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
 	if _, ok := session.requests.LoadAndDelete(rID); ok {
@@ -305,15 +352,17 @@ func (s *InMemory) DeleteRequest(ctx context.Context, sID, rID string) error {
 }
 
 func (s *InMemory) DeleteAllRequests(ctx context.Context, sID string) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return err
+	}
+
+	if !s.isSessionExists(sID) {
+		return ErrSessionNotFound // session not found
 	}
 
 	session, sessionOk := s.sessions.Load(sID)
 	if !sessionOk {
-		return ErrSessionNotFound // session not found
+		return ErrSessionNotFound // like a fuse, because we already checked it
 	}
 
 	// delete all session requests

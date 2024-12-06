@@ -65,7 +65,7 @@ type (
 		ResponseBody       []byte        `json:"body"`                  // server response body (payload)
 		Delay              time.Duration `json:"delay"`                 // delay before response sending
 		CreatedAtUnixMilli int64         `json:"created_at_unit_milli"` // creation time
-		ExpiresAt          time.Time     `json:"-"`                     // expiration time (doesn't store in the storage)
+		ExpiresAt          time.Time     `json:"-"`                     // expiration time
 	}
 
 	// Request describes recorded request and additional meta-data.
@@ -79,7 +79,13 @@ type (
 	}
 
 	HttpHeader struct {
-		Name  string `json:"name"`  // the name of the header, e.g., "Content-Type"
-		Value string `json:"value"` // the value of the header, e.g., "application/json"
+		Name  string `json:"name"`  // the name of the header, e.g. "Content-Type"
+		Value string `json:"value"` // the value of the header, e.g. "application/json"
 	}
 )
+
+// TimeFunc is a function that returns the current time.
+type TimeFunc func() time.Time
+
+// defaultTimeFunc is the default TimeFunc implementation, which returns the current time rounded to milliseconds.
+func defaultTimeFunc() time.Time { return time.Now().Round(time.Millisecond) }

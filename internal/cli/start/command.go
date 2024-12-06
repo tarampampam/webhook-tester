@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -42,6 +43,7 @@ type (
 				driver      string        // storage driver
 				sessionTTL  time.Duration // session TTL
 				maxRequests uint16        // maximal number of requests
+				fsDir       string        // path to the directory for local fs storage
 			}
 			pubSub struct {
 				driver string // Pub/Sub driver
@@ -65,9 +67,9 @@ type (
 )
 
 const (
-	pubSubDriverMemory, pubSubDriverRedis   = "memory", "redis"
-	storageDriverMemory, storageDriverRedis = "memory", "redis"
-	tunnelDriverNgrok                       = "ngrok"
+	pubSubDriverMemory, pubSubDriverRedis                    = "memory", "redis"
+	storageDriverMemory, storageDriverRedis, storageDriverFS = "memory", "redis", "fs"
+	tunnelDriverNgrok                                        = "ngrok"
 )
 
 // NewCommand creates new `start` command.
@@ -140,15 +142,19 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Validator: validateDuration("idle timeout", time.Millisecond, time.Hour),
 		}
 		storageDriverFlag = cli.StringFlag{
-			Name:     "storage-driver",
-			Value:    storageDriverMemory,
-			Usage:    "storage driver (" + strings.Join([]string{storageDriverMemory, storageDriverRedis}, "/") + ")",
+			Name:  "storage-driver",
+			Value: storageDriverMemory,
+			Usage: "storage driver (" + strings.Join([]string{
+				storageDriverMemory,
+				storageDriverRedis,
+				storageDriverFS,
+			}, "/") + ")",
 			Sources:  cli.EnvVars("STORAGE_DRIVER"),
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
 			Validator: func(s string) error {
 				switch s {
-				case storageDriverMemory, storageDriverRedis:
+				case storageDriverMemory, storageDriverRedis, storageDriverFS:
 					return nil
 				default:
 					return fmt.Errorf("wrong storage driver [%s]", s)
@@ -172,6 +178,19 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Validator: func(n uint64) error {
 				if n > math.MaxUint16 {
 					return fmt.Errorf("too big number of requests [%d]", n)
+				}
+
+				return nil
+			},
+		}
+		storageFsDirFlag = cli.StringFlag{
+			Name:     "fs-storage-dir",
+			Usage:    "path to the directory for local fs storage (directory must exist)",
+			Sources:  cli.EnvVars("FS_STORAGE_DIR"),
+			OnlyOnce: true,
+			Validator: func(s string) error {
+				if stat, err := os.Stat(s); err == nil && !stat.IsDir() {
+					return fmt.Errorf("not a directory [%s]", s)
 				}
 
 				return nil
@@ -282,7 +301,8 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			opt.timeouts.httpIdle = c.Duration(httpIdleTimeoutFlag.Name)
 			opt.storage.driver = c.String(storageDriverFlag.Name)
 			opt.storage.sessionTTL = c.Duration(storageSessionTTLFlag.Name)
-			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name))      //nolint:gosec
+			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name)) //nolint:gosec
+			opt.storage.fsDir = c.String(storageFsDirFlag.Name)
 			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name)) //nolint:gosec
 			opt.autoCreateSessions = c.Bool(autoCreateSessionsFlag.Name)
 			opt.pubSub.driver = c.String(pubSubDriverFlag.Name)
@@ -309,6 +329,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			&storageDriverFlag,
 			&storageSessionTTLFlag,
 			&storageMaxRequestsFlag,
+			&storageFsDirFlag,
 			&maxRequestPayloadSizeFlag,
 			&autoCreateSessionsFlag,
 			&pubSubDriverFlag,
@@ -343,7 +364,7 @@ func validateDuration(name string, minValue, maxValue time.Duration) func(d time
 }
 
 // Run current command.
-func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen,gocyclo
+func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //nolint:funlen,gocyclo,gocognit
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -376,6 +397,22 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		db = inMemory //nolint:wsl
 	case storageDriverRedis:
 		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
+	case storageDriverFS:
+		if stat, err := os.Stat(cmd.options.storage.fsDir); err != nil {
+			return fmt.Errorf("failed to get the storage directory [%s]: %w", cmd.options.storage.fsDir, err)
+		} else if !stat.IsDir() {
+			return fmt.Errorf("not a directory [%s]", cmd.options.storage.fsDir)
+		}
+
+		var fs = storage.NewFS( //nolint:contextcheck
+			cmd.options.storage.fsDir,
+			cmd.options.storage.sessionTTL,
+			uint32(cmd.options.storage.maxRequests),
+		)
+
+		defer func() { _ = fs.Close() }()
+
+		db = fs
 	default:
 		return fmt.Errorf("unknown storage driver [%s]", cmd.options.storage.driver)
 	}

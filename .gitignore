@@ -1,4 +1,4 @@
-# IDEs
+## IDEs
 /nbproject
 /.idea
 
@@ -11,7 +11,7 @@
 *_enum.go
 *.pb.go
 
-# Temp dirs & trash
+## Temp dirs & trash
 *.env
 /__old__
 /temp

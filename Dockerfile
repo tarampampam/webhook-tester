@@ -79,10 +79,10 @@ RUN --mount=type=bind,from=frontend,source=/src/web/dist,target=/src/web/dist \
     # prepare rootfs for runtime
     && mkdir -p /tmp/rootfs \
     && cd /tmp/rootfs \
-    && mkdir -p ./etc/ssl/certs ./bin ./tmp \
+    && mkdir -p ./etc/ssl/certs ./bin ./tmp ./data \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
-    && chmod 777 ./tmp \
+    && chmod 777 ./tmp ./data \
     && cp /etc/ssl/certs/ca-certificates.crt ./etc/ssl/certs/ \
     && mv /src/app ./bin/app
 
@@ -111,9 +111,11 @@ ENV \
   # logging format
   LOG_FORMAT=json \
   # logging level
-  LOG_LEVEL=info
+  LOG_LEVEL=info \
+  # default fs storage directory
+  FS_STORAGE_DIR=/data
 
-#EXPOSE "80/tcp" "443/tcp"
+#EXPOSE "8080/tcp"
 
 HEALTHCHECK --interval=10s --start-interval=1s --start-period=5s --timeout=1s CMD ["/bin/app", "start", "healthcheck"]
 ENTRYPOINT ["/bin/app"]

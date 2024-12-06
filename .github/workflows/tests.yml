@@ -128,7 +128,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        storage-driver: [memory, redis]
+        storage-driver: [memory, redis, fs]
         pubsub-driver: [memory, redis]
     services:
       redis:
@@ -139,11 +139,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - {uses: actions/download-artifact@v4, with: {name: webhook-tester-linux-amd64}}
+      - run: mkdir ./data
       - run: | # start the server in the background
           chmod +x ./webhook-tester-linux-amd64
           ./webhook-tester-linux-amd64 start --port 8081 \
             --storage-driver "${{ matrix.storage-driver }}" \
             --pubsub-driver "${{ matrix.pubsub-driver }}" \
+            --fs-storage-dir ./data \
             --redis-dsn "redis://127.0.0.1:6379/0" &
       - uses: grafana/setup-k6-action@v1
       - uses: grafana/run-k6-action@v1

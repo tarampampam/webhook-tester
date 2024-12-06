@@ -13,7 +13,10 @@ import (
 func TestRedis_Session_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var mini = miniredis.RunT(t)
+	var (
+		mini = miniredis.RunT(t)
+		ft   = newFakeTime(t)
+	)
 
 	testSessionCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -21,16 +24,20 @@ func TestRedis_Session_CreateReadDelete(t *testing.T) {
 				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
 				sTTL,
 				maxReq,
+				storage.WithRedisTimeNow(ft.Get),
 			)
 		},
-		func(t time.Duration) { mini.FastForward(t) },
+		func(t time.Duration) { mini.FastForward(t); ft.Add(t) },
 	)
 }
 
 func TestRedis_Request_CreateReadDelete(t *testing.T) {
 	t.Parallel()
 
-	var mini = miniredis.RunT(t)
+	var (
+		mini = miniredis.RunT(t)
+		ft   = newFakeTime(t)
+	)
 
 	testRequestCreateReadDelete(t,
 		func(sTTL time.Duration, maxReq uint32) storage.Storage {
@@ -38,9 +45,10 @@ func TestRedis_Request_CreateReadDelete(t *testing.T) {
 				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
 				sTTL,
 				maxReq,
+				storage.WithRedisTimeNow(ft.Get),
 			)
 		},
-		func(t time.Duration) { mini.FastForward(t) },
+		func(t time.Duration) { mini.FastForward(t); ft.Add(t) },
 	)
 }
 

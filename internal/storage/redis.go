@@ -18,12 +18,16 @@ type (
 		maxRequests uint32
 		client      redis.Cmdable
 		encDec      encoding.EncoderDecoder
+		timeNow     TimeFunc
 	}
 )
 
 var _ Storage = (*Redis)(nil) // ensure interface implementation
 
 type RedisOption func(*Redis)
+
+// WithRedisTimeNow sets the function that returns the current time.
+func WithRedisTimeNow(fn TimeFunc) RedisOption { return func(s *Redis) { s.timeNow = fn } }
 
 // NewRedis creates a new Redis storage.
 // Notes:
@@ -35,6 +39,7 @@ func NewRedis(c redis.Cmdable, sTTL time.Duration, maxReq uint32, opts ...RedisO
 		maxRequests: maxReq,
 		client:      c,
 		encDec:      encoding.JSON{},
+		timeNow:     defaultTimeFunc,
 	}
 
 	for _, opt := range opts {
@@ -66,6 +71,10 @@ func (s *Redis) isSessionExists(ctx context.Context, sID string) (bool, error) {
 }
 
 func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	}
+
 	if len(id) > 0 { // use the specified ID
 		if len(id[0]) == 0 {
 			return "", errors.New("empty session ID")
@@ -83,7 +92,7 @@ func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (
 		sID = s.newID()
 	}
 
-	session.CreatedAtUnixMilli = time.Now().UnixMilli()
+	session.CreatedAtUnixMilli = s.timeNow().UnixMilli()
 
 	data, mErr := s.encDec.Encode(session)
 	if mErr != nil {
@@ -98,6 +107,10 @@ func (s *Redis) NewSession(ctx context.Context, session Session, id ...string) (
 }
 
 func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	}
+
 	data, rErr := s.client.Get(ctx, s.sessionKey(sID)).Bytes()
 	if rErr != nil {
 		if errors.Is(rErr, redis.Nil) {
@@ -117,12 +130,16 @@ func (s *Redis) GetSession(ctx context.Context, sID string) (*Session, error) {
 		return nil, uErr
 	}
 
-	session.ExpiresAt = time.Now().Add(expire)
+	session.ExpiresAt = s.timeNow().Add(expire)
 
 	return &session, nil
 }
 
 func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	}
+
 	currentTTL, tErr := s.client.PTTL(ctx, s.sessionKey(sID)).Result()
 	if tErr != nil {
 		return tErr
@@ -165,6 +182,10 @@ func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Dura
 }
 
 func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	}
+
 	if result := s.client.Del(ctx, s.sessionKey(sID)); result.Err() != nil {
 		return result.Err()
 	} else if count, rErr := result.Result(); rErr != nil {
@@ -177,6 +198,10 @@ func (s *Redis) DeleteSession(ctx context.Context, sID string) error {
 }
 
 func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) {
+	if err := ctx.Err(); err != nil {
+		return "", err // context is done
+	}
+
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return "", err
@@ -184,7 +209,9 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 		return "", ErrSessionNotFound
 	}
 
-	rID, r.CreatedAtUnixMilli = s.newID(), time.Now().UnixMilli()
+	var now = s.timeNow()
+
+	rID, r.CreatedAtUnixMilli = s.newID(), now.UnixMilli()
 
 	data, mErr := s.encDec.Encode(r)
 	if mErr != nil {
@@ -193,7 +220,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 
 	// save the request data
 	if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(r.CreatedAtUnixMilli), Member: rID})
+		pipe.ZAdd(ctx, s.requestsKey(sID), redis.Z{Score: float64(now.UnixMilli()), Member: rID})
 		pipe.Set(ctx, s.requestKey(sID, rID), data, s.sessionTTL)
 
 		return nil
@@ -225,6 +252,10 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 }
 
 func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	}
+
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return nil, err
@@ -250,6 +281,10 @@ func (s *Redis) GetRequest(ctx context.Context, sID, rID string) (*Request, erro
 }
 
 func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	}
+
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return nil, err
@@ -288,18 +323,26 @@ func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Requ
 			continue
 		}
 
-		var request Request
-		if uErr := s.encDec.Decode([]byte(d.(string)), &request); uErr != nil {
-			return nil, uErr
-		}
+		if str, ok := d.(string); !ok {
+			return nil, errors.New("unexpected data type")
+		} else {
+			var request Request
+			if uErr := s.encDec.Decode([]byte(str), &request); uErr != nil {
+				return nil, uErr
+			}
 
-		all[ids[i]] = request
+			all[ids[i]] = request
+		}
 	}
 
 	return all, nil
 }
 
 func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	}
+
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return err
@@ -327,6 +370,10 @@ func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
 }
 
 func (s *Redis) DeleteAllRequests(ctx context.Context, sID string) error {
+	if err := ctx.Err(); err != nil {
+		return err // context is done
+	}
+
 	// check the session existence
 	if exists, err := s.isSessionExists(ctx, sID); err != nil {
 		return err

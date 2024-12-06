@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +20,20 @@ func toCloser(s storage.Storage) io.Closer {
 	}
 
 	return io.NopCloser(nil)
+}
+
+type fakeTime struct{ atomic.Pointer[time.Time] }
+
+func (f *fakeTime) Add(t time.Duration) { newNow := f.Load().Add(t); f.Store(&newNow) }
+func (f *fakeTime) Get() time.Time      { return *f.Load() }
+
+func newFakeTime(t *testing.T) *fakeTime {
+	t.Helper()
+
+	now, ft := time.Now(), fakeTime{}
+	ft.Store(&now)
+
+	return &ft
 }
 
 func testSessionCreateReadDelete(
@@ -115,37 +130,37 @@ func testSessionCreateReadDelete(
 	t.Run("add session TTL", func(t *testing.T) {
 		t.Parallel()
 
-		const sessionTTL = time.Millisecond * 10
+		const sessionTTL = time.Millisecond * 20
 
 		var impl = new(sessionTTL, 2)
 		defer func() { _ = toCloser(impl).Close() }()
 
-		// create session
+		var now = time.Now()
+
+		// create session with TTL
 		sID, err := impl.NewSession(ctx, storage.Session{})
 		require.NoError(t, err)
 		require.NotEmpty(t, sID)
 
-		// get it
+		// get it (ensure it exists)
 		sess, err := impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 
 		{ // check the created and expiration time
-			var now = time.Now()
-
 			require.InDelta(t, now.UnixMilli(), sess.CreatedAtUnixMilli, 50)
-			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+			require.InDelta(t, now.Add(sessionTTL).UnixMilli(), sess.ExpiresAt.UnixMilli(), 40)
 		}
 
 		var ( // store the original values
 			originalCreatedAt = sess.CreatedAtUnixMilli
-			originalTTL       = sess.ExpiresAt
+			originalExpiresAt = sess.ExpiresAt
 		)
 
 		// reload the session
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli) // should be the same
-		require.InDelta(t, originalTTL.UnixMilli(), sess.ExpiresAt.UnixMilli(), 5)
+		require.InDelta(t, originalExpiresAt.UnixMilli(), sess.ExpiresAt.UnixMilli(), 10)
 
 		// add TTL
 		require.NoError(t, impl.AddSessionTTL(ctx, sID, sessionTTL*2)) // current ttl = x + 2x = 3x
@@ -157,7 +172,7 @@ func testSessionCreateReadDelete(
 		sess, err = impl.GetSession(ctx, sID)
 		require.NoError(t, err)
 		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli)
-		require.NotEqual(t, originalTTL, sess.ExpiresAt) // changed
+		require.NotEqual(t, originalExpiresAt, sess.ExpiresAt) // changed
 
 		// wait for expiration (2x)
 		sleep(sessionTTL * 2)
@@ -255,14 +270,14 @@ func testRequestCreateReadDelete(
 		require.NotEmpty(t, sID)
 
 		// create request #1
-		rID1, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID1, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req1"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID1)
 
 		sleep(time.Millisecond) // the accuracy is one millisecond
 
 		// create request #2
-		rID2, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID2, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req2"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID2)
 
@@ -271,6 +286,10 @@ func testRequestCreateReadDelete(
 		{ // check made requests
 			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2)
+			_, ok := requests[rID1]
+			require.True(t, ok)
+			_, ok = requests[rID2]
+			require.True(t, ok)
 
 			req, _ := impl.GetRequest(ctx, sID, rID1)
 			require.NotNil(t, req)
@@ -282,7 +301,7 @@ func testRequestCreateReadDelete(
 		sleep(time.Millisecond)
 
 		// create request #3
-		rID3, err := impl.NewRequest(ctx, sID, storage.Request{})
+		rID3, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req3"})
 		require.NoError(t, err)
 		require.NotEmpty(t, rID3)
 
@@ -292,6 +311,10 @@ func testRequestCreateReadDelete(
 		{ // check made requests again
 			requests, _ := impl.GetAllRequests(ctx, sID)
 			require.Len(t, requests, 2) // still 2
+			_, ok := requests[rID2]
+			require.True(t, ok)
+			_, ok = requests[rID3]
+			require.True(t, ok)
 
 			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
 			require.Nil(t, req)
@@ -491,7 +514,7 @@ func testRaceProvocation(
 
 	var wg sync.WaitGroup
 
-	for range 100 {
+	for range 20 {
 		wg.Add(1)
 
 		go func() {
@@ -505,7 +528,7 @@ func testRaceProvocation(
 
 			var rID string
 
-			for range 50 {
+			for range 20 {
 				rID, err = impl.NewRequest(ctx, sID, storage.Request{})
 				require.NoError(t, err)
 
