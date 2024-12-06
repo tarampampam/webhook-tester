@@ -15,8 +15,6 @@ can customize the response code, `Content-Type` HTTP header, response content, a
 Consider it a free and self-hosted alternative to [webhook.site](https://github.com/fredsted/webhook.site),
 [requestinspector.com](https://requestinspector.com/), and similar services.
 
-The concept is inspired by [this project](https://github.com/fredsted/webhook.site).
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/26e56d78-8a10-4883-9052-d18047206fda" alt="screencast" />
 </p>
