@@ -11,6 +11,10 @@
 
 This application allows you to test and debug webhooks and HTTP requests using unique, randomly generated URLs. You
 can customize the response code, `Content-Type` HTTP header, response content, and even set a delay for responses.
+
+Consider it a free and self-hosted alternative to [webhook.site](https://github.com/fredsted/webhook.site),
+[requestinspector.com](https://requestinspector.com/), and similar services.
+
 The concept is inspired by [this project](https://github.com/fredsted/webhook.site).
 
 <p align="center">
@@ -19,7 +23,7 @@ The concept is inspired by [this project](https://github.com/fredsted/webhook.si
 
 Built with Go for high performance, this application includes a lightweight UI (written in `ReactJS`) that’s compiled
 into the binary, so no additional assets are required. WebSocket support provides real-time webhook notifications in
-the UI—no need for third-party solutions like `pusher.com`!
+the UI - no need for third-party solutions like `pusher.com`!
 
 ### 🔥 Features list
 
