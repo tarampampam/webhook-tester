@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/tarampampam/webhook-tester#readme">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://socialify.git.ci/tarampampam/webhook-tester/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fhsto.org%2Fwebt%2Frm%2F9y%2Fww%2Frm9ywwx3gjv9agwkcmllhsuyo7k.png&owner=1&pulls=1&pattern=Solid&stargazers=1&theme=Dark">
-      <img align="center" src="https://socialify.git.ci/tarampampam/webhook-tester/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fhsto.org%2Fwebt%2Frm%2F9y%2Fww%2Frm9ywwx3gjv9agwkcmllhsuyo7k.png&owner=1&pulls=1&pattern=Solid&stargazers=1&theme=Light">
+      <source media="(prefers-color-scheme: dark)" srcset="https://socialify.git.ci/tarampampam/webhook-tester/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fuser-attachments%2Fassets%2Fe2e659dc-7fb1-4ac2-ad3c-883899f5fc38&owner=1&pulls=1&pattern=Solid&stargazers=1&theme=Dark">
+      <img align="center" src="https://socialify.git.ci/tarampampam/webhook-tester/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fuser-attachments%2Fassets%2Fe2e659dc-7fb1-4ac2-ad3c-883899f5fc38&owner=1&pulls=1&pattern=Solid&stargazers=1&theme=Light">
     </picture>
   </a>
 </p>
