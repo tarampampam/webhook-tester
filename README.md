@@ -43,7 +43,7 @@ the UI - no need for third-party solutions like `pusher.com`!
 
 ### 🗃 Storage
 
-The app supports two storage options: **memory** and **Redis** (configured with the `--storage-driver` flag).
+The app supports 3 storage drivers: **memory**, **Redis** and **fs** (configured with the `--storage-driver` flag).
 
 - **Memory** driver: Ideal for local debugging when persistent storage isn’t needed, as recorded requests are cleared
   upon app shutdown
