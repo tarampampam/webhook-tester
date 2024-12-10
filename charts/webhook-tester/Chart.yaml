@@ -1,0 +1,15 @@
+apiVersion: v2
+name: webhook-tester
+description: |
+  WebHook Tester allows you to test and debug Webhooks and HTTP requests using unique (random) URLs
+
+type: application
+version: 0.1.0
+appVersion: "1.1.0"
+
+icon: https://hsto.org/webt/mn/fz/q-/mnfzq-lgdnbmv-3xv-1qm6gn82e.png
+sources:
+  - https://github.com/tarampampam/webhook-tester/
+maintainers:
+  - name: s0ko1ex
+    email: s0ko1ex@proton.me
