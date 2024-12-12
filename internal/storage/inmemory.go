@@ -155,8 +155,8 @@ func (s *InMemory) NewSession(ctx context.Context, session Session, id ...string
 		// check if the session with the specified ID already exists
 		if data, ok := s.sessions.Load(sID); ok {
 			return "", fmt.Errorf("session %s already exists", sID)
-		} else {
-			// check if the session with the specified ID has expired
+		} else if data != nil {
+			// check if the session with the specified ID has expired if it exists
 			data.Lock()
 			expiresAt := data.session.ExpiresAt
 			data.Unlock()
