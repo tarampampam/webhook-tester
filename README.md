@@ -20,8 +20,13 @@ Consider it a free and self-hosted alternative to [webhook.site](https://github.
 </p>
 
 > [!TIP]
-> The demo is available at [wh.tarampamp.am](https://wh.tarampamp.am/). Please note that it is quite limited, does
-> not persist data, and may be unavailable at times, but feel free to give it a try.
+> The demo is available at [wh.tarampamp.am](https://wh.tarampamp.am/). Please note that it is quite limited,
+> does not persist data, and may be unavailable at times, but feel free to give it a try.
+>
+> ![uptume][demo-uptime-badge] ![status][demo-status-badge]
+
+[demo-uptime-badge]:https://img.shields.io/uptimerobot/ratio/m798217500-b84f848c1cc418dc14654635?style=flat-square
+[demo-status-badge]:https://img.shields.io/uptimerobot/status/m798217500-b84f848c1cc418dc14654635?style=flat-square
 
 Built with Go for high performance, this application includes a lightweight UI (written in `ReactJS`) that’s compiled
 into the binary, so no additional assets are required. WebSocket support provides real-time webhook notifications in
