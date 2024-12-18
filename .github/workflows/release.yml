@@ -134,5 +134,5 @@ jobs:
         env:
           SRV: ${{ secrets.RENDER_COM_SERVICE_ID }}
           KEY: ${{ secrets.RENDER_COM_DEPLOY_KEY }}
-          IMG: docker.io/tarampampam/webhook-tester
+          IMG: ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}
           TAG: ${{ steps.slug.outputs.version }} # the same as in the "build-docker-image" job
