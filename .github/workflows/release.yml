@@ -129,6 +129,7 @@ jobs:
     needs: [build-docker-image]
     steps:
       - {uses: gacts/github-slug@v1, id: slug}
+      # https://render.com/docs/deploy-an-image#deploy-via-webhook
       - run: curl -SsL "https://api.render.com/deploy/${SRV}?key=${KEY}&imgURL=${IMG}:${TAG}"
         env:
           SRV: ${{ secrets.RENDER_COM_SERVICE_ID }}
