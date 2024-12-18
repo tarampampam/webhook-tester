@@ -120,3 +120,19 @@ jobs:
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version }}
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}
             docker.io/tarampampam/webhook-tester:${{ steps.slug.outputs.version-major }}
+
+  deploy-on-render:
+    name: Deploy on Render
+    runs-on: ubuntu-latest
+    concurrency: {group: render}
+    environment: {name: render}
+    needs: [build-docker-image]
+    steps:
+      - {uses: gacts/github-slug@v1, id: slug}
+      # https://render.com/docs/deploy-an-image#deploy-via-webhook
+      - run: curl -SsL "https://api.render.com/deploy/${SRV}?key=${KEY}&imgURL=${IMG}:${TAG}"
+        env:
+          SRV: ${{ secrets.RENDER_COM_SERVICE_ID }}
+          KEY: ${{ secrets.RENDER_COM_DEPLOY_KEY }}
+          IMG: docker.io/tarampampam/webhook-tester
+          TAG: ${{ steps.slug.outputs.version }} # the same as in the "build-docker-image" job

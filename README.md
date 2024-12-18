@@ -19,6 +19,10 @@ Consider it a free and self-hosted alternative to [webhook.site](https://github.
   <img src="https://github.com/user-attachments/assets/26e56d78-8a10-4883-9052-d18047206fda" alt="screencast" />
 </p>
 
+> [!TIP]
+> The demo is available at [wh.tarampamp.am](https://wh.tarampamp.am/). Please note that it is quite limited, does
+> not persist data, and may be unavailable at times, but feel free to give it a try.
+
 Built with Go for high performance, this application includes a lightweight UI (written in `ReactJS`) that’s compiled
 into the binary, so no additional assets are required. WebSocket support provides real-time webhook notifications in
 the UI - no need for third-party solutions like `pusher.com`!
