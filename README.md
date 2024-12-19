@@ -21,12 +21,7 @@ Consider it a free and self-hosted alternative to [webhook.site](https://github.
 
 > [!TIP]
 > The demo is available at [wh.tarampamp.am](https://wh.tarampamp.am/). Please note that it is quite limited,
-> does not persist data, and may be unavailable at times, but feel free to give it a try.
->
-> ![uptume][demo-uptime-badge] ![status][demo-status-badge]
-
-[demo-uptime-badge]:https://img.shields.io/uptimerobot/ratio/m798217500-b84f848c1cc418dc14654635?style=flat-square
-[demo-status-badge]:https://img.shields.io/uptimerobot/status/m798217500-b84f848c1cc418dc14654635?style=flat-square
+> does not persist data, and may be unavailable sometimes, but feel free to try it.
 
 Built with Go for high performance, this application includes a lightweight UI (written in `ReactJS`) that’s compiled
 into the binary, so no additional assets are required. WebSocket support provides real-time webhook notifications in
@@ -75,6 +70,17 @@ the app automatically creates the tunnel for you – no need to install or run `
 
 With this public URL, you can test your webhooks from external services like GitHub, GitLab, Bitbucket, and more.
 You'll never miss a request!
+
+## ⁉ FAQ
+
+**Can I have pre-defined (static) webhook URLs (sessions) to ensure that the sent request will be captured even 
+without data persistence?**
+
+Yes, simply use the `--auto-create-sessions` flag or set the `AUTO_CREATE_SESSIONS=true` environment variable. In 
+`v1`, you needed to define sessions during app startup to enable this functionality. However, since `v2`, all you 
+need to do is enable this feature. It works quite simply: if the incoming request contains a UUID-formatted prefix 
+(e.g., `https://app/{UUID}/...`), a session for this request will be created automatically. All that's left for you 
+to do is open the session in the UI.
 
 ## 🧩 Installation
 
