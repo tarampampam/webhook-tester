@@ -79,8 +79,8 @@ without data persistence?**
 Yes, simply use the `--auto-create-sessions` flag or set the `AUTO_CREATE_SESSIONS=true` environment variable. In 
 `v1`, you needed to define sessions during app startup to enable this functionality. However, since `v2`, all you 
 need to do is enable this feature. It works quite simply: if the incoming request contains a UUID-formatted prefix 
-(e.g., `https://app/{UUID}/...`), a session for this request will be created automatically. All that's left for you 
-to do is open the session in the UI.
+(e.g., `https://app/11111111-2222-3333-4444-555555555555/...`), a session for this request will be created 
+automatically. All that's left for you to do is open the session in the UI.
 
 ## 🧩 Installation
 
