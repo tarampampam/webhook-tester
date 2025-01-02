@@ -255,7 +255,7 @@ func (s *FS) listRequestFiles(sID string) ([]fsRequestFile, error) {
 	return list, nil
 }
 
-func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) { //nolint:funlen
+func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err // closed, or context is done
 	}
@@ -515,7 +515,7 @@ func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string,
 	return rID, nil
 }
 
-func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) { //nolint:funlen,gocyclo
+func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) { //nolint:funlen,gocyclo,gocognit
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
