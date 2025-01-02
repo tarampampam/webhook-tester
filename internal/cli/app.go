@@ -16,7 +16,7 @@ import (
 //go:generate go run app_readme.go
 
 // NewApp creates new console application.
-func NewApp() *cli.Command { //nolint:funlen
+func NewApp() *cli.Command {
 	var (
 		logLevelFlag = cli.StringFlag{
 			Name:     "log-level",

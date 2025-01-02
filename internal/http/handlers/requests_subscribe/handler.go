@@ -93,7 +93,7 @@ func (*Handler) reader(ctx context.Context, ws *websocket.Conn) error {
 // will block until the context is canceled, the client closes the connection, or an error during the writing occurs.
 //
 // This function sends the captured requests to the client and pings the client periodically.
-func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pubsub.RequestEvent) error { //nolint:funlen,lll
+func (h *Handler) writer(ctx context.Context, ws *websocket.Conn, sub <-chan pubsub.RequestEvent) error {
 	const pingInterval, pingDeadline = 10 * time.Second, 5 * time.Second
 
 	// create a ticker for the ping messages
