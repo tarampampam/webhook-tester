@@ -67,7 +67,7 @@ service:
   enabled: true
   # -- Sets the service type more information can be found here:
   #    https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-  type: ExternalName
+  type: ClusterIP
   # -- External name for the service (for type=ExternalName)
   externalName: null
   # -- Sets the port, more information can be found here:
