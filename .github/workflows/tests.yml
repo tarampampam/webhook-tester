@@ -41,14 +41,14 @@ jobs:
             backend: ['api/**', 'cmd/**', 'internal/**', '*go*', 'web/**/*.go']
             frontend: ['api/**', 'web/**']
             docker: [Dockerfile, '*docker*']
-            helm: ['chart/**', '*kube*']
+            helm: ['deployments/helm/**', '*kube*']
 
   lint-charts:
     name: Lint the chart
     runs-on: ubuntu-latest
     needs: [filter]
     if: needs.filter.outputs.helm == 'true'
-    defaults: {run: {working-directory: ./chart}}
+    defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
@@ -167,7 +167,7 @@ jobs:
     name: Build the docker image
     runs-on: ubuntu-latest
     needs: [filter]
-    if: needs.filter.outputs.docker == 'true'
+    if: ${{ needs.filter.outputs.docker == 'true' || needs.filter.outputs.backend == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/build-push-action@v6

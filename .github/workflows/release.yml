@@ -124,7 +124,7 @@ jobs:
   helm-pack:
     name: Pack the Helm chart
     runs-on: ubuntu-latest
-    defaults: {run: {working-directory: ./chart}}
+    defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
@@ -136,7 +136,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: helm-chart
-          path: ./chart/*.tgz
+          path: ./deployments/helm/*.tgz
           if-no-files-found: error
           retention-days: 1
 
@@ -147,10 +147,6 @@ jobs:
     steps:
       - {uses: actions/checkout@v4, with: {ref: gh-pages}}
       - uses: azure/setup-helm@v4
-      - name: Configure git
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
       - uses: actions/download-artifact@v4
         with: {name: helm-chart, path: ./helm-charts}
       - name: Update the index.yaml
@@ -160,12 +156,13 @@ jobs:
             --merge \
             ./helm-charts/index.yaml \
             ./helm-charts
-      - name: Update the index.html
-        run: tree -H '.' --noreport --dirsfirst -T 'Index' --charset utf-8 -P "*.tgz" -o ./index.html
+      - uses: yKicchan/generate-directory-listing-action@v1
+        with: {target: ., override: true}
       - name: Commit and push the changes
         run: |
-          git add 'helm-charts/*' index.html
-          git commit -m "Helm chart release"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git commit -am "Helm chart release"
           git push origin gh-pages
 
   deploy-on-render:
