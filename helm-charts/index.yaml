@@ -2,10 +2,10 @@ apiVersion: v1
 entries:
   webhook-tester:
   - apiVersion: v2
-    appVersion: X.Y.Z
-    created: "2025-02-01T10:51:49.248911022Z"
+    appVersion: 2.0.0
+    created: "2025-02-01T11:18:33.33562373Z"
     description: Powerful tool for testing WebHooks and more
-    digest: fe3040df7b06130c6a4ba21613c94453cdc4b12a38dbfa20844a82723675893f
+    digest: 53a4dc81933d2fb254045ce3c9fcb76c2a7ca8a68b944213121350bbc063a4a1
     icon: https://github.com/user-attachments/assets/e2e659dc-7fb1-4ac2-ad3c-883899f5fc38
     name: webhook-tester
     sources:
@@ -14,4 +14,4 @@ entries:
     urls:
     - https://tarampampam.github.io/webhook-tester/helm-charts/webhook-tester-0.1.0.tgz
     version: 0.1.0
-generated: "2025-02-01T10:51:49.248308394Z"
+generated: "2025-02-01T11:18:33.334989486Z"
