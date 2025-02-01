@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://json.schemastore.org/chart.json
+
+apiVersion: v2
+name: webhook-tester
+description: Powerful tool for testing WebHooks and more
+
+type: application
+version: 0.1.0
+appVersion: 2.0.1
+icon: https://github.com/user-attachments/assets/e2e659dc-7fb1-4ac2-ad3c-883899f5fc38
+sources: [https://github.com/tarampampam/webhook-tester]

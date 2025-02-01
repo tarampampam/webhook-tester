@@ -73,14 +73,14 @@ You'll never miss a request!
 
 ## ⁉ FAQ
 
-**Can I have pre-defined (static) webhook URLs (sessions) to ensure that the sent request will be captured even 
+**Can I have pre-defined (static) webhook URLs (sessions) to ensure that the sent request will be captured even
 without data persistence?**
 
-Yes, simply use the `--auto-create-sessions` flag or set the `AUTO_CREATE_SESSIONS=true` environment variable. In 
-`v1`, you needed to define sessions during app startup to enable this functionality. However, since `v2`, all you 
-need to do is enable this feature. It works quite simply - if the incoming request contains a UUID-formatted prefix 
-(e.g., `http://app/11111111-2222-3333-4444-555555555555/...`), a session for this request will be created 
-automatically. All that's left for you to do is open the session in the UI 
+Yes, simply use the `--auto-create-sessions` flag or set the `AUTO_CREATE_SESSIONS=true` environment variable. In
+`v1`, you needed to define sessions during app startup to enable this functionality. However, since `v2`, all you
+need to do is enable this feature. It works quite simply - if the incoming request contains a UUID-formatted prefix
+(e.g., `http://app/11111111-2222-3333-4444-555555555555/...`), a session for this request will be created
+automatically. All that's left for you to do is open the session in the UI
 (`http://app/s/11111111-2222-3333-4444-555555555555`).
 
 ## 🧩 Installation
@@ -111,6 +111,10 @@ Alternatively, you can use the Docker image:
 > [!NOTE]
 > It’s recommended to avoid using the `latest` tag, as **major** upgrades may include breaking changes.
 > Instead, use specific tags in `X.Y.Z` format for version consistency.
+
+To install it on Kubernetes (K8s), please use the Helm chart from [ArtifactHUB][artifact-hub].
+
+[artifact-hub]:https://artifacthub.io/packages/helm/webhook-tester/webhook-tester
 
 ## ⚙ Usage
 
