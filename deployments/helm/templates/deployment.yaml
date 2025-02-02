@@ -36,7 +36,7 @@ spec:
 
           {{- with .securityContext }}
           securityContext:
-            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
 
           {{- with $.Values.image }}
@@ -124,7 +124,7 @@ spec:
 
           {{- with .resources }}
           resources:
-            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
 
           {{- with .volumeMounts }}

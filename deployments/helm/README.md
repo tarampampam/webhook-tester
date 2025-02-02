@@ -8,10 +8,10 @@ never occur.
 ## Usage
 
 ```shell
-helm repo add tarampampam https://tarampampam.github.io/webhook-tester/helm-charts
+helm repo add webhook-tester https://tarampampam.github.io/webhook-tester/helm-charts
 helm repo update
 
-helm install webhook-tester tarampampam/webhook-tester
+helm install my-webhook-tester webhook-tester/webhook-tester --version <version_here>
 ```
 
 Alternatively, add the following lines to your `Chart.yaml`:
@@ -19,7 +19,7 @@ Alternatively, add the following lines to your `Chart.yaml`:
 ```yaml
 dependencies:
   - name: webhook-tester
-    version: <version>
+    version: <version_here>
     repository: https://tarampampam.github.io/webhook-tester/helm-charts
 ```
 

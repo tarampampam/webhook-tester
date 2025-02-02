@@ -21,12 +21,12 @@ deployment:
   # -- Additional pod annotations (e.g. for mesh injection or prometheus scraping)
   #    It supports templating. One can set it with values like some/name: '{{ template "some.name" . }}'
   #    For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-  podAnnotations: {}
+  podAnnotations: {} # supports templating
   # -- Additional deployment labels (e.g. for filtering deployment by custom labels)
-  labels: {}
+  labels: {} # supports templating
   # -- This is for the secretes for pulling an image from a private repository more information can be found
   #    here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-  imagePullSecrets: []
+  imagePullSecrets: [] # supports templating
   # -- Security context for the pod, more information can be found here:
   #    https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context-1
   securityContext:
@@ -45,22 +45,22 @@ deployment:
     limits: {memory: 256Mi}
   # -- Additional volumes to add to the pod, more information can be found here:
   #    https://kubernetes.io/docs/concepts/storage/volumes/
-  volumes: []
+  volumes: [] # supports templating
   # -- Additional volumeMounts to add to the container (for instance when using fs storage driver)
-  volumeMounts: []
+  volumeMounts: [] # supports templating
   # -- Node selector for pod assignment, more information can be found here:
   #    https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
-  nodeSelector: {}
+  nodeSelector: {} # supports templating
   # -- Affinity for pod assignment, more information can be found here:
   #    https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
-  affinity: {}
+  affinity: {} # supports templating
   # -- Tolerations for pod assignment, more information can be found here:
   #    https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
-  tolerations: []
+  tolerations: [] # supports templating
   # -- The list of additional environment variables to set in the container
-  env: []
+  env: [] # supports templating
   # -- The list of additional arguments to pass to the container
-  args: []
+  args: [] # supports templating
 
 service:
   # -- Enable service
@@ -81,7 +81,7 @@ ingress:
   #    https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-class
   className: null
   # -- Additional ingress annotations
-  annotations: {}
+  annotations: {} # supports templating
   # -- The list of hosts for the ingress
   hosts: []
   # -- TLS configuration for the ingress, more information can be found here:
