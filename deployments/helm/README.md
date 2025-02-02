@@ -1,5 +1,10 @@
 # WebHook Tester
 
+Important note: Since the chart is released together with the app under the same version (i.e., the chart version
+matches the app version), its versioning is not compatible with semantic versioning (SemVer). I will do my best to
+avoid non-backward-compatible changes in the chart, but due to Murphy's Law, I cannot guarantee that they will
+never occur.
+
 ## Usage
 
 ```shell
