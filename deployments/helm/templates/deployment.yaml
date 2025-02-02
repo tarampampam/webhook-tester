@@ -23,20 +23,20 @@ spec:
       labels:
         {{- include "webhook-tester.commonLabels" $ | nindent 8 }}
         {{- with .labels }}
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
     spec:
       automountServiceAccountToken: false
       {{- with .imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ include "webhook-tester.fullname" $ }}
 
           {{- with .securityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
           {{- end }}
 
           {{- with $.Values.image }}
@@ -102,13 +102,13 @@ spec:
             - {name: AUTO_CREATE_SESSIONS, value: "true"}
             {{- end }}
             {{- with $.Values.deployment.env }}
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
             {{- end }}
           {{- end }}
 
           {{- with .args }}
           args:
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
           {{- end }}
 
           {{- with .probe }}
@@ -124,32 +124,32 @@ spec:
 
           {{- with .resources }}
           resources:
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
           {{- end }}
 
           {{- with .volumeMounts }}
           volumeMounts:
-            {{- toYaml . | nindent 12 }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
           {{- end }}
 
       {{- with .volumes }}
       volumes:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
 
       {{- with .nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
 
       {{- with .affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
 
       {{- with .tolerations }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
   {{- end }}
 {{- end }}
