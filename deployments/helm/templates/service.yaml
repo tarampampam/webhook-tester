@@ -1,0 +1,25 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ include "webhook-tester.fullname" . }}
+  namespace: {{ template "webhook-tester.namespace" . }}
+  labels:
+    {{- include "webhook-tester.commonLabels" . | nindent 4 }}
+
+spec:
+  {{- with .Values.service }}
+  type: {{ .type }}
+  {{- with .externalName }}
+  externalName: {{ . }}
+  {{- end }}
+  ports:
+    - name: http
+      port: {{ .port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "webhook-tester.selectorLabels" $ | nindent 4 }}
+  {{- end }}
+{{- end }}

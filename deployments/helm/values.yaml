@@ -1,0 +1,160 @@
+# -- The name of the Helm release
+fullnameOverride: null
+# -- This is to override the chart name
+nameOverride: null
+# -- Override the default Release Namespace for Helm
+namespaceOverride: null
+
+image:
+  # -- The image repository to pull from
+  repository: ghcr.io/tarampampam/webhook-tester
+  # -- Defines the image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion
+  tag: null
+
+deployment:
+  # -- Enable deployment
+  enabled: true
+  # -- How many replicas to run
+  replicas: 1
+  # -- Additional pod annotations (e.g. for mesh injection or prometheus scraping)
+  #    It supports templating. One can set it with values like some/name: '{{ template "some.name" . }}'
+  #    For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  podAnnotations: {} # supports templating
+  # -- Additional deployment labels (e.g. for filtering deployment by custom labels)
+  labels: {} # supports templating
+  # -- This is for the secretes for pulling an image from a private repository more information can be found
+  #    here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  imagePullSecrets: [] # supports templating
+  # -- Security context for the pod, more information can be found here:
+  #    https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context-1
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001  # as defined in the Dockerfile
+    runAsGroup: 10001 # as defined in the Dockerfile
+  probe:
+    # -- How often (in seconds) to perform the probe
+    interval: 10
+    # -- Number of seconds after the container has started before liveness probes are initiated
+    initialDelay: 2
+  # -- Resource limits and requests, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  resources:
+    requests: {memory: 16Mi}
+    limits: {memory: 256Mi}
+  # -- Additional volumes to add to the pod, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/storage/volumes/
+  volumes: [] # supports templating
+  # -- Additional volumeMounts to add to the container (for instance when using fs storage driver)
+  volumeMounts: [] # supports templating
+  # -- Node selector for pod assignment, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  nodeSelector: {} # supports templating
+  # -- Affinity for pod assignment, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  affinity: {} # supports templating
+  # -- Tolerations for pod assignment, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: [] # supports templating
+  # -- The list of additional environment variables to set in the container
+  env: [] # supports templating
+  # -- The list of additional arguments to pass to the container
+  args: [] # supports templating
+
+service:
+  # -- Enable service
+  enabled: true
+  # -- Sets the service type more information can be found here:
+  #    https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+  type: ClusterIP
+  # -- External name for the service (for type=ExternalName)
+  externalName: null
+  # -- Sets the port, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+  port: 8081
+
+ingress:
+  # -- Enable ingress
+  enabled: false
+  # -- Ingress class to use, for more information checkout:
+  #    https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-class
+  className: null
+  # -- Additional ingress annotations
+  annotations: {} # supports templating
+  # -- The list of hosts for the ingress
+  hosts: []
+  # -- TLS configuration for the ingress, more information can be found here:
+  #    https://kubernetes.io/docs/concepts/services-networking/ingress/#tls
+  tls: []
+
+config:
+  log:
+    # -- Logging level (debug|info|warn|error|fatal)
+    # @default info (defined in the Dockerfile)
+    level: null
+    # -- Logging format (console|json)
+    # @default json (defined in the Dockerfile)
+    format: null
+
+  listen:
+    # -- IP (v4 or v6) address to listen on (0.0.0.0 to bind to all interfaces)
+    # @default 0.0.0.0
+    address: null
+    # -- HTTP server port
+    port: 8080
+
+  timeouts:
+    # -- Maximum duration for reading the entire request, including the body (zero = no timeout)
+    # @default 1m0s
+    read: null
+    # -- Maximum duration before timing out writes of the response (zero = no timeout)
+    # @default 1m0s
+    write: null
+    # -- Maximum amount of time to wait for the next request (keep-alive, zero = no timeout)
+    # @default 1m0s
+    idle: null
+    # -- Maximum duration for graceful shutdown
+    # @default 15s
+    shutdown: null
+
+  storage:
+    # -- Storage driver (memory|redis|fs)
+    # @default memory
+    driver: null
+    # -- Path to the directory for local fs storage (directory must exist)
+    # @default /data (defined in the Dockerfile)
+    dirPath: null
+
+  pubsub:
+    # -- Pub/Sub driver (memory|redis)
+    # @default memory
+    driver: null
+
+  tunnel:
+    # -- Tunnel driver to expose your locally running app to the internet (ngrok, empty to disable)
+    # @default "" (empty)
+    driver: null
+
+    # -- Ngrok authentication token (required for ngrok tunnel driver)
+    ngrokAuthToken: null
+
+  redis:
+    # -- Redis-like (redis, keydb) server DSN (e.g. redis://user:pwd@127.0.0.1:6379/0)
+    # @default redis://127.0.0.1:6379/0
+    dsn: null
+
+  limits:
+    # -- Session (single webhook) TTL (time-to-live, lifetime)
+    # @default 168h0m0s (7 days)
+    sessionTTL: null
+    # -- Maximal number of requests to store in the storage for the session (zero means unlimited)
+    # @default 128
+    maxRequests: null
+    # -- Maximal webhook request body size (in bytes), zero means unlimited
+    # @default 0
+    maxRequestBodySize: null
+
+  # -- Automatically create sessions (webhooks) for incoming requests
+  # @default false
+  autoCreateSessions: null

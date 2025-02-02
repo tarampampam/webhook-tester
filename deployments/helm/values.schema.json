@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "nameOverride": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
+    "fullnameOverride": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
+    "namespaceOverride": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "pullPolicy": {
+          "oneOf": [
+            {"type": "string", "enum": ["Always", "IfNotPresent", "Never"]},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "replicas": {"type": "integer"},
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"}
+            },
+            "minProperties": 1
+          }
+        },
+        "securityContext": {
+          "type": "object",
+          "properties": {
+            "runAsNonRoot": {"type": "boolean"},
+            "runAsUser": {"type": "integer"},
+            "runAsGroup": {"type": "integer"}
+          }
+        },
+        "probe": {
+          "type": "object",
+          "properties": {
+            "interval": {"type": "integer"},
+            "initialDelay": {"type": "integer"}
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {"type": "string"},
+                "memory": {"type": "string"}
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {"type": "string"},
+                "memory": {"type": "string"}
+              }
+            }
+          }
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "configMap": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"}
+                }
+              },
+              "secret": {
+                "type": "object",
+                "properties": {
+                  "secretName": {"type": "string"}
+                }
+              },
+              "persistentVolumeClaim": {
+                "type": "object",
+                "properties": {
+                  "claimName": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "volumeMounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "mountPath": {"type": "string"},
+              "subPath": {"type": "string"},
+              "readOnly": {"type": "boolean"}
+            }
+          }
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "affinity": {
+          "type": "object",
+          "properties": {
+            "nodeAffinity": {"type": "object"},
+            "podAffinity": {"type": "object"},
+            "podAntiAffinity": {"type": "object"}
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {"type": "string"},
+              "operator": {"type": "string"},
+              "value": {"type": "string"},
+              "effect": {"type": "string"}
+            }
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "value": {"type": "string"},
+              "valueFrom": {"type": "object"}
+            }
+          }
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+        },
+        "externalName": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "className": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {"type": "string", "minLength": 1},
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {"type": "string", "minLength": 1},
+                    "pathType": {"type": "string", "minLength": 1}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hosts": {"type": "array"},
+              "secretName": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "properties": {
+        "log": {
+          "properties": {
+            "level": {
+              "oneOf": [
+                {"type": "string", "enum": ["debug", "info", "warn", "error", "fatal"]},
+                {"type": "null"}
+              ]
+            },
+            "format": {
+              "oneOf": [
+                {"type": "string", "enum": ["console", "json"]},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "listen": {
+          "properties": {
+            "address": {
+              "oneOf": [
+                {"type": "string", "examples": ["0.0.0.0"]},
+                {"type": "null"}
+              ]
+            },
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+          }
+        },
+        "timeouts": {
+          "type": "object",
+          "properties": {
+            "read": {
+              "oneOf": [
+                {"type": "number", "enum": [0]},
+                {"type": "string", "minLength": 2, "examples": ["15s", "1m30s"]},
+                {"type": "null"}
+              ]
+            },
+            "write": {
+              "oneOf": [
+                {"type": "number", "enum": [0]},
+                {"type": "string", "minLength": 2, "examples": ["15s", "1m30s"]},
+                {"type": "null"}
+              ]
+            },
+            "idle": {
+              "oneOf": [
+                {"type": "number", "enum": [0]},
+                {"type": "string", "minLength": 2, "examples": ["15s", "1m30s"]},
+                {"type": "null"}
+              ]
+            },
+            "shutdown": {
+              "oneOf": [
+                {"type": "string", "examples": ["15s", "1m30s"]},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "driver": {
+              "oneOf": [
+                {"type": "string", "enum": ["memory", "redis", "fs"]},
+                {"type": "null"}
+              ]
+            },
+            "dirPath": {
+              "oneOf": [
+                {"type": "string"},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "pubsub": {
+          "type": "object",
+          "properties": {
+            "driver": {
+              "oneOf": [
+                {"type": "string", "enum": ["memory", "redis"]},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "tunnel": {
+          "type": "object",
+          "properties": {
+            "driver": {
+              "oneOf": [
+                {"type": "string", "enum": ["ngrok"]},
+                {"type": "null"}
+              ]
+            },
+            "ngrokAuthToken": {
+              "oneOf": [
+                {"type": "string", "minLength": 32},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "redis": {
+          "type": "object",
+          "properties": {
+            "dsn": {
+              "oneOf": [
+                {"type": "string", "examples": ["redis://user:pwd@127.0.0.1:6379/0"]},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "sessionTTL": {
+              "oneOf": [
+                {"type": "string", "minLength": 2, "examples": ["15s", "1m30s"]},
+                {"type": "null"}
+              ]
+            },
+            "maxRequests": {
+              "oneOf": [
+                {"type": "integer", "minimum": 0},
+                {"type": "null"}
+              ]
+            },
+            "maxRequestBodySize": {
+              "oneOf": [
+                {"type": "integer", "minimum": 0},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
+        "autoCreateSessions": {
+          "oneOf": [
+            {"type": "boolean"},
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  }
+}
