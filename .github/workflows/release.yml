@@ -124,6 +124,7 @@ jobs:
   helm-pack:
     name: Pack the Helm chart
     runs-on: ubuntu-latest
+    needs: [build-docker-image]
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v4
