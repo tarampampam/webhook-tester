@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button, type ButtonProps, Group } from '@mantine/core'
+import { Button, type ButtonProps, Group, Badge } from '@mantine/core'
 import { IconChevronDown, IconChevronsDown, IconChevronsUp, IconChevronUp } from '@tabler/icons-react'
 import { pathTo, RouteIDs } from '~/routing'
 import { useData } from '~/shared'
@@ -95,6 +95,12 @@ export const Navigator = (): React.JSX.Element => {
           Newer
         </Button>
       </Button.Group>
+
+      {requests.length && (
+        <Badge color="gray" size="xs" px="xs">
+          {requests.length}
+        </Badge>
+      )}
 
       <Button.Group>
         <Button // jump to the previous request
