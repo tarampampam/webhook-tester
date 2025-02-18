@@ -70,6 +70,7 @@ const (
 	pubSubDriverMemory, pubSubDriverRedis                    = "memory", "redis"
 	storageDriverMemory, storageDriverRedis, storageDriverFS = "memory", "redis", "fs"
 	tunnelDriverNgrok                                        = "ngrok"
+	tunnelDriverCloudflare                                   = "cloudflare"
 )
 
 // NewCommand creates new `start` command.
@@ -237,7 +238,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Category: tunnelCategory,
 			Value:    "", // no driver by default
 			Usage: "tunnel driver to expose your locally running app to the internet " +
-				"(" + strings.Join([]string{tunnelDriverNgrok}, "/") + ", empty to disable)",
+				"(" + strings.Join([]string{tunnelDriverNgrok, tunnelDriverCloudflare}, "/") + ", empty to disable)",
 			Sources:  cli.EnvVars("TUNNEL_DRIVER"),
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
@@ -247,6 +248,8 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 					return nil // no tunnel
 				case tunnelDriverNgrok:
 					return nil // ngrok
+				case tunnelDriverCloudflare:
+					return nil // cloudflare
 				default:
 					return fmt.Errorf("wrong tunnel driver [%s]", s)
 				}
@@ -484,6 +487,8 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 
 		if cmd.options.tunnel.driver == tunnelDriverNgrok {
 			tun = tunnel.NewNgrok(cmd.options.ngrok.authToken, tunnel.WithNgrokLogger(log.Named("ngrok")))
+		} else if cmd.options.tunnel.driver == tunnelDriverCloudflare {
+			tun = tunnel.NewCloudflareQuickTunnel()
 		}
 
 		if tun != nil {
