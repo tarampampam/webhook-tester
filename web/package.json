@@ -14,19 +14,19 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@mantine/code-highlight": "^7.16.2",
-    "@mantine/core": "^7.16.2",
-    "@mantine/hooks": "^7.16.2",
-    "@mantine/notifications": "^7.16.2",
-    "@tabler/icons-react": "^3.29.0",
+    "@mantine/code-highlight": "^7.17.0",
+    "@mantine/core": "^7.17.0",
+    "@mantine/hooks": "^7.17.0",
+    "@mantine/notifications": "^7.17.0",
+    "@tabler/icons-react": "^3.30.0",
     "dayjs": "^1.11.13",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
     "openapi-fetch": "^0.13.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.5",
-    "semver": "^7.7.0"
+    "react-router-dom": "^7.2.0",
+    "semver": "^7.7.1"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.6",
