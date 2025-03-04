@@ -4,7 +4,7 @@
 FROM docker.io/library/node:22-bookworm AS develop
 
 # install Go using the official image
-COPY --from=docker.io/library/golang:1.23-bookworm /usr/local/go /usr/local/go
+COPY --from=docker.io/library/golang:1.24-bookworm /usr/local/go /usr/local/go
 
 ENV \
   # add Go and Node.js "binaries" to the PATH
