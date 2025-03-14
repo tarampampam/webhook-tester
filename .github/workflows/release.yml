@@ -157,8 +157,7 @@ jobs:
             --merge \
             ./helm-charts/index.yaml \
             ./helm-charts
-      - uses: yKicchan/generate-directory-listing-action@v1
-        with: {target: ., ignore: "**/index.html", override: true}
+      - {uses: gacts/directory-listing@v1, with: {overwrite: true}}
       - name: Commit and push the changes
         run: |
           git config user.name "${{ github.actor }}"
