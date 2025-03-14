@@ -258,7 +258,7 @@ func (s *InMemory) NewRequest(ctx context.Context, sID string, r Request) (rID s
 
 	data.requests.Store(rID, r)
 
-	{ // limit stored requests count
+	if s.maxRequests > 0 { // limit stored requests count
 		type rq struct { // a runtime representation of the request, used for sorting
 			id string
 			ts int64

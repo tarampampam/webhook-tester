@@ -235,7 +235,7 @@ func (s *Redis) NewRequest(ctx context.Context, sID string, r Request) (rID stri
 	}
 
 	// if we have too many requests - remove unnecessary
-	if len(ids) > int(s.maxRequests) {
+	if s.maxRequests > 0 && len(ids) > int(s.maxRequests) {
 		if _, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			for _, id := range ids[:len(ids)-int(s.maxRequests)] {
 				pipe.ZRem(ctx, s.requestsKey(sID), id)
