@@ -488,7 +488,7 @@ func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string,
 		return "", err
 	}
 
-	{ // limit stored requests count
+	if s.maxRequests > 0 { // limit stored requests count
 		list, lErr := s.listRequestFiles(sID)
 		if lErr != nil {
 			return "", lErr
