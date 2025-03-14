@@ -432,7 +432,7 @@ func (s *FS) DeleteSession(ctx context.Context, sID string) error {
 	return s.withLock(false, func() error { return os.RemoveAll(s.sessionDir(sID)) })
 }
 
-func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen
+func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen,gocyclo
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return "", err
 	}
