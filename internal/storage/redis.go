@@ -146,10 +146,10 @@ func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Dura
 	}
 
 	if currentTTL < 0 {
-		switch { // https://redis.io/docs/latest/commands/ttl/
-		case currentTTL == -2:
+		switch currentTTL { //nolint:exhaustive // https://redis.io/docs/latest/commands/ttl/
+		case -2:
 			return ErrSessionNotFound
-		case currentTTL == -1:
+		case -1:
 			return fmt.Errorf("no associated expire: %w", ErrSessionNotFound)
 		}
 
