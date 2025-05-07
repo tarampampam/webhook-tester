@@ -13,10 +13,10 @@ func NewCommand(defaultHttpPort uint16) *cli.Command {
 		httpPortFlag = cli.UintFlag{
 			Name:     "port",
 			Usage:    "HTTP server port",
-			Value:    uint64(defaultHttpPort),
+			Value:    uint(defaultHttpPort),
 			Sources:  cli.EnvVars("HTTP_PORT"),
 			OnlyOnce: true,
-			Validator: func(port uint64) error {
+			Validator: func(port uint) error {
 				if port == 0 || port > 65535 {
 					return fmt.Errorf("wrong TCP port number [%d]", port)
 				}
@@ -31,7 +31,7 @@ func NewCommand(defaultHttpPort uint16) *cli.Command {
 		Aliases: []string{"hc", "health", "check"},
 		Usage:   "Health checker for the HTTP(S) servers. Use case - docker healthcheck",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return NewHealthChecker().Check(ctx, uint(c.Uint(httpPortFlag.Name)))
+			return NewHealthChecker().Check(ctx, c.Uint(httpPortFlag.Name))
 		},
 		Flags: []cli.Flag{
 			&httpPortFlag,

@@ -103,10 +103,10 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Name:     "port",
 			Category: httpCategory,
 			Usage:    "HTTP server port",
-			Value:    uint64(defaultHttpPort),
+			Value:    uint(defaultHttpPort),
 			Sources:  cli.EnvVars("HTTP_PORT"),
 			OnlyOnce: true,
-			Validator: func(port uint64) error {
+			Validator: func(port uint) error {
 				if port == 0 || port > math.MaxUint16 {
 					return fmt.Errorf("wrong TCP port number [%d]", port)
 				}
@@ -175,7 +175,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Value:    128, //nolint:mnd
 			Sources:  cli.EnvVars("MAX_REQUESTS"),
 			OnlyOnce: true,
-			Validator: func(n uint64) error {
+			Validator: func(n uint) error {
 				if n > math.MaxUint16 {
 					return fmt.Errorf("too big number of requests [%d]", n)
 				}
@@ -202,7 +202,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			Value:    0,
 			Sources:  cli.EnvVars("MAX_REQUEST_BODY_SIZE"),
 			OnlyOnce: true,
-			Validator: func(n uint64) error {
+			Validator: func(n uint) error {
 				if n > math.MaxUint32 {
 					return fmt.Errorf("too big request body size [%d]", n)
 				}
