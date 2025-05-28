@@ -17,14 +17,31 @@ type AppSettings = Readonly<{
   }>
 }>
 
+type HttpHeader = Readonly<{ name: string; value: string }>
+
+type ForwardedRequestItem = Readonly<{
+  url: string
+  statusCode?: number
+  requestBody?: Readonly<Uint8Array> // Assuming it will be base64 decoded like other bodies
+  responseBody?: Readonly<Uint8Array>
+  requestHeaders?: ReadonlyArray<HttpHeader>
+  responseHeaders?: ReadonlyArray<HttpHeader>
+  error?: string
+  occurredAt: Readonly<Date>
+}>
+
+type SessionResponseOptions = Readonly<{
+  statusCode: number
+  headers: ReadonlyArray<HttpHeader>
+  delay: number
+  body: Readonly<Uint8Array>
+  proxyUrls?: ReadonlyArray<string>
+  proxyResponseMode?: 'app_response' | 'proxy_first_success' | string // Allow string for flexibility
+}>
+
 type SessionOptions = Readonly<{
   uuid: string
-  response: Readonly<{
-    statusCode: number
-    headers: ReadonlyArray<{ name: string; value: string }>
-    delay: number
-    body: Readonly<Uint8Array>
-  }>
+  response: SessionResponseOptions
   createdAt: Readonly<Date>
 }>
 
@@ -35,9 +52,10 @@ type CapturedRequest = Readonly<{
   clientAddress: string
   method: HttpMethod
   requestPayload: Uint8Array
-  headers: ReadonlyArray<{ name: string; value: string }>
+  headers: ReadonlyArray<HttpHeader>
   url: Readonly<URL>
   capturedAt: Readonly<Date>
+  forwardedRequests?: ReadonlyArray<ForwardedRequestItem>
 }>
 
 type RequestEvent = Readonly<{
@@ -173,31 +191,48 @@ export class Client {
     headers = {},
     delay = 0,
     responseBody = new Uint8Array(),
+    proxyUrls,
+    proxyResponseMode,
   }: {
     statusCode?: number
     headers?: Record<string, string>
     delay?: number
     responseBody?: Uint8Array
+    proxyUrls?: string[]
+    proxyResponseMode?: string
   }): Promise<SessionOptions> {
+    const requestBody: components['schemas']['SessionResponseOptions'] = {
+      status_code: Math.min(Math.max(100, statusCode), 530), // clamp to the valid range
+      headers: Object.entries(headers)
+        .map(([name, value]) => ({ name, value })) // convert to array of objects
+        .filter((h) => h.value), // remove empty values
+      delay: Math.min(Math.max(0, delay), 30), // clamp to the valid range
+      response_body_base64: uint8ArrayToBase64(responseBody),
+    }
+
+    if (proxyUrls && proxyUrls.length > 0) {
+      requestBody.proxy_urls = proxyUrls
+    }
+
+    if (proxyResponseMode) {
+      requestBody.proxy_response_mode = proxyResponseMode as components['schemas']['SessionResponseOptions']['proxy_response_mode']
+    }
+
     const { data, response } = await this.api.POST('/api/session', {
-      body: {
-        status_code: Math.min(Math.max(100, statusCode), 530), // clamp to the valid range
-        headers: Object.entries(headers)
-          .map(([name, value]) => ({ name, value })) // convert to array of objects
-          .filter((h) => h.value), // remove empty values
-        delay: Math.min(Math.max(0, delay), 30), // clamp to the valid range
-        response_body_base64: uint8ArrayToBase64(responseBody),
-      },
+      body: requestBody,
     })
 
     if (data) {
+      const res = data.response
       return Object.freeze({
         uuid: data.uuid,
         response: Object.freeze({
-          statusCode: data.response.status_code,
-          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
-          delay: data.response.delay,
-          body: base64ToUint8Array(data.response.response_body_base64),
+          statusCode: res.status_code,
+          headers: res.headers.map(({ name, value }) => Object.freeze({ name, value })),
+          delay: res.delay,
+          body: base64ToUint8Array(res.response_body_base64),
+          proxyUrls: res.proxy_urls ? Object.freeze(res.proxy_urls) : undefined,
+          proxyResponseMode: res.proxy_response_mode ? res.proxy_response_mode : undefined,
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -217,13 +252,16 @@ export class Client {
     })
 
     if (data) {
+      const res = data.response
       return Object.freeze({
         uuid: data.uuid,
         response: Object.freeze({
-          statusCode: data.response.status_code,
-          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
-          delay: data.response.delay,
-          body: base64ToUint8Array(data.response.response_body_base64),
+          statusCode: res.status_code,
+          headers: res.headers.map(({ name, value }) => Object.freeze({ name, value })),
+          delay: res.delay,
+          body: base64ToUint8Array(res.response_body_base64),
+          proxyUrls: res.proxy_urls ? Object.freeze(res.proxy_urls) : undefined,
+          proxyResponseMode: res.proxy_response_mode ? res.proxy_response_mode : undefined,
         }),
         createdAt: Object.freeze(new Date(data.created_at_unix_milli)),
       })
@@ -290,8 +328,28 @@ export class Client {
       return Object.freeze(
         data
           // convert the list of requests to the immutable objects with the correct types
-          .map((req) =>
-            Object.freeze({
+          .map((req): CapturedRequest => {
+            let forwardedRequests: ForwardedRequestItem[] | undefined
+            if (req.forwarded_requests && req.forwarded_requests.length > 0) {
+              forwardedRequests = req.forwarded_requests.map((fr) =>
+                Object.freeze({
+                  url: fr.url,
+                  statusCode: fr.status_code,
+                  requestBody: fr.request_body_base64 ? base64ToUint8Array(fr.request_body_base64) : undefined,
+                  responseBody: fr.response_body_base64 ? base64ToUint8Array(fr.response_body_base64) : undefined,
+                  requestHeaders: fr.request_headers
+                    ? Object.freeze(fr.request_headers.map((h) => Object.freeze(h)))
+                    : undefined,
+                  responseHeaders: fr.response_headers
+                    ? Object.freeze(fr.response_headers.map((h) => Object.freeze(h)))
+                    : undefined,
+                  error: fr.error,
+                  occurredAt: Object.freeze(new Date(fr.occurred_at_unix_milli)),
+                })
+              )
+            }
+
+            return Object.freeze({
               uuid: req.uuid,
               clientAddress: req.client_address,
               method: req.method,
@@ -299,8 +357,9 @@ export class Client {
               headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
               url: Object.freeze(new URL(req.url)),
               capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
+              forwardedRequests: forwardedRequests ? Object.freeze(forwardedRequests) : undefined,
             })
-          )
+          })
           // sort the list by capturedAt date, to have the latest requests first
           .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())
       )
@@ -413,14 +472,35 @@ export class Client {
     })
 
     if (data) {
+      let forwardedRequests: ForwardedRequestItem[] | undefined
+      if (data.forwarded_requests && data.forwarded_requests.length > 0) {
+        forwardedRequests = data.forwarded_requests.map((fr) =>
+          Object.freeze({
+            url: fr.url,
+            statusCode: fr.status_code,
+            requestBody: fr.request_body_base64 ? base64ToUint8Array(fr.request_body_base64) : undefined,
+            responseBody: fr.response_body_base64 ? base64ToUint8Array(fr.response_body_base64) : undefined,
+            requestHeaders: fr.request_headers
+              ? Object.freeze(fr.request_headers.map((h) => Object.freeze(h)))
+              : undefined,
+            responseHeaders: fr.response_headers
+              ? Object.freeze(fr.response_headers.map((h) => Object.freeze(h)))
+              : undefined,
+            error: fr.error,
+            occurredAt: Object.freeze(new Date(fr.occurred_at_unix_milli)),
+          })
+        )
+      }
+
       return Object.freeze({
         uuid: data.uuid,
         clientAddress: data.client_address,
         method: data.method,
         requestPayload: base64ToUint8Array(data.request_payload_base64),
-        headers: Object.freeze(data.headers),
+        headers: Object.freeze(data.headers.map(h => Object.freeze(h))),
         url: Object.freeze(new URL(data.url)),
         capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
+        forwardedRequests: forwardedRequests ? Object.freeze(forwardedRequests) : undefined,
       })
     }
 

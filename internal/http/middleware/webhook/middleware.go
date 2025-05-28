@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"bytes"
 	"net/http"
 	"slices"
 	"strconv"
@@ -114,13 +115,111 @@ func New( //nolint:funlen,gocognit,gocyclo
 			slices.SortFunc(rHeaders, func(i, j storage.HttpHeader) int { return strings.Compare(i.Name, j.Name) })
 
 			// and save the request to the storage
-			rID, rErr := db.NewRequest(reqCtx, sID, storage.Request{ //nolint:contextcheck
+			// Prepare the main request object
+			mainRequest := storage.Request{
 				ClientAddr: extractRealIP(r),
 				Method:     r.Method,
-				Body:       body,
+				Body:       body, // body was read earlier
 				Headers:    rHeaders,
 				URL:        extractFullUrl(r),
-			})
+			}
+
+			// Proxying logic
+			if len(sess.ProxyURLs) > 0 { //nolint:nestif
+				forwardedRequests := make([]storage.ForwardedRequest, 0, len(sess.ProxyURLs))
+				proxyClient := &http.Client{Timeout: 10 * time.Second} // Configurable timeout
+
+				for _, proxyURL := range sess.ProxyURLs {
+					occurredAtUnixMilli := time.Now().UnixMilli()
+					var fr storage.ForwardedRequest
+
+					// Create new request for proxy
+					// Use bytes.NewReader for the body as it might be read multiple times
+					proxyReqBodyReader := bytes.NewReader(body)
+					proxyReq, pErr := http.NewRequestWithContext(reqCtx, r.Method, proxyURL, proxyReqBodyReader)
+					if pErr != nil {
+						fr = storage.ForwardedRequest{
+							URL:                 proxyURL,
+							Error:               fmt.Sprintf("failed to create proxy request: %v", pErr),
+							OccurredAtUnixMilli: occurredAtUnixMilli,
+						}
+						forwardedRequests = append(forwardedRequests, fr)
+						continue
+					}
+
+					// Copy headers to proxy request
+					proxyReq.Header = make(http.Header)
+					for _, h := range rHeaders { // Use already processed rHeaders
+						proxyReq.Header.Add(h.Name, h.Value)
+					}
+					// Remove hop-by-hop headers - this is a basic set, more might be needed
+					proxyReq.Header.Del("Connection")
+					proxyReq.Header.Del("Keep-Alive")
+					proxyReq.Header.Del("Proxy-Authenticate")
+					proxyReq.Header.Del("Proxy-Authorization")
+					proxyReq.Header.Del("Te")
+					proxyReq.Header.Del("Trailers")
+					proxyReq.Header.Del("Transfer-Encoding")
+					proxyReq.Header.Del("Upgrade")
+
+					var proxyReqHeaders = make([]storage.HttpHeader, 0, len(proxyReq.Header))
+					for name, values := range proxyReq.Header {
+						proxyReqHeaders = append(proxyReqHeaders, storage.HttpHeader{Name: name, Value: strings.Join(values, "; ")})
+					}
+					slices.SortFunc(proxyReqHeaders, func(i, j storage.HttpHeader) int { return strings.Compare(i.Name, j.Name) })
+
+					// Send the request
+					proxyResp, pErr := proxyClient.Do(proxyReq)
+					if pErr != nil {
+						fr = storage.ForwardedRequest{
+							URL:                 proxyURL,
+							Error:               pErr.Error(),
+							OccurredAtUnixMilli: occurredAtUnixMilli,
+							RequestBody:         body, // Log the body that was attempted to be sent
+							RequestHeaders:      proxyReqHeaders,
+						}
+						forwardedRequests = append(forwardedRequests, fr)
+						continue
+					}
+
+					// Read proxy response body
+					proxyRespBody, readErr := io.ReadAll(proxyResp.Body)
+					if readErr != nil {
+						_ = proxyResp.Body.Close() // Attempt to close, ignore error as we already have one
+						fr = storage.ForwardedRequest{
+							URL:                 proxyURL,
+							Error:               fmt.Sprintf("failed to read proxy response body: %v", readErr),
+							StatusCode:          proxyResp.StatusCode,
+							OccurredAtUnixMilli: occurredAtUnixMilli,
+							RequestBody:         body,
+							RequestHeaders:      proxyReqHeaders,
+						}
+						forwardedRequests = append(forwardedRequests, fr)
+						continue
+					}
+					_ = proxyResp.Body.Close()
+
+					var proxyRespHeaders = make([]storage.HttpHeader, 0, len(proxyResp.Header))
+					for name, values := range proxyResp.Header {
+						proxyRespHeaders = append(proxyRespHeaders, storage.HttpHeader{Name: name, Value: strings.Join(values, "; ")})
+					}
+					slices.SortFunc(proxyRespHeaders, func(i, j storage.HttpHeader) int { return strings.Compare(i.Name, j.Name) })
+
+					fr = storage.ForwardedRequest{
+						URL:                 proxyURL,
+						StatusCode:          proxyResp.StatusCode,
+						ResponseBody:        proxyRespBody,
+						ResponseHeaders:     proxyRespHeaders,
+						RequestBody:         body,
+						RequestHeaders:      proxyReqHeaders,
+						OccurredAtUnixMilli: occurredAtUnixMilli,
+					}
+					forwardedRequests = append(forwardedRequests, fr)
+				}
+				mainRequest.ForwardedRequests = forwardedRequests
+			}
+
+			rID, rErr := db.NewRequest(reqCtx, sID, mainRequest) //nolint:contextcheck
 			if rErr != nil {
 				respondWithError(w, log, http.StatusInternalServerError, rErr.Error())
 
@@ -145,6 +244,8 @@ func New( //nolint:funlen,gocognit,gocyclo
 				for i, h := range captured.Headers {
 					headers[i] = pubsub.HttpHeader{Name: h.Name, Value: h.Value}
 				}
+				// TODO: Consider if ForwardedRequests details should be part of the pubsub event.
+				// For now, keeping it simple and not including them.
 
 				if err := pub.Publish(appCtx, sID, pubsub.RequestEvent{
 					Action: pubsub.RequestActionCreate,

@@ -27,11 +27,25 @@ func (h *Handler) Handle(ctx context.Context, p openapi.CreateSessionRequest) (*
 		return nil, fmt.Errorf("cannot decode response body (wrong base64): %w", decErr)
 	}
 
+	// Handle proxy configuration
+	var proxyURLs []string
+	if p.ProxyUrls != nil {
+		proxyURLs = *p.ProxyUrls
+	}
+
+	var proxyResponseMode = "app_response" // Default value
+	if p.ProxyResponseMode != nil && *p.ProxyResponseMode != "" {
+		proxyResponseMode = *p.ProxyResponseMode
+		// TODO: Add validation for proxyResponseMode if specific values are expected, e.g., "app_response", "proxy_first_success"
+	}
+
 	sID, sErr := h.db.NewSession(ctx, storage.Session{
-		Code:         uint16(p.StatusCode), //nolint:gosec
-		Headers:      sHeaders,
-		ResponseBody: responseBody,
-		Delay:        time.Second * time.Duration(p.Delay),
+		Code:              uint16(p.StatusCode), //nolint:gosec
+		Headers:           sHeaders,
+		ResponseBody:      responseBody,
+		Delay:             time.Second * time.Duration(p.Delay),
+		ProxyURLs:         proxyURLs,
+		ProxyResponseMode: proxyResponseMode,
 	})
 	if sErr != nil {
 		return nil, fmt.Errorf("failed to create a new session: %w", sErr)
@@ -52,6 +66,17 @@ func (h *Handler) Handle(ctx context.Context, p openapi.CreateSessionRequest) (*
 		rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
 	}
 
+	// Prepare response, including proxy configuration
+	var responseProxyUrls *[]string
+	if len(sess.ProxyURLs) > 0 {
+		responseProxyUrls = &sess.ProxyURLs
+	}
+
+	var responseProxyResponseMode *string
+	if sess.ProxyResponseMode != "" {
+		responseProxyResponseMode = &sess.ProxyResponseMode
+	}
+
 	return &openapi.SessionOptionsResponse{
 		CreatedAtUnixMilli: sess.CreatedAtUnixMilli,
 		Response: openapi.SessionResponseOptions{
@@ -59,6 +84,8 @@ func (h *Handler) Handle(ctx context.Context, p openapi.CreateSessionRequest) (*
 			Headers:            rHeaders,
 			ResponseBodyBase64: base64.StdEncoding.EncodeToString(sess.ResponseBody),
 			StatusCode:         openapi.StatusCode(sess.Code),
+			ProxyUrls:          responseProxyUrls,
+			ProxyResponseMode:  responseProxyResponseMode,
 		},
 		Uuid: sUUID,
 	}, nil

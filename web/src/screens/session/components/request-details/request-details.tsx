@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { CodeHighlightTabs } from '@mantine/code-highlight'
-import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
+import { Accordion, Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title, Paper, Group } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { Link } from 'react-router-dom'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
@@ -45,17 +45,18 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
   }, [])
 
   return (
-    <Grid>
-      {!!request && !!session && showRequestDetails && (
-        <>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Title order={4} mb="md">
-              Request details
-            </Title>
-            <Table my="md" withRowBorders={false} verticalSpacing="0.2em" highlightOnHover>
-              <Table.Tbody>
-                <Table.Tr>
-                  <Table.Td ta="right" w="15%">
+    <>
+      <Grid>
+        {!!request && !!session && showRequestDetails && (
+          <>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Title order={4} mb="md">
+                Request details
+              </Title>
+              <Table my="md" withRowBorders={false} verticalSpacing="0.2em" highlightOnHover>
+                <Table.Tbody>
+                  <Table.Tr>
+                    <Table.Td ta="right" w="15%">
                     Path
                   </Table.Td>
                   <Table.Td>
@@ -192,7 +193,110 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
           </Tabs>
         )}
       </Grid.Col>
+      {!!request && !!request.forwardedRequests && request.forwardedRequests.length > 0 && showRequestDetails && (
+        <Grid.Col span={12}>
+          <Title order={4} my="md">
+            Forwarded Requests ({request.forwardedRequests.length})
+          </Title>
+          <Accordion variant="separated" defaultValue={request.forwardedRequests[0]?.url}>
+            {request.forwardedRequests.map((fr, index) => (
+              <Accordion.Item key={index} value={`${fr.url}-${index}`}>
+                <Accordion.Control>
+                  <Group justify="space-between">
+                    <Text size="sm" style={{ flexGrow: 1 }}>
+                      <Text span fw={500}>URL:</Text> {fr.url}
+                    </Text>
+                    {fr.error ? (
+                      <Badge color="red">Error</Badge>
+                    ) : (
+                      <Badge color={fr.statusCode && fr.statusCode >= 200 && fr.statusCode < 300 ? 'teal' : 'orange'}>
+                        Status: {fr.statusCode || 'N/A'}
+                      </Badge>
+                    )}
+                    <Text size="xs" c="dimmed">
+                      Attempted: {dayjs(fr.occurredAt).format('YYYY-MM-DD HH:mm:ss.SSS')}
+                    </Text>
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  {fr.error && (
+                    <Paper p="md" withBorder shadow="xs" mb="sm">
+                      <Text c="red" fw={500}>Error during forwarding:</Text>
+                      <Text>{fr.error}</Text>
+                    </Paper>
+                  )}
+                  <Tabs defaultValue="requestToProxy" variant="outline">
+                    <Tabs.List>
+                      <Tabs.Tab value="requestToProxy">Request to Proxy</Tabs.Tab>
+                      <Tabs.Tab value="responseFromProxy" disabled={!!fr.error}>Response from Proxy</Tabs.Tab>
+                    </Tabs.List>
+
+                    <Tabs.Panel value="requestToProxy" pt="xs">
+                      {fr.requestHeaders && fr.requestHeaders.length > 0 && (
+                        <>
+                          <Text fw={500} mb="xs">Request Headers:</Text>
+                          <CodeHighlightTabs
+                            code={{
+                              fileName: 'headers.txt',
+                              code: fr.requestHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                              language: 'bash',
+                            }}
+                            maxCollapsedHeight="10em"
+                            withExpandButton
+                            withCopyButton
+                          />
+                        </>
+                      )}
+                      {fr.requestBody && fr.requestBody.length > 0 && (
+                        <>
+                          <Text fw={500} mt="sm" mb="xs">Request Body:</Text>
+                          <ViewText input={fr.requestBody} contentType="application/octet-stream" /> {/* Adjust content type as needed */}
+                        </>
+                      )}
+                      {(!fr.requestHeaders || fr.requestHeaders.length === 0) && (!fr.requestBody || fr.requestBody.length === 0) && (
+                        <Text c="dimmed">No request headers or body sent to proxy.</Text>
+                      )}
+                    </Tabs.Panel>
+
+                    <Tabs.Panel value="responseFromProxy" pt="xs">
+                      {!fr.error && (
+                        <>
+                          {fr.responseHeaders && fr.responseHeaders.length > 0 && (
+                            <>
+                              <Text fw={500} mb="xs">Response Headers:</Text>
+                              <CodeHighlightTabs
+                                code={{
+                                  fileName: 'headers.txt',
+                                  code: fr.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n'),
+                                  language: 'bash',
+                                }}
+                                maxCollapsedHeight="10em"
+                                withExpandButton
+                                withCopyButton
+                              />
+                            </>
+                          )}
+                           {fr.responseBody && fr.responseBody.length > 0 && (
+                            <>
+                              <Text fw={500} mt="sm" mb="xs">Response Body:</Text>
+                              <ViewText input={fr.responseBody} contentType={fr.responseHeaders?.find(h => h.name.toLowerCase() === 'content-type')?.value || 'application/octet-stream'} />
+                            </>
+                          )}
+                          {(!fr.responseHeaders || fr.responseHeaders.length === 0) && (!fr.responseBody || fr.responseBody.length === 0) && (
+                            <Text c="dimmed">No response headers or body received from proxy.</Text>
+                          )}
+                        </>
+                      )}
+                    </Tabs.Panel>
+                  </Tabs>
+                </Accordion.Panel>
+              </Accordion.Item>
+            ))}
+          </Accordion>
+        </Grid.Col>
+      )}
     </Grid>
+    </>
   )
 }
 

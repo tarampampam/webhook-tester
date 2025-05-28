@@ -28,6 +28,17 @@ func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.SessionOptionsR
 		sHeaders[i].Name, sHeaders[i].Value = header.Name, header.Value
 	}
 
+	// Prepare response, including proxy configuration
+	var responseProxyUrls *[]string
+	if len(sess.ProxyURLs) > 0 {
+		responseProxyUrls = &sess.ProxyURLs
+	}
+
+	var responseProxyResponseMode *string
+	if sess.ProxyResponseMode != "" {
+		responseProxyResponseMode = &sess.ProxyResponseMode
+	}
+
 	return &openapi.SessionOptionsResponse{
 		CreatedAtUnixMilli: sess.CreatedAtUnixMilli,
 		Response: openapi.SessionResponseOptions{
@@ -35,6 +46,8 @@ func (h *Handler) Handle(ctx context.Context, sID sID) (*openapi.SessionOptionsR
 			Headers:            sHeaders,
 			ResponseBodyBase64: base64.StdEncoding.EncodeToString(sess.ResponseBody),
 			StatusCode:         openapi.StatusCode(sess.Code),
+			ProxyUrls:          responseProxyUrls,
+			ProxyResponseMode:  responseProxyResponseMode,
 		},
 		Uuid: sID,
 	}, nil

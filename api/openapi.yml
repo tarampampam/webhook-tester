@@ -210,6 +210,44 @@ components:
       minimum: 1600000000
       x-go-type: int64
 
+    ForwardedRequestItem:
+      type: object
+      description: Details of a request forwarded to a proxy URL.
+      properties:
+        url:
+          type: string
+          description: The proxy URL the request was forwarded to.
+          example: 'http://example.com/proxy'
+        status_code:
+          type: integer
+          description: Response status code from the proxy.
+          example: 200
+        request_body_base64:
+          allOf:
+            - {$ref: '#/components/schemas/Base64Encoded'}
+            - description: Request body sent to the proxy (base64 encoded).
+        response_body_base64:
+          allOf:
+            - {$ref: '#/components/schemas/Base64Encoded'}
+            - description: Response body from the proxy (base64 encoded).
+        request_headers:
+          type: array
+          items: {$ref: '#/components/schemas/HttpHeader'}
+          description: Headers sent to the proxy.
+        response_headers:
+          type: array
+          items: {$ref: '#/components/schemas/HttpHeader'}
+          description: Headers received from the proxy.
+        error:
+          type: string
+          description: Error message if the proxy request failed.
+          example: 'connection refused'
+        occurred_at_unix_milli:
+          allOf:
+            - {$ref: '#/components/schemas/UnixMilliTime'}
+            - description: Time the forwarding attempt occurred.
+      required: [url, occurred_at_unix_milli]
+
     UUID:
       type: string
       format: uuid
@@ -238,6 +276,22 @@ components:
         headers: {type: array, items: {$ref: '#/components/schemas/HttpHeader'}}
         delay: {type: integer, description: Delay in seconds, maximum: 30, example: 5, x-go-type: uint16}
         response_body_base64: {$ref: '#/components/schemas/Base64Encoded'}
+        proxy_urls:
+          type: array
+          items:
+            type: string
+            format: url
+            example: 'https://my-downstream-service.com/webhook'
+          description: A list of URLs to which incoming requests for this session will be proxied.
+          maxItems: 5
+        proxy_response_mode:
+          type: string
+          enum: [app_response, proxy_first_success]
+          description: |
+            Determines how the webhook tester responds to the original caller when proxying is enabled.
+            - `app_response`: Always respond with the application's configured response. Proxying happens in the background.
+            - `proxy_first_success`: Respond with the first successful proxy response. If all proxies fail, respond with the application's configured response.
+          example: 'app_response'
       required: [status_code, headers, delay, response_body_base64]
       additionalProperties: false
 
@@ -279,6 +333,11 @@ components:
           type: string
           example: 'https://example.com/path?query=string'
         captured_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
+        forwarded_requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForwardedRequestItem'
+          description: A list of requests that were forwarded to proxy URLs, along with their outcomes.
       required: [uuid, client_address, method, request_payload_base64, headers, url, captured_at_unix_milli]
       additionalProperties: false
 

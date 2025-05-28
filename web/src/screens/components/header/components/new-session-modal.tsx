@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea } from '@mantine/core'
-import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
+import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea, Select, MultiSelect, TagsInput } from '@mantine/core'
+import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions, IconLink, IconPlayerPlay } from '@tabler/icons-react'
 import { notifications as notify } from '@mantine/notifications'
 import { useNavigate } from 'react-router-dom'
 import { useStorage, UsedStorageKeys, type StorageArea, useSettings, useData } from '~/shared'
@@ -33,6 +33,19 @@ const controls = {
   body: {
     def: '{"captured": true}',
     key: UsedStorageKeys.NewSessionResponseBody,
+    area: 'session' satisfies StorageArea as StorageArea,
+  },
+  // proxy urls
+  proxyUrls: {
+    def: [] as string[], // Default to empty array
+    key: UsedStorageKeys.NewSessionProxyUrls, // Define this key in UsedStorageKeys
+    area: 'session' satisfies StorageArea as StorageArea,
+    limits: { maxCount: 5, maxUrlLength: 2048 }, // Example limits
+  },
+  // proxy response mode
+  proxyResponseMode: {
+    def: 'app_response',
+    key: UsedStorageKeys.NewSessionProxyResponseMode, // Define this key in UsedStorageKeys
     area: 'session' satisfies StorageArea as StorageArea,
   },
   // destroy current session
@@ -69,6 +82,22 @@ const validate: { [K in keyof typeof controls]: (v: unknown) => boolean } = {
   },
   delay: (v) => typeof v === 'number' && v >= controls.delay.limits.min && v <= controls.delay.limits.max,
   body: (v) => typeof v === 'string',
+  proxyUrls: (v) => {
+    if (!Array.isArray(v)) return false
+    if (v.length > controls.proxyUrls.limits.maxCount) return false
+    return v.every(
+      (url) => {
+        if (typeof url !== 'string' || url.length > controls.proxyUrls.limits.maxUrlLength) return false
+        try {
+          new URL(url) // Check if it's a valid URL
+          return true
+        } catch {
+          return false
+        }
+      }
+    )
+  },
+  proxyResponseMode: (v) => typeof v === 'string' && ['app_response', 'proxy_first_success'].includes(v),
   destroy: (v) => typeof v === 'boolean',
 }
 
@@ -85,14 +114,18 @@ export const NewSessionModal: React.FC<{
   const [headers, setHeaders] = useStorage<string>(controls.head.def, controls.head.key, controls.head.area)
   const [delay, setDelay] = useStorage<number>(controls.delay.def, controls.delay.key, controls.delay.area)
   const [body, setBody] = useStorage<string>(controls.body.def, controls.body.key, controls.body.area)
+  const [proxyUrls, setProxyUrls] = useStorage<string[]>(controls.proxyUrls.def, controls.proxyUrls.key, controls.proxyUrls.area)
+  const [proxyResponseMode, setProxyResponseMode] = useStorage<string>(controls.proxyResponseMode.def, controls.proxyResponseMode.key, controls.proxyResponseMode.area)
   const [destroy, setDestroy] = useStorage<boolean>(controls.destroy.def, controls.destroy.key, controls.destroy.area)
 
   const [wrongStatusCode, setWrongStatusCode] = useState<boolean>(false)
   const [wrongHeaders, setWrongHeaders] = useState<boolean>(false)
   const [wrongDelay, setWrongDelay] = useState<boolean>(false)
   const [wrongResponseBody, setWrongResponseBody] = useState<boolean>(false)
+  const [wrongProxyUrls, setWrongProxyUrls] = useState<boolean>(false)
+  const [wrongProxyResponseMode, setWrongProxyResponseMode] = useState<boolean>(false)
   const [createDisabled, setCreateDisabled] = useState<boolean>(
-    wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody
+    wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody || wrongProxyUrls || wrongProxyResponseMode
   )
 
   // watch the values and set the "wrong" state when the value changes
@@ -109,17 +142,19 @@ export const NewSessionModal: React.FC<{
 
     setWrongResponseBody(!bodyIsValid)
   }, [body, maxBodySize])
+  useEffect(() => setWrongProxyUrls(!validate.proxyUrls(proxyUrls)), [proxyUrls])
+  useEffect(() => setWrongProxyResponseMode(!validate.proxyResponseMode(proxyResponseMode)), [proxyResponseMode])
 
   // disable the create button if any of the fields are invalid
   useEffect(
-    () => setCreateDisabled(wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody),
-    [wrongStatusCode, wrongHeaders, wrongDelay, wrongResponseBody]
+    () => setCreateDisabled(wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody || wrongProxyUrls || wrongProxyResponseMode),
+    [wrongStatusCode, wrongHeaders, wrongDelay, wrongResponseBody, wrongProxyUrls, wrongProxyResponseMode]
   )
 
   /** Handle the creation of a new session */
   const handleCreate = () => {
     // if any of the fields are invalid, return (kinda fuse)
-    if (wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody) {
+    if (wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody || wrongProxyUrls || wrongProxyResponseMode) {
       return
     }
 
@@ -139,6 +174,8 @@ export const NewSessionModal: React.FC<{
       headers: Object.keys(respHeaders).length > 0 ? respHeaders : undefined,
       delay: delay > 0 ? delay : undefined,
       responseBody: body.trim().length > 0 ? new TextEncoder().encode(body) : undefined,
+      proxyUrls: proxyUrls.length > 0 ? proxyUrls.filter(url => url.trim() !== '') : undefined,
+      proxyResponseMode: proxyResponseMode,
     })
       .then((opts) => {
         notify.update({
@@ -254,6 +291,34 @@ export const NewSessionModal: React.FC<{
         value={body}
         onChange={(e) => setBody(e.currentTarget.value)}
         autosize
+      />
+      <TagsInput
+        my="sm"
+        label="Proxy URLs"
+        description={`Enter URLs to forward requests to (one per entry, max ${controls.proxyUrls.limits.maxCount})`}
+        placeholder="https://example.com/webhook"
+        leftSection={<IconLink />}
+        data={proxyUrls}
+        onChange={setProxyUrls}
+        error={wrongProxyUrls}
+        disabled={loading}
+        maxTags={controls.proxyUrls.limits.maxCount}
+        clearable
+      />
+      <Select
+        my="sm"
+        label="Proxy Response Mode"
+        description="Determines how the webhook tester responds when proxying"
+        leftSection={<IconPlayerPlay />}
+        data={[
+          { value: 'app_response', label: 'Application Response' },
+          { value: 'proxy_first_success', label: 'Proxy First Success' },
+        ]}
+        value={proxyResponseMode}
+        onChange={(value) => setProxyResponseMode(value || controls.proxyResponseMode.def)}
+        error={wrongProxyResponseMode}
+        disabled={loading}
+        allowDeselect={false}
       />
       <Group mt="xl" justify="space-between">
         <Checkbox

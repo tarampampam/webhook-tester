@@ -7,6 +7,8 @@ export type Session = {
   responseDelay: number
   responseBody: Uint8Array
   createdAt: Date
+  proxyUrls?: string[]
+  proxyResponseMode?: string
 }
 
 export type SessionsTable = Table<Session, string>
