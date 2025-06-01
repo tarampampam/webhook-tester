@@ -16,7 +16,7 @@
   "dependencies": {
     "@mantine/code-highlight": "^7.17.5",
     "@mantine/core": "^7.17.5",
-    "@mantine/hooks": "^7.17.5",
+    "@mantine/hooks": "^8.0.2",
     "@mantine/notifications": "^7.17.5",
     "@tabler/icons-react": "^3.33.0",
     "dayjs": "^1.11.13",
