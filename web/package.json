@@ -18,15 +18,15 @@
     "@mantine/core": "^7.17.5",
     "@mantine/hooks": "^7.17.5",
     "@mantine/notifications": "^7.17.5",
-    "@tabler/icons-react": "^3.31.0",
+    "@tabler/icons-react": "^3.33.0",
     "dayjs": "^1.11.13",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
-    "openapi-fetch": "^0.13.5",
+    "openapi-fetch": "^0.14.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.5.3",
-    "semver": "^7.7.1"
+    "react-router-dom": "^7.6.1",
+    "semver": "^7.7.2"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.8",
