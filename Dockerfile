@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # -✂- this stage is used to develop and build the application locally -------------------------------------------------
-FROM docker.io/library/node:22-bookworm AS develop
+FROM docker.io/library/node:24-bookworm AS develop
 
 # install Go using the official image
 COPY --from=docker.io/library/golang:1.24-bookworm /usr/local/go /usr/local/go
