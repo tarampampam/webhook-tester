@@ -18,14 +18,14 @@
     "@mantine/core": "^7.17.5",
     "@mantine/hooks": "^7.17.5",
     "@mantine/notifications": "^7.17.5",
-    "@tabler/icons-react": "^3.33.0",
+    "@tabler/icons-react": "^3.34.0",
     "dayjs": "^1.11.13",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
     "openapi-fetch": "^0.14.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.1",
+    "react-router-dom": "^7.6.3",
     "semver": "^7.7.2"
   },
   "devDependencies": {
