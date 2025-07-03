@@ -96,7 +96,7 @@ func (s *InMemory) cleanup(ctx context.Context) {
 
 			s.sessions.Range(func(sID string, data *sessionData) bool {
 				data.Lock()
-				var expiresAt = data.session.ExpiresAt
+				var expiresAt = data.session.ExpiresAt //nolint:wsl_v5
 				data.Unlock()
 
 				if expiresAt.Before(now) {
@@ -119,7 +119,7 @@ func (s *InMemory) isSessionExists(sID string) bool {
 	}
 
 	data.Lock()
-	var expiresAt = data.session.ExpiresAt
+	var expiresAt = data.session.ExpiresAt //nolint:wsl_v5
 	data.Unlock()
 
 	// TODO: remove expired sessions automatically?
@@ -189,7 +189,7 @@ func (s *InMemory) GetSession(ctx context.Context, sID string) (*Session, error)
 	}
 
 	data.Lock()
-	var expiresAt = data.session.ExpiresAt
+	var expiresAt = data.session.ExpiresAt //nolint:wsl_v5
 	data.Unlock()
 
 	if expiresAt.Before(s.timeNow()) {
