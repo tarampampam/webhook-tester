@@ -1,0 +1,2 @@
+@import url('highlight.js/styles/stackoverflow-dark.min.css') screen and (prefers-color-scheme: dark);
+@import url('highlight.js/styles/stackoverflow-light.min.css') screen and (prefers-color-scheme: light);

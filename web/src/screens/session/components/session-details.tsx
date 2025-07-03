@@ -75,7 +75,7 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
         <>
           <Text>Here&apos;s your unique URL:</Text>
           <Flex my="md" align="center" justify="space-between" gap="xs" direction={{ base: 'column', lg: 'row' }}>
-            <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" pr="lg" />
+            <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" />
             <Button.Group w={{ base: '100%', lg: 'auto' }}>
               <Button
                 variant="gradient"
@@ -244,18 +244,11 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               <Table.Tr>
                 <Table.Td ta="right">Response headers</Table.Td>
                 <Table.Td>
-                  <CodeHighlightTabs
-                    code={[
-                      {
-                        code: session.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n'),
-                        fileName: 'response-headers',
-                        language: 'bash',
-                      },
-                    ]}
-                    styles={{ pre: { width: 0 } }}
+                  <CodeHighlight
+                    code={session.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n')}
+                    language="bash"
                     expandCodeLabel="Show all headers"
-                    defaultExpanded={false}
-                    withHeader={false}
+                    defaultExpanded={session.responseHeaders.length <= 5}
                     withExpandButton
                   />
                 </Table.Td>
@@ -265,18 +258,12 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               <Table.Tr>
                 <Table.Td ta="right">Response body</Table.Td>
                 <Table.Td>
-                  <CodeHighlightTabs
-                    code={[
-                      {
-                        code: String.fromCharCode(...session.responseBody),
-                        fileName: 'response-body',
-                        language: 'json',
-                      },
-                    ]}
+                  <CodeHighlight
+                    code={String.fromCharCode(...session.responseBody)}
+                    language="json"
                     styles={{ pre: { whiteSpace: 'pre-line' } }}
                     expandCodeLabel="Show full response"
-                    defaultExpanded={false}
-                    withHeader={false}
+                    defaultExpanded={session.responseBody.length <= 1000}
                     withExpandButton
                   />
                 </Table.Td>

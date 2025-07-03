@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CodeHighlightTabs } from '@mantine/code-highlight'
+import { CodeHighlight } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { Link } from 'react-router-dom'
@@ -135,12 +135,9 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
             </Title>
             {(loading && <Skeleton radius="md" h="10em" w="100%" />) ||
               (!!request.headers && (
-                <CodeHighlightTabs
-                  code={{
-                    fileName: 'headers.txt',
-                    code: request.headers.map(({ name, value }) => `${name}: ${value}`).join('\n'),
-                    language: 'bash',
-                  }}
+                <CodeHighlight
+                  code={request.headers.map(({ name, value }) => `${name}: ${value}`).join('\n')}
+                  language="bash"
                   expandCodeLabel="Show all headers"
                   maxCollapsedHeight="10em"
                   expanded={headersExpanded}

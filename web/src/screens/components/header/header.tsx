@@ -61,7 +61,9 @@ export const Header: React.FC<{
         <Group>
           <Image
             src={LogoTextSvg}
-            style={{ height: 20 }}
+            h={20}
+            w="auto"
+            fit="scale-down"
             title={currentVersion ? 'v' + currentVersion.toString() : undefined}
           />
           <Button.Group visibleFrom="sm">
