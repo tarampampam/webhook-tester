@@ -45,7 +45,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   redis:
-    image: docker.io/library/redis:7-alpine
+    image: docker.io/library/redis:8-alpine
     volumes: [redis-data:/data:rw]
     ports: ['6379/tcp']
     healthcheck:
