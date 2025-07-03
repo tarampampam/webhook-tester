@@ -590,7 +590,7 @@ func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) 
 	return &request, nil
 }
 
-func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) { //nolint:funlen
+func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) {
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return nil, err
 	}
@@ -652,8 +652,8 @@ func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request
 			}
 
 			mu.Lock()
-			m[file.rID] = request
-			mu.Unlock()
+			m[file.rID] = request //nolint:wsl_v5
+			mu.Unlock()           //nolint:wsl_v5
 
 			return nil
 		})

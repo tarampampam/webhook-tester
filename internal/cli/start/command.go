@@ -394,7 +394,7 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 	case storageDriverMemory:
 		var inMemory = storage.NewInMemory(cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests)) //nolint:contextcheck,lll
 		defer func() { _ = inMemory.Close() }()
-		db = inMemory //nolint:wsl
+		db = inMemory //nolint:wsl_v5
 	case storageDriverRedis:
 		db = storage.NewRedis(rdc, cmd.options.storage.sessionTTL, uint32(cmd.options.storage.maxRequests))
 	case storageDriverFS:
