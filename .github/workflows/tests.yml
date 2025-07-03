@@ -116,7 +116,7 @@ jobs:
         pubsub-driver: [memory, redis]
     services:
       redis:
-        image: docker.io/library/redis:7-alpine
+        image: docker.io/library/redis:8-alpine
         ports: ['6379:6379/tcp']
         options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
     needs: [build-app]
