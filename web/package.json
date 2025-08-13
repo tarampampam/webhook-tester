@@ -14,10 +14,10 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@mantine/code-highlight": "^8.2.2",
-    "@mantine/core": "^8.2.2",
-    "@mantine/hooks": "^8.2.2",
-    "@mantine/notifications": "^8.2.2",
+    "@mantine/code-highlight": "^8.2.4",
+    "@mantine/core": "^8.2.4",
+    "@mantine/hooks": "^8.2.4",
+    "@mantine/notifications": "^8.2.4",
     "@tabler/icons-react": "^3.34.1",
     "dayjs": "^1.11.13",
     "dexie": "^4.0.11",
@@ -26,7 +26,7 @@
     "openapi-fetch": "^0.14.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.7.1",
+    "react-router-dom": "^7.8.0",
     "semver": "^7.7.2"
   },
   "devDependencies": {
