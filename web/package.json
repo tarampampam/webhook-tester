@@ -21,7 +21,7 @@
     "@tabler/icons-react": "^3.34.1",
     "dayjs": "^1.11.13",
     "dexie": "^4.2.0",
-    "dexie-react-hooks": "^1.1.7",
+    "dexie-react-hooks": "^4.2.0",
     "highlight.js": "^11.11.1",
     "openapi-fetch": "^0.14.0",
     "react": "^19.1.1",
