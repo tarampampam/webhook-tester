@@ -172,7 +172,8 @@ export const ViewHex: React.FC<{
   )
 }
 
-enum NumberBase { // hello
+enum NumberBase {
+  // hello
   Binary = 'Binary', // 01101000, 01100101, 01101100, 01101100, 01101111
   Octal = 'Octal', // 150, 145, 154, 154, 157
   Decimal = 'Decimal', // 104, 101, 108, 108, 111

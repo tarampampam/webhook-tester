@@ -237,7 +237,7 @@ export const WebHookPath: React.FC<{ sID: string; url: URL }> = ({ sID, url }) =
 }
 
 const download = (data: Readonly<Uint8Array>, fileName: string): void => {
-  const blob = new Blob([data.buffer], { type: 'application/octet-stream' })
+  const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
 
