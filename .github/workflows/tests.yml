@@ -41,7 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
-      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
       - run: go generate -skip readme ./...
       - uses: golangci/golangci-lint-action@v8
       - run: go test -race -covermode=atomic ./...
@@ -90,7 +89,6 @@ jobs:
           echo "app-version=${{ steps.slug.outputs.version-semantic }}@${{ steps.slug.outputs.commit-hash-short }}" >> $GITHUB_OUTPUT
           echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
       - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
-      - run: go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1"
       - run: go generate -skip readme ./...
       - {uses: actions/download-artifact@v4, with: {name: web-dist, path: ./web/dist}} # put the built frontend
       - env:
