@@ -7,7 +7,7 @@ import { resolve, join } from 'path'
 const rootDir = resolve(__dirname)
 const [distDir, srcDir] = [join(rootDir, 'dist'), join(rootDir, 'src')]
 const isWatchMode = ['serve', 'dev', 'watch'].some((arg) => process.argv.slice(2).some((a) => a.indexOf(arg) !== -1))
-const devServerProxyTo = process.env?.['DEV_SERVER_PROXY_TO'] || null
+const devServerProxyTo = process.env?.['DEV_SERVER_PROXY_TO'] || undefined
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -46,18 +46,19 @@ export default defineConfig({
   server: {
     strictPort: true,
     open: false,
-    proxy: devServerProxyTo && {
-      '^/api/.*': devServerProxyTo,
-      '^/api/.*/subscribe$': { ws: true, target: devServerProxyTo },
-      '/ready': devServerProxyTo,
-      '/healthz': devServerProxyTo,
-      '^/[0-9a-f-]{36}.*$': devServerProxyTo, // webhook url's
-    },
+    proxy: devServerProxyTo
+      ? {
+          '^/api/.*': devServerProxyTo,
+          '^/api/.*/subscribe$': { ws: true, target: devServerProxyTo },
+          '/ready': devServerProxyTo,
+          '/healthz': devServerProxyTo,
+          '^/[0-9a-f-]{36}.*$': devServerProxyTo, // webhook url's
+        }
+      : undefined,
   },
   esbuild: {
     legalComments: 'none',
   },
-  // @ts-ignore-next-line The `vite` type definitions are not up-to-date
   test: {
     globals: true,
     environment: 'jsdom',

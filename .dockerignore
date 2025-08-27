@@ -5,5 +5,7 @@
 !/api
 !/cmd
 !/internal
-!/web
-!/go.*
+!/web/public
+!/web/src
+!/web/*.*
+!/*go.*
