@@ -14,7 +14,7 @@ jobs:
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
