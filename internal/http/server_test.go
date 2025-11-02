@@ -195,7 +195,7 @@ func startServer(t *testing.T, pCtx context.Context, srv interface {
 
 	var (
 		port     = getFreeTcpPort(t)
-		hostPort = fmt.Sprintf("%s:%d", "127.0.0.1", port)
+		hostPort = fmt.Sprintf("%s:%d", "127.0.0.1", port) //nolint:govet
 	)
 
 	// open HTTP port
