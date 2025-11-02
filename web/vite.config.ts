@@ -59,6 +59,7 @@ export default defineConfig({
   esbuild: {
     legalComments: 'none',
   },
+  // @ts-expect-error https://vitest.dev/config/
   test: {
     globals: true,
     environment: 'jsdom',
