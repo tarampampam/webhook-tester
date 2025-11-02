@@ -378,6 +378,7 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		}
 
 		rdc = redis.NewClient(opt)
+
 		redis.SetLogger(logger.NewRedisBridge(log.Named("redis")))
 
 		defer func() { _ = rdc.Close() }()
