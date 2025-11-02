@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # -✂- this stage is used to develop and build the application locally -------------------------------------------------
-FROM docker.io/library/node:24-alpine AS builder
+FROM docker.io/library/node:25-alpine AS builder
 
 # install Go using the official image
 COPY --from=docker.io/library/golang:1.25-alpine /usr/local/go /usr/local/go
