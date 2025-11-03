@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, type ButtonProps, Group, Badge } from '@mantine/core'
 import { IconChevronDown, IconChevronsDown, IconChevronsUp, IconChevronUp } from '@tabler/icons-react'
@@ -9,17 +9,7 @@ export const Navigator = (): React.JSX.Element => {
   const { session, request, requests } = useData()
   const navigate = useNavigate()
 
-  const [jumpFirstEnabled, setJumpFirstEnabled] = useState<boolean>(false)
-  const [jumpPrevEnabled, setJumpPrevEnabled] = useState<boolean>(false)
-  const [jumpNextEnabled, setJumpNextEnabled] = useState<boolean>(false)
-  const [jumpLastEnabled, setJumpLastEnabled] = useState<boolean>(false)
-
-  const [pathToFirst, setPathToFirst] = useState<string | null>(null)
-  const [pathToPrev, setPathToPrev] = useState<string | null>(null)
-  const [pathToNext, setPathToNext] = useState<string | null>(null)
-  const [pathToLast, setPathToLast] = useState<string | null>(null)
-
-  useEffect(() => {
+  const navInfo = useMemo(() => {
     const firstIdx: number = 0
     const prevIdx: number | -1 = requests.findIndex((rq) => !!request && rq.rID === request.rID) + 1
     const nextIdx: number | -1 = requests.findIndex((rq) => !!request && rq.rID === request.rID) - 1
@@ -31,43 +21,41 @@ export const Navigator = (): React.JSX.Element => {
     const lastID = requests[lastIdx] ? requests[lastIdx].rID : null
     const moreThanOneRequest = requests.length > 1
 
-    setJumpFirstEnabled(moreThanOneRequest && !!request && firstID !== request.rID)
-    setJumpPrevEnabled(moreThanOneRequest && !!request && !!prevID && request.rID !== lastID)
-    setJumpNextEnabled(moreThanOneRequest && !!request && !!nextID && request.rID !== firstID)
-    setJumpLastEnabled(moreThanOneRequest && !!request && lastID !== request.rID)
+    return {
+      jumpFirstEnabled: moreThanOneRequest && !!request && firstID !== request.rID,
+      jumpPrevEnabled: moreThanOneRequest && !!request && !!prevID && request.rID !== lastID,
+      jumpNextEnabled: moreThanOneRequest && !!request && !!nextID && request.rID !== firstID,
+      jumpLastEnabled: moreThanOneRequest && !!request && lastID !== request.rID,
 
-    setPathToFirst(
-      moreThanOneRequest && !!session && firstID ? pathTo(RouteIDs.SessionAndRequest, session.sID, firstID) : null
-    )
-    setPathToPrev(
-      moreThanOneRequest && !!session && prevID && !!request
-        ? pathTo(RouteIDs.SessionAndRequest, session.sID, prevID)
-        : null
-    )
-    setPathToNext(
-      moreThanOneRequest && !!session && nextID && !!request
-        ? pathTo(RouteIDs.SessionAndRequest, session.sID, nextID)
-        : null
-    )
-    setPathToLast(
-      moreThanOneRequest && !!session && lastID ? pathTo(RouteIDs.SessionAndRequest, session.sID, lastID) : null
-    )
+      pathToFirst:
+        moreThanOneRequest && !!session && firstID ? pathTo(RouteIDs.SessionAndRequest, session.sID, firstID) : null,
+      pathToPrev:
+        moreThanOneRequest && !!session && prevID && !!request
+          ? pathTo(RouteIDs.SessionAndRequest, session.sID, prevID)
+          : null,
+      pathToNext:
+        moreThanOneRequest && !!session && nextID && !!request
+          ? pathTo(RouteIDs.SessionAndRequest, session.sID, nextID)
+          : null,
+      pathToLast:
+        moreThanOneRequest && !!session && lastID ? pathTo(RouteIDs.SessionAndRequest, session.sID, lastID) : null,
+    }
   }, [request, requests, session])
 
   // listen for arrow keys to navigate between requests
   useEffect(() => {
     const eventsHandler = (e: KeyboardEvent) => {
-      if ((e.code === 'ArrowDown' || e.code === 'ArrowRight') && jumpPrevEnabled && pathToPrev) {
-        navigate(pathToPrev)
-      } else if ((e.code === 'ArrowUp' || e.code === 'ArrowLeft') && jumpNextEnabled && pathToNext) {
-        navigate(pathToNext)
+      if ((e.code === 'ArrowDown' || e.code === 'ArrowRight') && navInfo.jumpPrevEnabled && navInfo.pathToPrev) {
+        navigate(navInfo.pathToPrev)
+      } else if ((e.code === 'ArrowUp' || e.code === 'ArrowLeft') && navInfo.jumpNextEnabled && navInfo.pathToNext) {
+        navigate(navInfo.pathToNext)
       }
     }
 
     window.addEventListener('keydown', eventsHandler)
 
     return () => window.removeEventListener('keydown', eventsHandler)
-  })
+  }, [navInfo, navigate])
 
   const shortJumpButtonProps: Partial<ButtonProps> = { variant: 'default', size: 'compact-xs' }
   const longJumpButtonProps: Partial<ButtonProps> = { ...shortJumpButtonProps, styles: { section: { margin: 0 } } }
@@ -78,18 +66,26 @@ export const Navigator = (): React.JSX.Element => {
         <Button // jump to the first request
           {...longJumpButtonProps}
           leftSection={<IconChevronsUp size="1em" />}
-          disabled={!jumpFirstEnabled}
+          disabled={!navInfo.jumpFirstEnabled}
           renderRoot={(props) =>
-            jumpFirstEnabled && pathToFirst ? <Link to={pathToFirst} {...props} /> : <button {...props} />
+            navInfo.jumpFirstEnabled && navInfo.pathToFirst ? (
+              <Link to={navInfo.pathToFirst} {...props} />
+            ) : (
+              <button {...props} />
+            )
           }
           title="First request"
         />
         <Button // jump to the next request
           {...shortJumpButtonProps}
           leftSection={<IconChevronUp size="1em" />}
-          disabled={!jumpNextEnabled}
+          disabled={!navInfo.jumpNextEnabled}
           renderRoot={(props) =>
-            jumpNextEnabled && pathToNext ? <Link to={pathToNext} {...props} /> : <button {...props} />
+            navInfo.jumpNextEnabled && navInfo.pathToNext ? (
+              <Link to={navInfo.pathToNext} {...props} />
+            ) : (
+              <button {...props} />
+            )
           }
         >
           Newer
@@ -106,9 +102,13 @@ export const Navigator = (): React.JSX.Element => {
         <Button // jump to the previous request
           {...shortJumpButtonProps}
           rightSection={<IconChevronDown size="1em" />}
-          disabled={!jumpPrevEnabled}
+          disabled={!navInfo.jumpPrevEnabled}
           renderRoot={(props) =>
-            jumpPrevEnabled && pathToPrev ? <Link to={pathToPrev} {...props} /> : <button {...props} />
+            navInfo.jumpPrevEnabled && navInfo.pathToPrev ? (
+              <Link to={navInfo.pathToPrev} {...props} />
+            ) : (
+              <button {...props} />
+            )
           }
         >
           Older
@@ -116,9 +116,13 @@ export const Navigator = (): React.JSX.Element => {
         <Button // jump to the last request
           {...longJumpButtonProps}
           leftSection={<IconChevronsDown size="1em" />}
-          disabled={!jumpLastEnabled}
+          disabled={!navInfo.jumpLastEnabled}
           renderRoot={(props) =>
-            jumpLastEnabled && pathToLast ? <Link to={pathToLast} {...props} /> : <button {...props} />
+            navInfo.jumpLastEnabled && navInfo.pathToLast ? (
+              <Link to={navInfo.pathToLast} {...props} />
+            ) : (
+              <button {...props} />
+            )
           }
           title="Last request"
         />
