@@ -57,7 +57,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./${{ steps.values.outputs.bin-name }}
           asset_name: ${{ steps.values.outputs.bin-name }}
-          tag: ${{ github.ref }}
+          tag: ${{ github.event.release.tag_name }}
 
   build-deb-package:
     name: Build the Debian package
@@ -84,7 +84,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./${{ steps.values.outputs.pkg-name }}.deb
           asset_name: webhook-tester-linux-${{ matrix.arch }}.deb
-          tag: ${{ github.ref }}
+          tag: ${{ github.event.release.tag_name }}
 
   build-docker-image:
     name: Build the docker image
