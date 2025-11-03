@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Button, Checkbox, Group, Modal, NumberInput, Space, Text, Textarea } from '@mantine/core'
 import { IconCodeAsterisk, IconHeading, IconHourglassHigh, IconVersions } from '@tabler/icons-react'
 import { notifications as notify } from '@mantine/notifications'
@@ -87,32 +87,21 @@ export const NewSessionModal: React.FC<{
   const [body, setBody] = useStorage<string>(controls.body.def, controls.body.key, controls.body.area)
   const [destroy, setDestroy] = useStorage<boolean>(controls.destroy.def, controls.destroy.key, controls.destroy.area)
 
-  const [wrongStatusCode, setWrongStatusCode] = useState<boolean>(false)
-  const [wrongHeaders, setWrongHeaders] = useState<boolean>(false)
-  const [wrongDelay, setWrongDelay] = useState<boolean>(false)
-  const [wrongResponseBody, setWrongResponseBody] = useState<boolean>(false)
-  const [createDisabled, setCreateDisabled] = useState<boolean>(
-    wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody
-  )
+  const wrongStatusCode = useMemo(() => !validate.code(status), [status])
+  const wrongHeaders = useMemo(() => !validate.head(headers), [headers])
+  const wrongDelay = useMemo(() => !validate.delay(delay), [delay])
+  const wrongResponseBody = useMemo(() => {
+    let bodyIsValid = validate.body(body)
 
-  // watch the values and set the "wrong" state when the value changes
-  useEffect(() => setWrongStatusCode(!validate.code(status)), [status])
-  useEffect(() => setWrongHeaders(!validate.head(headers)), [headers])
-  useEffect(() => setWrongDelay(!validate.delay(delay)), [delay])
-  useEffect(() => {
-    let bodyIsValid = validate.body(body) // validate the body
-
-    // if max body size is set and the body is valid
+    // if max body size is set and the body is valid, check the body length
     if (!!maxBodySize && bodyIsValid) {
-      bodyIsValid = body.length <= maxBodySize // check the body length
+      bodyIsValid = body.length <= maxBodySize
     }
 
-    setWrongResponseBody(!bodyIsValid)
+    return !bodyIsValid
   }, [body, maxBodySize])
-
-  // disable the create button if any of the fields are invalid
-  useEffect(
-    () => setCreateDisabled(wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody),
+  const createDisabled = useMemo(
+    () => wrongStatusCode || wrongHeaders || wrongDelay || wrongResponseBody,
     [wrongStatusCode, wrongHeaders, wrongDelay, wrongResponseBody]
   )
 

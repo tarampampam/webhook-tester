@@ -11,7 +11,7 @@ import {
   IconRefreshAlert,
   IconUsersGroup,
 } from '@tabler/icons-react'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import type { SemVer } from 'semver'
 import LogoTextSvg from '~/assets/logo-text.svg'
@@ -27,15 +27,11 @@ export const Header: React.FC<{
   const clipboard = useClipboard({ timeout: 500 })
   const { webHookUrl, allSessionIDs } = useData()
   const { tunnelEnabled, tunnelUrl } = useSettings()
-  const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false)
   const [isNewSessionModalOpened, newSessionModalHandlers] = useDisclosure(false)
   const [isHelpModalOpened, helpModalHandlers] = useDisclosure(false)
 
-  useEffect(() => {
-    if (currentVersion && latestVersion) {
-      setIsUpdateAvailable(currentVersion.compare(latestVersion) === -1)
-    }
-  }, [currentVersion, latestVersion])
+  const isUpdateAvailable: boolean | null =
+    currentVersion && latestVersion && currentVersion.compare(latestVersion) === -1
 
   /** Handle copying the webhook URL to the clipboard */
   const handleCopyWebhookUrl = useCallback(() => {
