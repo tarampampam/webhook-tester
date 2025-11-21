@@ -2,8 +2,29 @@ apiVersion: v1
 entries:
   webhook-tester:
   - apiVersion: v2
+    appVersion: 2.2.5
+    created: "2025-11-21T14:31:02.45120805Z"
+    description: Powerful tool for testing WebHooks and more
+    digest: bf640f550e38ff131fe6097616ecd7841e8193b1dbdc347a344053c0ed375e4c
+    home: https://github.com/tarampampam/webhook-tester
+    icon: https://github.com/user-attachments/assets/e2e659dc-7fb1-4ac2-ad3c-883899f5fc38
+    keywords:
+    - webhook
+    - tester
+    - http
+    - webhooks
+    - testing
+    - tool
+    name: webhook-tester
+    sources:
+    - https://github.com/tarampampam/webhook-tester
+    type: application
+    urls:
+    - https://tarampampam.github.io/webhook-tester/helm-charts/webhook-tester-2.2.5.tgz
+    version: 2.2.5
+  - apiVersion: v2
     appVersion: 2.2.4
-    created: "2025-11-03T10:49:41.749034161Z"
+    created: "2025-11-21T14:31:02.450759953Z"
     description: Powerful tool for testing WebHooks and more
     digest: e1c7a1d3c3edd7055f53bbeca1557c5c2173123adbb8e70b54aebbba668a8228
     home: https://github.com/tarampampam/webhook-tester
@@ -24,7 +45,7 @@ entries:
     version: 2.2.4
   - apiVersion: v2
     appVersion: 2.2.3
-    created: "2025-11-03T10:49:41.748603286Z"
+    created: "2025-11-21T14:31:02.450314681Z"
     description: Powerful tool for testing WebHooks and more
     digest: aa13b434d708bda3cddde709d24d09a0c3d918b51f4ca831e08e846edca8bbdf
     home: https://github.com/tarampampam/webhook-tester
@@ -45,7 +66,7 @@ entries:
     version: 2.2.3
   - apiVersion: v2
     appVersion: 2.2.2
-    created: "2025-11-03T10:49:41.748140221Z"
+    created: "2025-11-21T14:31:02.449861914Z"
     description: Powerful tool for testing WebHooks and more
     digest: ebbc49f682a7365eedad6a1122cbfdb46b7696af2731b245327f4a6c71307c65
     home: https://github.com/tarampampam/webhook-tester
@@ -66,7 +87,7 @@ entries:
     version: 2.2.2
   - apiVersion: v2
     appVersion: 2.2.1
-    created: "2025-11-03T10:49:41.747660835Z"
+    created: "2025-11-21T14:31:02.449412264Z"
     description: Powerful tool for testing WebHooks and more
     digest: 65517a07932c69526563502ed1db8f9d214a732effd023e5465c41cacc234c4d
     home: https://github.com/tarampampam/webhook-tester
@@ -87,7 +108,7 @@ entries:
     version: 2.2.1
   - apiVersion: v2
     appVersion: 2.2.0
-    created: "2025-11-03T10:49:41.747174987Z"
+    created: "2025-11-21T14:31:02.448940392Z"
     description: Powerful tool for testing WebHooks and more
     digest: 509398ab97a8dd08b1d46a15cc621ad03b6d7511a507b12553c5fa1cc7d30bc0
     home: https://github.com/tarampampam/webhook-tester
@@ -108,7 +129,7 @@ entries:
     version: 2.2.0
   - apiVersion: v2
     appVersion: 2.1.0
-    created: "2025-11-03T10:49:41.746705981Z"
+    created: "2025-11-21T14:31:02.448449184Z"
     description: Powerful tool for testing WebHooks and more
     digest: f2d90fe1db35e0b26fb962702b3a588991ede866dff8ee735397b10d939a4ab2
     home: https://github.com/tarampampam/webhook-tester
@@ -129,7 +150,7 @@ entries:
     version: 2.1.0
   - apiVersion: v2
     appVersion: 2.1.0-rc2
-    created: "2025-11-03T10:49:41.746173326Z"
+    created: "2025-11-21T14:31:02.447934041Z"
     description: Powerful tool for testing WebHooks and more
     digest: d1f45fc60dbd615aa8da78fab49dcefcd5f3c2921b92f1ebb923a5274dc01f32
     icon: https://github.com/user-attachments/assets/e2e659dc-7fb1-4ac2-ad3c-883899f5fc38
@@ -142,7 +163,7 @@ entries:
     version: 2.1.0-rc2
   - apiVersion: v2
     appVersion: 2.1.0-rc1
-    created: "2025-11-03T10:49:41.744988132Z"
+    created: "2025-11-21T14:31:02.447477648Z"
     description: Powerful tool for testing WebHooks and more
     digest: f9ba81858358893a60d72bd1f293a4ccd36de32aa1785a1e850eddcd6a379060
     icon: https://github.com/user-attachments/assets/e2e659dc-7fb1-4ac2-ad3c-883899f5fc38
@@ -153,4 +174,4 @@ entries:
     urls:
     - https://tarampampam.github.io/webhook-tester/helm-charts/webhook-tester-2.1.0-rc1.tgz
     version: 2.1.0-rc1
-generated: "2025-11-03T10:49:41.744429097Z"
+generated: "2025-11-21T14:31:02.446816532Z"
