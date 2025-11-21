@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 
@@ -375,6 +376,14 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		var opt, pErr = redis.ParseURL(cmd.options.redis.dsn)
 		if pErr != nil {
 			return fmt.Errorf("failed to parse Redis DSN: %w", pErr)
+		}
+
+		{ // disable maintenance notifications (https://github.com/tarampampam/webhook-tester/issues/713)
+			if opt.MaintNotificationsConfig == nil {
+				opt.MaintNotificationsConfig = new(maintnotifications.Config)
+			}
+
+			opt.MaintNotificationsConfig.Mode = maintnotifications.ModeDisabled
 		}
 
 		rdc = redis.NewClient(opt)
