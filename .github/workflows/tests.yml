@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
       - run: go generate -skip readme ./...
       - uses: golangci/golangci-lint-action@v9
       - run: go test -race -covermode=atomic ./...
@@ -88,9 +88,9 @@ jobs:
         run: |
           echo "app-version=${{ steps.slug.outputs.version-semantic }}@${{ steps.slug.outputs.commit-hash-short }}" >> $GITHUB_OUTPUT
           echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
       - run: go generate -skip readme ./...
-      - {uses: actions/download-artifact@v4, with: {name: web-dist, path: ./web/dist}} # put the built frontend
+      - {uses: actions/download-artifact@v6, with: {name: web-dist, path: ./web/dist}} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
@@ -120,7 +120,7 @@ jobs:
     needs: [build-app]
     steps:
       - uses: actions/checkout@v6
-      - {uses: actions/download-artifact@v4, with: {name: webhook-tester-linux-amd64}}
+      - {uses: actions/download-artifact@v6, with: {name: webhook-tester-linux-amd64}}
       - run: mkdir ./data
       - run: | # start the server in the background
           chmod +x ./webhook-tester-linux-amd64

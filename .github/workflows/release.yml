@@ -37,9 +37,9 @@ jobs:
       - id: values
         run: |
           echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-      - {uses: actions/setup-go@v5, with: {go-version-file: go.mod}}
+      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
       - run: go generate -skip readme ./...
-      - {uses: actions/download-artifact@v4, with: {name: web-dist, path: ./web/dist}} # put the built frontend
+      - {uses: actions/download-artifact@v6, with: {name: web-dist, path: ./web/dist}} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
@@ -66,7 +66,7 @@ jobs:
     needs: [build-app]
     steps:
       - {uses: gacts/github-slug@v1, id: slug}
-      - {uses: actions/download-artifact@v4, with: {name: "webhook-tester-linux-${{ matrix.arch }}"}}
+      - {uses: actions/download-artifact@v6, with: {name: "webhook-tester-linux-${{ matrix.arch }}"}}
       - id: values
         run: |
           majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
