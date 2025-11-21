@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
@@ -32,7 +32,7 @@ jobs:
         arch: [amd64, arm64]
     needs: [build-web]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - {uses: gacts/github-slug@v1, id: slug}
       - id: values
         run: |
@@ -90,7 +90,7 @@ jobs:
     name: Build the docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -126,7 +126,7 @@ jobs:
     needs: [build-docker-image]
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
       - {uses: gacts/github-slug@v1, id: slug}
       - run: |
