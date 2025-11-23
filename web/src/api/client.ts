@@ -15,6 +15,7 @@ type AppSettings = Readonly<{
     enabled: boolean
     url: URL | null
   }>
+  publicUrlRoot: URL | null
 }>
 
 type SessionOptions = Readonly<{
@@ -155,6 +156,7 @@ export class Client {
           enabled: data.tunnel.enabled,
           url: data?.tunnel.url ? new URL(data.tunnel.url) : null,
         }),
+        publicUrlRoot: data?.public_url_root ? new URL(data.public_url_root) : null,
       })
 
       return this.cache.settings

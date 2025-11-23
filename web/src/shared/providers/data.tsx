@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { APIErrorNotFound, type Client, RequestEventAction } from '~/api'
 import { Database } from '~/db'
-import { UsedStorageKeys, useStorage } from '~/shared'
+import { UsedStorageKeys, useSettings, useStorage } from '~/shared'
 
 export type Session = {
   sID: string
@@ -157,6 +157,7 @@ export const DataProvider: React.FC<{
   errHandler: (err: Error | unknown) => void // error handler for non-critical errors
   children: React.JSX.Element
 }> = ({ api, db, errHandler, children }) => {
+  const { publicUrlRoot } = useSettings()
   const [lastUsedSID, setLastUsedSID] = useStorage<string | null>(null, UsedStorageKeys.SessionsLastUsed, 'local')
   const [session, setSession] = useState<Readonly<Session> | null>(null)
   const [allSessionIDs, setAllSessionIDs] = useState<ReadonlyArray<string>>([])
@@ -766,9 +767,10 @@ export const DataProvider: React.FC<{
   // watch for the session changes and update the webhook URL
   useEffect(() => {
     if (session) {
-      setWebHookUrl(Object.freeze(new URL(`${window.location.origin}/${session.sID}`)))
+      const baseUrl = publicUrlRoot ? publicUrlRoot.origin : window.location.origin
+      setWebHookUrl(Object.freeze(new URL(`${baseUrl}/${session.sID}`)))
     }
-  }, [session])
+  }, [session, publicUrlRoot])
 
   return (
     <dataContext.Provider

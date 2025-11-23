@@ -95,7 +95,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 			}
 
 			// check the request body size and respond with an error if it's too large
-			if cfg.MaxRequestBodySize > 0 && uint32(len(body)) > cfg.MaxRequestBodySize { //nolint:gosec
+			if cfg.MaxRequestBodySize > 0 && uint32(len(body)) > cfg.MaxRequestBodySize {
 				respondWithError(w, log,
 					http.StatusRequestEntityTooLarge,
 					fmt.Sprintf("The request body is too large (current: %d, max: %d)", len(body), cfg.MaxRequestBodySize),
