@@ -150,10 +150,10 @@ $ app [GLOBAL FLAGS] [COMMAND] [COMMAND FLAGS] [ARGUMENTS...]
 
 Global flags:
 
-| Name               | Description                                 | Default value | Environment variables |
-|--------------------|---------------------------------------------|:-------------:|:---------------------:|
-| `--log-level="…"`  | Logging level (debug/info/warn/error/fatal) |    `info`     |      `LOG_LEVEL`      |
-| `--log-format="…"` | Logging format (console/json)               |   `console`   |     `LOG_FORMAT`      |
+| Name               | Description                                 | Type   | Default value | Environment variables |
+|--------------------|---------------------------------------------|--------|:-------------:|:---------------------:|
+| `--log-level="…"`  | Logging level (debug/info/warn/error/fatal) | string |   `"info"`    |      `LOG_LEVEL`      |
+| `--log-format="…"` | Logging format (console/json)               | string |  `"console"`  |     `LOG_FORMAT`      |
 
 ### `start` command (aliases: `s`, `server`, `serve`, `http-server`)
 
@@ -167,25 +167,25 @@ $ app [GLOBAL FLAGS] start [COMMAND FLAGS] [ARGUMENTS...]
 
 The following flags are supported:
 
-| Name                          | Description                                                                                                               |       Default value        |    Environment variables     |
-|-------------------------------|---------------------------------------------------------------------------------------------------------------------------|:--------------------------:|:----------------------------:|
-| `--addr="…"`                  | IP (v4 or v6) address to listen on (0.0.0.0 to bind to all interfaces)                                                    |         `0.0.0.0`          | `SERVER_ADDR`, `LISTEN_ADDR` |
-| `--port="…"`                  | HTTP server port                                                                                                          |           `8080`           |         `HTTP_PORT`          |
-| `--read-timeout="…"`          | maximum duration for reading the entire request, including the body (zero = no timeout)                                   |           `1m0s`           |     `HTTP_READ_TIMEOUT`      |
-| `--write-timeout="…"`         | maximum duration before timing out writes of the response (zero = no timeout)                                             |           `1m0s`           |     `HTTP_WRITE_TIMEOUT`     |
-| `--idle-timeout="…"`          | maximum amount of time to wait for the next request (keep-alive, zero = no timeout)                                       |           `1m0s`           |     `HTTP_IDLE_TIMEOUT`      |
-| `--storage-driver="…"`        | storage driver (memory/redis/fs)                                                                                          |          `memory`          |       `STORAGE_DRIVER`       |
-| `--session-ttl="…"`           | session TTL (time-to-live, lifetime)                                                                                      |         `168h0m0s`         |        `SESSION_TTL`         |
-| `--max-requests="…"`          | maximal number of requests to store in the storage (zero means unlimited)                                                 |           `128`            |        `MAX_REQUESTS`        |
-| `--fs-storage-dir="…"`        | path to the directory for local fs storage (directory must exist)                                                         |                            |       `FS_STORAGE_DIR`       |
-| `--max-request-body-size="…"` | maximal webhook request body size (in bytes), zero means unlimited                                                        |            `0`             |   `MAX_REQUEST_BODY_SIZE`    |
-| `--auto-create-sessions`      | automatically create sessions for incoming requests                                                                       |          `false`           |    `AUTO_CREATE_SESSIONS`    |
-| `--pubsub-driver="…"`         | pub/sub driver (memory/redis)                                                                                             |          `memory`          |       `PUBSUB_DRIVER`        |
-| `--tunnel-driver="…"`         | tunnel driver to expose your locally running app to the internet (ngrok, empty to disable)                                |                            |       `TUNNEL_DRIVER`        |
-| `--ngrok-auth-token="…"`      | ngrok authentication token (required for ngrok tunnel; create a new one at https://dashboard.ngrok.com/authtokens/new)    |                            |      `NGROK_AUTHTOKEN`       |
-| `--redis-dsn="…"`             | redis-like (redis, keydb) server DSN (e.g. redis://user:pwd@127.0.0.1:6379/0 or unix://user:pwd@/path/to/redis.sock?db=0) | `redis://127.0.0.1:6379/0` |         `REDIS_DSN`          |
-| `--shutdown-timeout="…"`      | maximum duration for graceful shutdown                                                                                    |           `15s`            |      `SHUTDOWN_TIMEOUT`      |
-| `--use-live-frontend`         | use frontend from the local directory instead of the embedded one (useful for development)                                |          `false`           |            *none*            |
+| Name                          | Description                                                                                                               | Type     |        Default value         |    Environment variables     |
+|-------------------------------|---------------------------------------------------------------------------------------------------------------------------|----------|:----------------------------:|:----------------------------:|
+| `--addr="…"`                  | IP (v4 or v6) address to listen on (0.0.0.0 to bind to all interfaces)                                                    | string   |         `"0.0.0.0"`          | `SERVER_ADDR`, `LISTEN_ADDR` |
+| `--port="…"`                  | HTTP server port                                                                                                          | uint     |            `8080`            |         `HTTP_PORT`          |
+| `--read-timeout="…"`          | maximum duration for reading the entire request, including the body (zero = no timeout)                                   | duration |            `1m0s`            |     `HTTP_READ_TIMEOUT`      |
+| `--write-timeout="…"`         | maximum duration before timing out writes of the response (zero = no timeout)                                             | duration |            `1m0s`            |     `HTTP_WRITE_TIMEOUT`     |
+| `--idle-timeout="…"`          | maximum amount of time to wait for the next request (keep-alive, zero = no timeout)                                       | duration |            `1m0s`            |     `HTTP_IDLE_TIMEOUT`      |
+| `--storage-driver="…"`        | storage driver (memory/redis/fs)                                                                                          | string   |          `"memory"`          |       `STORAGE_DRIVER`       |
+| `--session-ttl="…"`           | session TTL (time-to-live, lifetime)                                                                                      | duration |          `168h0m0s`          |        `SESSION_TTL`         |
+| `--max-requests="…"`          | maximal number of requests to store in the storage (zero means unlimited)                                                 | uint     |            `128`             |        `MAX_REQUESTS`        |
+| `--fs-storage-dir="…"`        | path to the directory for local fs storage (directory must exist)                                                         | string   |                              |       `FS_STORAGE_DIR`       |
+| `--max-request-body-size="…"` | maximal webhook request body size (in bytes), zero means unlimited                                                        | uint     |             `0`              |   `MAX_REQUEST_BODY_SIZE`    |
+| `--auto-create-sessions`      | automatically create sessions for incoming requests                                                                       | bool     |           `false`            |    `AUTO_CREATE_SESSIONS`    |
+| `--pubsub-driver="…"`         | pub/sub driver (memory/redis)                                                                                             | string   |          `"memory"`          |       `PUBSUB_DRIVER`        |
+| `--tunnel-driver="…"`         | tunnel driver to expose your locally running app to the internet (ngrok, empty to disable)                                | string   |                              |       `TUNNEL_DRIVER`        |
+| `--ngrok-auth-token="…"`      | ngrok authentication token (required for ngrok tunnel; create a new one at https://dashboard.ngrok.com/authtokens/new)    | string   |                              |      `NGROK_AUTHTOKEN`       |
+| `--redis-dsn="…"`             | redis-like (redis, keydb) server DSN (e.g. redis://user:pwd@127.0.0.1:6379/0 or unix://user:pwd@/path/to/redis.sock?db=0) | string   | `"redis://127.0.0.1:6379/0"` |         `REDIS_DSN`          |
+| `--shutdown-timeout="…"`      | maximum duration for graceful shutdown                                                                                    | duration |            `15s`             |      `SHUTDOWN_TIMEOUT`      |
+| `--use-live-frontend`         | use frontend from the local directory instead of the embedded one (useful for development)                                | bool     |           `false`            |            *none*            |
 
 ### `start healthcheck` subcommand (aliases: `hc`, `health`, `check`)
 
@@ -199,9 +199,9 @@ $ app [GLOBAL FLAGS] start healthcheck [COMMAND FLAGS] [ARGUMENTS...]
 
 The following flags are supported:
 
-| Name         | Description      | Default value | Environment variables |
-|--------------|------------------|:-------------:|:---------------------:|
-| `--port="…"` | HTTP server port |    `8080`     |      `HTTP_PORT`      |
+| Name         | Description      | Type | Default value | Environment variables |
+|--------------|------------------|------|:-------------:|:---------------------:|
+| `--port="…"` | HTTP server port | uint |    `8080`     |      `HTTP_PORT`      |
 
 <!--/GENERATED:CLI_DOCS-->
 
