@@ -14,10 +14,10 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@mantine/code-highlight": "^8.3.8",
-    "@mantine/core": "^8.3.8",
-    "@mantine/hooks": "^8.3.8",
-    "@mantine/notifications": "^8.3.8",
+    "@mantine/code-highlight": "^8.3.9",
+    "@mantine/core": "^8.3.9",
+    "@mantine/hooks": "^8.3.9",
+    "@mantine/notifications": "^8.3.9",
     "@tabler/icons-react": "^3.35.0",
     "dayjs": "^1.11.19",
     "dexie": "^4.2.1",
