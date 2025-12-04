@@ -262,6 +262,7 @@ components:
             url: {type: string, example: 'https://tunnel.example.com/'} # optional
           required: [enabled]
           additionalProperties: false
+        public_url_root: {type: string, example: 'https://example.com', description: 'Public URL root override for webhook URLs'} # optional
       required: [limits, tunnel]
       additionalProperties: false
 
