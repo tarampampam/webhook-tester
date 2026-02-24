@@ -69,7 +69,7 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
       - run: npm --prefix "$NPM_PREFIX" run build
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
@@ -97,7 +97,7 @@ jobs:
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.values.outputs.app-version }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: ./${{ steps.values.outputs.bin-name }}
