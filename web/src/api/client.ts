@@ -195,7 +195,7 @@ export class Client {
         uuid: data.uuid,
         response: Object.freeze({
           statusCode: data.response.status_code,
-          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
+          headers: Array.from(data.response.headers).map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
           body: base64ToUint8Array(data.response.response_body_base64),
         }),
@@ -221,7 +221,7 @@ export class Client {
         uuid: data.uuid,
         response: Object.freeze({
           statusCode: data.response.status_code,
-          headers: data.response.headers.map(({ name, value }) => Object.freeze({ name, value })),
+          headers: Array.from(data.response.headers).map(({ name, value }) => Object.freeze({ name, value })),
           delay: data.response.delay,
           body: base64ToUint8Array(data.response.response_body_base64),
         }),
@@ -288,7 +288,7 @@ export class Client {
 
     if (data) {
       return Object.freeze(
-        data
+        Array.from(data)
           // convert the list of requests to the immutable objects with the correct types
           .map((req) =>
             Object.freeze({
@@ -296,7 +296,7 @@ export class Client {
               clientAddress: req.client_address,
               method: req.method,
               requestPayload: base64ToUint8Array(req.request_payload_base64),
-              headers: Object.freeze(req.headers.map(({ name, value }) => Object.freeze({ name, value }))),
+              headers: Object.freeze(Array.from(req.headers).map(({ name, value }) => Object.freeze({ name, value }))),
               url: Object.freeze(new URL(req.url)),
               capturedAt: Object.freeze(new Date(req.captured_at_unix_milli)),
             })
@@ -418,7 +418,7 @@ export class Client {
         clientAddress: data.client_address,
         method: data.method,
         requestPayload: base64ToUint8Array(data.request_payload_base64),
-        headers: Object.freeze(data.headers),
+        headers: Object.freeze(Array.from(data.headers)),
         url: Object.freeze(new URL(data.url)),
         capturedAt: Object.freeze(new Date(data.captured_at_unix_milli)),
       })
