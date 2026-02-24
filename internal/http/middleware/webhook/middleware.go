@@ -195,7 +195,7 @@ func New( //nolint:funlen,gocognit,gocyclo
 			w.WriteHeader(statusCode)
 
 			// write the response body
-			if _, err := w.Write(sess.ResponseBody); err != nil {
+			if _, err := w.Write(sess.ResponseBody); err != nil { //nolint:gosec
 				log.Error("failed to write the response body", zap.Error(err))
 			}
 		})
