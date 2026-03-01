@@ -19,7 +19,7 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
       - run: npm --prefix "$NPM_PREFIX" run build
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
@@ -46,7 +46,7 @@ jobs:
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version-semantic }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: ./${{ steps.values.outputs.bin-name }}
@@ -133,7 +133,7 @@ jobs:
           helm package \
             --app-version "${{ steps.slug.outputs.version }}" \
             --version "${{ steps.slug.outputs.version }}" .
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: helm-chart
           path: ./deployments/helm/*.tgz
@@ -147,7 +147,7 @@ jobs:
     steps:
       - {uses: actions/checkout@v4, with: {ref: gh-pages}}
       - uses: azure/setup-helm@v4
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: {name: helm-chart, path: ./helm-charts}
       - name: Update the index.yaml
         run: |
