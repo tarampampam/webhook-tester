@@ -20,5 +20,11 @@ func (h *Handler) Handle() (resp openapi.SettingsResponse) {
 		resp.Tunnel.Enabled, resp.Tunnel.Url = true, &tunnelUrl
 	}
 
+	if h.cfg.PublicURLRoot != nil {
+		var publicUrlRoot = h.cfg.PublicURLRoot.String()
+
+		resp.PublicUrlRoot = &publicUrlRoot
+	}
+
 	return
 }

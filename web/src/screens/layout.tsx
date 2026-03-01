@@ -33,6 +33,7 @@ export default function DefaultLayout({ api }: { api: Client }): React.JSX.Eleme
           sessionTTLSec: s.limits.sessionTTL,
           tunnelEnabled: s.tunnel.enabled,
           tunnelUrl: s.tunnel.url,
+          publicUrlRoot: s.publicUrlRoot,
         })
       )
       .catch(errHandler)

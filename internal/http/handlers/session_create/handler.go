@@ -28,7 +28,7 @@ func (h *Handler) Handle(ctx context.Context, p openapi.CreateSessionRequest) (*
 	}
 
 	sID, sErr := h.db.NewSession(ctx, storage.Session{
-		Code:         uint16(p.StatusCode), //nolint:gosec
+		Code:         uint16(p.StatusCode),
 		Headers:      sHeaders,
 		ResponseBody: responseBody,
 		Delay:        time.Second * time.Duration(p.Delay),

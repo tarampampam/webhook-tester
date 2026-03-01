@@ -12,6 +12,7 @@ type Settings = {
   sessionTTLSec: number | null
   tunnelEnabled: boolean | null
   tunnelUrl: URL | null
+  publicUrlRoot: URL | null
 }
 
 type SettingsContext = Settings & {
@@ -31,6 +32,7 @@ const defaults: Readonly<Settings> = {
   sessionTTLSec: null,
   tunnelEnabled: null,
   tunnelUrl: null,
+  publicUrlRoot: null,
 }
 
 const uiSettingsContext = createContext<SettingsContext>({
