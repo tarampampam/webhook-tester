@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -23,60 +22,46 @@ type (
 func New(db storage.Storage) *Handler { return &Handler{db: db} }
 
 func (h *Handler) Handle(ctx context.Context, sID sID, p params) (*openapi.CapturedRequestsListResponse, error) {
-	rList, lErr := h.db.GetAllRequests(ctx, sID.String())
-	if lErr != nil {
-		return nil, lErr
+	var opts = storage.GetRequestsOptions{
+		IncludeBody: p.IncludeBody == nil || *p.IncludeBody,
 	}
 
-	var (
-		includeBody = p.IncludeBody == nil || *p.IncludeBody
-		list        = make([]openapi.CapturedRequest, 0, len(rList))
-	)
+	if p.Limit != nil {
+		opts.Limit = *p.Limit
+	}
 
-	for rID, r := range rList {
-		rUUID, pErr := uuid.Parse(rID)
+	if p.Offset != nil {
+		opts.Offset = *p.Offset
+	}
+
+	// storage returns already sorted (newest-first) and paginated results
+	requests, err := h.db.GetRequests(ctx, sID.String(), opts)
+	if err != nil {
+		return nil, err
+	}
+
+	var list = make([]openapi.CapturedRequest, 0, len(requests))
+
+	for _, r := range requests {
+		rUUID, pErr := uuid.Parse(r.ID)
 		if pErr != nil {
 			return nil, fmt.Errorf("failed to parse request UUID: %w", pErr)
 		}
 
-		var rHeaders = make([]openapi.HttpHeader, len(r.Headers))
-		for i, header := range r.Headers {
+		var rHeaders = make([]openapi.HttpHeader, len(r.Request.Headers))
+		for i, header := range r.Request.Headers {
 			rHeaders[i].Name, rHeaders[i].Value = header.Name, header.Value
 		}
 
-		var payload string
-		if includeBody {
-			payload = base64.StdEncoding.EncodeToString(r.Body)
-		}
-
 		list = append(list, openapi.CapturedRequest{
-			CapturedAtUnixMilli:  r.CreatedAtUnixMilli,
-			ClientAddress:        r.ClientAddr,
+			CapturedAtUnixMilli:  r.Request.CreatedAtUnixMilli,
+			ClientAddress:        r.Request.ClientAddr,
 			Headers:              rHeaders,
-			Method:               strings.ToUpper(r.Method),
-			RequestPayloadBase64: payload,
-			Url:                  r.URL,
+			Method:               strings.ToUpper(r.Request.Method),
+			RequestPayloadBase64: base64.StdEncoding.EncodeToString(r.Request.Body),
+			Url:                  r.Request.URL,
 			Uuid:                 rUUID,
 		})
-	}
-
-	// sort the list by the captured time from newest to oldest
-	slices.SortFunc(list, func(a, b openapi.CapturedRequest) int {
-		return int(b.CapturedAtUnixMilli - a.CapturedAtUnixMilli)
-	})
-
-	// apply offset
-	if p.Offset != nil {
-		if int(*p.Offset) < len(list) {
-			list = list[*p.Offset:]
-		} else {
-			list = list[:0]
-		}
-	}
-
-	// apply limit
-	if p.Limit != nil && *p.Limit > 0 && int(*p.Limit) < len(list) {
-		list = list[:*p.Limit]
 	}
 
 	return &list, nil

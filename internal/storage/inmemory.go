@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -326,6 +327,59 @@ func (s *InMemory) GetAllRequests(ctx context.Context, sID string) (map[string]R
 
 		return true
 	})
+
+	return all, nil
+}
+
+func (s *InMemory) GetRequests(
+	ctx context.Context, sID string, opts GetRequestsOptions,
+) ([]RequestWithID, error) {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return nil, err
+	}
+
+	if !s.isSessionExists(sID) {
+		return nil, ErrSessionNotFound // session not found
+	}
+
+	session, sessionOk := s.sessions.Load(sID)
+	if !sessionOk {
+		return nil, ErrSessionNotFound // like a fuse, because we already checked it
+	}
+
+	var all []RequestWithID
+
+	session.requests.Range(func(id string, req Request) bool {
+		all = append(all, RequestWithID{ID: id, Request: req})
+
+		return true
+	})
+
+	// sort newest-first
+	slices.SortFunc(all, func(a, b RequestWithID) int {
+		return int(b.Request.CreatedAtUnixMilli - a.Request.CreatedAtUnixMilli)
+	})
+
+	// apply offset
+	if opts.Offset > 0 {
+		if int(opts.Offset) < len(all) {
+			all = all[opts.Offset:]
+		} else {
+			return []RequestWithID{}, nil
+		}
+	}
+
+	// apply limit
+	if opts.Limit > 0 && int(opts.Limit) < len(all) {
+		all = all[:opts.Limit]
+	}
+
+	// strip body if not requested
+	if !opts.IncludeBody {
+		for i := range all {
+			all[i].Request.Body = nil
+		}
+	}
 
 	return all, nil
 }
