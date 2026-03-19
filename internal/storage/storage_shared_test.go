@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -549,4 +550,224 @@ func testRaceProvocation(
 	}
 
 	wg.Wait()
+}
+
+func testGetRequests( //nolint:funlen
+	t *testing.T,
+	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
+	sleep func(time.Duration),
+) {
+	t.Helper()
+
+	var ctx = context.Background()
+
+	// createRequests creates a session with N requests (sleeping between each to ensure unique timestamps).
+	// Returns the session ID.
+	createRequests := func(t *testing.T, impl storage.Storage, n int) string {
+		t.Helper()
+
+		sID, err := impl.NewSession(ctx, storage.Session{Code: 200})
+		require.NoError(t, err)
+
+		for i := range n {
+			if i > 0 {
+				sleep(time.Millisecond)
+			}
+
+			_, err = impl.NewRequest(ctx, sID, storage.Request{
+				ClientAddr: fmt.Sprintf("client-%d", i),
+				Method:     "POST",
+				Body:       []byte(fmt.Sprintf("body-%d", i)),
+				Headers:    []storage.HttpHeader{{Name: "X-Index", Value: fmt.Sprintf("%d", i)}},
+				URL:        "http://example.com",
+			})
+			require.NoError(t, err)
+		}
+
+		return sID
+	}
+
+	t.Run("all, newest-first", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 5)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 5)
+
+		for i := 1; i < len(results); i++ {
+			assert.Greater(t, results[i-1].Request.CreatedAtUnixMilli, results[i].Request.CreatedAtUnixMilli,
+				"requests should be sorted newest-first")
+		}
+	})
+
+	t.Run("limit", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 20)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{Limit: 5, IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 5)
+
+		// verify these are the 5 newest
+		all, aErr := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, aErr)
+
+		for i := range 5 {
+			assert.Equal(t, all[i].ID, results[i].ID)
+		}
+	})
+
+	t.Run("limit zero returns all", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 5)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{Limit: 0, IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 5)
+	})
+
+	t.Run("limit exceeds total", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 5)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{Limit: 100, IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 5)
+	})
+
+	t.Run("offset", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 5)
+
+		all, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, all, 5)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{Offset: 3, IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		assert.Equal(t, all[3].ID, results[0].ID)
+		assert.Equal(t, all[4].ID, results[1].ID)
+	})
+
+	t.Run("offset exceeds total", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 5)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{Offset: 100, IncludeBody: true})
+		require.NoError(t, err)
+		require.Empty(t, results)
+	})
+
+	t.Run("limit and offset", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 20)
+
+		all, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, all, 20)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{
+			Limit: 5, Offset: 3, IncludeBody: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, results, 5)
+
+		for i := range 5 {
+			assert.Equal(t, all[3+i].ID, results[i].ID)
+		}
+	})
+
+	t.Run("include body false", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 3)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: false})
+		require.NoError(t, err)
+		require.Len(t, results, 3)
+
+		for _, r := range results {
+			assert.Nil(t, r.Request.Body, "body should be nil when IncludeBody is false")
+			assert.NotEmpty(t, r.Request.Headers)
+			assert.NotEmpty(t, r.Request.Method)
+		}
+	})
+
+	t.Run("include body true", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID := createRequests(t, impl, 3)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, err)
+		require.Len(t, results, 3)
+
+		for _, r := range results {
+			assert.NotNil(t, r.Request.Body, "body should be present when IncludeBody is true")
+			assert.Contains(t, string(r.Request.Body), "body-")
+		}
+	})
+
+	t.Run("empty session", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		sID, err := impl.NewSession(ctx, storage.Session{Code: 200})
+		require.NoError(t, err)
+
+		results, err := impl.GetRequests(ctx, sID, storage.GetRequestsOptions{IncludeBody: true})
+		require.NoError(t, err)
+		require.Empty(t, results)
+	})
+
+	t.Run("session not found", func(t *testing.T) {
+		t.Parallel()
+
+		var impl = new(time.Minute, 100)
+		defer func() { _ = toCloser(impl).Close() }()
+
+		results, err := impl.GetRequests(ctx, "nonexistent", storage.GetRequestsOptions{})
+		require.Nil(t, results)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
 }

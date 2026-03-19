@@ -338,6 +338,79 @@ func (s *Redis) GetAllRequests(ctx context.Context, sID string) (map[string]Requ
 	return all, nil
 }
 
+func (s *Redis) GetRequests( //nolint:funlen,gocyclo
+	ctx context.Context, sID string, opts GetRequestsOptions,
+) ([]RequestWithID, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // context is done
+	}
+
+	// check the session existence
+	if exists, err := s.isSessionExists(ctx, sID); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, ErrSessionNotFound
+	}
+
+	var rangeBy = &redis.ZRangeBy{Min: "-inf", Max: "+inf"}
+
+	if opts.Offset > 0 || opts.Limit > 0 {
+		rangeBy.Offset = int64(opts.Offset)
+
+		if opts.Limit > 0 {
+			rangeBy.Count = int64(opts.Limit)
+		} else {
+			rangeBy.Count = -1 // all remaining from offset
+		}
+	}
+
+	ids, rErr := s.client.ZRevRangeByScore(ctx, s.requestsKey(sID), rangeBy).Result()
+	if rErr != nil {
+		return nil, rErr
+	}
+
+	if len(ids) == 0 {
+		return []RequestWithID{}, nil
+	}
+
+	var keys = make([]string, len(ids))
+
+	for i, id := range ids {
+		keys[i] = s.requestKey(sID, id)
+	}
+
+	data, mErr := s.client.MGet(ctx, keys...).Result()
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	var result = make([]RequestWithID, 0, len(ids))
+
+	for i, d := range data {
+		if d == nil {
+			continue
+		}
+
+		str, ok := d.(string)
+		if !ok {
+			return nil, errors.New("unexpected data type")
+		}
+
+		var req Request
+		if uErr := s.encDec.Decode([]byte(str), &req); uErr != nil {
+			return nil, uErr
+		}
+
+		if !opts.IncludeBody {
+			req.Body = nil
+		}
+
+		result = append(result, RequestWithID{ID: ids[i], Request: req})
+	}
+
+	return result, nil
+}
+
 func (s *Redis) DeleteRequest(ctx context.Context, sID, rID string) error {
 	if err := ctx.Err(); err != nil {
 		return err // context is done

@@ -52,6 +52,27 @@ func TestRedis_Request_CreateReadDelete(t *testing.T) {
 	)
 }
 
+func TestRedis_GetRequests(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mini = miniredis.RunT(t)
+		ft   = newFakeTime(t)
+	)
+
+	testGetRequests(t,
+		func(sTTL time.Duration, maxReq uint32) storage.Storage {
+			return storage.NewRedis(
+				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
+				sTTL,
+				maxReq,
+				storage.WithRedisTimeNow(ft.Get),
+			)
+		},
+		func(t time.Duration) { mini.FastForward(t); ft.Add(t) },
+	)
+}
+
 //	func TestRedis_RaceProvocation(t *testing.T) {
 //		t.Parallel()
 //

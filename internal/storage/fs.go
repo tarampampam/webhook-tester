@@ -662,6 +662,99 @@ func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request
 	return m, eg.Wait()
 }
 
+func (s *FS) GetRequests( //nolint:funlen,gocyclo,gocognit
+	ctx context.Context, sID string, opts GetRequestsOptions,
+) ([]RequestWithID, error) {
+	if err := s.isOpenAndNotDone(ctx); err != nil {
+		return nil, err
+	}
+
+	var now = s.timeNow()
+
+	// check the session existence
+	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, ErrSessionNotFound
+		}
+
+		return nil, err
+	} else if expiresAt.Before(now) {
+		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
+			return nil, dErr
+		}
+
+		return nil, ErrSessionNotFound
+	}
+
+	// list all request files (sorted newest-first, no file content read)
+	files, lErr := s.listRequestFiles(sID)
+	if lErr != nil {
+		return nil, lErr
+	}
+
+	// apply offset before reading files
+	if opts.Offset > 0 {
+		if int(opts.Offset) < len(files) {
+			files = files[opts.Offset:]
+		} else {
+			return []RequestWithID{}, nil
+		}
+	}
+
+	// apply limit before reading files
+	if opts.Limit > 0 && int(opts.Limit) < len(files) {
+		files = files[:opts.Limit]
+	}
+
+	var (
+		eg     errgroup.Group
+		result = make([]RequestWithID, len(files))
+	)
+
+	for i, file := range files {
+		eg.Go(func() error {
+			var data []byte
+
+			if err := s.withLock(true, func() (err error) {
+				var f *os.File
+
+				if f, err = os.OpenFile(file.path, os.O_RDONLY, 0); err != nil {
+					return // file opening failed
+				}
+
+				if data, err = io.ReadAll(f); err != nil {
+					_ = f.Close() // do not forget to close the file in case of an error
+
+					return // reading failed
+				}
+
+				return f.Close()
+			}); err != nil {
+				return err
+			}
+
+			var req Request
+			if err := s.encDec.Decode(data, &req); err != nil {
+				return err // decoding failed
+			}
+
+			if !opts.IncludeBody {
+				req.Body = nil
+			}
+
+			result[i] = RequestWithID{ID: file.rID, Request: req}
+
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (s *FS) DeleteRequest(ctx context.Context, sID, rID string) error {
 	if err := s.isOpenAndNotDone(ctx); err != nil {
 		return err

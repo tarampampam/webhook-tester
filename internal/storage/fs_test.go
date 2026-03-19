@@ -36,6 +36,19 @@ func TestFS_Request_CreateReadDelete(t *testing.T) {
 	)
 }
 
+func TestFS_GetRequests(t *testing.T) {
+	t.Parallel()
+
+	var ft = newFakeTime(t)
+
+	testGetRequests(t,
+		func(sTTL time.Duration, maxReq uint32) storage.Storage {
+			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
+		},
+		func(t time.Duration) { ft.Add(t) },
+	)
+}
+
 func TestFS_Close(t *testing.T) {
 	t.Parallel()
 
@@ -61,6 +74,9 @@ func TestFS_Close(t *testing.T) {
 	require.ErrorIs(t, err, storage.ErrClosed)
 
 	_, err = impl.GetAllRequests(ctx, "foo")
+	require.ErrorIs(t, err, storage.ErrClosed)
+
+	_, err = impl.GetRequests(ctx, "foo", storage.GetRequestsOptions{})
 	require.ErrorIs(t, err, storage.ErrClosed)
 
 	err = impl.DeleteRequest(ctx, "foo", "bar")
