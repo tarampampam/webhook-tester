@@ -30,7 +30,7 @@ jobs:
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm dependency update .
       - run: helm template . > /dev/null
       - run: helm lint --strict .
@@ -140,7 +140,7 @@ jobs:
     needs: [lint-and-test-backend, lint-and-test-frontend]
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
