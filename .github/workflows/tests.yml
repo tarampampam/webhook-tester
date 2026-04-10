@@ -21,7 +21,7 @@ jobs:
     name: Check for GitLeaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: {fetch-depth: 0}
       - uses: gacts/gitleaks@v1
 
@@ -31,7 +31,7 @@ jobs:
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm dependency update .
       - run: helm template . > /dev/null
       - run: helm lint --strict .
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/setup-go@v6
         with: {go-version-file: go.mod}
       - run: go generate -skip readme ./...
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with: {name: web-dist, path: ./web/dist} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
@@ -125,7 +125,7 @@ jobs:
     needs: [build-app]
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with: {name: webhook-tester-linux-amd64}
       - run: mkdir ./data
       - run: | # start the server in the background
@@ -146,7 +146,7 @@ jobs:
     needs: [lint-and-test-backend, lint-and-test-frontend]
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
