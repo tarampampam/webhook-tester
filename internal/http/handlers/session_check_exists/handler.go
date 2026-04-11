@@ -29,8 +29,8 @@ func (h *Handler) Handle(ctx context.Context, ids []openapi.UUID) (*openapi.Chec
 				if _, err := h.db.GetSession(egCtx, sID); err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
 						mu.Lock()
-						res[sID] = false //nolint:wsl_v5
-						mu.Unlock()      //nolint:wsl_v5
+						res[sID] = false
+						mu.Unlock()
 
 						return nil
 					}
@@ -39,8 +39,8 @@ func (h *Handler) Handle(ctx context.Context, ids []openapi.UUID) (*openapi.Chec
 				}
 
 				mu.Lock()
-				res[sID] = true //nolint:wsl_v5
-				mu.Unlock()     //nolint:wsl_v5
+				res[sID] = true
+				mu.Unlock()
 
 				return nil
 			}

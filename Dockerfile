@@ -4,7 +4,7 @@
 FROM docker.io/library/node:25-alpine AS builder
 
 # install Go using the official image
-COPY --from=docker.io/library/golang:1.25-alpine /usr/local/go /usr/local/go
+COPY --from=docker.io/library/golang:1.26-alpine /usr/local/go /usr/local/go
 
 ENV \
   # add Go and Node.js "binaries" to the PATH

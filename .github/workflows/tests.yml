@@ -21,7 +21,8 @@ jobs:
     name: Check for GitLeaks
     runs-on: ubuntu-latest
     steps:
-      - {uses: actions/checkout@v4, with: {fetch-depth: 0}}
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
       - uses: gacts/gitleaks@v1
 
   lint-charts:
@@ -30,7 +31,7 @@ jobs:
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm dependency update .
       - run: helm template . > /dev/null
       - run: helm lint --strict .
@@ -40,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
+      - uses: actions/setup-go@v6
+        with: {go-version-file: go.mod}
       - run: go generate -skip readme ./...
       - uses: golangci/golangci-lint-action@v9
       - run: go test -race -covermode=atomic ./...
@@ -69,7 +71,7 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
       - run: npm --prefix "$NPM_PREFIX" run build
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
@@ -83,21 +85,24 @@ jobs:
     needs: [lint-and-test-backend, lint-and-test-frontend, build-web]
     steps:
       - uses: actions/checkout@v6
-      - {uses: gacts/github-slug@v1, id: slug}
+      - uses: gacts/github-slug@v1
+        id: slug
       - id: values
         run: |
           echo "app-version=${{ steps.slug.outputs.version-semantic }}@${{ steps.slug.outputs.commit-hash-short }}" >> $GITHUB_OUTPUT
           echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
+      - uses: actions/setup-go@v6
+        with: {go-version-file: go.mod}
       - run: go generate -skip readme ./...
-      - {uses: actions/download-artifact@v6, with: {name: web-dist, path: ./web/dist}} # put the built frontend
+      - uses: actions/download-artifact@v8
+        with: {name: web-dist, path: ./web/dist} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.values.outputs.app-version }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: ./${{ steps.values.outputs.bin-name }}
@@ -120,7 +125,8 @@ jobs:
     needs: [build-app]
     steps:
       - uses: actions/checkout@v6
-      - {uses: actions/download-artifact@v6, with: {name: webhook-tester-linux-amd64}}
+      - uses: actions/download-artifact@v8
+        with: {name: webhook-tester-linux-amd64}
       - run: mkdir ./data
       - run: | # start the server in the background
           chmod +x ./webhook-tester-linux-amd64
@@ -140,7 +146,7 @@ jobs:
     needs: [lint-and-test-backend, lint-and-test-frontend]
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile

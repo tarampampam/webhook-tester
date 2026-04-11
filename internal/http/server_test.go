@@ -220,7 +220,7 @@ func sendRequest(t *testing.T, method, url string, headers ...map[string]string)
 		}
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
 	require.NoError(t, err)
 
 	body, _ = io.ReadAll(resp.Body)

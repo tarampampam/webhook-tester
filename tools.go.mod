@@ -1,6 +1,6 @@
 module tools
 
-go 1.25
+go 1.26
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 

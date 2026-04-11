@@ -19,7 +19,7 @@ jobs:
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
       - run: npm --prefix "$NPM_PREFIX" run generate
       - run: npm --prefix "$NPM_PREFIX" run build
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with: {name: web-dist, path: ./web/dist/, if-no-files-found: error, retention-days: 1}
 
   build-app:
@@ -33,20 +33,23 @@ jobs:
     needs: [build-web]
     steps:
       - uses: actions/checkout@v6
-      - {uses: gacts/github-slug@v1, id: slug}
+      - uses: gacts/github-slug@v1
+        id: slug
       - id: values
         run: |
           echo "bin-name=webhook-tester-${{ matrix.os }}-${{ matrix.arch }}`[ ${{ matrix.os }} = 'windows' ] && echo '.exe'`" >> $GITHUB_OUTPUT
-      - {uses: actions/setup-go@v6, with: {go-version-file: go.mod}}
+      - uses: actions/setup-go@v6
+        with: {go-version-file: go.mod}
       - run: go generate -skip readme ./...
-      - {uses: actions/download-artifact@v6, with: {name: web-dist, path: ./web/dist}} # put the built frontend
+      - uses: actions/download-artifact@v8
+        with: {name: web-dist, path: ./web/dist} # put the built frontend
       - env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
           LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version-semantic }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: webhook-tester-${{ matrix.os }}-${{ matrix.arch }}
           path: ./${{ steps.values.outputs.bin-name }}
@@ -65,8 +68,10 @@ jobs:
     strategy: {matrix: {arch: [amd64, arm64]}}
     needs: [build-app]
     steps:
-      - {uses: gacts/github-slug@v1, id: slug}
-      - {uses: actions/download-artifact@v6, with: {name: "webhook-tester-linux-${{ matrix.arch }}"}}
+      - uses: gacts/github-slug@v1
+        id: slug
+      - uses: actions/download-artifact@v8
+        with: {name: "webhook-tester-linux-${{ matrix.arch }}"}
       - id: values
         run: |
           majorMinorPatch="${{ steps.slug.outputs.version-major }}.${{ steps.slug.outputs.version-minor }}.${{ steps.slug.outputs.version-patch }}"
@@ -91,19 +96,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_LOGIN }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - {uses: gacts/github-slug@v1, id: slug}
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: gacts/github-slug@v1
+        id: slug
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -127,13 +133,14 @@ jobs:
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
-      - {uses: gacts/github-slug@v1, id: slug}
+      - uses: azure/setup-helm@v5
+      - uses: gacts/github-slug@v1
+        id: slug
       - run: |
           helm package \
             --app-version "${{ steps.slug.outputs.version }}" \
             --version "${{ steps.slug.outputs.version }}" .
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: helm-chart
           path: ./deployments/helm/*.tgz
@@ -145,9 +152,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [helm-pack]
     steps:
-      - {uses: actions/checkout@v4, with: {ref: gh-pages}}
-      - uses: azure/setup-helm@v4
-      - uses: actions/download-artifact@v6
+      - uses: actions/checkout@v6
+        with: {ref: gh-pages}
+      - uses: azure/setup-helm@v5
+      - uses: actions/download-artifact@v8
         with: {name: helm-chart, path: ./helm-charts}
       - name: Update the index.yaml
         run: |
@@ -156,7 +164,8 @@ jobs:
             --merge \
             ./helm-charts/index.yaml \
             ./helm-charts
-      - {uses: gacts/directory-listing@v1, with: {overwrite: true}}
+      - uses: gacts/directory-listing@v1
+        with: {overwrite: true}
       - name: Commit and push the changes
         run: |
           git config user.name "${{ github.actor }}"
@@ -172,7 +181,8 @@ jobs:
     environment: {name: render}
     needs: [build-docker-image]
     steps:
-      - {uses: gacts/github-slug@v1, id: slug}
+      - uses: gacts/github-slug@v1
+        id: slug
       # https://render.com/docs/deploy-an-image#deploy-via-webhook
       - run: curl -SsL "https://api.render.com/deploy/${SRV}?key=${KEY}&imgURL=${IMG}:${TAG}"
         env:
