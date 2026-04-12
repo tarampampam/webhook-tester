@@ -126,6 +126,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - web/node_modules
 formatters:
   enable:
     - gci
