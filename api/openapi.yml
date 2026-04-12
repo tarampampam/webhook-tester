@@ -64,11 +64,15 @@ paths:
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
   /api/session/{session_uuid}/requests:
-    get: # TODO: add possibility to omit the request body
+    get:
       summary: Get the list of requests for a session by UUID
       tags: [api]
       operationId: apiSessionListRequests
-      parameters: [{$ref: '#/components/parameters/SessionUUIDInPath'}]
+      parameters:
+        - {$ref: '#/components/parameters/SessionUUIDInPath'}
+        - {$ref: '#/components/parameters/ListRequestsLimitInQuery'}
+        - {$ref: '#/components/parameters/ListRequestsOffsetInQuery'}
+        - {$ref: '#/components/parameters/ListRequestsIncludeBodyInQuery'}
       responses:
         '200': {$ref: '#/components/responses/CapturedRequestsListResponse'}
         '404': {$ref: '#/components/responses/ErrorResponse'} # Not found
@@ -364,6 +368,39 @@ components:
       in: header
       required: true
       schema: {type: string, example: '13'}
+
+    ListRequestsLimitInQuery:
+      description: Maximum number of requests to return (0 or omit for all)
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 1000
+        example: 50
+        x-go-type: uint32
+
+    ListRequestsOffsetInQuery:
+      description: Number of requests to skip for pagination
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        example: 0
+        x-go-type: uint32
+
+    ListRequestsIncludeBodyInQuery:
+      description: Whether to include the base64-encoded request body in the response
+      name: include_body
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: true
+        example: true
 
   requestBodies: # --------------------------------------------- REQUESTS ---------------------------------------------
     CreateSessionRequest:

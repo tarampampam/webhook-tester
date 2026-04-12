@@ -48,6 +48,10 @@ type Storage interface {
 	// will be returned.
 	GetAllRequests(_ context.Context, sID string) (map[string]Request, error)
 
+	// GetRequests returns a paginated, newest-first sorted list of requests for the session.
+	// If the session is not found, ErrSessionNotFound will be returned.
+	GetRequests(_ context.Context, sID string, opts GetRequestsOptions) ([]RequestWithID, error)
+
 	// DeleteRequest removes the request with the specified ID.
 	// If the request or session is not found, ErrNotFound (ErrSessionNotFound or ErrRequestNotFound) will be returned.
 	DeleteRequest(_ context.Context, sID, rID string) error
@@ -83,6 +87,19 @@ type (
 		Value string `json:"value"` // the value of the header, e.g. "application/json"
 	}
 )
+
+// GetRequestsOptions defines filtering and pagination options for request queries.
+type GetRequestsOptions struct {
+	Limit       uint32 // 0 = no limit (return all)
+	Offset      uint32
+	IncludeBody bool // if false, Request.Body will be nil
+}
+
+// RequestWithID pairs a request with its ID, preserving order from the storage layer.
+type RequestWithID struct {
+	ID      string
+	Request Request
+}
 
 // TimeFunc is a function that returns the current time.
 type TimeFunc func() time.Time
