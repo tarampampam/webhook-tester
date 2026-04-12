@@ -63,6 +63,7 @@ type (
 			}
 			maxRequestPayloadSize uint32
 			autoCreateSessions    bool
+			publicURLRoot         string // public URL root override
 		}
 	}
 )
@@ -262,6 +263,16 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			OnlyOnce: true,
 			Config:   cli.StringConfig{TrimSpace: true},
 		}
+		publicURLRootFlag = cli.StringFlag{
+			Name:     "public-url-root",
+			Category: httpCategory,
+			Usage: "public URL root override for webhook URLs (e.g., https://example.com); " +
+				"if not set, the URL shown in the UI is based on the browser's location",
+			Sources:   cli.EnvVars("PUBLIC_URL_ROOT"),
+			OnlyOnce:  true,
+			Config:    cli.StringConfig{TrimSpace: true},
+			Validator: validateURL,
+		}
 		redisServerDsnFlag = cli.StringFlag{
 			Name: "redis-dsn",
 			Usage: "redis-like (redis, keydb) server DSN (e.g. redis://user:pwd@127.0.0.1:6379/0 or " +
@@ -296,15 +307,15 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 
 			// set options
 			opt.addr = c.String(httpAddrFlag.Name)
-			opt.http.tcpPort = uint16(c.Uint(httpPortFlag.Name)) //nolint:gosec
+			opt.http.tcpPort = uint16(c.Uint(httpPortFlag.Name))
 			opt.timeouts.httpRead = c.Duration(httpReadTimeoutFlag.Name)
 			opt.timeouts.httpWrite = c.Duration(httpWriteTimeoutFlag.Name)
 			opt.timeouts.httpIdle = c.Duration(httpIdleTimeoutFlag.Name)
 			opt.storage.driver = c.String(storageDriverFlag.Name)
 			opt.storage.sessionTTL = c.Duration(storageSessionTTLFlag.Name)
-			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name)) //nolint:gosec
+			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name))
 			opt.storage.fsDir = c.String(storageFsDirFlag.Name)
-			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name)) //nolint:gosec
+			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name))
 			opt.autoCreateSessions = c.Bool(autoCreateSessionsFlag.Name)
 			opt.pubSub.driver = c.String(pubSubDriverFlag.Name)
 			opt.tunnel.driver = c.String(tunnelDriverFlag.Name)
@@ -312,6 +323,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			opt.redis.dsn = c.String(redisServerDsnFlag.Name)
 			opt.timeouts.shutdown = c.Duration(shutdownTimeoutFlag.Name)
 			opt.frontend.useLive = c.Bool(useLiveFrontendFlag.Name)
+			opt.publicURLRoot = c.String(publicURLRootFlag.Name)
 
 			if opt.tunnel.driver == tunnelDriverNgrok && opt.ngrok.authToken == "" {
 				return fmt.Errorf("ngrok authentication token (--%s or %s) is required",
@@ -336,6 +348,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 			&pubSubDriverFlag,
 			&tunnelDriverFlag,
 			&ngrokAuthTokenFlag,
+			&publicURLRootFlag,
 			&redisServerDsnFlag,
 			&shutdownTimeoutFlag,
 			&useLiveFrontendFlag,
@@ -362,6 +375,24 @@ func validateDuration(name string, minValue, maxValue time.Duration) func(d time
 
 		return nil
 	}
+}
+
+// validateURL validates a URL flag value, ensuring it has a scheme and host.
+func validateURL(s string) error {
+	if s == "" {
+		return nil // empty is valid (means no override)
+	}
+
+	u, err := url.Parse(s)
+	if err != nil {
+		return fmt.Errorf("invalid URL [%s]: %w", s, err)
+	}
+
+	if u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("URL must include scheme and host [%s]", s)
+	}
+
+	return nil
 }
 
 // Run current command.
@@ -446,6 +477,13 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 		MaxRequestBodySize: cmd.options.maxRequestPayloadSize,
 		SessionTTL:         cmd.options.storage.sessionTTL,
 		AutoCreateSessions: cmd.options.autoCreateSessions,
+	}
+
+	// parse public URL root if provided
+	if cmd.options.publicURLRoot != "" {
+		if parsedURL, err := url.Parse(cmd.options.publicURLRoot); err == nil {
+			appSettings.PublicURLRoot = parsedURL
+		}
 	}
 
 	// create HTTP server
