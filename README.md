@@ -206,6 +206,10 @@ The following flags are supported:
 
 <!--/GENERATED:CLI_DOCS-->
 
+## 🤖 AI Agent Instructions
+
+See [AGENTS.md](AGENTS.md) for detailed guidelines for AI agents working with this repository.
+
 ## License
 
 This is open-sourced software licensed under the [MIT License][link_license].
