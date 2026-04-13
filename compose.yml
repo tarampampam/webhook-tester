@@ -3,13 +3,14 @@
 services:
   app: # common use case is to run shell or execute commands
     build: &app-build {dockerfile: Dockerfile, target: builder}
-    env_file: [{path: .env, required: false}]
+    env_file: &app-env-file [{path: .env, required: false}]
     environment: {HOME: /tmp, LOG_LEVEL: debug}
     volumes: [.:/src:rw, app-tmp-data:/tmp:rw, app-modules-cache:/var/tmp/go:rw]
     security_opt: [no-new-privileges:true]
 
   app-http:
     build: *app-build
+    env_file: *app-env-file
     command: go run ./cmd/webhook-tester/ start --use-live-frontend --auto-create-sessions --max-requests 16
     volumes: [.:/src:rw]
     ports: ['8080:8080/tcp'] # open http://127.0.0.1:8080
@@ -23,6 +24,7 @@ services:
 
   app-web-dist:
     build: *app-build
+    env_file: *app-env-file
     user: node
     volumes: [.:/src:rw]
     working_dir: /src/web
@@ -36,6 +38,7 @@ services:
 
   app-web-serve:
     build: *app-build
+    env_file: *app-env-file
     user: node
     volumes: [.:/src:rw]
     working_dir: /src/web
