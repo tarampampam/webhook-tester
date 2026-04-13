@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -156,6 +157,48 @@ func TestServer_StartHTTP(t *testing.T) {
 				require.Contains(t, headers.Get("Content-Type"), "application/json")
 			})
 		}
+	})
+}
+
+func TestServer_PublicURLRoot(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = context.Background()
+		log = zap.NewNop()
+		srv = appHttp.NewServer(ctx, log)
+		db  = storage.NewInMemory(time.Minute, 8)
+	)
+
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	// Configure PublicURLRoot
+	publicURLRoot, err := url.Parse("https://example.com")
+	require.NoError(t, err)
+
+	srv.Register(
+		context.Background(),
+		log,
+		func(context.Context) error { return nil },
+		func(context.Context) (string, error) { return "v1.0.0", nil },
+		&config.AppSettings{PublicURLRoot: publicURLRoot},
+		db,
+		pubsub.NewInMemory[pubsub.RequestEvent](),
+		false,
+	)
+
+	var baseUrl, stop = startServer(t, ctx, srv)
+
+	t.Cleanup(stop)
+
+	t.Run("api settings includes public_url_root", func(t *testing.T) {
+		t.Parallel()
+
+		var status, body, headers = sendRequest(t, "GET", baseUrl+"/api/settings")
+
+		require.Equal(t, http.StatusOK, status)
+		require.Contains(t, headers.Get("Content-Type"), "application/json")
+		require.Contains(t, string(body), `"public_url_root":"https://example.com"`)
 	})
 }
 
