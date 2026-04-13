@@ -156,7 +156,7 @@ export class Client {
           enabled: data.tunnel.enabled,
           url: data?.tunnel.url ? new URL(data.tunnel.url) : null,
         }),
-        publicUrlRoot: data?.public_url_root ? new URL(data.public_url_root) : null,
+        publicUrlRoot: data?.public_url_root ? new URL(data.public_url_root.replace(/\/+$/, '')) : null,
       })
 
       return this.cache.settings

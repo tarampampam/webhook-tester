@@ -266,7 +266,7 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 		publicURLRootFlag = cli.StringFlag{
 			Name:     "public-url-root",
 			Category: httpCategory,
-			Usage: "public URL root override for webhook URLs (e.g., https://example.com); " +
+			Usage: "public URL root override for webhook URLs (e.g., http://webhook-tester.k8s.internal); " +
 				"if not set, the URL shown in the UI is based on the browser's location",
 			Sources:   cli.EnvVars("PUBLIC_URL_ROOT"),
 			OnlyOnce:  true,
@@ -307,15 +307,15 @@ func NewCommand(log *zap.Logger, defaultHttpPort uint16) *cli.Command { //nolint
 
 			// set options
 			opt.addr = c.String(httpAddrFlag.Name)
-			opt.http.tcpPort = uint16(c.Uint(httpPortFlag.Name))
+			opt.http.tcpPort = uint16(c.Uint(httpPortFlag.Name)) //nolint:gosec
 			opt.timeouts.httpRead = c.Duration(httpReadTimeoutFlag.Name)
 			opt.timeouts.httpWrite = c.Duration(httpWriteTimeoutFlag.Name)
 			opt.timeouts.httpIdle = c.Duration(httpIdleTimeoutFlag.Name)
 			opt.storage.driver = c.String(storageDriverFlag.Name)
 			opt.storage.sessionTTL = c.Duration(storageSessionTTLFlag.Name)
-			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name))
+			opt.storage.maxRequests = uint16(c.Uint(storageMaxRequestsFlag.Name)) //nolint:gosec
 			opt.storage.fsDir = c.String(storageFsDirFlag.Name)
-			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name))
+			opt.maxRequestPayloadSize = uint32(c.Uint(maxRequestPayloadSizeFlag.Name)) //nolint:gosec
 			opt.autoCreateSessions = c.Bool(autoCreateSessionsFlag.Name)
 			opt.pubSub.driver = c.String(pubSubDriverFlag.Name)
 			opt.tunnel.driver = c.String(tunnelDriverFlag.Name)
@@ -481,9 +481,12 @@ func (cmd *command) Run(parentCtx context.Context, log *zap.Logger) error { //no
 
 	// parse public URL root if provided
 	if cmd.options.publicURLRoot != "" {
-		if parsedURL, err := url.Parse(cmd.options.publicURLRoot); err == nil {
-			appSettings.PublicURLRoot = parsedURL
+		parsedURL, err := url.Parse(cmd.options.publicURLRoot)
+		if err != nil {
+			return fmt.Errorf("parse public URL root %q: %w", cmd.options.publicURLRoot, err)
 		}
+
+		appSettings.PublicURLRoot = parsedURL
 	}
 
 	// create HTTP server

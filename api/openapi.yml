@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: WebHook Tester
   description: The powerful tool to test webhooks and not only
-  version: 0.2.0
+  version: 0.3.0
   contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
 
 servers:

@@ -767,8 +767,13 @@ export const DataProvider: React.FC<{
   // watch for the session changes and update the webhook URL
   useEffect(() => {
     if (session) {
-      const baseUrl = publicUrlRoot ? publicUrlRoot.origin : window.location.origin
-      setWebHookUrl(Object.freeze(new URL(`${baseUrl}/${session.sID}`)))
+      const baseUrl = publicUrlRoot ? new URL(publicUrlRoot.toString()) : new URL(window.location.origin)
+
+      if (!baseUrl.pathname.endsWith('/')) {
+        baseUrl.pathname = `${baseUrl.pathname}/`
+      }
+
+      setWebHookUrl(Object.freeze(new URL(session.sID, baseUrl)))
     }
   }, [session, publicUrlRoot])
 
