@@ -206,6 +206,18 @@ The following flags are supported:
 
 <!--/GENERATED:CLI_DOCS-->
 
+## 🧠 A note on AI-assisted development
+
+AI tools are great assistants - they can autocomplete, review, summarize, and help you move faster. But they’re not a
+substitute for understanding what's going on. If you're using AI to contribute here, please make sure you actually
+read, understand, and stand behind the changes you’re proposing.
+
+I personally write my code myself, and I encourage others to do the same. Not because AI is "bad", but because blindly
+trusting generated code tends to produce... let's say creative results.
+
+And honestly, I'm still waiting for the day "AI-free software" becomes a trend - like organic food, but for code 😄 
+Until then: trust, but verify.
+
 ## 🤖 AI Agent Instructions
 
 See [AGENTS.md](AGENTS.md) for detailed guidelines for AI agents working with this repository.
