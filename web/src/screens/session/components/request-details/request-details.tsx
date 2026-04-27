@@ -17,6 +17,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
   const [elapsedTime, setElapsedTime] = useState<string | null>(null)
   const [contentType, setContentType] = useState<string | null>(null)
   const [payload, setPayload] = useState<Uint8Array | null>(null)
+  const queryParams = request?.url?.searchParams ? Array.from(request.url.searchParams.entries()) : []
 
   useEffect(
     () => setContentType(request?.headers.find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? null),
@@ -148,6 +149,41 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               ))}
           </Grid.Col>
         </>
+      )}
+
+      {!loading && queryParams.length > 0 && (
+        <Grid.Col span={12}>
+          <Title order={4} mb="md">
+            Query params
+          </Title>
+
+          <Table my="md" verticalSpacing="xs" highlightOnHover withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w="25%">Name</Table.Th>
+                <Table.Th>Value</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+
+            <Table.Tbody>
+              {queryParams.map(([name, value], index) => (
+                <Table.Tr key={`${name}-${index}`}>
+                  <Table.Td>
+                    <Text size="sm" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      {name}
+                    </Text>
+                  </Table.Td>
+
+                  <Table.Td>
+                    <Text size="sm" c={value === '' ? 'dimmed' : undefined} style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      {value === '' ? '(empty)' : value}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Grid.Col>
       )}
 
       <Grid.Col span={12}>
