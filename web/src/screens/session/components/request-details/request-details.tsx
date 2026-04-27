@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { CodeHighlight } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
+import { CopyButton, ActionIcon, Group } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { Link } from 'react-router-dom'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
@@ -152,7 +153,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
       )}
 
       {!loading && queryParams.length > 0 && (
-        <Grid.Col span={12}>
+        <Grid.Col span={10}>
           <Title order={4} mb="md">
             Query params
           </Title>
@@ -175,9 +176,29 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                   </Table.Td>
 
                   <Table.Td>
-                    <Text size="sm" c={value === '' ? 'dimmed' : undefined} style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {value === '' ? '(empty)' : value}
-                    </Text>
+                    <Group gap="xs" justify="space-between" wrap="nowrap">
+                      <Text
+                        size="sm"
+                        c={value === '' ? 'dimmed' : undefined}
+                        style={{ fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}
+                      >
+                        {value === '' ? '(empty)' : value}
+                      </Text>
+
+                      <CopyButton value={value} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color={copied ? 'teal' : 'gray'}
+                            onClick={copy}
+                            title="Copy value"
+                          >
+                            {copied ? '✓' : '📋'}
+                          </ActionIcon>
+                        )}
+                      </CopyButton>
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
