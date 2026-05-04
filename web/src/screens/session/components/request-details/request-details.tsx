@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { CodeHighlight } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
+import { CopyButton, ActionIcon, Group } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
 import { Link } from 'react-router-dom'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
@@ -17,6 +18,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
   const [elapsedTime, setElapsedTime] = useState<string | null>(null)
   const [contentType, setContentType] = useState<string | null>(null)
   const [payload, setPayload] = useState<Uint8Array | null>(null)
+  const queryParams = request?.url?.searchParams ? Array.from(request.url.searchParams.entries()) : []
 
   useEffect(
     () => setContentType(request?.headers.find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? null),
@@ -148,6 +150,61 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               ))}
           </Grid.Col>
         </>
+      )}
+
+      {!loading && queryParams.length > 0 && (
+        <Grid.Col span={10}>
+          <Title order={4} mb="md">
+            Query params
+          </Title>
+
+          <Table my="md" verticalSpacing="xs" highlightOnHover withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w="25%">Name</Table.Th>
+                <Table.Th>Value</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+
+            <Table.Tbody>
+              {queryParams.map(([name, value], index) => (
+                <Table.Tr key={`${name}-${index}`}>
+                  <Table.Td>
+                    <Text size="sm" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      {name}
+                    </Text>
+                  </Table.Td>
+
+                  <Table.Td>
+                    <Group gap="xs" justify="space-between" wrap="nowrap">
+                      <Text
+                        size="sm"
+                        c={value === '' ? 'dimmed' : undefined}
+                        style={{ fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}
+                      >
+                        {value === '' ? '(empty)' : value}
+                      </Text>
+
+                      <CopyButton value={value} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color={copied ? 'teal' : 'gray'}
+                            onClick={copy}
+                            title="Copy value"
+                          >
+                            {copied ? '✓' : '📋'}
+                          </ActionIcon>
+                        )}
+                      </CopyButton>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Grid.Col>
       )}
 
       <Grid.Col span={12}>
