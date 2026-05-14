@@ -1,8 +1,6 @@
-/// <reference types="vite/client" />
-
-import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve, join } from 'path'
+import { join, resolve } from 'path'
+import { defineConfig } from 'vite'
 
 const rootDir = resolve(__dirname)
 const [distDir, srcDir] = [join(rootDir, 'dist'), join(rootDir, 'src')]
@@ -15,10 +13,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': srcDir,
-      // /esm/icons/index.mjs only exports the icons statically, so no separate chunks are created.
-      // without this workaround vite dev server sends a bunch of chunks (more than 5k+) to the browser
-      // @link https://github.com/tabler/tabler-icons/issues/1233#issuecomment-2428245119
-      '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
     },
   },
   define: {
@@ -30,7 +24,8 @@ export default defineConfig({
     outDir: distDir,
     reportCompressedSize: false,
     assetsInlineLimit: 0, // default: 4096 (4 KiB)
-    rollupOptions: {
+    chunkSizeWarningLimit: 2048,
+    rolldownOptions: {
       input: {
         app: join(rootDir, 'index.html'), // the default entry point
       },
@@ -38,6 +33,7 @@ export default defineConfig({
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
+        comments: { legal: false },
       },
     },
     sourcemap: isWatchMode,
@@ -48,21 +44,12 @@ export default defineConfig({
     open: false,
     proxy: devServerProxyTo
       ? {
-          '^/api/.*': devServerProxyTo,
-          '^/api/.*/subscribe$': { ws: true, target: devServerProxyTo },
+          '^/api/.*': { ws: true, target: devServerProxyTo },
           '/ready': devServerProxyTo,
           '/healthz': devServerProxyTo,
           '^/[0-9a-f-]{36}.*$': devServerProxyTo, // webhook url's
         }
       : undefined,
-  },
-  esbuild: {
-    legalComments: 'none',
-  },
-  // @ts-expect-error https://vitest.dev/config/
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './vitest.setup.js',
+    allowedHosts: true,
   },
 })

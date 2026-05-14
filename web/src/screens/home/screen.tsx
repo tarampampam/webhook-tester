@@ -52,10 +52,11 @@ export function HomeScreen(): React.JSX.Element {
     }
 
     // automatically redirect to the last created session, if available
-    if (allSessionIDs.current.length) {
+    const lastSessionID = allSessionIDs.current[allSessionIDs.current.length - 1]
+    if (lastSessionID !== undefined) {
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, allSessionIDs.current[allSessionIDs.current.length - 1]))
+      navigate(pathTo(RouteIDs.SessionAndRequest, lastSessionID))
 
       return
     }

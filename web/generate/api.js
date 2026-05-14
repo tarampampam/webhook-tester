@@ -36,6 +36,6 @@ if (!input || typeof input !== 'string') {
   panic('Please provide an output file')
 }
 
-await Promise.all([apiGenerate(input, output)]).catch((error) => {
+await apiGenerate(input, output).catch((error) => {
   panic(error)
 })

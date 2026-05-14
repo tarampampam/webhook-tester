@@ -5,7 +5,7 @@ import { useInterval } from '@mantine/hooks'
 import dayjs from 'dayjs'
 import { Link, useNavigate } from 'react-router-dom'
 import { pathTo, RouteIDs } from '~/routing'
-import { Request as RequestData, useData } from '~/shared'
+import { type Request as RequestData, useData } from '~/shared'
 import { methodToColor } from '~/theme'
 import styles from './request.module.css'
 

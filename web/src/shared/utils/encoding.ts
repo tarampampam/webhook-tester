@@ -19,8 +19,8 @@ export function base64ToUint8Array(base64: string): Uint8Array {
 export function uint8ArrayToBase64(uint8Array: Uint8Array): string {
   let binaryString = ''
 
-  for (let i = 0; i < uint8Array.length; i++) {
-    binaryString += String.fromCharCode(uint8Array[i])
+  for (const byte of uint8Array) {
+    binaryString += String.fromCharCode(byte)
   }
 
   return btoa(binaryString)

@@ -1,32 +1,34 @@
 {
   "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
     "module": "ESNext",
-    "skipLibCheck": true,
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "noEmit": true,
-    "jsx": "react-jsx",
+
     "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false,
+
+    "useDefineForClassFields": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "esModuleInterop": true,
     "paths": {
       "~/*": ["./src/*"]
     }
   },
-  "include": [
-    "node_modules/vite/client.d.ts",
-    "*.ts",
-    "src/**/*"
-  ]
+  "include": ["node_modules/vite/client.d.ts", "*.ts", "src/**/*", "vitest/**/*"]
 }

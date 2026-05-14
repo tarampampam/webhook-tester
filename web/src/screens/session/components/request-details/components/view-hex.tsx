@@ -58,11 +58,13 @@ export const ViewHex: React.FC<{
     }
 
     // fill the data items array with the actual data, handling all the heavy lifting here
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      for (let itemNum = 0; itemNum < lines[lineNum].length; itemNum++) {
+    for (const [lineNum, line] of lines.entries()) {
+      for (let itemNum = 0; itemNum < line.length; itemNum++) {
         const byte = input[lineNum * lineSize + itemNum]
 
-        lines[lineNum][itemNum] = [byteToString(byte, displayType), byteToAscii(byte)] satisfies DataItem
+        if (byte !== undefined) {
+          line[itemNum] = [byteToString(byte, displayType), byteToAscii(byte)] satisfies DataItem
+        }
       }
     }
 
@@ -85,7 +87,7 @@ export const ViewHex: React.FC<{
           The request body is large and has been trimmed to {lengthLimit} bytes for performance reasons.
         </Alert>
       )}
-      <Grid my="sm" justify="space-between" align="stretch" gutter="lg" grow>
+      <Grid my="sm" justify="space-between" align="stretch" gap="lg" grow>
         <Grid.Col span="content" visibleFrom="lg">
           <NativeSelect
             size="xs"
@@ -119,7 +121,7 @@ export const ViewHex: React.FC<{
             <Box component="span" c="dimmed" size={fontSize}>
               {!!dataItems && // print column numbers
                 dataItems.length &&
-                dataItems[0]
+                (dataItems[0] ?? [])
                   .map((_, colNum) => byteToString(colNum, displayType).toUpperCase() + (colNum % 4 === 3 ? ' ' : ''))
                   .join(' ')
                   .trimEnd()}

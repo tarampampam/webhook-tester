@@ -160,7 +160,14 @@ export function SessionAndRequestScreen(): React.JSX.Element {
             }
           })()
         : Promise.resolve(),
-    ] satisfies Array<Promise<void>>).then(([sessionSwitchResult, requestSwitchResult]) => {
+    ] satisfies Array<Promise<void>>).then((results) => {
+      const sessionSwitchResult = results[0]
+      const requestSwitchResult = results[1]
+
+      if (sessionSwitchResult === undefined || requestSwitchResult === undefined) {
+        return
+      }
+
       // if switching to the session failed
       if (sessionSwitchResult.status === 'rejected') {
         notify.show({

@@ -282,7 +282,8 @@ const sendTestRequest = async (url: URL): Promise<Response> => {
     now: Math.floor(Date.now() / 1000),
   }
 
-  const methods: Readonly<Array<string>> = ['post', 'put', 'delete', 'patch']
+  const methods: readonly [string, ...string[]] = ['post', 'put', 'delete', 'patch']
+  const randomMethod: string = methods[Math.floor(Math.random() * methods.length)] ?? methods[0]
 
   if (Math.random() > 0.5) {
     url.pathname += '/any/path' // add random path, 50% chance
@@ -294,7 +295,7 @@ const sendTestRequest = async (url: URL): Promise<Response> => {
 
   return fetch(
     new Request(url, {
-      method: methods[Math.floor(Math.random() * methods.length)].toUpperCase(), // pick random method
+      method: randomMethod.toUpperCase(), // pick random method
       cache: 'no-cache',
       headers: { 'Content-Type': 'application/json', 'X-Test-Header': 'test' },
       body: JSON.stringify(payload),

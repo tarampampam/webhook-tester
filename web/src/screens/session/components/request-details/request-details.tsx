@@ -80,12 +80,14 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                       <Flex justify="flex-start" align="center">
                         <Text span>{request.clientAddress}</Text>
                         <Flex align="center" ml="md" gap="sm">
-                          {[
-                            ['WhoIs', 'https://who.is/whois-ip/ip-address/' + request.clientAddress],
-                            ['Shodan', 'https://www.shodan.io/host/' + request.clientAddress],
-                            ['Netify', 'https://www.netify.ai/resources/ips/' + request.clientAddress],
-                            ['Censys', 'https://search.censys.io/hosts/' + request.clientAddress],
-                          ].map(([name, link], index) => (
+                          {(
+                            [
+                              ['WhoIs', 'https://who.is/whois-ip/ip-address/' + request.clientAddress],
+                              ['Shodan', 'https://www.shodan.io/host/' + request.clientAddress],
+                              ['Netify', 'https://www.netify.ai/resources/ips/' + request.clientAddress],
+                              ['Censys', 'https://search.censys.io/hosts/' + request.clientAddress],
+                            ] satisfies Array<[string, string]>
+                          ).map(([name, link], index) => (
                             <Link key={index} to={link} target="_blank" rel="noreferrer">
                               {name}
                             </Link>
