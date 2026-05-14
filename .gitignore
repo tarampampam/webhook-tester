@@ -11,6 +11,14 @@
 *_enum.go
 *.pb.go
 
+## AI shit
+/.copilot
+/.cursor
+/.claude
+/.windsurf
+/.aider*
+/.gemini
+
 ## Temp dirs & trash
 *.env
 /__old__
