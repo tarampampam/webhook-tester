@@ -1,4 +1,4 @@
-import { Table } from 'dexie'
+import type { Table } from 'dexie'
 
 export type Session = {
   sID: string

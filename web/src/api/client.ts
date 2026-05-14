@@ -3,7 +3,7 @@ import { coerce as semverCoerce, parse as semverParse, type SemVer } from 'semve
 import { base64ToUint8Array, uint8ArrayToBase64 } from '~/shared'
 import { APIErrorUnknown } from './errors'
 import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
-import { components, paths, type RequestEventAction } from './schema.gen'
+import type { components, paths, RequestEventAction } from './schema.gen'
 
 type AppSettings = Readonly<{
   limits: Readonly<{

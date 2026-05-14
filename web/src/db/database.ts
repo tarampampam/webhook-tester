@@ -1,5 +1,6 @@
 import { Dexie } from 'dexie'
-import { SessionsTable, Session, sessionsSchema, RequestsTable, Request, requestsSchema } from './tables'
+import type { SessionsTable, Session, RequestsTable, Request } from './tables'
+import { sessionsSchema, requestsSchema } from './tables'
 
 export class Database {
   public dexie: Dexie
