@@ -30,6 +30,12 @@ npm run generate            # regenerates ./src/api/schema.gen.ts and other *.ge
 - **Don't instantiate `Client` inside components** - it is passed as a prop from `main.tsx`.
 - **Don't omit braces for conditionals and loops** - the `curly` ESLint rule enforces this; never suppress it.
 - **Don't make unrequested changes** to files outside the scope of the current task.
+- **Don't mutate git state**. Read commands (`status`, `log`, `diff`, `show`, `blame`) are fine; anything that
+  changes the index, working tree, refs, stash, config, or remotes is forbidden - no staging, committing,
+  branching, tagging, resetting, rebasing, merging, cherry-picking, stashing, pushing, pulling, or fetching.
+  No "I'll undo it after". Editing files is fine; turning edits into history is the user's job.
+- **Don't leave the repo** - no modifying, moving, or deleting files outside the repo root, no `rm -rf` on
+  unspecified paths, no `chmod` / `chown`; ask before touching anything beyond the repo.
 
 ## Agent workflow
 
