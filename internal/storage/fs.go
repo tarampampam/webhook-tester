@@ -138,16 +138,12 @@ func (s *FS) cleanup(ctx context.Context) {
 			var wg sync.WaitGroup
 
 			for _, sID := range sIDs {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-
+				wg.Go(func() {
 					// check the session expiration
 					if _, expiresAt, err := s.findSessionFile(sID); err == nil && expiresAt.Before(now) {
 						_ = s.DeleteSession(ctx, sID) // and delete the expired
 					}
-				}()
+				})
 			}
 
 			wg.Wait()

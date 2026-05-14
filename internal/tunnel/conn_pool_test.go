@@ -3,7 +3,6 @@ package tunnel_test
 import (
 	"context"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -42,26 +41,23 @@ func TestConnectionsPool_Get(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for range 100 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			// get a new connection from the pool
 			conn, got := tc.Get(ctx)
 			require.True(t, got)
 			require.NotNil(t, conn.Conn)
 			require.NotPanics(t, conn.Release)
-		}()
+		})
 	}
 
 	wg.Wait() // wait until all goroutines are finished
 
-	<-time.After(time.Millisecond) // wait for the last dial to be completed
-	runtime.Gosched()              // give the scheduler a chance to run
-
-	// the dial function should be called 110 times (10 initial dials + 100 dials from goroutines)
-	require.Equal(t, int32(100+10), dialer.dialCount.Load())
+	// Each Release() signals needNewCh asynchronously; poll until all 110 dials complete.
+	require.Eventually(t,
+		func() bool { return dialer.dialCount.Load() == int32(100+10) },
+		time.Second,
+		time.Millisecond,
+	)
 
 	stop() // after this line, each attempt to get a new connection should return false and nil connection
 

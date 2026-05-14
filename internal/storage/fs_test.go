@@ -20,6 +20,7 @@ func TestFS_Session_CreateReadDelete(t *testing.T) {
 			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
 		},
 		func(t time.Duration) { ft.Add(t) },
+		ft.Get,
 	)
 }
 

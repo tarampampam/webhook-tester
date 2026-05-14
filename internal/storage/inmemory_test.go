@@ -20,6 +20,7 @@ func TestInMemory_Session_CreateReadDelete(t *testing.T) {
 			return storage.NewInMemory(sTTL, maxReq, storage.WithInMemoryTimeNow(ft.Get))
 		},
 		func(t time.Duration) { ft.Add(t) },
+		ft.Get,
 	)
 }
 

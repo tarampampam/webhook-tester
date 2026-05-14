@@ -157,6 +157,7 @@ func (s *Redis) AddSessionTTL(ctx context.Context, sID string, howMuch time.Dura
 	}
 
 	// read all stored request UUIDs
+	//nolint:goconst
 	rIDs, rErr := s.client.ZRangeByScore(ctx, s.requestsKey(sID), &redis.ZRangeBy{Min: "-inf", Max: "+inf"}).Result()
 	if rErr != nil {
 		return rErr
