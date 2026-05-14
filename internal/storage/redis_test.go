@@ -28,6 +28,7 @@ func TestRedis_Session_CreateReadDelete(t *testing.T) {
 			)
 		},
 		func(t time.Duration) { mini.FastForward(t); ft.Add(t) },
+		ft.Get,
 	)
 }
 

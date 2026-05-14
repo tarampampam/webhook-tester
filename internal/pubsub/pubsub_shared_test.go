@@ -107,23 +107,15 @@ func testRaceProvocation(t *testing.T, new func() pubSub[any]) {
 		sub, unsubscribe, err := ps.Subscribe(ctx, topicName) // subscribe
 		require.NoError(t, err)
 
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			require.Equal(t, <-sub, eventData) // receive (block until event is received)
 
 			unsubscribe() // unsubscribe
-		}()
+		})
 
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			require.NoError(t, ps.Publish(ctx, topicName, eventData)) // publish
-		}()
+		})
 	}
 
 	wg.Wait()
