@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type CSSProperties } from 'react'
+import React, { useMemo, useState, type CSSProperties } from 'react'
 import { Alert, Box, Divider, Grid, NativeSelect } from '@mantine/core'
 import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
 
@@ -15,7 +15,7 @@ export const ViewHex: React.FC<{
   const [lineNumberType, setLineNumberType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [displayType, setDisplayType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [lineSize, setLineSize] = useState<number>(16)
-  const [trimmed, setTrimmed] = useState<boolean>(false)
+  const trimmed = input.length > lengthLimit
 
   /**
    * Data items are stored in a 2D array where each item is a tuple of two strings:
@@ -35,17 +35,10 @@ export const ViewHex: React.FC<{
    *   [['64', 'd'], ['0a', undefined]]
    * ]
    */
-  const [dataItems, setDataItems] = useState<ReadonlyArray<DataLine>>([])
-
-  useEffect(() => {
-    if (input.length === 0) {
-      setDataItems([])
-
-      return
-    }
+  const dataItems = useMemo((): ReadonlyArray<DataLine> => {
+    if (input.length === 0) return []
 
     const length = input.length > lengthLimit ? lengthLimit : input.length // limit the number of bytes
-    setTrimmed(input.length > lengthLimit)
 
     // preallocate the data items array
     const lines = new Array<DataLine>(Math.ceil(length / lineSize))
@@ -68,7 +61,7 @@ export const ViewHex: React.FC<{
       }
     }
 
-    setDataItems(lines)
+    return lines
   }, [input, displayType, lineSize, lengthLimit])
 
   const fontSize: string | number = '0.75em'

@@ -127,7 +127,7 @@ export function SessionAndRequestScreen(): React.JSX.Element {
     Promise.allSettled([
       // if the session ID has changed, switch to the session
       stateSID.current !== sID
-        ? (async (): Promise<void> => {
+        ? (async () => {
             try {
               // invoke the fast switching to the session (usually with the data from the database) and
               // get the slow operation
@@ -145,7 +145,7 @@ export function SessionAndRequestScreen(): React.JSX.Element {
 
       // if the request ID has changed, switch to the request
       stateRID.current !== rID
-        ? (async (): Promise<void> => {
+        ? (async () => {
             try {
               // invoke the fast switching to the request (usually with the data from the database) and
               // get the slow operation
