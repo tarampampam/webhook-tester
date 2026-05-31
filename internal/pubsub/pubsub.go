@@ -2,51 +2,60 @@ package pubsub
 
 import (
 	"context"
+	"errors"
+	"time"
 )
 
-type (
-	Publisher[T any] interface {
-		// Publish an event into the topic.
-		Publish(_ context.Context, topic string, event T) error
-	}
+// ErrClosed is returned by Publish and Subscribe after Close has been called.
+var ErrClosed = errors.New("pubsub is closed")
 
-	Subscriber[T any] interface {
-		// Subscribe to the topic. The returned channel will receive events.
-		// The returned function should be called to unsubscribe.
-		Subscribe(_ context.Context, topic string) (_ <-chan T, unsubscribe func(), _ error)
-	}
-)
-
-type PubSub[T any] interface {
-	Publisher[T]
-	Subscriber[T]
+// Publisher publishes events to named topics.
+type Publisher interface {
+	// Publish an event into the topic.
+	Publish(_ context.Context, topic string, event RequestEvent) error
 }
 
-type (
-	RequestEvent struct {
-		Action  RequestAction `json:"action"`
-		Request *Request      `json:"request"`
-	}
+// Subscriber subscribes to named topics and receives events.
+type Subscriber interface {
+	// Subscribe to the topic. The returned channel will receive events.
+	// The returned function should be called to unsubscribe.
+	Subscribe(_ context.Context, topic string) (_ <-chan RequestEvent, unsubscribe func(), _ error)
+}
 
-	Request struct {
-		ID                 string       `json:"id"`
-		ClientAddr         string       `json:"client_addr"`
-		Method             string       `json:"method"`
-		Headers            []HttpHeader `json:"headers"`
-		URL                string       `json:"url"`
-		CreatedAtUnixMilli int64        `json:"created_at_unix_milli"`
-	}
+// PubSub combines the Publisher and Subscriber interfaces.
+type PubSub interface {
+	Publisher
+	Subscriber
+}
 
-	HttpHeader struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-
-	RequestAction = string
-)
+// RequestAction describes the type of change to a captured request.
+type RequestAction string
 
 const (
 	RequestActionCreate RequestAction = "create" // create a request
 	RequestActionDelete RequestAction = "delete" // delete a request
 	RequestActionClear  RequestAction = "clear"  // delete all requests
+)
+
+type (
+	// RequestEvent is the event published when a captured request is created, deleted, or all requests are removed.
+	RequestEvent struct {
+		Action  RequestAction
+		Request *RequestData
+	}
+
+	// RequestData holds the details of a captured HTTP request.
+	RequestData struct {
+		ID         string
+		ClientAddr string
+		Method     string
+		Headers    []HttpHeader
+		URL        string
+		CreatedAt  time.Time
+	}
+
+	// HttpHeader represents a single HTTP header name-value pair.
+	HttpHeader struct {
+		Name, Value string
+	}
 )

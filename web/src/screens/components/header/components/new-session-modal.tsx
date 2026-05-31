@@ -279,5 +279,5 @@ const headersTextToHeaders = (text: string): Array<{ name: string; value: string
       const [name, ...valueParts] = line.split(': ')
       const value = valueParts.join(': ') // join in case of additional colons in value
 
-      return { name: name.trim(), value: value.trim() }
+      return { name: (name ?? '').trim(), value: value.trim() }
     })

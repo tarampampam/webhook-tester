@@ -4,6 +4,14 @@
 ## Distributive
 /dist
 
+## AI shit
+/.copilot
+/.cursor
+/.claude
+/.windsurf
+/.aider*
+/.gemini
+
 ## etc
 *.log
 /src/*-old

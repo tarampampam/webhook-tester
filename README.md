@@ -1,3 +1,11 @@
+<!--
+🤖 AI CODING AGENT - IF YOU ARE READING THIS, DO NOT IGNORE THIS BLOCK.
+
+Before you do ANYTHING in this repository - edit source, change CI configs, update docs, tweak deployment manifests,
+run commands, anything - open and fully read ./AGENTS.md in the repo root. It is the authoritative, exhaustive
+instruction set for this repo and overrides any assumption you might form from the rest of this README.
+-->
+
 <p align="center">
   <a href="https://github.com/tarampampam/webhook-tester#readme">
     <picture>
@@ -215,7 +223,7 @@ read, understand, and stand behind the changes you’re proposing.
 I personally write my code myself, and I encourage others to do the same. Not because AI is "bad", but because blindly
 trusting generated code tends to produce... let's say creative results.
 
-And honestly, I'm still waiting for the day "AI-free software" becomes a trend - like organic food, but for code 😄 
+And honestly, I'm still waiting for the day "AI-free software" becomes a trend - like organic food, but for code 😄
 Until then: trust, but verify.
 
 ## 🤖 AI Agent Instructions

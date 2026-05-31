@@ -1,0 +1,49 @@
+{{/* https://github.com/oapi-codegen/oapi-codegen/blob/main/pkg/codegen/templates/inline.tmpl */}}
+
+{{/* --- ORIGINAL CODE BEGIN --- */}}
+// swaggerSpec is base64 encoded, compressed with deflate, json marshaled Swagger object.
+var swaggerSpec = []string{
+{{range .SpecParts}}    "{{.}}",
+{{end}}}
+
+// decodeSpec returns the content of the embedded swagger specification file
+// or error if failed to decode.
+func decodeSpec() ([]byte, error) {
+	compressed, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+
+	zr := flate.NewReader(bytes.NewReader(compressed))
+
+	var buf bytes.Buffer
+
+	if _, err = buf.ReadFrom(zr); err != nil {
+		return nil, fmt.Errorf("read flate: %w", err)
+	}
+
+	if err = zr.Close(); err != nil {
+		return nil, fmt.Errorf("close flate reader: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+{{/* --- ORIGINAL CODE END --- */}}
+
+var specCache struct {
+	data []byte
+	once sync.Once
+}
+
+// Spec returns the OpenAPI specification in JSON format.
+func Spec() []byte {
+	specCache.once.Do(func() {
+		if data, err := decodeSpec(); err != nil {
+			panic(err) // will never happen
+		} else {
+			specCache.data = data
+		}
+	})
+
+	return specCache.data
+}

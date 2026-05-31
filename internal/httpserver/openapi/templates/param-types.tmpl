@@ -1,0 +1,88 @@
+{{/* https://github.com/oapi-codegen/oapi-codegen/blob/main/pkg/codegen/templates/param-types.tmpl */}}
+
+{{/* --- ORIGINAL CODE BEGIN --- */}}
+{{range .}}{{$opid := .OperationId}}
+{{range .TypeDefinitions}}
+// {{.TypeName}} defines parameters for {{$opid}}.
+type {{.TypeName}} {{if .IsAlias}}={{end}} {{.Schema.TypeDecl}}
+{{end}}
+{{end}}
+{{/* --- ORIGINAL CODE END --- */}}
+
+// ErrValidationFailed is returned when a type fails validation.
+var ErrValidationFailed = errors.New("validation error")
+
+// validationError wraps errors related to validation failures.
+type validationError struct{ cause error }
+
+// ensure validationError implements the error interface and supports unwrapping.
+var (
+	_ error                       = (*validationError)(nil)
+	_ interface{ Unwrap() error } = (*validationError)(nil)
+	_ interface{ Is(error) bool } = (*validationError)(nil)
+)
+
+// Error implements the error interface.
+func (e *validationError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrValidationFailed.Error(), e.cause.Error())
+}
+
+// Unwrap allows unwrapping the underlying cause.
+func (e *validationError) Unwrap() error { return e.cause }
+
+// Is allows errors.Is to identify validationError as ErrValidationFailed.
+func (e *validationError) Is(v error) bool { return v == ErrValidationFailed }
+
+// wrapValidationError wraps an error into a validationError if it's not already one.
+// It returns nil if the input error is nil.
+func wrapValidationError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, ErrValidationFailed) {
+		return err
+	}
+
+	return &validationError{cause: err}
+}
+
+// validatable is an interface for types that must validate themselves.
+//
+// To implement this interface for a struct, define a function in this package with the signature:
+//
+//	func (t *TypeName) Validate() error
+//
+// Where TypeName is the name of the struct type. The function should return nil if the struct is valid,
+// or an error describing the validation issue. Any error returned from Validate() SHOULD or wrap
+// ErrValidationFailed, for example:
+//
+//	fmt.Errorf("%w: foo must be ...", ErrValidationFailed)
+//	// or
+//	wrapValidationError(fmt.Errorf("foo must be ..."))
+//
+// The second approach is preferred as it preserves the original error for inspection.
+type validatable interface {
+	Validate() error
+}
+
+{{ if len . }}
+// Compile-time check to confirm that all parameter and request body types implement the validatable interface.
+// This is needed since everything received from external world must be validated before processing.
+var (
+{{ range . -}}
+	{{- range .TypeDefinitions }}
+		{{- if not .IsAlias }}
+		_ validatable = (*{{ .TypeName }})(nil)
+		{{- end }}
+	{{- end }}
+	{{- range .Bodies }}
+		{{- if and .IsSupported .Schema.IsRef .Schema.OAPISchema (len .Schema.OAPISchema.Type) }}
+			{{- if eq (index .Schema.OAPISchema.Type 0) "object" }}
+		_ validatable = (*{{ .Schema.RefType }})(nil)
+			{{- end }}
+		{{- end }}
+	{{- end }}
+{{- end }}
+)
+{{ end }}

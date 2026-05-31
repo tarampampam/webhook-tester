@@ -1,0 +1,34 @@
+{{/* https://github.com/oapi-codegen/oapi-codegen/blob/main/pkg/codegen/templates/typedef.tmpl */}}
+
+{{/* --- ORIGINAL CODE BEGIN --- */}}
+{{range .Types}}
+{{ if .Schema.Description }}{{ toGoComment .Schema.Description .TypeName  }}{{ else }}// {{.TypeName}} defines model for {{.JsonName}}.{{ end }}
+type {{.TypeName}} {{if .IsAlias }}={{end}} {{.Schema.TypeDecl}}
+
+{{/* --- CUSTOM CODE BEGIN --- */ -}}
+{{/* type {{.TypeName}} {{.Schema.TypeDecl}} */}}
+
+{{ if and .Schema .Schema.OAPISchema }}
+{{ $schema := .Schema.OAPISchema -}}
+{{ if or $schema.MinLength $schema.MaxLength $schema.Min $schema.Max }}
+// Constraints for {{ .TypeName }} (they might be useful for validation).
+const (
+	{{- if $schema.MinLength }}
+		{{ .TypeName -}}MinLength = {{ $schema.MinLength }} // minimum length for {{ .TypeName }}
+	{{- end -}}
+	{{- if $schema.MaxLength }}
+		{{ .TypeName -}}MaxLength = {{ $schema.MaxLength }} // maximum length for {{ .TypeName }}
+	{{- end -}}
+	{{- if $schema.Min }}
+		{{ .TypeName -}}Min {{ .TypeName -}} = {{ $schema.Min }} // minimum value for {{ .TypeName }}
+	{{- end -}}
+	{{- if $schema.Max }}
+		{{ .TypeName -}}Max {{ .TypeName -}} = {{ $schema.Max }} // maximum value for {{ .TypeName }}
+	{{- end }}
+)
+{{ end }}
+{{ end }}
+{{/* --- CUSTOM CODE END --- */}}
+
+{{end}}
+{{/* --- ORIGINAL CODE END --- */}}

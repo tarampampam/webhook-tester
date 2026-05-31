@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { APIErrorNotFound, type Client, RequestEventAction } from '~/api'
 import { Database } from '~/db'
 import { UsedStorageKeys, useSettings, useStorage } from '~/shared'
@@ -163,7 +163,6 @@ export const DataProvider: React.FC<{
   const [allSessionIDs, setAllSessionIDs] = useState<ReadonlyArray<string>>([])
   const [request, setRequest] = useState<Readonly<Request> | null>(null)
   const [requests, setRequests] = useState<ReadonlyArray<Request>>([])
-  const [webHookUrl, setWebHookUrl] = useState<URL | null>(null)
 
   // the subscription closer function (if not null, it means the subscription is active)
   const closeSubRef = useRef<(() => void) | null>(null)
@@ -764,17 +763,17 @@ export const DataProvider: React.FC<{
       .catch(errHandler)
   }, [api, db, errHandler, setLastUsedSID])
 
-  // watch for the session changes and update the webhook URL
-  useEffect(() => {
-    if (session) {
-      const baseUrl = publicUrlRoot ? new URL(publicUrlRoot.toString()) : new URL(window.location.origin)
+  // derive the webhook URL from the current session and public URL root
+  const webHookUrl = useMemo((): Readonly<URL> | null => {
+    if (!session) return null
 
-      if (!baseUrl.pathname.endsWith('/')) {
-        baseUrl.pathname = `${baseUrl.pathname}/`
-      }
+    const baseUrl = publicUrlRoot ? new URL(publicUrlRoot.toString()) : new URL(window.location.origin)
 
-      setWebHookUrl(Object.freeze(new URL(session.sID, baseUrl)))
+    if (!baseUrl.pathname.endsWith('/')) {
+      baseUrl.pathname = `${baseUrl.pathname}/`
     }
+
+    return Object.freeze(new URL(session.sID, baseUrl))
   }, [session, publicUrlRoot])
 
   return (

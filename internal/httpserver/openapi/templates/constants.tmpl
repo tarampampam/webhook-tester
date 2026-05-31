@@ -1,0 +1,39 @@
+{{/* https://github.com/oapi-codegen/oapi-codegen/blob/main/pkg/codegen/templates/constants.tmpl */}}
+
+{{/* --- ORIGINAL CODE BEGIN --- */}}
+{{- if gt (len .SecuritySchemeProviderNames) 0 }}
+const (
+{{range $ProviderName := .SecuritySchemeProviderNames}}
+	{{- $ProviderName | sanitizeGoIdentity | ucFirst}}Scopes {{$ProviderName | schemaNameToTypeName | lcFirst}}ContextKey = "{{$ProviderName}}.Scopes"
+{{end}}
+)
+{{end}}
+
+{{range $Enum := .EnumDefinitions}}
+// Defines values for {{$Enum.TypeName}}.
+const (
+{{range $name, $value := $Enum.GetValues}}
+	{{$name}} {{$Enum.TypeName}} = {{$Enum.ValueWrapper}}{{$value}}{{$Enum.ValueWrapper -}}
+{{end}}
+)
+{{/* --- ORIGINAL CODE END --- */}}
+
+// Validate checks if the value of {{ $Enum.TypeName }} is in the set of defined values.
+func (v {{ $Enum.TypeName }}) Validate() error {
+	switch v {
+	case {{ $first := true -}}
+	{{- range $name, $value := $Enum.GetValues -}}
+		{{- if $first -}}
+			{{ $first = false -}}
+		{{- else -}}
+			,
+		{{ end -}}
+		{{- $name -}}
+	{{- end -}}:
+		return nil
+	default:
+  	{{- /* ErrValidationFailed defined in param-types.tmpl file */}}
+		return wrapValidationError(fmt.Errorf("invalid value '%v'", v))
+	}
+}
+{{end}}

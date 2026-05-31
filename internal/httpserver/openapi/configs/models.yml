@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/refs/tags/v2.7.0/configuration-schema.json
+
+package: openapi
+output: models.gen.go
+
+generate:
+  models: true
+
+compatibility:
+  always-prefix-enum-values: true
+
+output-options:
+  skip-prune: true
+  type-mapping:
+    string: {formats: {uuid: {type: string}}}
+  overlay:
+    path: ./spec/overlay.yml
+  user-templates:
+    constants.tmpl: ./templates/constants.tmpl
+    param-types.tmpl: ./templates/param-types.tmpl
+    typedef.tmpl: ./templates/typedef.tmpl
+    request-bodies.tmpl: ./templates/request-bodies.tmpl

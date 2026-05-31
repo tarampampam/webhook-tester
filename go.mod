@@ -1,4 +1,4 @@
-module gh.tarampamp.am/webhook-tester/v2
+module gh.tarampamp.am/webhook-tester/v3
 
 go 1.26
 

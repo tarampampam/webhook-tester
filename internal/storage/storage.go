@@ -1,91 +1,157 @@
+// Package storage provides abstractions and implementations for persisting webhook sessions
+// and captured HTTP requests.
 package storage
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"time"
 )
 
 var (
-	ErrNotFound        = errors.New("not found")
+	// ErrNotFound is the base sentinel for missing-resource errors. The specific variants
+	// ([ErrSessionNotFound], [ErrRequestNotFound]) wrap it, so [errors.Is](err, ErrNotFound) matches all of them.
+	ErrNotFound = errors.New("not found")
+	// ErrSessionNotFound is returned when a session does not exist or has expired.
 	ErrSessionNotFound = fmt.Errorf("session %w", ErrNotFound)
+	// ErrRequestNotFound is returned when a captured request does not exist.
 	ErrRequestNotFound = fmt.Errorf("request %w", ErrNotFound)
 
-	ErrClosed = errors.New("closed")
+	// ErrAlreadyExists is the base sentinel for duplicate-resource errors. The specific variants
+	// ([ErrSessionAlreadyExists], [ErrRequestAlreadyExists]) wrap it.
+	ErrAlreadyExists = errors.New("already exists")
+	// ErrSessionAlreadyExists is returned when creating a session whose ID is already in use.
+	ErrSessionAlreadyExists = fmt.Errorf("session %w", ErrAlreadyExists)
+	// ErrRequestAlreadyExists is returned when creating a request whose ID is already in use within a session.
+	ErrRequestAlreadyExists = fmt.Errorf("request %w", ErrAlreadyExists)
+
+	// ErrClosed is returned by any operation called after Close has been invoked on the storage.
+	ErrClosed = errors.New("storage closed")
 )
 
-// Storage manages Session and Request data.
-type Storage interface {
-	// NewSession creates a new session and returns a session ID on success.
-	// The Session.CreatedAt field will be set to the current time.
-	NewSession(_ context.Context, _ Session, id ...string) (sID string, _ error)
+type (
+	// ResponseHeader is a single HTTP header name-value pair included in the session's response.
+	ResponseHeader struct {
+		Name  string
+		Value string
+	}
 
-	// GetSession retrieves session data.
-	// If the session is not found, ErrSessionNotFound will be returned.
+	// SessionResponse defines the HTTP response the storage returns to every incoming webhook request.
+	SessionResponse struct {
+		Code    uint16
+		Headers []ResponseHeader
+		Body    []byte
+		Delay   time.Duration // artificial delay before the response is sent; zero means no delay
+	}
+
+	// SessionMeta holds server-assigned session metadata. Callers receive it from the storage;
+	// they cannot supply these values on creation.
+	SessionMeta struct {
+		CreatedAt time.Time
+		ExpiresAt time.Time // zero value means the session has no expiration
+	}
+
+	// Session is the complete session record: its configured response and server-assigned metadata.
+	Session struct {
+		Response SessionResponse
+		Meta     SessionMeta
+	}
+)
+
+// NoExpiration disables session expiration when passed as the ttl argument to NewSession.
+// Any other negative duration is not meaningful and will produce an already-expired session.
+const NoExpiration time.Duration = -1
+
+// SessionStorage manages session data, including response configuration and metadata.
+type SessionStorage interface {
+	// NewSession creates a session with the given ID and response configuration.
+	// Pass [NoExpiration] as ttl to create a session that never expires.
+	// Returns [ErrSessionAlreadyExists] if a live session with that ID already exists.
+	// The returned [SessionMeta] carries the server-assigned timestamps.
+	NewSession(_ context.Context, sID string, _ SessionResponse, ttl time.Duration) (*SessionMeta, error)
+
+	// GetSession returns the session with the given ID.
+	// Returns [ErrSessionNotFound] if the session does not exist or has expired.
 	GetSession(_ context.Context, sID string) (*Session, error)
 
-	// AddSessionTTL adds the specified TTL to the session (and all its requests) with the specified ID.
+	// AddSessionTTL sets the session expiry to now+howMuch and applies the same deadline to all
+	// captured requests. Pass [NoExpiration] to remove the expiry entirely.
+	// Returns [ErrSessionNotFound] if the session does not exist or has expired.
 	AddSessionTTL(_ context.Context, sID string, howMuch time.Duration) error
 
-	// DeleteSession removes the session with the specified ID.
-	// If the session is not found, ErrSessionNotFound will be returned.
+	// DeleteSession removes the session and all its captured requests.
+	// Returns [ErrSessionNotFound] if the session does not exist.
 	DeleteSession(_ context.Context, sID string) error
-
-	// NewRequest creates a new request for the session with the specified ID and returns a request ID on success.
-	// The session with the specified ID must exist. The Request.CreatedAtUnixMilli field will be set to the
-	// current time. The storage may limit the number of requests per session - in this case the oldest request
-	// will be removed.
-	// If the session is not found, ErrSessionNotFound will be returned.
-	NewRequest(_ context.Context, sID string, _ Request) (rID string, _ error)
-
-	// GetRequest retrieves request data.
-	// If the request or session is not found, ErrNotFound (ErrSessionNotFound or ErrRequestNotFound) will be returned.
-	GetRequest(_ context.Context, sID, rID string) (*Request, error)
-
-	// GetAllRequests returns all requests for the session with the specified ID.
-	// If the session is not found, ErrSessionNotFound will be returned. If there are no requests, an empty map
-	// will be returned.
-	GetAllRequests(_ context.Context, sID string) (map[string]Request, error)
-
-	// DeleteRequest removes the request with the specified ID.
-	// If the request or session is not found, ErrNotFound (ErrSessionNotFound or ErrRequestNotFound) will be returned.
-	DeleteRequest(_ context.Context, sID, rID string) error
-
-	// DeleteAllRequests removes all requests for the session with the specified ID.
-	// If the session is not found, ErrSessionNotFound will be returned.
-	DeleteAllRequests(_ context.Context, sID string) error
 }
 
 type (
-	// Session describes session settings (like response data and any additional information).
-	Session struct {
-		Code               uint16        `json:"code"`                  // default server response code
-		Headers            []HttpHeader  `json:"headers"`               // server response headers
-		ResponseBody       []byte        `json:"body"`                  // server response body (payload)
-		Delay              time.Duration `json:"delay"`                 // delay before response sending
-		CreatedAtUnixMilli int64         `json:"created_at_unit_milli"` // creation time
-		ExpiresAt          time.Time     `json:"-"`                     // expiration time
+	// RequestHeader is a single HTTP header name-value pair from a captured webhook request.
+	RequestHeader struct {
+		Name  string
+		Value string
 	}
 
-	// Request describes recorded request and additional meta-data.
+	// CapturedRequest holds the raw data from an incoming HTTP request to a webhook endpoint.
+	CapturedRequest struct {
+		ClientAddr string
+		Method     string
+		Body       []byte
+		Headers    []RequestHeader
+		URL        string
+	}
+
+	// RequestMeta holds server-assigned metadata for a captured request.
+	RequestMeta struct {
+		CreatedAt time.Time
+	}
+
+	// Request is the complete record of a captured webhook request.
 	Request struct {
-		ClientAddr         string       `json:"client_addr"`           // client hostname or IP address
-		Method             string       `json:"method"`                // HTTP method name (i.e., 'GET', 'POST')
-		Body               []byte       `json:"body"`                  // request body (payload)
-		Headers            []HttpHeader `json:"headers"`               // HTTP request headers
-		URL                string       `json:"url"`                   // Uniform Resource Identifier
-		CreatedAtUnixMilli int64        `json:"created_at_unit_milli"` // creation time
-	}
-
-	HttpHeader struct {
-		Name  string `json:"name"`  // the name of the header, e.g. "Content-Type"
-		Value string `json:"value"` // the value of the header, e.g. "application/json"
+		Data CapturedRequest
+		Meta RequestMeta
 	}
 )
 
-// TimeFunc is a function that returns the current time.
-type TimeFunc func() time.Time
+// RequestStorage manages captured webhook requests, which are associated with sessions.
+type RequestStorage interface {
+	// NewRequest records a captured request under sID/rID.
+	// When the per-session request cap is reached, the oldest request is evicted to make room.
+	// Returns [ErrSessionNotFound] if the session does not exist or has expired.
+	// Returns [ErrRequestAlreadyExists] if a request with rID already exists in the session.
+	// The returned [RequestMeta] carries the server-assigned creation timestamp.
+	NewRequest(_ context.Context, sID, rID string, _ CapturedRequest) (*RequestMeta, error)
 
-// defaultTimeFunc is the default TimeFunc implementation, which returns the current time rounded to milliseconds.
-func defaultTimeFunc() time.Time { return time.Now().Round(time.Millisecond) }
+	// GetRequest returns the captured request identified by sID and rID.
+	// Returns [ErrSessionNotFound] or [ErrRequestNotFound] if either does not exist.
+	GetRequest(_ context.Context, sID, rID string) (*Request, error)
+
+	// GetRequests returns an iterator over all captured requests for the session, ordered newest-first.
+	// The returned error covers setup failures, including [ErrSessionNotFound].
+	// Errors that occur mid-iteration are written to *err if err is non-nil; always check it after
+	// the loop, not before. Passing nil disables mid-iteration error reporting.
+	GetRequests(_ context.Context, sID string, err *error) (iter.Seq2[string, Request], error)
+
+	// DeleteRequest removes the captured request identified by sID and rID.
+	// Returns [ErrSessionNotFound] or [ErrRequestNotFound] if either does not exist.
+	DeleteRequest(_ context.Context, sID, rID string) error
+
+	// DeleteAllRequests removes all captured requests for the given session.
+	// Returns [ErrSessionNotFound] if the session does not exist.
+	DeleteAllRequests(_ context.Context, sID string) error
+}
+
+// Storage combines session and request management.
+type Storage interface {
+	SessionStorage
+	RequestStorage
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// sortEntry is a lightweight sort key used when building ordered snapshots for iteration.
+type sortEntry struct {
+	id        string
+	createdAt time.Time
+}

@@ -47,7 +47,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
-          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${{ steps.slug.outputs.version-semantic }}
+          LDFLAGS: -s -w -X gh.tarampamp.am/webhook-tester/v3/internal/version.version=${{ steps.slug.outputs.version-semantic }}
         run: go build -trimpath -ldflags "$LDFLAGS" -o "./${{ steps.values.outputs.bin-name }}" ./cmd/webhook-tester/
       - uses: actions/upload-artifact@v7
         with:

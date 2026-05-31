@@ -2,548 +2,1073 @@ package storage_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v3/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v3/internal/testutil/assert"
 )
 
-func toCloser(s storage.Storage) io.Closer {
-	if c, ok := s.(io.Closer); ok {
-		return c
+// StorageFactory creates a fresh, isolated storage instance for a single test or benchmark case.
+// timeNow controls the instance's clock; limit caps requests stored per session (0 = unlimited).
+// The factory must register tb.Cleanup to close the storage when the test or benchmark ends.
+type StorageFactory func(tb testing.TB, limit uint, timeNow func() time.Time) storage.Storage
+
+// RunSuite exercises the full [SessionStorage] + [RequestStorage] contract.
+// Call it from each implementation's test file with an appropriate factory.
+func RunSuite(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("NewSession", func(t *testing.T) { t.Parallel(); testNewSession(t, factory) })
+	t.Run("GetSession", func(t *testing.T) { t.Parallel(); testGetSession(t, factory) })
+	t.Run("AddSessionTTL", func(t *testing.T) { t.Parallel(); testAddSessionTTL(t, factory) })
+	t.Run("DeleteSession", func(t *testing.T) { t.Parallel(); testDeleteSession(t, factory) })
+	t.Run("NewRequest", func(t *testing.T) { t.Parallel(); testNewRequest(t, factory) })
+	t.Run("GetRequest", func(t *testing.T) { t.Parallel(); testGetRequest(t, factory) })
+	t.Run("GetRequests", func(t *testing.T) { t.Parallel(); testGetRequests(t, factory) })
+	t.Run("DeleteRequest", func(t *testing.T) { t.Parallel(); testDeleteRequest(t, factory) })
+	t.Run("DeleteAllRequests", func(t *testing.T) { t.Parallel(); testDeleteAllRequests(t, factory) })
+	t.Run("SessionExpiry", func(t *testing.T) { t.Parallel(); testSessionExpiry(t, factory) })
+	t.Run("RaceProvocation", func(t *testing.T) { t.Parallel(); testRaceProvocation(t, factory) })
+
+	t.Run("Close", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		closer, ok := store.(io.Closer)
+		if !ok {
+			t.Skipf("storage %T does not implement io.Closer", store)
+
+			return
+		}
+
+		assert.NoError(t, closer.Close())
+
+		testClose(t, factory)
+	})
+}
+
+const someSessionID = "some\\session Id"
+
+func testNewSession(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("returned meta reflects creation time and TTL", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft  = newFakeTime()
+			now = ft.Now()
+		)
+
+		const ttl = time.Minute
+
+		meta, err := factory(t, 10, ft.Now).NewSession(t.Context(), someSessionID, storage.SessionResponse{Code: 200}, ttl)
+		assert.NoError(t, err)
+		assert.NotNil(t, meta)
+
+		assert.True(t, meta.CreatedAt.Equal(now))
+		assert.True(t, meta.ExpiresAt.Equal(meta.CreatedAt.Add(ttl)))
+	})
+
+	t.Run("NoExpiration yields zero ExpiresAt", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		meta, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+		assert.True(t, meta.ExpiresAt.IsZero())
+	})
+
+	t.Run("duplicate live session ID returns ErrSessionAlreadyExists", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.ErrorIs(t, err, storage.ErrSessionAlreadyExists)
+		assert.ErrorIs(t, err, storage.ErrAlreadyExists) // ErrSessionAlreadyExists wraps ErrAlreadyExists
+	})
+
+	t.Run("expired session ID can be reused", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		const ttl = time.Minute
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, ttl)
+		assert.NoError(t, err)
+
+		ft.Advance(ttl + time.Millisecond)
+
+		// creating a session with the same ID after expiry must succeed
+		_, err = store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, ttl)
+		assert.NoError(t, err)
+	})
+}
+
+func testGetSession(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("returns correct Response and Meta", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+			resp  = storage.SessionResponse{
+				Code:    201,
+				Headers: []storage.ResponseHeader{{Name: "X-Foo", Value: "bar"}, {Name: "X-Baz", Value: "qux"}},
+				Body:    []byte("hello body"),
+				Delay:   3 * time.Second,
+			}
+			now = ft.Now()
+		)
+
+		const ttl = time.Minute
+
+		_, err := store.NewSession(t.Context(), someSessionID, resp, ttl)
+		assert.NoError(t, err)
+
+		got, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+
+		assert.DeepEqual(t, resp, got.Response)
+		assert.True(t, got.Meta.CreatedAt.Equal(now))
+		assert.True(t, got.Meta.ExpiresAt.Equal(got.Meta.CreatedAt.Add(ttl)))
+	})
+
+	t.Run("unknown ID returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := factory(t, 10, time.Now).GetSession(t.Context(), "nonexistent")
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("returned session is a deep copy", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{Body: []byte("original")}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		got, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+
+		got.Response.Body[0] = 'X' // mutate the returned copy
+
+		// a subsequent read must still return the original data
+		got2, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+		assert.DeepEqual(t, []byte("original"), got2.Response.Body)
+	})
+}
+
+func testAddSessionTTL(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("positive duration imposes expiration on an eternal session", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		const ttl = time.Minute
+
+		now := ft.Now()
+
+		assert.NoError(t, store.AddSessionTTL(t.Context(), someSessionID, ttl))
+
+		// ExpiresAt must equal exactly now+ttl
+		got, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+		assert.True(t, got.Meta.ExpiresAt.Equal(now.Add(ttl)))
+
+		ft.Advance(ttl + time.Millisecond)
+
+		_, err = store.GetSession(t.Context(), someSessionID)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound) // past the new deadline
+	})
+
+	t.Run("NoExpiration removes the expiration deadline", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		const ttl = time.Minute
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, ttl)
+		assert.NoError(t, err)
+
+		// confirm the session has a deadline after creation
+		before, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+		assert.True(t, before.Meta.ExpiresAt.Equal(ft.Now().Add(ttl)))
+
+		// clear the deadline
+		assert.NoError(t, store.AddSessionTTL(t.Context(), someSessionID, storage.NoExpiration))
+
+		// ExpiresAt must be zero — no deadline
+		after, err := store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err)
+		assert.True(t, after.Meta.ExpiresAt.IsZero())
+
+		ft.Advance(time.Hour) // far past the original TTL
+
+		_, err = store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err) // session is still present
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		assert.ErrorIs(
+			t,
+			factory(t, 10, time.Now).AddSessionTTL(t.Context(), "nonexistent", time.Hour),
+			storage.ErrSessionNotFound,
+		)
+	})
+}
+
+func testDeleteSession(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("deleted session is no longer accessible", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		assert.NoError(t, store.DeleteSession(t.Context(), someSessionID))
+
+		// subsequent reads must return ErrSessionNotFound
+		_, err = store.GetSession(t.Context(), someSessionID)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		assert.ErrorIs(
+			t,
+			factory(t, 10, time.Now).DeleteSession(t.Context(), "nonexistent"),
+			storage.ErrSessionNotFound,
+		)
+	})
+
+	t.Run("its requests become inaccessible after deletion", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, store.DeleteSession(t.Context(), someSessionID))
+
+		_, err = store.GetRequests(t.Context(), someSessionID, nil)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
+}
+
+func testNewRequest(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("returned meta reflects creation time", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+			now   = ft.Now()
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		meta, err := store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{Method: "POST"})
+		assert.NoError(t, err)
+		assert.NotNil(t, meta)
+		assert.True(t, meta.CreatedAt.Equal(now))
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := factory(t, 10, time.Now).NewRequest(t.Context(), "nonexistent", "r1", storage.CapturedRequest{})
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
+
+	t.Run("duplicate request ID returns ErrRequestAlreadyExists", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.ErrorIs(t, err, storage.ErrRequestAlreadyExists)
+		assert.ErrorIs(t, err, storage.ErrAlreadyExists)
+	})
+
+	t.Run("oldest request is evicted when the per-session limit is reached", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 2, ft.Now) // IMPORTANT: limit = 2
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		ft.Advance(time.Second) // r2 must be strictly newer than r1 for the eviction order to be deterministic
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r2", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		ft.Advance(time.Second) // r3 must be strictly newer than r2
+
+		// adding r3 reaches the cap; r1 (oldest) must be evicted, r2 and r3 must remain
+		_, err = store.NewRequest(t.Context(), someSessionID, "r3", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		_, err = store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.ErrorIs(t, err, storage.ErrRequestNotFound)
+
+		_, err = store.GetRequest(t.Context(), someSessionID, "r2")
+		assert.NoError(t, err)
+
+		_, err = store.GetRequest(t.Context(), someSessionID, "r3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("zero limit means no eviction", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 0, time.Now) // 0 = unlimited
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		const n = 1_000
+
+		for i := range n {
+			_, err = store.NewRequest(t.Context(), someSessionID, fmt.Sprintf("r%d", i), storage.CapturedRequest{})
+			assert.NoError(t, err)
+		}
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, err)
+		assert.Seq2Count(t, n, seq)
+	})
+}
+
+func testGetRequest(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("returns correct Data and Meta", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+			req   = storage.CapturedRequest{
+				ClientAddr: "1.2.3.4",
+				Method:     "POST",
+				Body:       []byte(`{"key":"value"}`),
+				Headers:    []storage.RequestHeader{{Name: "Content-Type", Value: "application/json"}},
+				URL:        "https://example.com/webhook",
+			}
+			now = ft.Now()
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", req)
+		assert.NoError(t, err)
+
+		got, err := store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.DeepEqual(t, req, got.Data)
+		assert.True(t, got.Meta.CreatedAt.Equal(now))
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := factory(t, 10, time.Now).GetRequest(t.Context(), "nonexistent", "r1")
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("unknown request returns ErrRequestNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		got, err := store.GetRequest(t.Context(), someSessionID, "nonexistent")
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, storage.ErrRequestNotFound)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("returned request is a deep copy", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{Body: []byte("original")})
+		assert.NoError(t, err)
+
+		got, err := store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.NoError(t, err)
+
+		got.Data.Body[0] = 'X' // mutate the returned copy
+
+		// a subsequent read must still return the original data
+		got2, err := store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.NoError(t, err)
+		assert.DeepEqual(t, []byte("original"), got2.Data.Body)
+	})
+}
+
+func testGetRequests(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("empty iterator for session with no requests", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		var iterErr error
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, &iterErr)
+		assert.NoError(t, err)
+		assert.Seq2Count(t, 0, seq)
+		assert.NoError(t, iterErr)
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		seq, err := factory(t, 10, time.Now).GetRequests(t.Context(), "nonexistent", nil)
+		assert.Nil(t, seq)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+	})
+
+	t.Run("requests yielded newest-first", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		for _, id := range []string{"r1", "r2", "r3"} {
+			_, err = store.NewRequest(t.Context(), someSessionID, id, storage.CapturedRequest{})
+			assert.NoError(t, err)
+
+			ft.Advance(time.Second) // ensure strictly increasing CreatedAt
+		}
+
+		var iterErr error
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, &iterErr)
+		assert.NoError(t, err)
+
+		var ids []string
+
+		for id := range seq {
+			assert.NoError(t, iterErr)
+
+			ids = append(ids, id)
+		}
+
+		assert.NoError(t, iterErr)
+		assert.DeepEqual(t, []string{"r3", "r2", "r1"}, ids) // the order must be newest-first
+	})
+
+	t.Run("early break stops iteration", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		for _, id := range []string{"r1", "r2", "r3"} {
+			_, err = store.NewRequest(t.Context(), someSessionID, id, storage.CapturedRequest{})
+			assert.NoError(t, err)
+			ft.Advance(time.Second)
+		}
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, err)
+
+		var count int
+
+		for range seq {
+			count++
+			break
+		}
+
+		assert.Equal(t, 1, count)
+	})
+
+	t.Run("large result set preserves newest-first order across batch boundaries", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 0, ft.Now) // 0 = unlimited, no eviction
+		)
+
+		const n = 1_001 // deliberately > 1000 to exercise second-batch fetches in paging implementations
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		want := make([]string, 0, n)
+
+		for i := range n {
+			rID := fmt.Sprintf("r%d", i)
+			_, err = store.NewRequest(t.Context(), someSessionID, rID, storage.CapturedRequest{})
+			assert.NoError(t, err)
+
+			ft.Advance(time.Millisecond)
+
+			want = append([]string{rID}, want...) // prepend
+		}
+
+		var iterErr error
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, &iterErr)
+		assert.NoError(t, err)
+
+		var got []string
+
+		for id := range seq {
+			assert.NoError(t, iterErr)
+
+			got = append(got, id)
+		}
+
+		assert.NoError(t, iterErr)
+		assert.Equal(t, n, len(got))
+		assert.DeepEqual(t, want, got)
+	})
+}
+
+func testDeleteRequest(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("deleted request is no longer accessible", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, store.DeleteRequest(t.Context(), someSessionID, "r1"))
+
+		_, err = store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.ErrorIs(t, err, storage.ErrRequestNotFound)
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		assert.ErrorIs(
+			t,
+			factory(t, 10, time.Now).DeleteRequest(t.Context(), "nonexistent", "r1"),
+			storage.ErrSessionNotFound,
+		)
+	})
+
+	t.Run("unknown request returns ErrRequestNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		assert.ErrorIs(
+			t,
+			store.DeleteRequest(t.Context(), someSessionID, "nonexistent"),
+			storage.ErrRequestNotFound,
+		)
+	})
+}
+
+func testDeleteAllRequests(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("clears requests but leaves the session intact", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r2", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, store.DeleteAllRequests(t.Context(), someSessionID))
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, err)
+		assert.Seq2Count(t, 0, seq)
+
+		_, err = store.GetSession(t.Context(), someSessionID)
+		assert.NoError(t, err) // session itself is intact
+	})
+
+	t.Run("no-op for session with no requests", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		seq, err := store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, err)
+		assert.Seq2Count(t, 0, seq)
+
+		assert.NoError(t, store.DeleteAllRequests(t.Context(), someSessionID))
+
+		seq, err = store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, err)
+		assert.Seq2Count(t, 0, seq)
+	})
+
+	t.Run("session remains writable after clearing requests", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 10, time.Now)
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, store.DeleteAllRequests(t.Context(), someSessionID))
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r2", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		seq, seqErr := store.GetRequests(t.Context(), someSessionID, nil)
+		assert.NoError(t, seqErr)
+		assert.Seq2Count(t, 1, seq)
+	})
+
+	t.Run("unknown session returns ErrSessionNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		assert.ErrorIs(
+			t,
+			factory(t, 10, time.Now).DeleteAllRequests(t.Context(), "nonexistent"),
+			storage.ErrSessionNotFound,
+		)
+	})
+}
+
+func testSessionExpiry(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("all operations treat an expired session as not found", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			ft    = newFakeTime()
+			store = factory(t, 10, ft.Now)
+		)
+
+		const ttl = time.Minute
+
+		_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, ttl)
+		assert.NoError(t, err)
+
+		_, err = store.NewRequest(t.Context(), someSessionID, "r1", storage.CapturedRequest{})
+		assert.NoError(t, err)
+
+		ft.Advance(ttl + time.Millisecond)
+
+		// session-level operations
+		_, err = store.GetSession(t.Context(), someSessionID)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+
+		assert.ErrorIs(t, store.AddSessionTTL(t.Context(), someSessionID, time.Hour), storage.ErrSessionNotFound)
+		assert.ErrorIs(t, store.DeleteSession(t.Context(), someSessionID), storage.ErrSessionNotFound)
+
+		// request-level operations
+		_, err = store.NewRequest(t.Context(), someSessionID, "r2", storage.CapturedRequest{})
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+
+		_, err = store.GetRequest(t.Context(), someSessionID, "r1")
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+
+		_, err = store.GetRequests(t.Context(), someSessionID, nil)
+		assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+
+		assert.ErrorIs(t, store.DeleteRequest(t.Context(), someSessionID, "r1"), storage.ErrSessionNotFound)
+		assert.ErrorIs(t, store.DeleteAllRequests(t.Context(), someSessionID), storage.ErrSessionNotFound)
+	})
+}
+
+func testRaceProvocation(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	t.Run("concurrent session and request operations", func(t *testing.T) {
+		t.Parallel()
+
+		store := factory(t, 1000, time.Now)
+
+		var wg sync.WaitGroup
+
+		for i := range 20 {
+			wg.Add(1)
+
+			go func(i int) {
+				defer wg.Done()
+
+				sID := fmt.Sprintf("session-%d", i)
+
+				_, _ = store.NewSession(t.Context(), sID, storage.SessionResponse{Code: 200}, storage.NoExpiration)
+				_, _ = store.GetSession(t.Context(), sID)
+
+				for j := range 20 {
+					rID := fmt.Sprintf("req-%d-%d", i, j)
+					_, _ = store.NewRequest(t.Context(), sID, rID, storage.CapturedRequest{Method: "POST"})
+					_, _ = store.GetRequest(t.Context(), sID, rID)
+				}
+
+				rseq, _ := store.GetRequests(t.Context(), sID, nil)
+				for range rseq {
+				}
+
+				_ = store.DeleteRequest(t.Context(), sID, fmt.Sprintf("req-%d-%d", i, 19))
+				_ = store.DeleteAllRequests(t.Context(), sID)
+
+				wg.Go(func() {
+					_ = store.AddSessionTTL(t.Context(), sID, time.Hour)
+				})
+
+				_ = store.DeleteSession(t.Context(), sID)
+			}(i)
+		}
+
+		wg.Wait()
+	})
+}
+
+func testClose(t *testing.T, factory StorageFactory) {
+	t.Helper()
+
+	store := factory(t, 10, time.Now)
+
+	closer, ok := store.(io.Closer)
+	assert.True(t, ok) // must implement io.Closer for RunCloserSuite to be meaningful
+
+	if !ok {
+		t.Skip("storage does not implement io.Closer")
+
+		return
 	}
 
-	return io.NopCloser(nil)
-}
+	assert.NoError(t, closer.Close())
 
-type fakeTime struct{ atomic.Pointer[time.Time] }
+	for name, fn := range map[string]func() error{
+		"NewSession": func() error {
+			_, err := store.NewSession(t.Context(), "s", storage.SessionResponse{}, time.Minute)
+			return err
+		},
+		"GetSession":        func() error { _, err := store.GetSession(t.Context(), "s"); return err },
+		"AddSessionTTL":     func() error { return store.AddSessionTTL(t.Context(), "s", time.Hour) },
+		"DeleteSession":     func() error { return store.DeleteSession(t.Context(), "s") },
+		"NewRequest":        func() error { _, err := store.NewRequest(t.Context(), "s", "r", storage.CapturedRequest{}); return err },
+		"GetRequest":        func() error { _, err := store.GetRequest(t.Context(), "s", "r"); return err },
+		"GetRequests":       func() error { _, err := store.GetRequests(t.Context(), "s", nil); return err },
+		"DeleteRequest":     func() error { return store.DeleteRequest(t.Context(), "s", "r") },
+		"DeleteAllRequests": func() error { return store.DeleteAllRequests(t.Context(), "s") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-func (f *fakeTime) Add(t time.Duration) { newNow := f.Load().Add(t); f.Store(&newNow) }
-func (f *fakeTime) Get() time.Time      { return *f.Load() }
-
-func newFakeTime(t *testing.T) *fakeTime {
-	t.Helper()
-
-	now, ft := time.Now(), fakeTime{}
-	ft.Store(&now)
-
-	return &ft
-}
-
-func testSessionCreateReadDelete(
-	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
-	sleep func(time.Duration),
-	now func() time.Time,
-) {
-	t.Helper()
-
-	var ctx = context.Background()
-
-	t.Run("create, read, delete", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		var sessionHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
-
-		const (
-			code  uint16 = 201
-			delay        = time.Second * 123
-		)
-
-		// create
-		var sID, newErr = impl.NewSession(ctx, storage.Session{
-			Code:    code,
-			Headers: sessionHeaders,
-			Delay:   delay,
+			assert.ErrorIs(t, fn(), storage.ErrClosed)
 		})
-
-		require.NoError(t, newErr)
-		require.NotEmpty(t, sID)
-
-		// read
-		got, getErr := impl.GetSession(ctx, sID)
-		require.NoError(t, getErr)
-		require.Equal(t, code, got.Code)
-		require.Equal(t, sessionHeaders, got.Headers)
-		require.Equal(t, delay, got.Delay)
-		assert.NotZero(t, got.CreatedAtUnixMilli)
-
-		// delete
-		require.NoError(t, impl.DeleteSession(ctx, sID))                      // success
-		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrNotFound) // already deleted
-		require.ErrorIs(t, impl.DeleteSession(ctx, sID), storage.ErrSessionNotFound)
-
-		// read again
-		got, getErr = impl.GetSession(ctx, sID)
-		require.Nil(t, got)
-		require.ErrorIs(t, getErr, storage.ErrNotFound)
-		require.ErrorIs(t, getErr, storage.ErrSessionNotFound)
-	})
-
-	t.Run("not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		got, err := impl.GetSession(ctx, "foo")
-		require.Nil(t, got)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("delete not existing", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		require.ErrorIs(t, impl.DeleteSession(ctx, "foo"), storage.ErrSessionNotFound)
-	})
-
-	t.Run("expired", func(t *testing.T) {
-		t.Parallel()
-
-		const sessionTTL = time.Millisecond
-
-		var impl = new(sessionTTL, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		sID, err := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, err)
-		require.NotEmpty(t, sID)
-
-		sleep(sessionTTL * 2) // wait for expiration
-
-		_, err = impl.GetSession(ctx, sID)
-
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("add session TTL", func(t *testing.T) {
-		t.Parallel()
-
-		const sessionTTL = time.Millisecond * 20
-
-		var impl = new(sessionTTL, 2)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		var before = now()
-
-		// create session with TTL
-		sID, err := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, err)
-		require.NotEmpty(t, sID)
-
-		// get it (ensure it exists)
-		sess, err := impl.GetSession(ctx, sID)
-		require.NoError(t, err)
-
-		{ // check the created and expiration time
-			require.GreaterOrEqual(t, sess.CreatedAtUnixMilli, before.UnixMilli())
-			require.LessOrEqual(t, sess.CreatedAtUnixMilli, now().UnixMilli())
-			require.True(t, sess.ExpiresAt.After(time.UnixMilli(sess.CreatedAtUnixMilli)))
-		}
-
-		var ( // store the original values
-			originalCreatedAt = sess.CreatedAtUnixMilli
-			originalExpiresAt = sess.ExpiresAt
-		)
-
-		// reload the session
-		sess, err = impl.GetSession(ctx, sID)
-		require.NoError(t, err)
-		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli) // should be the same
-
-		// add TTL
-		require.NoError(t, impl.AddSessionTTL(ctx, sID, sessionTTL*2)) // current ttl = x + 2x = 3x
-
-		// wait for expiration (2x)
-		sleep(sessionTTL * 2)
-
-		// the session should be still alive
-		sess, err = impl.GetSession(ctx, sID)
-		require.NoError(t, err)
-		require.Equal(t, originalCreatedAt, sess.CreatedAtUnixMilli)
-		require.True(t, sess.ExpiresAt.After(originalExpiresAt)) // TTL was extended
-
-		// wait for expiration (2x)
-		sleep(sessionTTL * 2)
-
-		// check again
-		sess, err = impl.GetSession(ctx, sID)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-		require.Nil(t, sess)
-	})
+	}
 }
 
-func testRequestCreateReadDelete(
-	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
-	sleep func(time.Duration),
-) {
+// RunPersistenceSuite exercises behaviors that require restarting storage with changed settings.
+// The factory must return instances backed by the same underlying data on every call.
+// Do not call this from in-memory implementations - persistence is meaningless there.
+func RunPersistenceSuite(t *testing.T, factory StorageFactory) {
 	t.Helper()
-
-	var ctx = context.Background()
-
-	const someUrl = "https://example.com/foo/bar"
-
-	t.Run("create, read, delete", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, newErr := impl.NewSession(ctx, storage.Session{
-			Code:    201,
-			Headers: []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}},
-			Delay:   time.Second,
-		})
-		require.NoError(t, newErr)
-		require.NotEmpty(t, sID)
-
-		const (
-			clientAddr = "127.0.0.1"
-			method     = "GET"
-			body       = " \nfoo bar\n\t \nbaz"
-		)
-
-		var requestHeaders = []storage.HttpHeader{{"foo", "bar"}, {"bar", "baz"}}
-
-		// create
-		rID, newReqErr := impl.NewRequest(ctx, sID, storage.Request{
-			ClientAddr: clientAddr,
-			Method:     method,
-			Body:       []byte(body),
-			Headers:    requestHeaders,
-			URL:        someUrl,
-		})
-		require.NoError(t, newReqErr)
-		require.NotEmpty(t, rID)
-
-		// read
-		got, getErr := impl.GetRequest(ctx, sID, rID)
-		require.NoError(t, getErr)
-		require.Equal(t, clientAddr, got.ClientAddr)
-		require.Equal(t, method, got.Method)
-		require.Equal(t, []byte(body), got.Body)
-		require.Equal(t, requestHeaders, got.Headers)
-		require.Equal(t, someUrl, got.URL)
-		assert.NotZero(t, got.CreatedAtUnixMilli)
-
-		{ // read all
-			all, err := impl.GetAllRequests(ctx, sID)
-			require.NoError(t, err)
-			require.Len(t, all, 1)
-			require.Equal(t, all, map[string]storage.Request{rID: *got})
-		}
-
-		// delete
-		require.NoError(t, impl.DeleteRequest(ctx, sID, rID))                      // success
-		require.ErrorIs(t, impl.DeleteRequest(ctx, sID, rID), storage.ErrNotFound) // already deleted
-		require.ErrorIs(t, impl.DeleteRequest(ctx, sID, rID), storage.ErrRequestNotFound)
-
-		// read again
-		got, getErr = impl.GetRequest(ctx, sID, rID)
-		require.Nil(t, got)
-		require.ErrorIs(t, getErr, storage.ErrNotFound)
-		require.ErrorIs(t, getErr, storage.ErrRequestNotFound)
-	})
-
-	t.Run("new request - limit exceeded", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 2) // limit is 2
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, err := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, err)
-		require.NotEmpty(t, sID)
-
-		// create request #1
-		rID1, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req1"})
-		require.NoError(t, err)
-		require.NotEmpty(t, rID1)
-
-		sleep(time.Millisecond) // the accuracy is one millisecond
-
-		// create request #2
-		rID2, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req2"})
-		require.NoError(t, err)
-		require.NotEmpty(t, rID2)
-
-		// now, the session has 2 requests and the limit is reached
-
-		{ // check made requests
-			requests, _ := impl.GetAllRequests(ctx, sID)
-			require.Len(t, requests, 2)
-			_, ok := requests[rID1]
-			require.True(t, ok)
-			_, ok = requests[rID2]
-			require.True(t, ok)
-
-			req, _ := impl.GetRequest(ctx, sID, rID1)
-			require.NotNil(t, req)
-
-			req, _ = impl.GetRequest(ctx, sID, rID2)
-			require.NotNil(t, req)
-		}
-
-		sleep(time.Millisecond)
-
-		// create request #3
-		rID3, err := impl.NewRequest(ctx, sID, storage.Request{ClientAddr: "req3"})
-		require.NoError(t, err)
-		require.NotEmpty(t, rID3)
-
-		// now, the request #1 should be deleted because the limit is reached (the storage should keep the requests
-		// with numbers 2 and 3)
-
-		{ // check made requests again
-			requests, _ := impl.GetAllRequests(ctx, sID)
-			require.Len(t, requests, 2) // still 2
-			_, ok := requests[rID2]
-			require.True(t, ok)
-			_, ok = requests[rID3]
-			require.True(t, ok)
-
-			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
-			require.Nil(t, req)
-			require.Error(t, reqErr)
-
-			req, _ = impl.GetRequest(ctx, sID, rID2) // ok
-			require.NotNil(t, req)
-
-			req, _ = impl.GetRequest(ctx, sID, rID3) // ok
-			require.NotNil(t, req)
-		}
-
-		// and now add one more request - after that, the request #2 should be deleted (the storage should keep the
-		// requests with numbers 3 and 4)
-
-		sleep(time.Millisecond)
-
-		// create request #4
-		rID4, err := impl.NewRequest(ctx, sID, storage.Request{})
-		require.NoError(t, err)
-		require.NotEmpty(t, rID4)
-
-		{ // check made requests again
-			requests, _ := impl.GetAllRequests(ctx, sID)
-			require.Len(t, requests, 2) // still 2
-
-			req, reqErr := impl.GetRequest(ctx, sID, rID1) // not found
-			require.Nil(t, req)
-			require.Error(t, reqErr)
-
-			req, reqErr = impl.GetRequest(ctx, sID, rID2) // not found
-			require.Nil(t, req)
-			require.Error(t, reqErr)
-
-			req, _ = impl.GetRequest(ctx, sID, rID3) // ok
-			require.NotNil(t, req)
-
-			req, _ = impl.GetRequest(ctx, sID, rID4) // ok
-			require.NotNil(t, req)
-		}
-
-		// and now delete all the requests
-		require.NoError(t, impl.DeleteAllRequests(ctx, sID))
-
-		_, err = impl.GetAllRequests(ctx, sID)
-		require.NoError(t, err)
-
-		// and the session
-		require.NoError(t, impl.DeleteSession(ctx, sID))
-
-		_, err = impl.GetAllRequests(ctx, sID)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("delete all", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, err := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, err)
-		require.NotEmpty(t, sID)
-
-		// create request
-		rID, err := impl.NewRequest(ctx, sID, storage.Request{})
-		require.NoError(t, err)
-		require.NotEmpty(t, rID)
-
-		// delete all
-		require.NoError(t, impl.DeleteAllRequests(ctx, sID))
-
-		// check
-		all, err := impl.GetAllRequests(ctx, sID)
-		require.NoError(t, err)
-		require.Empty(t, all)
-	})
-
-	t.Run("delete all - no session", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		err := impl.DeleteAllRequests(ctx, "foo")
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("get all - empty", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, err := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, err)
-		require.NotEmpty(t, sID)
-
-		all, err := impl.GetAllRequests(ctx, sID)
-		require.NoError(t, err)
-		require.Empty(t, all)
-	})
-
-	t.Run("get all - no session", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		all, err := impl.GetAllRequests(ctx, "foo")
-		require.Nil(t, all)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("new request - session not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		_, err := impl.NewRequest(ctx, "foo", storage.Request{})
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("get request - session not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		got, err := impl.GetRequest(ctx, "foo", "bar")
-		require.Nil(t, got)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("get request - request not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, newErr := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, newErr)
-		require.NotEmpty(t, sID)
-
-		got, err := impl.GetRequest(ctx, sID, "foo")
-		require.Nil(t, got)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrRequestNotFound)
-	})
-
-	t.Run("delete request - session not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		err := impl.DeleteRequest(ctx, "foo", "bar")
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrSessionNotFound)
-	})
-
-	t.Run("delete request - request not found", func(t *testing.T) {
-		t.Parallel()
-
-		var impl = new(time.Minute, 1)
-		defer func() { _ = toCloser(impl).Close() }()
-
-		// create session
-		sID, newErr := impl.NewSession(ctx, storage.Session{})
-		require.NoError(t, newErr)
-		require.NotEmpty(t, sID)
-
-		err := impl.DeleteRequest(ctx, sID, "foo")
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.ErrorIs(t, err, storage.ErrRequestNotFound)
-	})
+	t.Run("RequestLimitReduction", func(t *testing.T) { t.Parallel(); testRequestLimitReduction(t, factory) })
 }
 
-func testRaceProvocation(
-	t *testing.T,
-	new func(sessionTTL time.Duration, maxRequests uint32) storage.Storage,
-) {
+func testRequestLimitReduction(t *testing.T, factory StorageFactory) {
 	t.Helper()
 
-	var ctx = context.Background()
+	t.Run("excess requests are evicted on the next write after reopening with a lower limit", func(t *testing.T) {
+		t.Parallel()
 
-	var impl = new(time.Minute, 1000)
-	defer func() { _ = toCloser(impl).Close() }()
+		ft := newFakeTime()
 
-	var wg sync.WaitGroup
+		{ // phase 1: limit=5, add 6 requests; the oldest is evicted on the 6th add, leaving 5
+			store := factory(t, 5, ft.Now)
 
-	for range 20 {
-		wg.Go(func() {
-			sID, err := impl.NewSession(ctx, storage.Session{})
-			require.NoError(t, err)
+			_, err := store.NewSession(t.Context(), someSessionID, storage.SessionResponse{}, storage.NoExpiration)
+			assert.NoError(t, err)
 
-			_, err = impl.GetSession(ctx, sID)
-			require.NoError(t, err)
-
-			var rID string
-
-			for range 20 {
-				rID, err = impl.NewRequest(ctx, sID, storage.Request{})
-				require.NoError(t, err)
-
-				_, err = impl.GetRequest(ctx, sID, rID)
-				require.NoError(t, err)
-
-				all, aErr := impl.GetAllRequests(ctx, sID)
-				require.NoError(t, aErr)
-				require.NotEmpty(t, all)
+			for i := range 6 {
+				_, err = store.NewRequest(t.Context(), someSessionID, fmt.Sprintf("r%d", i), storage.CapturedRequest{})
+				assert.NoError(t, err)
+				ft.Advance(time.Second)
 			}
 
-			require.NoError(t, impl.AddSessionTTL(ctx, sID, time.Minute))
+			seq, seqErr := store.GetRequests(t.Context(), someSessionID, nil)
+			assert.NoError(t, seqErr)
+			assert.Seq2Count(t, 5, seq)
 
-			require.NoError(t, impl.DeleteRequest(ctx, sID, rID))
+			if closer, ok := store.(io.Closer); ok {
+				assert.NoError(t, closer.Close())
+			}
+		}
 
-			require.NoError(t, impl.DeleteAllRequests(ctx, sID))
-		})
+		{ // phase 2: reopen with limit=3; on the first NewRequest all excess entries are evicted at once
+			store := factory(t, 3, ft.Now)
+
+			_, err := store.NewRequest(t.Context(), someSessionID, "r6", storage.CapturedRequest{})
+			assert.NoError(t, err)
+			ft.Advance(time.Second)
+
+			seq, seqErr := store.GetRequests(t.Context(), someSessionID, nil)
+			assert.NoError(t, seqErr)
+			assert.Seq2Count(t, 3, seq) // (5 excess - 3) + 1 new = 3
+
+			_, err = store.NewRequest(t.Context(), someSessionID, "r7", storage.CapturedRequest{})
+			assert.NoError(t, err)
+
+			seq, seqErr = store.GetRequests(t.Context(), someSessionID, nil)
+			assert.NoError(t, seqErr)
+			assert.Seq2Count(t, 3, seq) // capped at 3
+		}
+	})
+}
+
+func testContextCancellationClosesStorage(t *testing.T, newStorage func(ctx context.Context) storage.Storage) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	store := newStorage(ctx)
+
+	_, err := store.NewSession(ctx, "s1", storage.SessionResponse{}, storage.NoExpiration)
+	assert.NoError(t, err)
+
+	cancel()
+
+	if closer, ok := store.(io.Closer); ok {
+		_ = closer.Close() // blocks until the background goroutine exits
 	}
 
-	wg.Wait()
+	_, err = store.GetSession(t.Context(), "s1")
+	assert.ErrorIs(t, err, storage.ErrClosed)
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// RunBenchmarks covers the full [Storage] contract.
+func RunBenchmarks(b *testing.B, factory StorageFactory) {
+	b.Helper()
+	b.ReportAllocs()
+
+	const mainSID = "main-session"
+
+	capturedReq := storage.CapturedRequest{
+		ClientAddr: "10.0.0.1:54321",
+		Method:     "POST",
+		Headers:    []storage.RequestHeader{{Name: "Content-Type", Value: "application/json"}},
+		Body:       []byte(`{"event":"push","repository":{"id":42}}`),
+		URL:        "https://wh.example.com/" + mainSID,
+	}
+	sessionResp := storage.SessionResponse{
+		Code:    200,
+		Headers: []storage.ResponseHeader{{Name: "Content-Type", Value: "application/json"}},
+	}
+
+	b.Run("write", func(b *testing.B) {
+		store := factory(b, 100, time.Now)
+		ctx := b.Context()
+		_, _ = store.NewSession(ctx, mainSID, sessionResp, storage.NoExpiration)
+
+		b.ResetTimer()
+
+		for i := range b.N {
+			_, _ = store.NewRequest(ctx, mainSID, fmt.Sprintf("req-%d", i), capturedReq)
+			if i%10 == 0 {
+				seq, _ := store.GetRequests(ctx, mainSID, nil)
+				for range seq {
+				}
+			}
+		}
+	})
+
+	b.Run("read", func(b *testing.B) {
+		const prefill = 50
+
+		store := factory(b, 100, time.Now)
+		ctx := b.Context()
+		_, _ = store.NewSession(ctx, mainSID, sessionResp, storage.NoExpiration)
+
+		for i := range prefill {
+			_, _ = store.NewRequest(ctx, mainSID, fmt.Sprintf("req-%d", i), capturedReq)
+		}
+
+		b.ResetTimer()
+
+		for i := range b.N {
+			_, _ = store.GetRequest(ctx, mainSID, fmt.Sprintf("req-%d", i%prefill))
+			if i%5 == 0 {
+				seq, _ := store.GetRequests(ctx, mainSID, nil)
+				for range seq {
+				}
+			}
+
+			if i%7 == 0 {
+				_, _ = store.GetSession(ctx, mainSID)
+			}
+		}
+	})
+
+	b.Run("manage", func(b *testing.B) {
+		store := factory(b, 100, time.Now)
+		ctx := b.Context()
+		_, _ = store.NewSession(ctx, mainSID, sessionResp, storage.NoExpiration)
+
+		b.ResetTimer()
+
+		for i := range b.N {
+			rID := fmt.Sprintf("req-%d", i)
+
+			_, _ = store.NewRequest(ctx, mainSID, rID, capturedReq)
+			if i%5 == 0 {
+				_ = store.AddSessionTTL(ctx, mainSID, time.Hour)
+			}
+
+			if i%3 == 0 {
+				_ = store.DeleteRequest(ctx, mainSID, rID)
+			}
+
+			if i%20 == 0 && i > 0 {
+				_ = store.DeleteAllRequests(ctx, mainSID)
+			}
+		}
+	})
+
+	b.Run("lifecycle", func(b *testing.B) {
+		store := factory(b, 100, time.Now)
+		ctx := b.Context()
+		b.ResetTimer()
+
+		for i := range b.N {
+			sid := fmt.Sprintf("session-%d", i)
+			_, _ = store.NewSession(ctx, sid, sessionResp, time.Hour)
+			_, _ = store.NewRequest(ctx, sid, "r0", capturedReq)
+			_, _ = store.GetSession(ctx, sid)
+
+			seq, _ := store.GetRequests(ctx, sid, nil)
+			for range seq {
+			}
+
+			_ = store.DeleteSession(ctx, sid)
+		}
+	})
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// fakeTime is a thread-safe, manually-advanceable clock.
+// Each test case that needs time control should create its own fakeTime via newFakeTime so that
+// parallel sub-tests do not interfere with each other's time progression.
+type fakeTime struct{ v atomic.Pointer[time.Time] }
+
+func newFakeTime() *fakeTime {
+	ft := &fakeTime{}
+	ft.v.Store(new(time.Now().Truncate(time.Second)))
+
+	return ft
+}
+
+func (ft *fakeTime) Now() time.Time { return *ft.v.Load() }
+
+// Advance moves the clock forward by the specified duration.
+func (ft *fakeTime) Advance(d time.Duration) { ft.v.Store(new(ft.v.Load().Add(d))) }

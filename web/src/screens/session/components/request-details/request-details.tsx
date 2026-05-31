@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { CodeHighlight } from '@mantine/code-highlight'
 import { Badge, Button, Flex, Grid, Skeleton, Table, Tabs, Text, Title } from '@mantine/core'
 import { useInterval } from '@mantine/hooks'
@@ -14,12 +14,11 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
   const { showRequestDetails } = useSettings()
 
   const [headersExpanded, setHeadersExpanded] = useStorage<boolean>(false, UsedStorageKeys.RequestDetailsHeadersExpand)
-  const [elapsedTime, setElapsedTime] = useState<string | null>(null)
-  const [contentType, setContentType] = useState<string | null>(null)
+  const [now, setNow] = useState(() => new Date())
   const [payload, setPayload] = useState<Uint8Array | null>(null)
 
-  useEffect(
-    () => setContentType(request?.headers.find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? null),
+  const contentType = useMemo(
+    () => request?.headers.find(({ name }) => name.toLowerCase() === 'content-type')?.value ?? null,
     [request]
   )
 
@@ -28,21 +27,15 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
     request?.payload?.then((data) => setPayload(data))
   }, [request, request?.payload])
 
-  // automatically update the elapsed time
-  useEffect(
-    () => setElapsedTime(request?.capturedAt ? dayjs(request?.capturedAt).fromNow() : null),
-    [request?.capturedAt, setElapsedTime]
-  )
-  const interval = useInterval(
-    () => setElapsedTime(request?.capturedAt ? dayjs(request?.capturedAt).fromNow() : null),
-    1000
-  )
+  const interval = useInterval(() => setNow(new Date()), 1000)
 
   useEffect((): (() => void) => {
     interval.start()
 
     return interval.stop // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const elapsedTime = request?.capturedAt ? dayjs(request.capturedAt).from(now) : null
 
   return (
     <Grid>
@@ -80,12 +73,14 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                       <Flex justify="flex-start" align="center">
                         <Text span>{request.clientAddress}</Text>
                         <Flex align="center" ml="md" gap="sm">
-                          {[
-                            ['WhoIs', 'https://who.is/whois-ip/ip-address/' + request.clientAddress],
-                            ['Shodan', 'https://www.shodan.io/host/' + request.clientAddress],
-                            ['Netify', 'https://www.netify.ai/resources/ips/' + request.clientAddress],
-                            ['Censys', 'https://search.censys.io/hosts/' + request.clientAddress],
-                          ].map(([name, link], index) => (
+                          {(
+                            [
+                              ['WhoIs', 'https://who.is/whois-ip/ip-address/' + request.clientAddress],
+                              ['Shodan', 'https://www.shodan.io/host/' + request.clientAddress],
+                              ['Netify', 'https://www.netify.ai/resources/ips/' + request.clientAddress],
+                              ['Censys', 'https://search.censys.io/hosts/' + request.clientAddress],
+                            ] satisfies Array<[string, string]>
+                          ).map(([name, link], index) => (
                             <Link key={index} to={link} target="_blank" rel="noreferrer">
                               {name}
                             </Link>

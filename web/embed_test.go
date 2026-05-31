@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gh.tarampamp.am/webhook-tester/v2/web"
+	"gh.tarampamp.am/webhook-tester/v3/web"
 )
 
 func TestDist(t *testing.T) {

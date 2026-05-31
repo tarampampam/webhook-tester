@@ -1,7 +1,7 @@
 import { CodeHighlight } from '@mantine/code-highlight'
 import { Alert, Code } from '@mantine/core'
 import { IconInfoCircle } from '@tabler/icons-react'
-import React, { useEffect, useState } from 'react'
+import React, { useMemo } from 'react'
 
 const decoder = new TextDecoder('utf-8')
 const cutMessage = '\n\n[...content truncated (to view the full content, please download the binary file)...]\n\n'
@@ -15,34 +15,25 @@ export const ViewText: React.FC<{
   contentType = null,
   lengthLimit = 1024 * 128, // 128KB
 }) => {
-  const [content, setContent] = useState<string | null>(null)
-  const [language, setLanguage] = useState<'json' | 'xml' | null>(null)
-  const [trimmed, setTrimmed] = useState<boolean>(false)
-
-  useEffect(() => {
+  const { content, language, trimmed } = useMemo((): {
+    content: string
+    language: 'json' | 'xml' | null
+    trimmed: boolean
+  } => {
     if (!input || input.length === 0) {
-      setContent('// empty request body')
-      setTrimmed(false)
-      setLanguage('json')
-
-      return
+      return { content: '// empty request body', trimmed: false, language: 'json' }
     }
 
     if (input.length > lengthLimit + cutMessage.length) {
-      const [start, end] = [input.slice(0, lengthLimit / 2), input.slice(-lengthLimit / 2)]
+      const start = input.slice(0, lengthLimit / 2)
+      const end = input.slice(-lengthLimit / 2)
 
-      setContent(decoder.decode(start) + cutMessage + decoder.decode(end))
-      setTrimmed(true)
-      setLanguage(null)
-
-      return
+      return { content: decoder.decode(start) + cutMessage + decoder.decode(end), trimmed: true, language: null }
     }
 
     const [maybePretty, lang] = tryToFormat(decoder.decode(input), contentType)
 
-    setTrimmed(false)
-    setContent(maybePretty)
-    setLanguage(lang)
+    return { content: maybePretty, trimmed: false, language: lang }
   }, [input, lengthLimit, contentType])
 
   return (

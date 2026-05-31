@@ -19,15 +19,15 @@ WORKDIR /src
 # burn the dependencies cache
 RUN --mount=type=bind,source=go.mod,target=/src/go.mod \
     --mount=type=bind,source=go.sum,target=/src/go.sum \
-    --mount=type=bind,source=tools.go.mod,target=/src/tools.go.mod \
-    --mount=type=bind,source=tools.go.sum,target=/src/tools.go.sum \
+    --mount=type=bind,source=tools/go.mod,target=/src/tools/go.mod \
+    --mount=type=bind,source=tools/go.sum,target=/src/tools/go.sum \
     --mount=type=bind,source=web/package.json,target=/src/web/package.json \
     --mount=type=bind,source=web/package-lock.json,target=/src/web/package-lock.json \
     set -x \
     # for the Go modules
     && mkdir -p "$GOPATH" \
     && go mod download -x \
-    && go mod download -modfile=tools.go.mod -x \
+    && go mod download -modfile=tools/go.mod -x \
     # and for the Node.js packages
     && npm --prefix /src/web ci --loglevel verbose --no-audit \
     # allow read/write for everyone to use the cache from any user (including non-root)
@@ -64,7 +64,7 @@ RUN --mount=type=bind,from=frontend,source=/src/web/dist,target=/src/web/dist \
     && CGO_ENABLED=0 go build \
       -trimpath \
       -buildvcs=false \
-      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/v2/internal/version.version=${APP_VERSION}" \
+      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/v3/internal/version.version=${APP_VERSION}" \
       -o ./app \
       ./cmd/webhook-tester/ \
     && ./app --version \

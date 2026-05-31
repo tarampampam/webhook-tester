@@ -5,15 +5,26 @@
 ## Binaries
 /app
 /webhook-tester
+/*.test
 
 ## Generated code
 *.gen.go
 *_enum.go
 *.pb.go
 
+## AI shit
+/.copilot
+/.cursor
+/.claude
+/.windsurf
+/.aider*
+/.gemini
+
 ## Temp dirs & trash
 *.env
 /__old__
+/*-old
+/old-*
 /temp
 /tmp
 .DS_Store

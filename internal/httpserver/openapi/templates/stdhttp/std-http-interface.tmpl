@@ -1,0 +1,59 @@
+{{/* https://github.com/oapi-codegen/oapi-codegen/blob/main/pkg/codegen/templates/stdhttp/std-http-interface.tmpl */}}
+
+{{/* --- ORIGINAL CODE BEGIN --- */}}
+// ServerInterface represents all server handlers.
+type ServerInterface interface {
+{{range .}}{{if not .IsAlias}}{{.SummaryAsComment }}
+// ({{.Method}} {{.Path}})
+{{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}})
+{{end}}{{end}}
+}
+{{/* --- ORIGINAL CODE END --- */}}
+
+// IsOpenAPIError checks if the given error is one of the known OpenAPI errors, occurred during parameters parsing
+// and/or early validation. This function can be used by handlers to determine if an error should be translated to
+// a specific HTTP status code in the OpenAPI adapter (usually 400 Bad Request).
+func IsOpenAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// note for me in the future: one time additional error types may be added, so this function should be updated
+	// accordingly (for now, it covers all the errors that can be returned by the generated code)
+
+	// fast path for exact type matches without using errors.As (micro-optimization)
+	switch err.(type) {
+	case *UnescapedCookieParamError,
+		*UnmarshalingParamError,
+		*RequiredParamError,
+		*RequiredHeaderError,
+		*InvalidParamFormatError,
+		*TooManyValuesForParamError:
+		return true
+	}
+
+	// slow path for errors wrapped in other errors (e.g. by middleware or handlers) - this allows to detect OpenAPI
+	// errors even if they are wrapped in other errors, as long as the original error is one of the known OpenAPI errors
+	switch {
+	case errors.As(err, new(*UnescapedCookieParamError)):
+		return true
+	case errors.As(err, new(*UnmarshalingParamError)):
+		return true
+	case errors.As(err, new(*RequiredParamError)):
+		return true
+	case errors.As(err, new(*RequiredHeaderError)):
+		return true
+	case errors.As(err, new(*InvalidParamFormatError)):
+		return true
+	case errors.As(err, new(*TooManyValuesForParamError)):
+		return true
+	}
+
+	return false
+}
+
+const (
+{{ range . -}}
+  Route{{.OperationId}} = "{{ .Path | swaggerUriToStdHttpUri }}"
+{{ end }}
+)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type CSSProperties } from 'react'
+import React, { useMemo, useState, type CSSProperties } from 'react'
 import { Alert, Box, Divider, Grid, NativeSelect } from '@mantine/core'
 import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
 
@@ -15,7 +15,7 @@ export const ViewHex: React.FC<{
   const [lineNumberType, setLineNumberType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [displayType, setDisplayType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [lineSize, setLineSize] = useState<number>(16)
-  const [trimmed, setTrimmed] = useState<boolean>(false)
+  const trimmed = input.length > lengthLimit
 
   /**
    * Data items are stored in a 2D array where each item is a tuple of two strings:
@@ -35,17 +35,10 @@ export const ViewHex: React.FC<{
    *   [['64', 'd'], ['0a', undefined]]
    * ]
    */
-  const [dataItems, setDataItems] = useState<ReadonlyArray<DataLine>>([])
-
-  useEffect(() => {
-    if (input.length === 0) {
-      setDataItems([])
-
-      return
-    }
+  const dataItems = useMemo((): ReadonlyArray<DataLine> => {
+    if (input.length === 0) return []
 
     const length = input.length > lengthLimit ? lengthLimit : input.length // limit the number of bytes
-    setTrimmed(input.length > lengthLimit)
 
     // preallocate the data items array
     const lines = new Array<DataLine>(Math.ceil(length / lineSize))
@@ -58,15 +51,17 @@ export const ViewHex: React.FC<{
     }
 
     // fill the data items array with the actual data, handling all the heavy lifting here
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      for (let itemNum = 0; itemNum < lines[lineNum].length; itemNum++) {
+    for (const [lineNum, line] of lines.entries()) {
+      for (let itemNum = 0; itemNum < line.length; itemNum++) {
         const byte = input[lineNum * lineSize + itemNum]
 
-        lines[lineNum][itemNum] = [byteToString(byte, displayType), byteToAscii(byte)] satisfies DataItem
+        if (byte !== undefined) {
+          line[itemNum] = [byteToString(byte, displayType), byteToAscii(byte)] satisfies DataItem
+        }
       }
     }
 
-    setDataItems(lines)
+    return lines
   }, [input, displayType, lineSize, lengthLimit])
 
   const fontSize: string | number = '0.75em'
@@ -85,7 +80,7 @@ export const ViewHex: React.FC<{
           The request body is large and has been trimmed to {lengthLimit} bytes for performance reasons.
         </Alert>
       )}
-      <Grid my="sm" justify="space-between" align="stretch" gutter="lg" grow>
+      <Grid my="sm" justify="space-between" align="stretch" gap="lg" grow>
         <Grid.Col span="content" visibleFrom="lg">
           <NativeSelect
             size="xs"
@@ -119,7 +114,7 @@ export const ViewHex: React.FC<{
             <Box component="span" c="dimmed" size={fontSize}>
               {!!dataItems && // print column numbers
                 dataItems.length &&
-                dataItems[0]
+                (dataItems[0] ?? [])
                   .map((_, colNum) => byteToString(colNum, displayType).toUpperCase() + (colNum % 4 === 3 ? ' ' : ''))
                   .join(' ')
                   .trimEnd()}
