@@ -43,17 +43,17 @@ func TestSessionResponseOptions_Validate(t *testing.T) {
 		"invalid/status_code below min": {
 			give:        openapi.SessionResponseOptions{StatusCode: openapi.StatusCodeMin - 1},
 			wantErr:     true,
-			errContains: "status_code",
+			errContains: "wrong status code",
 		},
 		"invalid/status_code above max": {
 			give:        openapi.SessionResponseOptions{StatusCode: openapi.StatusCodeMax + 1},
 			wantErr:     true,
-			errContains: "status_code",
+			errContains: "wrong status code",
 		},
 		"invalid/status_code zero": {
 			give:        openapi.SessionResponseOptions{StatusCode: 0},
 			wantErr:     true,
-			errContains: "status_code",
+			errContains: "wrong status code",
 		},
 		"invalid/delay above max": {
 			give:        openapi.SessionResponseOptions{StatusCode: 200, Delay: 31},

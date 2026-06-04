@@ -137,6 +137,15 @@ func (l *Logger) Warn(msg string, f ...Attr) { l.Log(WarnLevel, msg, f...) }
 // Error logs a message at ErrorLevel.
 func (l *Logger) Error(msg string, f ...Attr) { l.Log(ErrorLevel, msg, f...) }
 
+// Slog returns the underlying [*slog.Logger] with the logger name baked in as a static attribute, if set.
+func (l *Logger) Slog() *slog.Logger {
+	if l.name == "" {
+		return l.log
+	}
+
+	return l.log.With(loggerNameAttr(l.name))
+}
+
 // loggerNameAttr returns the "logger" attribute for the given name.
 func loggerNameAttr(loggerName string) Attr { return slog.String("logger", loggerName) }
 

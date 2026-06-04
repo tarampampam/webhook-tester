@@ -60,9 +60,8 @@ type (
 	}
 )
 
-// NoExpiration disables session expiration when passed as the ttl argument to NewSession.
-// Any other negative duration is not meaningful and will produce an already-expired session.
-const NoExpiration time.Duration = -1
+// NoExpiration disables session expiration when passed as the ttl argument to NewSession or AddSessionTTL.
+const NoExpiration time.Duration = 0
 
 // SessionStorage manages session data, including response configuration and metadata.
 type SessionStorage interface {

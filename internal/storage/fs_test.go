@@ -47,6 +47,7 @@ func TestFS_ContextCancellationClosesStorage(t *testing.T) {
 		t.Cleanup(func() { _ = root.Close() })
 
 		s := storage.NewFS(ctx, root, 10)
+
 		t.Cleanup(func() { _ = s.Close() })
 
 		return s

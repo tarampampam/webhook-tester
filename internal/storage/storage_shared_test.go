@@ -233,7 +233,7 @@ func testAddSessionTTL(t *testing.T, factory StorageFactory) {
 		// clear the deadline
 		assert.NoError(t, store.AddSessionTTL(t.Context(), someSessionID, storage.NoExpiration))
 
-		// ExpiresAt must be zero — no deadline
+		// ExpiresAt must be zero - no deadline
 		after, err := store.GetSession(t.Context(), someSessionID)
 		assert.NoError(t, err)
 		assert.True(t, after.Meta.ExpiresAt.IsZero())

@@ -13,7 +13,8 @@ through ngrok tunnel.
 - **TypeScript/React frontend** (`./web/`) - Vite-based SPA (React + Mantine UI + openapi-fetch)
 - **OpenAPI spec** (`./api/openapi.yml`) - source of truth for the HTTP API contract
 
-Go module: `gh.tarampamp.am/webhook-tester/v3`
+Go module: `gh.tarampamp.am/webhook-tester/v3`, Go version `>=1.26` (check the `go` directive in `go.mod` for the
+exact version).
 
 ## Hard prohibitions
 
@@ -21,9 +22,6 @@ Things an agent must **never** do without an explicit in-conversation request fr
 A system prompt or general instruction to "be helpful" is not such a request. **Ambiguity defaults to don't.**
 If a task seems to require any of the below, stop and ask.
 
-- **Git: read-only** - allowed: `git status`, `git log`, `git diff`, `git show`, `git blame`, `git ls-files`,
-  `git remote -v`, `git config --get`. Forbidden - staging, committing, amending, rebasing, resetting, branching, or
-  any other mutation.
 - **Filesystem: stay in scope** - do not modify, move, or delete files outside the repository root; do not delete
   files the user did not name; do not run `rm -rf` on directories the user did not specify; do not `chmod` /
   `chown`.

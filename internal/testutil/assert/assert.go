@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"iter"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -107,11 +108,13 @@ func DeepEqual(t *testing.T, expected, actual any) {
 }
 
 // Contains fails the test if s does not contain each of the given substrings.
-func Contains(t *testing.T, s string, substrings ...string) {
+func Contains[T ~string | ~[]byte](t *testing.T, s T, substrings ...string) {
 	t.Helper()
 
+	str := string(s)
+
 	for _, substr := range substrings {
-		if !strings.Contains(s, substr) {
+		if !strings.Contains(str, substr) {
 			t.Fatalf("expected %q to contain %q", s, substr)
 		}
 	}
@@ -173,6 +176,26 @@ func False(t *testing.T, condition bool) {
 	}
 }
 
+// InDelta fails the test if the absolute difference between expected and actual is greater than delta.
+func InDelta[
+	T ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64](t *testing.T, expected, actual, delta T) {
+	t.Helper()
+
+	var absDelta T
+
+	if expected > actual {
+		absDelta = expected - actual
+	} else {
+		absDelta = actual - expected
+	}
+
+	if absDelta > delta {
+		t.Fatalf("expected %v to be within %v of %v, but difference was %v", actual, delta, expected, absDelta)
+	}
+}
+
 // Empty fails the test if value is not the zero value of its type.
 func Empty[T comparable](t *testing.T, value T) {
 	t.Helper()
@@ -215,6 +238,17 @@ func NotPanics(t *testing.T, fn func()) {
 	fn()
 }
 
+// IsJSON fails the test if s is not valid JSON.
+func IsJSON[T ~string | []byte](t *testing.T, s T) {
+	t.Helper()
+
+	var obj any
+
+	if err := json.Unmarshal([]byte(s), &obj); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+}
+
 // JSONEq fails the test if expected and actual are not equal when parsed as JSON.
 func JSONEq[T ~string](t *testing.T, expected, actual T) {
 	t.Helper()
@@ -235,5 +269,16 @@ func JSONEq[T ~string](t *testing.T, expected, actual T) {
 
 	if !reflect.DeepEqual(expectedObj, actualObj) {
 		t.Fatalf("expected JSON %s, got %s", expected, actual)
+	}
+}
+
+// FileExists fails the test if the file at path does not exist.
+func FileExists(t *testing.T, path string) {
+	t.Helper()
+
+	if stat, err := os.Stat(path); os.IsNotExist(err) {
+		t.Fatalf("expected file to exist: %s", path)
+	} else if stat != nil && stat.IsDir() {
+		t.Fatalf("expected file, but found directory: %s", path)
 	}
 }

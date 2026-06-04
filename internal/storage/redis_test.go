@@ -78,7 +78,7 @@ func (m *miniredisTimeSyncer) Now(_ context.Context) (time.Time, error) {
 // DialHook implements [redis.Hook].
 func (m *miniredisTimeSyncer) DialHook(next redis.DialHook) redis.DialHook { return next }
 
-// ProcessHook implements [redis.Hook] — syncs miniredis before every single command.
+// ProcessHook implements [redis.Hook] - syncs miniredis before every single command.
 func (m *miniredisTimeSyncer) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
 	return func(ctx context.Context, cmd redis.Cmder) error {
 		m.sync()
@@ -87,7 +87,7 @@ func (m *miniredisTimeSyncer) ProcessHook(next redis.ProcessHook) redis.ProcessH
 	}
 }
 
-// ProcessPipelineHook implements [redis.Hook] — syncs miniredis before every pipeline.
+// ProcessPipelineHook implements [redis.Hook] - syncs miniredis before every pipeline.
 func (m *miniredisTimeSyncer) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
 	return func(ctx context.Context, cmds []redis.Cmder) error {
 		m.sync()

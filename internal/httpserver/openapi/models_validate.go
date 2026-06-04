@@ -21,7 +21,7 @@ func (o *SessionResponseOptions) Validate() (outErr error) {
 	)
 
 	if o.StatusCode < minCode || o.StatusCode > maxCode {
-		return fmt.Errorf("status_code must be in [%d, %d]", minCode, maxCode)
+		return fmt.Errorf("wrong status code: must be in [%d, %d]", minCode, maxCode)
 	}
 
 	if o.Delay > maxDelay {
@@ -34,11 +34,11 @@ func (o *SessionResponseOptions) Validate() (outErr error) {
 
 	for i, h := range o.Headers {
 		if len(h.Name) < minHeaderNameLen || len(h.Name) > maxHeaderNameLen {
-			return fmt.Errorf("headers[%d].name length must be in [%d, %d]", i, minHeaderNameLen, maxHeaderNameLen)
+			return fmt.Errorf("header key length must be in [%d, %d] (headers[%d].name)", minHeaderNameLen, maxHeaderNameLen, i)
 		}
 
 		if len(h.Value) > maxHeaderValueLen {
-			return fmt.Errorf("headers[%d].value length must be at most %d", i, maxHeaderValueLen)
+			return fmt.Errorf("header value length must be at most %d (headers[%d].value)", maxHeaderValueLen, i)
 		}
 	}
 

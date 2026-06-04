@@ -11,7 +11,7 @@ import (
 )
 
 // Generate mock distributive files, if needed.
-//go:generate go run generate_dist_stub.go
+//go:generate go run generate/dist_stub.go
 
 //go:embed dist
 var content embed.FS

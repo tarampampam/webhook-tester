@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
+	"go.uber.org/atomic"
 
 	"gh.tarampamp.am/webhook-tester/v3/internal/appmeta"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/request_delete"
@@ -16,10 +19,11 @@ import (
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_create"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_delete"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_get"
-	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/settings_get"
 	j "gh.tarampamp.am/webhook-tester/v3/internal/httpserver/json"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/openapi"
 	"gh.tarampamp.am/webhook-tester/v3/internal/logger"
+	"gh.tarampamp.am/webhook-tester/v3/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/v3/internal/storage"
 )
 
 type (
@@ -38,9 +42,6 @@ type (
 type OpenAPI struct {
 	log      *logger.Logger
 	handlers struct {
-		settings struct {
-			get func() openapi.SettingsResponse
-		}
 		session struct {
 			create func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
 			get    func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
@@ -55,8 +56,18 @@ type OpenAPI struct {
 			deleteAll func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
 		}
 	}
+	sessionTTL          time.Duration
+	settings            AppSettings
 	latestVersionGetter latestVersionProvider
 	readyChecker        checker
+}
+
+// AppSettings is a "holder" struct for application settings that are returned in the /api/settings response.
+type AppSettings struct {
+	MaxRequestBodySize uint32
+	MaxRequests        uint16
+	PublicUrlRoot      string
+	TunnelUrl          *atomic.String
 }
 
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // compile-time interface implementation check
@@ -64,25 +75,30 @@ var _ openapi.ServerInterface = (*OpenAPI)(nil) // compile-time interface implem
 // NewOpenAPI creates a new instance of the OpenAPI server implementation.
 func NewOpenAPI(
 	log *logger.Logger,
+	s storage.Storage,
+	ps pubsub.PubSub,
+	sessionTTL time.Duration,
+	settings AppSettings,
 	readyChecker checker,
 	latestVersionGetter latestVersionProvider,
 ) *OpenAPI {
 	o := OpenAPI{
 		log:                 log,
+		sessionTTL:          sessionTTL,
+		settings:            settings,
 		latestVersionGetter: latestVersionGetter,
 		readyChecker:        readyChecker,
 	}
 
-	o.handlers.settings.get = settings_get.New().Handle
-	o.handlers.session.create = session_create.New().Handle
-	o.handlers.session.get = session_get.New().Handle
-	o.handlers.session.exists = session_check_exists.New().Handle
-	o.handlers.session.delete = session_delete.New().Handle
-	o.handlers.request.get = request_get.New().Handle
-	o.handlers.request.list = requests_list.New().Handle
-	o.handlers.request.subscribe = requests_subscribe.New().Handle
-	o.handlers.request.delete = request_delete.New().Handle
-	o.handlers.request.deleteAll = requests_delete_all.New().Handle
+	o.handlers.session.create = session_create.New(s, sessionTTL).Handle
+	o.handlers.session.get = session_get.New(s).Handle
+	o.handlers.session.exists = session_check_exists.New(s).Handle
+	o.handlers.session.delete = session_delete.New(s).Handle
+	o.handlers.request.get = request_get.New(s).Handle
+	o.handlers.request.list = requests_list.New(s).Handle
+	o.handlers.request.subscribe = requests_subscribe.New(ps).Handle
+	o.handlers.request.delete = request_delete.New(s, ps).Handle
+	o.handlers.request.deleteAll = requests_delete_all.New(s, ps).Handle
 
 	return &o
 }
@@ -289,7 +305,23 @@ func (o *OpenAPI) ApiSessionGetRequest(
 
 // ApiSettings handles GET /api/settings.
 func (o *OpenAPI) ApiSettings(w http.ResponseWriter, r *http.Request) {
-	o.respondWithJSON(w, r, http.StatusOK, o.handlers.settings.get())
+	resp := openapi.SettingsResponse{}
+
+	resp.Limits.MaxRequestBodySize = o.settings.MaxRequestBodySize
+	resp.Limits.MaxRequests = o.settings.MaxRequests
+	resp.Limits.SessionTtl = uint32(o.sessionTTL.Seconds())
+
+	if o.settings.PublicUrlRoot != "" {
+		resp.PublicUrlRoot = &o.settings.PublicUrlRoot
+	}
+
+	if o.settings.TunnelUrl != nil {
+		if tunUrl := o.settings.TunnelUrl.Load(); tunUrl != "" {
+			resp.Tunnel.Enabled, resp.Tunnel.Url = true, &tunUrl
+		}
+	}
+
+	o.respondWithJSON(w, r, http.StatusOK, resp)
 }
 
 // ApiAppVersion handles GET /api/version.

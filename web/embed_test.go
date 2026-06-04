@@ -4,8 +4,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
+	"gh.tarampamp.am/webhook-tester/v3/internal/testutil/assert"
 	"gh.tarampamp.am/webhook-tester/v3/web"
 )
 
@@ -17,14 +16,14 @@ func TestDist(t *testing.T) {
 		web.Dist(false),
 	} {
 		f, err := fileSystem.Open("index.html")
-		require.NoError(t, err)
-		require.NotNil(t, f)
+		assert.NoError(t, err)
+		assert.NotNil(t, f)
 
 		// file is not empty
 		bytes, err := f.Read(make([]byte, 2))
-		require.NoError(t, err)
-		require.Equal(t, 2, bytes)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, bytes)
 
-		require.NoError(t, f.Close())
+		assert.NoError(t, f.Close())
 	}
 }

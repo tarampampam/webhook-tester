@@ -59,6 +59,7 @@ linters:
     - dupword            # duplicate words in comments and strings
     - embeddedstructfieldcheck # embedded fields first, separated from regular fields by blank line
     - exhaustive         # switch statements over enums must be exhaustive
+    - depguard           # deny imports of test-only packages in production code
     - forbidigo          # forbid debug print statements (see settings below)
     - funlen             # functions must not be too long
     - gochecknoglobals   # no package-level var declarations - globals are mutable shared state
@@ -122,10 +123,23 @@ linters:
     nolintlint: {require-specific: true, allow-unused: false}
     paralleltest: {ignore-missing-subtests: true}
     testifylint: {enable-all: true}
+    depguard:
+      rules:
+        no-testutil-assert-outside-tests:
+          files: ["**/*.go", "!**/*_test.go", "!**/tests/feature/featuretest/**"]
+          deny:
+            - pkg: "gh.tarampamp.am/webhook-tester/v3/internal/testutil/assert"
+              desc: "test-only package; allowed only in *_test.go files and tests/feature/featuretest"
+        no-featuretest-outside-feature:
+          files: ["**/*.go", "!**/tests/feature/**"]
+          deny:
+            - pkg: "gh.tarampamp.am/webhook-tester/v3/tests/feature/featuretest"
+              desc: "feature test helpers; allowed only within tests/feature"
 
   exclusions:
     presets: [common-false-positives, legacy, std-error-handling]
     rules:
+      - {path: tests, linters: [bodyclose]} # false-positive: body is closed via t.Cleanup
       - path: _test\.go
         linters:
           - dupl

@@ -189,6 +189,47 @@ func TestJSONFormat(t *testing.T) {
 	})
 }
 
+func TestLogger_Slog(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unnamed", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		sl := newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Slog()
+		assert.NotNil(t, sl)
+
+		sl.Info("hello")
+
+		assert.Equal(t, "INFO   hello\n", withoutTimestamps(t, buf.String()))
+	})
+
+	t.Run("named bakes in logger attribute", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Named("ngrok").Slog().Info("hello")
+
+		assert.Contains(t, withoutTimestamps(t, buf.String()), "logger=ngrok")
+	})
+
+	t.Run("level filtering is inherited", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		sl := newLog(t, &buf, logger.WarnLevel, logger.ConsoleFormat).Slog()
+		sl.Debug("d")
+		sl.Info("i")
+		sl.Warn("w")
+		sl.Error("e")
+
+		assert.Equal(t, "WARN   w\nERROR  e\n", withoutTimestamps(t, buf.String()))
+	})
+}
+
 func TestNewNop(t *testing.T) {
 	t.Parallel()
 

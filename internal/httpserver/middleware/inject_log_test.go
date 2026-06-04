@@ -45,8 +45,8 @@ func TestNewInjectLog(t *testing.T) {
 
 			var handler http.Handler
 			if tc.giveDoubleWrapped {
-				// wrap next with the inner middleware first, then the outer one on top —
-				// the outer middleware runs first and should win.
+				// wrap next with the inner middleware first, then the outer one on top - the outer middleware runs first
+				// and should win
 				handler = middleware.NewInjectLog(tc.giveLogger)(
 					middleware.NewInjectLog(tc.giveSecondLogger)(next),
 				)

@@ -12,7 +12,7 @@ func main() {
 	const distDir = "./dist"
 
 	if _, err := os.Stat(distDir); err != nil && errors.Is(err, os.ErrNotExist) {
-		if err = os.Mkdir(distDir, 0755); err != nil {
+		if err = os.Mkdir(distDir, 0o755); err != nil {
 			panic(err)
 		}
 	}

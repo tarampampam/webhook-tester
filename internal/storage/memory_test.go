@@ -24,6 +24,7 @@ func TestMemory_ContextCancellationClosesStorage(t *testing.T) {
 	t.Parallel()
 	testContextCancellationClosesStorage(t, func(ctx context.Context) storage.Storage {
 		m := storage.NewMemory(ctx, 10)
+
 		t.Cleanup(func() { _ = m.Close() })
 
 		return m
