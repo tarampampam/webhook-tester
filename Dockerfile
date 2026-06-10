@@ -1,90 +1,110 @@
 # syntax=docker/dockerfile:1
 
 # -✂- this stage is used to develop and build the application locally -------------------------------------------------
-FROM docker.io/library/node:25-alpine AS builder
+FROM docker.io/library/golang:1.26.4-alpine AS builder
 
-# install Go using the official image
-COPY --from=docker.io/library/golang:1.26-alpine /usr/local/go /usr/local/go
+# path to the directory used by go to store cache and modules (/var/cache/go)
+ENV GOCACHE=/var/cache/go/build GOMODCACHE=/var/cache/go/mod
 
-ENV \
-  # add Go and Node.js "binaries" to the PATH
-  PATH="$PATH:/src/web/node_modules/.bin:/usr/local/go/bin" \
-  # tell the Go command where to find (and store) various stuff (instead of ~/go)
-  GOPATH="/var/tmp/go" \
-  # disable npm update notifier
-  NPM_CONFIG_UPDATE_NOTIFIER=false
+# disable golang telemetry (https://go.dev/doc/telemetry#faq)
+# https://go.googlesource.com/telemetry/+/refs/tags/config/v0.100.0/internal/telemetry/dir.go#90
+RUN set -x \
+    && mkdir -p ~/.config/go/telemetry \
+    && echo "off $(date -u +%Y-%m-%d)" > ~/.config/go/telemetry/mode
 
-WORKDIR /src
+# path to the directory used by npm and node to store cache
+ENV NODE_COMPILE_CACHE=/var/cache/node
 
-# burn the dependencies cache
-RUN --mount=type=bind,source=go.mod,target=/src/go.mod \
-    --mount=type=bind,source=go.sum,target=/src/go.sum \
-    --mount=type=bind,source=tools/go.mod,target=/src/tools/go.mod \
-    --mount=type=bind,source=tools/go.sum,target=/src/tools/go.sum \
-    --mount=type=bind,source=web/package.json,target=/src/web/package.json \
-    --mount=type=bind,source=web/package-lock.json,target=/src/web/package-lock.json \
+# install nodejs using the official image
+RUN --mount=type=bind,from=docker.io/library/node:25-alpine,source=/,target=/mnt \
     set -x \
-    # for the Go modules
-    && mkdir -p "$GOPATH" \
-    && go mod download -x \
-    && go mod download -modfile=tools/go.mod -x \
-    # and for the Node.js packages
-    && npm --prefix /src/web ci --loglevel verbose --no-audit \
-    # allow read/write for everyone to use the cache from any user (including non-root)
-    && find "$GOPATH" /src/web/node_modules -type d -exec chmod 0777 {} + \
-    && find "$GOPATH" /src/web/node_modules -type f -exec chmod a+rwX {} +
+    && cp /mnt/usr/local/bin/node /usr/local/bin/ \
+    && cp /mnt/usr/lib/libgcc_s.so.1 /mnt/usr/lib/libstdc++.so.6 /usr/lib/ \
+    && cp -r /mnt/usr/local/lib/node_modules /usr/local/lib/ \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && cd /usr/local/lib \
+    && rm -r ./node_modules/npm/docs ./node_modules/npm/man \
+    && find ./node_modules/ -type f \( -name "*.map" -o -name "*.md" \) -delete \
+    && npm config set --global "update-notifier=false" "loglevel=error" "cache=$NODE_COMPILE_CACHE" \
+    && rm -r ~/.npm \
+    && node --version && npm --version && npx --version \
+    && rm -r "$NODE_COMPILE_CACHE" \
+    && echo "default:x:1000:1000::/tmp:/bin/sh" >> /etc/passwd
 
-ENTRYPOINT [""]
+# prepare cache directories with proper permissions
+RUN set -x \
+    && mkdir -p "$GOCACHE" "$GOMODCACHE" "$NODE_COMPILE_CACHE" \
+    && find "$GOCACHE" "$GOMODCACHE" "$NODE_COMPILE_CACHE" -type d -exec chmod 777 {} \; \
+    && find "$GOCACHE" "$GOMODCACHE" "$NODE_COMPILE_CACHE" -type f -exec chmod a+rwX {} \;
+
+# install gcc to be able to run tests with race detector
+RUN apk add --no-cache gcc musl-dev
 
 # -✂- this stage is used to build the application frontend ------------------------------------------------------------
 FROM builder AS frontend
 
-# copy the frontend source code
-COPY ./web /src/web
-
 # build the frontend (built artifact can be found in /src/web/dist)
-RUN --mount=type=bind,source=api/openapi.yml,target=/src/api/openapi.yml \
+RUN --mount=type=bind,source=api,target=/src/api \
+    --mount=type=bind,source=web,target=/mnt/web \
     set -x \
-    && npm --prefix /src/web run generate \
-    && npm --prefix /src/web run build
+    && cp -r /mnt/web /src/web \
+    && cd /src/web \
+    && npm install --loglevel http --no-audit --no-fund \
+    && npm run generate \
+    && npm run build \
+    && mv ./dist /tmp/dist \
+    && rm -r /src/web \
+    && mkdir /src/web \
+    && mv /tmp/dist /src/web/dist \
+    && rm -r "$NODE_COMPILE_CACHE"
 
 # -✂- this stage is used to build the app itself (including frontend embedding) ---------------------------------------
 FROM builder AS backend
 
-# can be passed with any prefix (like `v1.2.3@FOO`), e.g.: `docker build --build-arg "APP_VERSION=v1.2.3@FOO" .`
+# can be passed with any prefix (like `v1.2.3@GITHASH`), e.g.: `(podman|docker) build --build-arg "APP_VERSION=v1.2.3" .`
 ARG APP_VERSION="undefined@docker"
 
-# copy the source code
-COPY . /src
-
-RUN --mount=type=bind,from=frontend,source=/src/web/dist,target=/src/web/dist \
+# build the application itself (built artifact can be found in /tmp/webhook-tester)
+RUN --mount=type=bind,source=.,target=/mnt/src \
+    --mount=type=bind,from=frontend,source=/src/web/dist,target=/mnt/dist \
     set -x \
-    # build the app itself
+    && cp -r /mnt/src /src \
+    && cp -r /mnt/dist /src/web/dist \
+    && cd /src \
     && go generate -skip readme ./... \
     && CGO_ENABLED=0 go build \
       -trimpath \
       -buildvcs=false \
-      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/v3/internal/version.version=${APP_VERSION}" \
-      -o ./app \
+      -ldflags "-s -w -X gh.tarampamp.am/webhook-tester/v3/internal/appmeta.version=${APP_VERSION}" \
+      -o /tmp/webhook-tester \
       ./cmd/webhook-tester/ \
-    && ./app --version \
-    # prepare rootfs for runtime
-    && mkdir -p /tmp/rootfs \
-    && cd /tmp/rootfs \
+    && go clean -cache -modcache -i \
+    && /tmp/webhook-tester --version \
+    && rm -r /src
+
+WORKDIR /tmp/rootfs
+
+# prepare rootfs for runtime
+RUN set -x \
     && mkdir -p ./etc/ssl/certs ./bin ./tmp ./data \
     && echo 'appuser:x:10001:10001::/nonexistent:/sbin/nologin' > ./etc/passwd \
     && echo 'appuser:x:10001:' > ./etc/group \
     && chmod 777 ./tmp ./data \
     && cp /etc/ssl/certs/ca-certificates.crt ./etc/ssl/certs/ \
-    && mv /src/app ./bin/app
+    && mv /tmp/webhook-tester ./bin/webhook-tester
+
+# add super-lightweight HTTP checking tool to use it in the healthcheck
+# docs: https://github.com/tarampampam/microcheck
+COPY --from=ghcr.io/tarampampam/microcheck:1 /bin/httpscheck /tmp/rootfs/bin/httpscheck
 
 # -✂- and this is the final stage -------------------------------------------------------------------------------------
 FROM scratch AS runtime
 
 ARG APP_VERSION="undefined@docker"
 
+# docs: https://github.com/opencontainers/image-spec/blob/master/annotations.md
 LABEL \
-    # Docs: <https://github.com/opencontainers/image-spec/blob/master/annotations.md>
     org.opencontainers.image.title="webhook-tester" \
     org.opencontainers.image.description="Test your HTTP webhooks using friendly web UI" \
     org.opencontainers.image.url="https://github.com/tarampampam/webhook-tester" \
@@ -93,22 +113,21 @@ LABEL \
     org.opencontainers.version="$APP_VERSION" \
     org.opencontainers.image.licenses="MIT"
 
-# import compiled application
-COPY --from=backend /tmp/rootfs /
-
-# use an unprivileged user
+# use an unprivileged user by dedault
 USER 10001:10001
 
-ENV \
-  # logging format
-  LOG_FORMAT=json \
-  # logging level
-  LOG_LEVEL=info \
-  # default fs storage directory
-  FS_STORAGE_DIR=/data
+# import rootfs from the backend stage
+COPY --from=backend /tmp/rootfs /
 
-#EXPOSE "8080/tcp"
+ENV LOG_FORMAT=json \
+    LOG_LEVEL=info \
+    FS_STORAGE_DIR=/data
 
-HEALTHCHECK --interval=10s --start-interval=1s --start-period=5s --timeout=1s CMD ["/bin/app", "start", "healthcheck"]
-ENTRYPOINT ["/bin/app"]
-CMD ["start"]
+# docs: https://docs.docker.com/reference/dockerfile/#healthcheck
+HEALTHCHECK --interval=10s --start-interval=1s --start-period=1s CMD [\
+  "/bin/httpscheck", "--port-env", "HTTP_PORT", "127.0.0.1:8080/ready"\
+]
+
+EXPOSE "8080/tcp"
+
+ENTRYPOINT ["/bin/webhook-tester"]

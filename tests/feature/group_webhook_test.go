@@ -74,8 +74,6 @@ func groupTestWebhook(t *testing.T, baseUrl string) {
 							}
 
 							assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
-							assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Methods"))
-							assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Headers"))
 							assert.Equal(t, respHeaderValue, resp.Header.Get(respHeaderName))
 
 							rID := resp.Header.Get("X-Wh-Request-Id")
@@ -106,6 +104,166 @@ func groupTestWebhook(t *testing.T, baseUrl string) {
 			}
 		})
 	}
+
+	t.Run("cors", func(t *testing.T) {
+		t.Parallel()
+
+		sID := ft.CreateSession(t, baseUrl, http.StatusOK, nil, nil)
+		webhookURL := baseUrl + "/" + sID
+
+		t.Run("browser preflight without requested headers", func(t *testing.T) {
+			t.Parallel()
+
+			resp := ft.MustRequest(t, http.MethodOptions, webhookURL, map[string]string{
+				"Origin":                        "http://localhost:5173",
+				"Access-Control-Request-Method": "POST",
+			}, nil)
+
+			assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+			assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+			assert.Equal(t, "POST", resp.Header.Get("Access-Control-Allow-Methods"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Allow-Headers"))
+			assert.Equal(t, "86400", resp.Header.Get("Access-Control-Max-Age"))
+		})
+
+		t.Run("browser preflight mirrors Access-Control-Request-Headers", func(t *testing.T) {
+			t.Parallel()
+
+			resp := ft.MustRequest(t, http.MethodOptions, webhookURL, map[string]string{
+				"Origin":                         "http://localhost:5173",
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "Content-Type, Authorization",
+			}, nil)
+
+			assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+			assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+			assert.Equal(t, "POST", resp.Header.Get("Access-Control-Allow-Methods"))
+			assert.Equal(t, "Content-Type, Authorization", resp.Header.Get("Access-Control-Allow-Headers"))
+			assert.Equal(t, "86400", resp.Header.Get("Access-Control-Max-Age"))
+		})
+
+		t.Run("OPTIONS without ACRM gets no preflight headers", func(t *testing.T) {
+			t.Parallel()
+
+			resp := ft.MustRequest(t, http.MethodOptions, webhookURL, map[string]string{
+				"Origin": "http://localhost:5173",
+			}, nil)
+
+			assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Allow-Methods"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Allow-Headers"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Max-Age"))
+		})
+
+		t.Run("actual request has ACAO only", func(t *testing.T) {
+			t.Parallel()
+
+			resp := ft.MustRequest(t, http.MethodPost, webhookURL, map[string]string{
+				"Origin":       "http://localhost:5173",
+				"Content-Type": "application/json",
+			}, []byte(`{"test":true}`))
+
+			assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Allow-Methods"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Allow-Headers"))
+			assert.Nil(t, resp.Header.Values("Access-Control-Max-Age"))
+		})
+
+		t.Run("preflight not captured", func(t *testing.T) {
+			t.Parallel()
+
+			isolatedSID := ft.CreateSession(t, baseUrl, http.StatusOK, nil, nil)
+
+			ft.MustRequest(t, http.MethodOptions, baseUrl+"/"+isolatedSID, map[string]string{
+				"Origin":                        "http://localhost:5173",
+				"Access-Control-Request-Method": "POST",
+			}, nil)
+
+			r := ft.MustGet(t, baseUrl+"/api/session/"+isolatedSID+"/requests")
+
+			var reqs []any
+			assert.NoError(t, json.Unmarshal(ft.ReadBody(t, r), &reqs))
+			assert.Equal(t, 0, len(reqs))
+		})
+	})
+
+	t.Run("error-formats", func(t *testing.T) {
+		t.Parallel()
+
+		// a well-formed UUID that will never exist in storage - triggers a 404 error response
+		const ghost = "deadbeef-dead-dead-dead-deaddeadbeef"
+
+		t.Run("json", func(t *testing.T) {
+			t.Parallel()
+
+			for name, headers := range map[string]map[string]string{
+				"accept application/json":             {"Accept": "application/json"},
+				"accept text/json":                    {"Accept": "text/json"},
+				"accept json before html - json wins": {"Accept": "application/json, text/html"},
+				"accept with quality param":           {"Accept": "application/json; q=0.9"},
+				"accept wildcard, content-type json":  {"Accept": "*/*", "Content-Type": "application/json"},
+				"no accept, content-type json":        {"Content-Type": "application/json"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+
+					resp := ft.MustRequest(t, http.MethodGet, baseUrl+"/"+ghost, headers, nil)
+					body := ft.ReadBody(t, resp)
+
+					assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+					assert.True(t, strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json"))
+					assert.IsJSON(t, body)
+					assert.True(t, len(ft.JSONPath[string](t, body, "error")) > 0)
+					assert.True(t, len(ft.JSONPath[string](t, body, "message")) > 0)
+					assert.True(t, len(ft.JSONPath[string](t, body, "powered_by")) > 0)
+				})
+			}
+		})
+
+		t.Run("html", func(t *testing.T) {
+			t.Parallel()
+
+			for name, headers := range map[string]map[string]string{
+				"accept text/html":                    {"Accept": "text/html"},
+				"accept html before json - html wins": {"Accept": "text/html, application/json"},
+				"accept wildcard, content-type html":  {"Accept": "*/*", "Content-Type": "text/html"},
+				"no accept, content-type html":        {"Content-Type": "text/html"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+
+					resp := ft.MustRequest(t, http.MethodGet, baseUrl+"/"+ghost, headers, nil)
+					body := ft.ReadBody(t, resp)
+
+					assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+					assert.True(t, strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html"))
+					assert.Contains(t, body, "<!doctype html>")
+				})
+			}
+		})
+
+		t.Run("plain", func(t *testing.T) {
+			t.Parallel()
+
+			for name, headers := range map[string]map[string]string{
+				"accept text/plain":                    {"Accept": "text/plain"},
+				"no accept, content-type plain":        {"Content-Type": "text/plain"},
+				"no accept, unrecognized content-type": {"Content-Type": "application/xml"},
+				"no accept, no content-type":           {},
+			} {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+
+					resp := ft.MustRequest(t, http.MethodGet, baseUrl+"/"+ghost, headers, nil)
+					body := ft.ReadBody(t, resp)
+
+					assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+					assert.True(t, strings.HasPrefix(resp.Header.Get("Content-Type"), "text/plain"))
+					assert.Contains(t, body, "WebHook: ")
+				})
+			}
+		})
+	})
 }
 
 // capturedHeadersContain checks if the captured headers list contains an entry with the given name and value.

@@ -15,18 +15,31 @@ import {
   IconRun,
 } from '@tabler/icons-react'
 import dayjs from 'dayjs'
-import React, { useCallback, useRef } from 'react'
-import { useData, UsedStorageKeys, useStorage } from '~/shared'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useActiveSessionID } from '~/routing'
+import { useSessions, useWebhookURL, UsedStorageKeys, useStorage } from '~/shared'
 
-export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
-  const { session, webHookUrl } = useData()
+export const SessionDetails = ({ loading = false }: { loading?: boolean }): React.JSX.Element => {
+  const { sessions } = useSessions()
+  const { webhookURL } = useWebhookURL()
+  const activeSessionID = useActiveSessionID()
+  const session = (activeSessionID ? sessions.get(activeSessionID) : null) ?? null
+  const [responseBody, setResponseBody] = useState<Uint8Array | null>(null)
+
+  useEffect(() => {
+    if (!session) {
+      setResponseBody(null)
+      return
+    }
+    session.response.getBody().then(setResponseBody).catch(() => setResponseBody(null))
+  }, [session])
   const [selectedShellTab, setSelectedShellTab] = useStorage(0, UsedStorageKeys.SessionDetailsShellTab, 'session')
   const [selectedCodeTab, setSelectedCodeTab] = useStorage(0, UsedStorageKeys.SessionDetailsCodeTab, 'session')
   const testNotifyID = useRef<string | null>(null)
 
   /** Sends a test request to the generated URL */
   const handleSendTestRequest = useCallback((): void => {
-    if (!webHookUrl) {
+    if (!webhookURL) {
       return
     }
 
@@ -40,7 +53,7 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
       })
     }
 
-    sendTestRequest(new URL(webHookUrl))
+    sendTestRequest(new URL(webhookURL))
       .then(() => {
         if (testNotifyID.current === null) {
           return
@@ -67,22 +80,22 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
           loading: false,
         })
       })
-  }, [webHookUrl])
+  }, [webhookURL])
 
   return (
     <>
-      {!!webHookUrl && (
+      {!!webhookURL && (
         <>
           <Text>Here&apos;s your unique URL:</Text>
           <Flex my="md" align="center" justify="space-between" gap="xs" direction={{ base: 'column', lg: 'row' }}>
-            <CodeHighlight code={webHookUrl.toString()} language="bash" w="100%" />
+            <CodeHighlight code={webhookURL.toString()} language="bash" w="100%" />
             <Button.Group w={{ base: '100%', lg: 'auto' }}>
               <Button
                 variant="gradient"
                 gradient={{ from: 'cyan', to: 'teal', deg: 90 }}
                 leftSection={<IconExternalLink size="1.4em" />}
                 component="a"
-                href={webHookUrl.toString()}
+                href={webhookURL.toString()}
                 target="_blank"
                 disabled={loading}
               >
@@ -106,36 +119,36 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               {
                 fileName: 'curl',
                 language: 'bash',
-                code: `curl -v -X POST --data '{"foo": "bar"}' ${webHookUrl.toString()}`,
+                code: `curl -v -X POST --data '{"foo": "bar"}' ${webhookURL.toString()}`,
                 icon: <IconBrandDebian size="1.2em" />,
               },
               {
                 fileName: 'wget',
                 language: 'bash',
-                code: `wget -O- --post-data '{"foo": "bar"}' ${webHookUrl.toString()}`,
+                code: `wget -O- --post-data '{"foo": "bar"}' ${webhookURL.toString()}`,
                 icon: <IconBrandDebian size="1.2em" />,
               },
               {
                 fileName: 'HTTPie',
                 language: 'bash',
-                code: `http POST ${webHookUrl.toString()} foo=bar --verbose`,
+                code: `http POST ${webhookURL.toString()} foo=bar --verbose`,
                 icon: <IconBrandDebian size="1.2em" />,
               },
               {
                 fileName: 'get',
                 language: 'bash',
-                code: `get --data '{"foo": "bar"}' ${webHookUrl.toString()} --method=post --verbose`,
+                code: `get --data '{"foo": "bar"}' ${webhookURL.toString()} --method=post --verbose`,
                 icon: <IconBrandDebian size="1.2em" />,
               },
               {
                 fileName: 'PowerShell',
                 language: 'bash',
-                code: `Invoke-RestMethod -Uri ${webHookUrl.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
+                code: `Invoke-RestMethod -Uri ${webhookURL.toString()} -Method POST -Body '{"foo": "bar"}' -Verbose`,
                 icon: <IconBrandWindows size="1.2em" />,
               },
             ]}
             onTabChange={(index) => setSelectedShellTab(index)}
-            activeTab={selectedShellTab}
+            activeTab={selectedShellTab ?? 0}
             w="100%"
             my="md"
           />
@@ -145,53 +158,53 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               {
                 fileName: 'JavaScript',
                 language: 'javascript',
-                code: snippet('js', webHookUrl),
+                code: snippet('js', webhookURL),
                 icon: <IconBrandJavascript size="1.2em" />,
               },
               {
                 fileName: 'Node.js',
                 language: 'javascript',
-                code: snippet('node', webHookUrl),
+                code: snippet('node', webhookURL),
                 icon: <IconBrandNodejs size="1.2em" />,
               },
               {
                 fileName: 'Go',
                 language: 'go',
-                code: snippet('go', webHookUrl),
+                code: snippet('go', webhookURL),
                 icon: <IconBrandGolang size="1.2em" />,
               },
               {
                 fileName: 'Java',
                 language: 'java',
-                code: snippet('java', webHookUrl),
+                code: snippet('java', webhookURL),
                 icon: <IconCup size="1.2em" />,
               },
               {
                 fileName: 'Python',
                 language: 'python',
-                code: snippet('python', webHookUrl),
+                code: snippet('python', webhookURL),
                 icon: <IconBrandPython size="1.2em" />,
               },
               {
                 fileName: 'PHP',
                 language: 'php',
-                code: snippet('php', webHookUrl),
+                code: snippet('php', webhookURL),
                 icon: <IconBrandPhp size="1.2em" />,
               },
               {
                 fileName: 'Ruby',
                 language: 'ruby',
-                code: snippet('ruby', webHookUrl),
+                code: snippet('ruby', webhookURL),
                 icon: <IconDiamond size="1.2em" />,
               },
               {
                 fileName: 'C#',
                 language: 'csharp',
-                code: snippet('csharp', webHookUrl),
+                code: snippet('csharp', webhookURL),
               },
             ]}
             onTabChange={(index) => setSelectedCodeTab(index)}
-            activeTab={selectedCodeTab}
+            activeTab={selectedCodeTab ?? 0}
             w="100%"
             my="md"
             defaultExpanded={false}
@@ -211,59 +224,59 @@ export const SessionDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {!!session.responseCode && (
+            {!!session.response.code && (
               <Table.Tr>
                 <Table.Td ta="right">Status code</Table.Td>
                 <Table.Td>
                   <Badge
                     color={((): MantineColor => {
                       switch (true) {
-                        case session.responseCode <= 299:
+                        case session.response.code <= 299:
                           return 'teal'
-                        case session.responseCode <= 399:
+                        case session.response.code <= 399:
                           return 'orange'
-                        case session.responseCode <= 499:
+                        case session.response.code <= 499:
                           return 'red'
                         default:
                           return 'cyan'
                       }
                     })()}
                   >
-                    {session.responseCode}
+                    {session.response.code}
                   </Badge>
                 </Table.Td>
               </Table.Tr>
             )}
-            {!!session.responseDelay && (
+            {!!session.response.delay && (
               <Table.Tr>
                 <Table.Td ta="right">Delay</Table.Td>
-                <Table.Td>{session.responseDelay} sec</Table.Td>
+                <Table.Td>{session.response.delay} sec</Table.Td>
               </Table.Tr>
             )}
-            {!!session.responseHeaders.length && (
+            {!!session.response.headers.length && (
               <Table.Tr>
                 <Table.Td ta="right">Response headers</Table.Td>
                 <Table.Td>
                   <CodeHighlight
-                    code={session.responseHeaders.map(({ name, value }) => `${name}: ${value}`).join('\n')}
+                    code={session.response.headers.map(({ name, value }) => `${name}: ${value}`).join('\n')}
                     language="bash"
                     expandCodeLabel="Show all headers"
-                    defaultExpanded={session.responseHeaders.length <= 5}
+                    defaultExpanded={session.response.headers.length <= 5}
                     withExpandButton
                   />
                 </Table.Td>
               </Table.Tr>
             )}
-            {!!session.responseBody.length && (
+            {responseBody !== null && responseBody.length > 0 && (
               <Table.Tr>
                 <Table.Td ta="right">Response body</Table.Td>
                 <Table.Td>
                   <CodeHighlight
-                    code={String.fromCharCode(...session.responseBody)}
+                    code={String.fromCharCode(...responseBody)}
                     language="json"
                     styles={{ pre: { whiteSpace: 'pre-line' } }}
                     expandCodeLabel="Show full response"
-                    defaultExpanded={session.responseBody.length <= 1000}
+                    defaultExpanded={responseBody.length <= 1000}
                     withExpandButton
                   />
                 </Table.Td>

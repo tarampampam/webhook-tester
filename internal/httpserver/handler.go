@@ -34,7 +34,9 @@ func NewHandler(
 	api := NewOpenAPI(log, s, ps, sessionTTL, appSettings, readyChecker, latestVersionGetter)
 
 	// do you get it? it's a webhook handler, so "huk" :D
-	huk := webhook.New(log.Named("webhook"), s, ps, autoCreateSessions, sessionTTL, maxRequestBodySize)
+	huk := middleware.CORSPreflight(http.HandlerFunc(
+		webhook.New(log.Named("webhook"), s, ps, autoCreateSessions, sessionTTL, maxRequestBodySize).Handle,
+	))
 
 	handler := openapi.HandlerWithOptions(api, openapi.StdHTTPServerOptions{
 		ErrorHandlerFunc: api.HandleInternalError, // set error handler for internal server errors
@@ -51,7 +53,7 @@ func NewHandler(
 
 		// if the request is a webhook request, handle it with the webhook handler
 		if webhook.ShouldBeCaptured(r) {
-			huk.Handle(w, r)
+			huk.ServeHTTP(w, r)
 
 			return
 		}

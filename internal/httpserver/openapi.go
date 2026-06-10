@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"gh.tarampamp.am/webhook-tester/v3/internal/appmeta"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/request_delete"
@@ -43,7 +42,7 @@ type OpenAPI struct {
 	log      *logger.Logger
 	handlers struct {
 		session struct {
-			create func(context.Context, openapi.CreateSessionRequest) (*openapi.SessionOptionsResponse, error)
+			create func(context.Context, openapi.CreateSessionRequest) (*openapi.CreateSessionResponse, error)
 			get    func(context.Context, sID) (*openapi.SessionOptionsResponse, error)
 			exists func(context.Context, []sID) (*openapi.CheckSessionExistsResponse, error)
 			delete func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
@@ -67,7 +66,7 @@ type AppSettings struct {
 	MaxRequestBodySize uint32
 	MaxRequests        uint16
 	PublicUrlRoot      string
-	TunnelUrl          *atomic.String
+	TunnelUrl          *atomic.Pointer[string]
 }
 
 var _ openapi.ServerInterface = (*OpenAPI)(nil) // compile-time interface implementation check
@@ -125,7 +124,7 @@ func (o *OpenAPI) ApiSessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o.respondWithJSON(w, r, http.StatusOK, resp)
+	o.respondWithJSON(w, r, http.StatusCreated, resp)
 }
 
 // ApiSessionCheckExists handles POST /api/session/check/exists.
@@ -316,8 +315,8 @@ func (o *OpenAPI) ApiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if o.settings.TunnelUrl != nil {
-		if tunUrl := o.settings.TunnelUrl.Load(); tunUrl != "" {
-			resp.Tunnel.Enabled, resp.Tunnel.Url = true, &tunUrl
+		if tunUrl := o.settings.TunnelUrl.Load(); tunUrl != nil && *tunUrl != "" {
+			resp.Tunnel.Enabled, resp.Tunnel.Url = true, tunUrl
 		}
 	}
 

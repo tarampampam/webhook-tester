@@ -4,6 +4,10 @@
 ## Distributive
 /dist
 
+## Temp dirs & trash
+/temp
+/tmp
+
 ## AI shit
 /.copilot
 /.cursor
@@ -14,4 +18,5 @@
 
 ## etc
 *.log
+/coverage
 /src/*-old

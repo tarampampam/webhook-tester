@@ -2,20 +2,21 @@ import { Title } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import React, { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { pathTo, RouteIDs } from '~/routing'
-import { useData } from '~/shared'
+import { pathTo, ROUTE_ID } from '~/routing'
+import { useLastUsed, useSessions } from '~/shared'
 
-export function HomeScreen(): React.JSX.Element {
+export const HomeScreen = (): React.JSX.Element => {
   const [navigate, { hash }] = [useNavigate(), useLocation()]
-  const { lastUsedSID: last, allSessionIDs: all, newSession } = useData()
+  const { lastUsedSID: last } = useLastUsed()
+  const { sessions, newSession } = useSessions()
 
   // store the last used session ID and all session IDs in refs to prevent unnecessary re-renders
   const lastUsedSID = useRef<string | null>(last)
-  const allSessionIDs = useRef<ReadonlyArray<string>>(all)
+  const allSessionIDs = useRef<ReadonlyArray<string>>([...sessions.keys()])
 
   // update the refs when the values change
   useEffect(() => { lastUsedSID.current = last }, [last]) // prettier-ignore
-  useEffect(() => { allSessionIDs.current = all }, [all]) // prettier-ignore
+  useEffect(() => { allSessionIDs.current = [...sessions.keys()] }, [sessions]) // prettier-ignore
 
   useEffect(() => {
     if (hash) {
@@ -30,11 +31,11 @@ export function HomeScreen(): React.JSX.Element {
         .filter((v) => v && v.length === 36) // 36 characters is the length of a UUID
 
       if (sID && rID) {
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID, rID))
+        navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID, rID }))
 
         return
       } else if (sID) {
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID))
+        navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID }))
 
         return
       }
@@ -46,7 +47,7 @@ export function HomeScreen(): React.JSX.Element {
     if (lastUsedSID.current) {
       notify.show({ title: 'Redirected to the last used WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastUsedSID.current))
+      navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID: lastUsedSID.current }))
 
       return
     }
@@ -56,7 +57,7 @@ export function HomeScreen(): React.JSX.Element {
     if (lastSessionID !== undefined) {
       notify.show({ title: 'Redirected to the last created WebHook', message: null })
 
-      navigate(pathTo(RouteIDs.SessionAndRequest, lastSessionID))
+      navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID: lastSessionID }))
 
       return
     }
@@ -74,17 +75,17 @@ export function HomeScreen(): React.JSX.Element {
       headers: { 'Content-Type': 'application/json' },
       responseBody: new TextEncoder().encode('"Hello, world!"'),
     })
-      .then((sInfo) => {
+      .then((newSID) => {
         notify.update({
           id,
           title: 'A new WebHook has been created',
-          message: `Session ID: ${sInfo.sID}`,
+          message: `Session ID: ${newSID}`,
           color: 'green',
           autoClose: 5000,
           loading: false,
         })
 
-        navigate(pathTo(RouteIDs.SessionAndRequest, sInfo.sID))
+        navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID: newSID }))
       })
       .catch(() => {
         notify.update({

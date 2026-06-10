@@ -9,11 +9,11 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
-	"go.uber.org/atomic"
 
 	"gh.tarampamp.am/webhook-tester/v3/cmd/webhook-tester/app/loader"
 	"gh.tarampamp.am/webhook-tester/v3/internal/appmeta"
@@ -338,7 +338,7 @@ func (a *App) run(ctx context.Context, log *logger.Logger) error { //nolint:goco
 	}
 
 	// we use atomic string here because the tunnel will update the public URL dynamically after it starts
-	var tnlPublicUrl atomic.String
+	var tnlPublicUrl atomic.Pointer[string]
 
 	// initialize tunnel based on the selected driver (if any)
 	tnl, tnlErr := a.newTunnel(log.Named("tunnel"))
@@ -418,7 +418,7 @@ func (a *App) run(ctx context.Context, log *logger.Logger) error { //nolint:goco
 				return
 			}
 
-			tnlPublicUrl.Store(pubUrl)
+			tnlPublicUrl.Store(new(pubUrl))
 
 			log.Info("Tunnel opened", logger.String("public_url", pubUrl))
 		}()
@@ -565,7 +565,7 @@ func (a *App) newHTTPServer(
 	strg storage.Storage,
 	ps pubsub.PubSub,
 	healthyChecker func(context.Context) error,
-	tnlPublicUrl *atomic.String,
+	tnlPublicUrl *atomic.Pointer[string],
 ) *httpserver.Server {
 	opts := []httpserver.Option{
 		httpserver.WithErrorLog(logger.NewStdLog(log, logger.ErrorLevel)),
@@ -598,7 +598,7 @@ func (a *App) newHTTPServer(
 
 	return httpserver.New(
 		httpserver.NewHandler(
-			log.Named("http"),
+			log,
 			strg,
 			ps,
 			a.opt.storage.sessionTTL,

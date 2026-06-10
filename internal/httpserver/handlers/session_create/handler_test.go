@@ -28,7 +28,7 @@ func TestHandler_Handle(t *testing.T) {
 		mockFn   func(context.Context, string, storage.SessionResponse, time.Duration) (*storage.SessionMeta, error)
 		wantErr  bool
 		checkErr func(*testing.T, error)
-		check    func(*testing.T, *openapi.SessionOptionsResponse)
+		check    func(*testing.T, *openapi.CreateSessionResponse)
 	}{
 		"success/minimal request": {
 			giveReq: openapi.CreateSessionRequest{
@@ -42,17 +42,13 @@ func TestHandler_Handle(t *testing.T) {
 
 				return fixedMeta, nil
 			},
-			check: func(t *testing.T, resp *openapi.SessionOptionsResponse) {
+			check: func(t *testing.T, resp *openapi.CreateSessionResponse) {
 				assert.True(t, openapi.IsValidUUID(resp.Uuid))
 				assert.Equal(t, fixedNow.UnixMilli(), resp.CreatedAtUnixMilli)
-				assert.Equal(t, 200, resp.Response.StatusCode)
-				assert.Equal(t, uint16(0), resp.Response.Delay)
-				assert.DeepEqual(t, []openapi.HttpHeader{}, resp.Response.Headers)
-				assert.Equal(t, "", resp.Response.ResponseBodyBase64)
 			},
 		},
 
-		"success/body base64 decoded for storage and echoed in response": {
+		"success/body base64 decoded for storage": {
 			giveReq: openapi.CreateSessionRequest{
 				StatusCode:         http.StatusOK,
 				Headers:            []openapi.HttpHeader{},
@@ -64,12 +60,9 @@ func TestHandler_Handle(t *testing.T) {
 
 				return fixedMeta, nil
 			},
-			check: func(t *testing.T, resp *openapi.SessionOptionsResponse) {
-				assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("hello body")), resp.Response.ResponseBodyBase64)
-			},
 		},
 
-		"success/headers converted to storage format and echoed": {
+		"success/headers converted to storage format": {
 			giveReq: openapi.CreateSessionRequest{
 				StatusCode: 201,
 				Headers: []openapi.HttpHeader{
@@ -87,12 +80,6 @@ func TestHandler_Handle(t *testing.T) {
 
 				return fixedMeta, nil
 			},
-			check: func(t *testing.T, resp *openapi.SessionOptionsResponse) {
-				assert.DeepEqual(t, []openapi.HttpHeader{
-					{Name: "Content-Type", Value: "application/json"},
-					{Name: "X-Custom", Value: "value"},
-				}, resp.Response.Headers)
-			},
 		},
 
 		"success/delay in seconds converted to duration for storage": {
@@ -108,9 +95,6 @@ func TestHandler_Handle(t *testing.T) {
 
 				return fixedMeta, nil
 			},
-			check: func(t *testing.T, resp *openapi.SessionOptionsResponse) {
-				assert.Equal(t, uint16(7), resp.Response.Delay)
-			},
 		},
 
 		"success/status code passed to storage": {
@@ -124,9 +108,6 @@ func TestHandler_Handle(t *testing.T) {
 				assert.Equal(t, uint16(418), r.Code)
 
 				return fixedMeta, nil
-			},
-			check: func(t *testing.T, resp *openapi.SessionOptionsResponse) {
-				assert.Equal(t, 418, resp.Response.StatusCode)
 			},
 		},
 

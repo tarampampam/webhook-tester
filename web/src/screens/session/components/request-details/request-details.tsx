@@ -5,13 +5,18 @@ import { useInterval } from '@mantine/hooks'
 import { Link } from 'react-router-dom'
 import { IconBinary, IconDownload, IconLetterCase } from '@tabler/icons-react'
 import dayjs from 'dayjs'
-import { useData, UsedStorageKeys, useSettings, useStorage } from '~/shared'
+import { useActiveRequestID } from '~/routing'
+import { useRequests, UsedStorageKeys, useStorage, useUserSettings } from '~/shared'
 import { methodToColor } from '~/theme'
 import { ViewHex, ViewText } from './components'
 
-export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = false }) => {
-  const { session, request } = useData()
-  const { showRequestDetails } = useSettings()
+export const RequestDetails = ({ loading = false }: { loading?: boolean }): React.JSX.Element => {
+  const { requests } = useRequests()
+  const activeRequestID = useActiveRequestID()
+  const request = (activeRequestID ? requests.get(activeRequestID) : null) ?? null
+  const {
+    userSettings: { showRequestDetails },
+  } = useUserSettings()
 
   const [headersExpanded, setHeadersExpanded] = useStorage<boolean>(false, UsedStorageKeys.RequestDetailsHeadersExpand)
   const [now, setNow] = useState(() => new Date())
@@ -24,8 +29,12 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
 
   // automatically update the payload
   useEffect(() => {
-    request?.payload?.then((data) => setPayload(data))
-  }, [request, request?.payload])
+    if (!request) {
+      setPayload(null)
+      return
+    }
+    request.getPayload().then(setPayload).catch(() => setPayload(null))
+  }, [request])
 
   const interval = useInterval(() => setNow(new Date()), 1000)
 
@@ -39,7 +48,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
 
   return (
     <Grid>
-      {!!request && !!session && showRequestDetails && (
+      {!!request && showRequestDetails && (
         <>
           <Grid.Col span={{ base: 12, md: 6 }}>
             <Title order={4} mb="md">
@@ -53,7 +62,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                   </Table.Td>
                   <Table.Td>
                     {(loading && <Skeleton radius="xl" h="sm" w="80%" />) ||
-                      (request.url && <WebHookPath sID={session.sID} url={request.url} />) || <>...</>}
+                      (request.url && <WebHookPath sID={request.sID} url={request.url} />) || <>...</>}
                   </Table.Td>
                 </Table.Tr>
                 <Table.Tr>
@@ -116,7 +125,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                   <Table.Td>
                     {(loading && <Skeleton radius="xl" h="xs" w="50%" />) || (
                       <Text size="xs" c="dimmed" span>
-                        {request.rID}
+                        {request.id}
                       </Text>
                     )}
                   </Table.Td>
@@ -135,7 +144,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
                   language="bash"
                   expandCodeLabel="Show all headers"
                   maxCollapsedHeight="10em"
-                  expanded={headersExpanded}
+                  expanded={headersExpanded ?? undefined}
                   onExpandedChange={setHeadersExpanded}
                   withExpandButton
                   withCopyButton
@@ -155,7 +164,7 @@ export const RequestDetails: React.FC<{ loading?: boolean }> = ({ loading = fals
               size="compact-sm"
               ml="sm"
               leftSection={<IconDownload size="1.2em" />}
-              onClick={() => (payload ? download(payload, `${request.rID}.bin`) : undefined)}
+              onClick={() => (payload ? download(payload, `${request.id}.bin`) : undefined)}
             >
               Download
             </Button>
@@ -192,7 +201,7 @@ enum TabsList {
   Text = 'Text',
   Binary = 'Binary',
 }
-export const WebHookPath: React.FC<{ sID: string; url: URL }> = ({ sID, url }) => {
+export const WebHookPath = ({ sID, url }: { sID: string; url: URL }): React.JSX.Element => {
   const { search, hash } = url // search may be '', '?' or '?key=value'; hash may be '', '#' or '#fragment'
   let { pathname } = url // pathname is usually '/{sID}' or '/{sID}/any/path'
 

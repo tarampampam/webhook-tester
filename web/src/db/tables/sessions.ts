@@ -1,16 +1,17 @@
 import type { Table } from 'dexie'
 
 export type Session = {
-  sID: string
-  responseCode: number
-  responseHeaders: Array<{ name: string; value: string }>
-  responseDelay: number
-  responseBody: Uint8Array
+  id: string
+  response: {
+    code: number
+    headers: Array<{ name: string; value: string }>
+    delay: number
+  }
   createdAt: Date
 }
 
 export type SessionsTable = Table<Session, string>
 
 export const sessionsSchema = {
-  sessions: '&sID',
+  sessions: '&id, createdAt',
 }

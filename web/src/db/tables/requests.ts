@@ -5,14 +5,13 @@ export type Request = {
   rID: string
   clientAddress: string
   method: string
-  headers: Array<{ name: string; value: string }>
+  headers: ReadonlyArray<{ name: string; value: string }>
   url: string
-  payload: Uint8Array | null
   capturedAt: Date
 }
 
 export type RequestsTable = Table<Request, string>
 
 export const requestsSchema = {
-  requests: '&rID, sID',
+  requests: '&rID, [sID+capturedAt], sID',
 }

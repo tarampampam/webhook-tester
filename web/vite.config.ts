@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { join, resolve } from 'path'
 import { defineConfig } from 'vite'
+import { compression } from 'vite-plugin-compression2'
 
 const rootDir = resolve(__dirname)
 const [distDir, srcDir] = [join(rootDir, 'dist'), join(rootDir, 'src')]
@@ -9,7 +10,10 @@ const devServerProxyTo = process.env?.['DEV_SERVER_PROXY_TO'] || undefined
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    compression({ algorithms: ['gz'], include: [], exclude: [/\.(png|jpg|jpeg|gif|webp|woff|woff2)$/] }),
+    react(),
+  ],
   resolve: {
     alias: {
       '~': srcDir,

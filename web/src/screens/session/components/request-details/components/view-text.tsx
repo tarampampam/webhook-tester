@@ -6,15 +6,15 @@ import React, { useMemo } from 'react'
 const decoder = new TextDecoder('utf-8')
 const cutMessage = '\n\n[...content truncated (to view the full content, please download the binary file)...]\n\n'
 
-export const ViewText: React.FC<{
-  input: Uint8Array | null
-  contentType: string | null
-  lengthLimit?: number
-}> = ({
+export const ViewText = ({
   input,
   contentType = null,
   lengthLimit = 1024 * 128, // 128KB
-}) => {
+}: {
+  input: Uint8Array | null
+  contentType: string | null
+  lengthLimit?: number
+}): React.JSX.Element => {
   const { content, language, trimmed } = useMemo((): {
     content: string
     language: 'json' | 'xml' | null

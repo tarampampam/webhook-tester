@@ -1,199 +1,64 @@
-import { describe, expect, test, beforeAll, afterAll } from 'vitest'
-import { throwIfNotJSON, throwIfNotValidResponse } from './middleware'
-import fetchMock from '@fetch-mock/vitest'
-import type { Middleware } from 'openapi-fetch'
-import createClient from 'openapi-fetch'
-import { APIErrorCommon, APIErrorNotFound } from './errors'
+import { APIErrorBadRequest, APIErrorNotFound } from './errors'
+import { throwIfBadRequest, throwIfNotFound } from './middleware'
+import { describe, expect, test } from 'vitest'
 
-beforeAll(() => fetchMock.mockGlobal())
-afterAll(() => fetchMock.mockRestore())
-
-interface paths {
-  '/self': {
-    get: {
-      responses: {
-        200: {
-          headers: Record<string, string>
-          content: {
-            'application/json': string
-          }
-        }
-      }
-    }
+function callOnResponse(middleware: typeof throwIfBadRequest, response: Response) {
+  const { onResponse } = middleware
+  if (typeof onResponse !== 'function') {
+    throw new Error('middleware.onResponse is not defined')
   }
+  return onResponse({ response } as Parameters<typeof onResponse>[0])
 }
 
-const newClient = (...mv: Middleware[]) => {
-  const client = createClient<paths>({ baseUrl: 'http://localhost' })
-
-  client.use(...mv) // attach the middleware
-
-  return client
+function makeResponse(status: number, body?: BodyInit | null, contentType?: string): Response {
+  return new Response(body, {
+    status,
+    headers: contentType ? { 'Content-Type': contentType } : {},
+  })
 }
 
-describe('throwIfNotJSON', () => {
-  test('pass', async () => {
-    const client = newClient(throwIfNotJSON)
+describe('throwIfBadRequest', () => {
+  test('throws APIErrorBadRequest with message from JSON body', async () => {
+    const response = makeResponse(400, JSON.stringify({ message: 'Validation failed' }), 'application/json')
 
-    fetchMock.getOnce(/\/self$/, {
-      status: 200,
-      body: '"ok"',
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    const { data, error } = await client.GET('/self')
-
-    expect(data).equals('ok')
-    expect(error).toBeUndefined()
+    await expect(callOnResponse(throwIfBadRequest, response)).rejects.toSatisfy(
+      (e: unknown) => e instanceof APIErrorBadRequest && e.message === 'Validation failed' && e.response === response
+    )
   })
 
-  test('throws', async () => {
-    const client = newClient(throwIfNotJSON)
+  test('throws APIErrorBadRequest with default message when no content-type', async () => {
+    const response = makeResponse(400)
 
-    fetchMock.getOnce(/\/self$/, {
-      status: 200,
-      body: '"ok"',
-      headers: { 'Content-Type': 'text/html' }, // the header is incorrect
-    })
+    await expect(callOnResponse(throwIfBadRequest, response)).rejects.toSatisfy(
+      (e: unknown) => e instanceof APIErrorBadRequest && e.message === 'Bad request (400)'
+    )
+  })
 
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false) // fail the test if the error is not thrown
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorCommon)
-      expect((e as TypeError).message).toBe('Response is not JSON (the header "Content-Type" does not include "json")')
-    }
+  test.each([200, 401, 403, 404, 500])('does not throw for status %d', async (status) => {
+    const response = makeResponse(status)
+    await expect(callOnResponse(throwIfBadRequest, response)).resolves.toBeUndefined()
   })
 })
 
-describe('throwIfNotValidResponse', () => {
-  test('pass', async () => {
-    const client = newClient(throwIfNotValidResponse)
+describe('throwIfNotFound', () => {
+  test('throws APIErrorNotFound with message from JSON body', async () => {
+    const response = makeResponse(404, JSON.stringify({ message: 'Session not found' }), 'application/json')
 
-    fetchMock.getOnce(/\/self$/, {
-      status: 200,
-      body: '"ok"',
-      headers: { 'Content-Type': 'text/html' }, // the header doesn't matter
-    })
-
-    const { data, error } = await client.GET('/self')
-
-    expect(data).equals('ok')
-    expect(error).toBeUndefined()
+    await expect(callOnResponse(throwIfNotFound, response)).rejects.toSatisfy(
+      (e: unknown) => e instanceof APIErrorNotFound && e.message === 'Session not found' && e.response === response
+    )
   })
 
-  test('throws ({ message: "..." })', async () => {
-    const client = newClient(throwIfNotValidResponse)
+  test('throws APIErrorNotFound with default message when no content-type', async () => {
+    const response = makeResponse(404)
 
-    fetchMock.getOnce(/\/self$/, {
-      status: 404,
-      body: `{"message": "some value"}`,
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorNotFound)
-      expect((e as TypeError).message).toBe('some value')
-    }
+    await expect(callOnResponse(throwIfNotFound, response)).rejects.toSatisfy(
+      (e: unknown) => e instanceof APIErrorNotFound && e.message === 'Not found (404)'
+    )
   })
 
-  test('throws ({ error: "..." })', async () => {
-    const client = newClient(throwIfNotValidResponse)
-
-    fetchMock.getOnce(/\/self$/, {
-      status: 404,
-      body: `{"error": "some value"}`,
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorNotFound)
-      expect((e as TypeError).message).toBe('some value')
-    }
-  })
-
-  test('throws ({ errors: ["...", ...] })', async () => {
-    const client = newClient(throwIfNotValidResponse)
-
-    fetchMock.getOnce(/\/self$/, {
-      status: 404,
-      body: `{"errors": ["some", "value"]}`,
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorNotFound)
-      expect((e as TypeError).message).toBe('some, value')
-    }
-  })
-
-  test('throws ({ errors: { "...": "..." } })', async () => {
-    const client = newClient(throwIfNotValidResponse)
-
-    fetchMock.getOnce(/\/self$/, {
-      status: 500,
-      body: `{"errors": {"a": "some", "b": "value"}}`,
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorCommon)
-      expect((e as TypeError).message).toBe('some, value')
-    }
-  })
-
-  test('throws', async () => {
-    const client = newClient(throwIfNotValidResponse)
-
-    fetchMock.getOnce(/\/self$/, {
-      status: 500,
-      body: `{"error]`, // since the content type, the error message will be `res.statusText`
-      headers: { 'Content-Type': 'foo/bar' }, // the header is incorrect
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorCommon)
-      expect((e as TypeError).message).toBe('Internal Server Error')
-    }
-  })
-
-  test('throws json (Failed to parse the response body as JSON)', async () => {
-    const client = newClient(throwIfNotValidResponse)
-
-    fetchMock.getOnce(/\/self$/, {
-      status: 500,
-      body: `{"error]`,
-      headers: { 'Content-Type': 'application/json' }, // the header is correct
-    })
-
-    try {
-      await client.GET('/self')
-
-      expect(true).toBe(false)
-    } catch (e: TypeError | unknown) {
-      expect(e).toBeInstanceOf(APIErrorCommon)
-      expect((e as TypeError).message).toBe('Internal Server Error (failed to parse the response body as JSON)')
-    }
+  test.each([200, 400, 500])('does not throw for status %d', async (status) => {
+    const response = makeResponse(status)
+    await expect(callOnResponse(throwIfNotFound, response)).resolves.toBeUndefined()
   })
 })

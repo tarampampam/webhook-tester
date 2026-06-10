@@ -25,7 +25,7 @@ func New(s storage.SessionStorage, ttl time.Duration) *Handler { return &Handler
 func (h *Handler) Handle(
 	ctx context.Context,
 	req openapi.CreateSessionRequest,
-) (*openapi.SessionOptionsResponse, error) {
+) (*openapi.CreateSessionResponse, error) {
 	body, err := base64.StdEncoding.DecodeString(req.ResponseBodyBase64)
 	if err != nil {
 		return nil, openapi.NewErrBadRequest("cannot decode response body: " + err.Error())
@@ -56,14 +56,8 @@ func (h *Handler) Handle(
 		respHeaders[i] = openapi.HttpHeader{Name: hdr.Name, Value: hdr.Value}
 	}
 
-	return &openapi.SessionOptionsResponse{
+	return &openapi.CreateSessionResponse{
 		CreatedAtUnixMilli: meta.CreatedAt.UnixMilli(),
-		Response: openapi.SessionResponseOptions{
-			Delay:              req.Delay,
-			Headers:            respHeaders,
-			ResponseBodyBase64: req.ResponseBodyBase64,
-			StatusCode:         req.StatusCode,
-		},
-		Uuid: sID,
+		Uuid:               sID,
 	}, nil
 }

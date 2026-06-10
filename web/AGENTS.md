@@ -3,7 +3,7 @@
 ## Project
 
 React 19 + TypeScript SPA for **webhook-tester** - a web app for testing and debugging webhooks. The compiled output
-is embedded into the Go binary (no separate asset serving).
+is embedded into the Go binary.
 
 Backend source: `../` (Go). See `../AGENTS.md` for backend conventions.
 
@@ -27,52 +27,27 @@ npm run generate            # regenerates ./src/api/schema.gen.ts and other *.ge
 - **Don't edit `*.gen.ts` or `*.gen.js` files** - they are overwritten on the next `npm run generate` run.
 - **Don't use `// eslint-disable-line`, `// eslint-disable-next-line`, `/* eslint-disable */`, or `// @ts-ignore`** -
   fix the underlying issue instead of suppressing it.
+- **Don't use `!` (non-null assertion operator)**. When you need to use `as`, ensure the type assertion is correct
+  and doesn't hide a potential issue (prefer `satisfies` instead, or other safer patterns).
 - **Don't instantiate `Client` inside components** - it is passed as a prop from `main.tsx`.
 - **Don't omit braces for conditionals and loops** - the `curly` ESLint rule enforces this; never suppress it.
 - **Don't make unrequested changes** to files outside the scope of the current task.
-- **Don't mutate git state**. Read commands (`status`, `log`, `diff`, `show`, `blame`) are fine; anything that
-  changes the index, working tree, refs, stash, config, or remotes is forbidden - no staging, committing,
-  branching, tagging, resetting, rebasing, merging, cherry-picking, stashing, pushing, pulling, or fetching.
-  No "I'll undo it after". Editing files is fine; turning edits into history is the user's job.
-- **Don't leave the repo** - no modifying, moving, or deleting files outside the repo root, no `rm -rf` on
-  unspecified paths, no `chmod` / `chown`; ask before touching anything beyond the repo.
 
-## Agent workflow
+## Agent workflow (after any file change)
 
-After each logical batch of changes, run the following steps in order before considering the task complete:
-
-1. **Read existing tests**: before writing or modifying any test file, read the existing test(s) in the same
-   directory most analogous to what you are about to write. Use them as the authoritative style reference - do not
-   invent a new pattern when one is already established nearby
+1. **Read similar code in the same package/directory files**.
 2. **Format**: `npm run fmt` - fixes formatting and auto-fixable lint issues
 3. **Lint**: `npm run lint` - run after fmt; address any remaining errors
-4. **Test**: `npm run test` - if a test file exists for the modified code and the change affects logic (skip for
-   comment-only or trivial markup changes). If no test file exists, suggest me to create one, but do not create it
-   yourself - I will review the suggestion and decide whether to proceed
-5. **Self-review**: after all steps pass, review the code against this checklist:
-   - [ ] Logic errors: off-by-one, wrong condition, unreachable branch
-   - [ ] Type safety: unsafe `as` casts, suppressed TypeScript errors, missing nullability checks
-   - [ ] API errors: unhandled error cases from `Client` calls
-   - [ ] Security: unsanitized user input rendered as HTML, credentials in code
-   - [ ] Pre-existing bugs: report only what you naturally encountered - do not actively inspect unrelated code
-
-Do not present work as finished until all steps above pass without errors or warnings.
-
-Do not fix issues outside the current task scope without asking first.
+4. **Test**: `npm run test` - if a test file exists for the modified code. If no test file exists, suggest me to
+   create one, but do not create it yourself
+5. **Self-review**: logic errors (off-by-one, wrong condition, unreachable branch), type safety (unsafe `as` casts,
+   suppressed TypeScript errors), security
 
 ## Agent behavior and autonomy
 
-**Ask before acting when**:
-
-- The task requires introducing a new provider, a new routing pattern, or a new shared abstraction not already
-  present in the codebase
-- The correct approach is ambiguous and two or more reasonable implementations exist
-- A change would affect generated files (`*.gen.ts`) or the OpenAPI spec (`../api/openapi.yml`) - these have
-  broad downstream impact and must be explicitly approved before running codegen
-- A change touches `routing/` in a way that affects existing route IDs or path patterns
-
-One well-placed question saves more time than a fully-written but wrong implementation. Do not guess silently and
-then discard the work - ask a focused question first.
+Ask the user for confirmation before making any change that has a broad impact on the codebase, or you have more than
+one reasonable implementation approach for. One well-placed question saves more time than a fully-written but wrong
+implementation. Do not guess silently and then discard the work - ask a focused question first.
 
 **Prefer small, targeted changes**. Modify only the files directly relevant to the task. Do not refactor adjacent
 code, rename things, or "clean up" unless explicitly asked.
@@ -108,6 +83,7 @@ When working with these libraries, use AI-optimized docs instead of guessing:
 - **React** – https://react.dev/llms.txt
 - **Vite** – https://vite.dev/llms.txt
 - **Vitest** – https://vitest.dev/llms.txt
+- **Dexie** – https://dexie.org/llms.txt
 
 > React Router, openapi-fetch, dayjs, and @tabler/icons-react don't have llms.txt.
 > Refer to their official docs: reactrouter.com, openapi-ts.dev, day.js.org, tabler.io/icons
@@ -133,8 +109,8 @@ needed, report it.
 
 ### Routing
 
-- Every route has a `RouteIDs` string enum value
-- Use `pathTo(RouteIDs.Foo)` to build links - never hardcode paths
+- Every route has a `ROUTE_ID` string enum value
+- Use `pathTo(ROUTE_ID.Foo)` to build links - never hardcode paths
 
 ### API
 

@@ -1,6 +1,7 @@
 package feature_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -19,10 +20,17 @@ func TestWithMemory(t *testing.T) {
 func TestWithRedis(t *testing.T) {
 	t.Parallel()
 
+	var redisDsn string
+	if v, ok := os.LookupEnv("REDIS_DSN"); ok {
+		redisDsn = v
+	} else {
+		redisDsn = "redis://" + miniredis.RunT(t).Addr()
+	}
+
 	runGroupTests(t, ft.MustRunApp(t,
 		"--storage-driver", "redis",
 		"--pubsub-driver", "redis",
-		"--redis-dsn", "redis://"+miniredis.RunT(t).Addr(),
+		"--redis-dsn", redisDsn,
 	))
 }
 

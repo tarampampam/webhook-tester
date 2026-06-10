@@ -1,21 +1,29 @@
-import type React from 'react'
-import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import React from 'react'
+import { CodeHighlightAdapterProvider, createHighlightJsAdapter } from '@mantine/code-highlight'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
-import { CodeHighlightAdapterProvider, createHighlightJsAdapter } from '@mantine/code-highlight'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import hljs from 'highlight.js/lib/core'
+import { createRoot } from 'react-dom/client'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { Client } from '~/api'
 import { Database } from '~/db'
 import { createRoutes } from '~/routing'
-import { BrowserNotificationsProvider, DataProvider, SettingsProvider } from './shared'
 import { initializeHighlightJs } from '~/theme'
 import '~/theme/highlight.css'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
 import '@mantine/notifications/styles.css'
+import {
+  AppConfigProvider,
+  AppVersionProvider,
+  BrowserNotificationsProvider,
+  LastUsedProvider,
+  RequestsProvider,
+  SessionsProvider,
+  UserSettingsProvider,
+} from './shared'
 import '~/theme/app.css'
 
 dayjs.extend(relativeTime) // https://day.js.org/docs/en/plugin/relative-time
@@ -32,16 +40,48 @@ const App = (): React.JSX.Element => {
     <MantineProvider defaultColorScheme="auto">
       <CodeHighlightAdapterProvider adapter={highlightJsAdapter}>
         <Notifications />
-        <BrowserNotificationsProvider>
-          <SettingsProvider>
-            <DataProvider api={api} db={db} errHandler={console.error}>
-              <RouterProvider router={createBrowserRouter(createRoutes(api))} />
-            </DataProvider>
-          </SettingsProvider>
-        </BrowserNotificationsProvider>
+        <AppProviders api={api} db={db} errHandler={console.error}>
+          <RouterProvider router={createBrowserRouter(createRoutes())} />
+        </AppProviders>
       </CodeHighlightAdapterProvider>
     </MantineProvider>
   )
 }
 
-createRoot(document.getElementById('root') as HTMLElement).render(<App />)
+/**
+ * Providers component that wraps the app with all the necessary context providers.
+ * The order of providers is important.
+ */
+const AppProviders = ({
+  api,
+  db,
+  errHandler,
+  children,
+}: {
+  api: Client
+  db: Database
+  errHandler?: (err: Error) => void
+  children: React.ReactNode
+}): React.JSX.Element => {
+  return (
+    <AppVersionProvider api={api}>
+      <AppConfigProvider api={api}>
+        <BrowserNotificationsProvider>
+          <UserSettingsProvider>
+            <SessionsProvider api={api} db={db} errHandler={errHandler}>
+              <RequestsProvider.WithConfig api={api} db={db} errHandler={errHandler}>
+                <LastUsedProvider>{children}</LastUsedProvider>
+              </RequestsProvider.WithConfig>
+            </SessionsProvider>
+          </UserSettingsProvider>
+        </BrowserNotificationsProvider>
+      </AppConfigProvider>
+    </AppVersionProvider>
+  )
+}
+
+createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)

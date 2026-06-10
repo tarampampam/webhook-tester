@@ -5,13 +5,13 @@ import { IconInfoCircle, IconScissors } from '@tabler/icons-react'
 type DataItem = [string /* representation */, string | undefined /* ascii */]
 type DataLine = Array<DataItem>
 
-export const ViewHex: React.FC<{
-  input: Uint8Array
-  lengthLimit?: number
-}> = ({
+export const ViewHex = ({
   input,
   lengthLimit = 1024 * 24, // 24KB
-}) => {
+}: {
+  input: Uint8Array
+  lengthLimit?: number
+}): React.JSX.Element => {
   const [lineNumberType, setLineNumberType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [displayType, setDisplayType] = useState<NumberBase>(NumberBase.Hexadecimal)
   const [lineSize, setLineSize] = useState<number>(16)

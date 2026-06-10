@@ -2,202 +2,103 @@ import { Blockquote } from '@mantine/core'
 import { notifications as notify } from '@mantine/notifications'
 import { IconInfoCircle, IconRocket } from '@tabler/icons-react'
 import dayjs from 'dayjs'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { pathTo, RouteIDs } from '~/routing'
-import { type SessionEvents, useBrowserNotifications, useData, useSettings } from '~/shared'
+import { pathTo, ROUTE_ID, useActiveRequestID } from '~/routing'
+import { useAppConfig, useBrowserNotifications, useRequests, useUserSettings } from '~/shared'
 import { RequestDetails, SessionDetails } from './components'
 
-export function SessionAndRequestScreen(): React.JSX.Element {
+export const SessionAndRequestScreen = (): React.JSX.Element => {
   const navigate = useNavigate()
-  const [{ sID }, { rID }] = [
-    useParams<{ sID: string }>() as Readonly<{ sID: string }>, // I'm sure that sID is always present here because it's required in the route
-    useParams<Readonly<{ rID?: string }>>(), // rID is optional for this screen
-  ]
+  const { sID } = useParams<{ sID: string }>() as Readonly<{ sID: string }>
   const [sessionLoading, setSessionLoading] = useState<boolean>(false)
-  const [requestLoading, setRequestLoading] = useState<boolean>(false)
-  const { session, request, switchToSession, switchToRequest, setRequestsCount, removeRequest, removeAllRequests } =
-    useData()
+  const { requests, setSessionID } = useRequests()
+  const activeRequestID = useActiveRequestID()
+  const request = (activeRequestID ? requests.get(activeRequestID) : null) ?? null
   const {
-    showNativeRequestNotifications: useNative,
-    autoNavigateToNewRequest: autoNavigate,
-    maxRequestsPerSession: maxRequests,
-  } = useSettings()
+    userSettings: { showNativeRequestNotifications: useNative, autoNavigateToNewRequest: autoNavigate },
+  } = useUserSettings()
+  const { config } = useAppConfig()
   const { granted: bnGranted, show: bnShow } = useBrowserNotifications()
 
-  // store some values in the ref to avoid unnecessary re-renders
-  const bnGrantedRef = useRef<boolean>(bnGranted) // is native browser notifications granted?
-  const useNativeRef = useRef<boolean>(useNative) // should use native browser notifications?
-  const autoNavigateRef = useRef<boolean>(autoNavigate) // should auto-navigate to the new request?
-  const stateSID = useRef<string | null>(session?.sID || null)
-  const stateRID = useRef<string | null>(request?.rID || null)
+  // store in refs to avoid stale closures in effects
+  const bnGrantedRef = useRef<boolean>(bnGranted)
+  const useNativeRef = useRef<boolean>(useNative)
+  const autoNavigateRef = useRef<boolean>(autoNavigate)
+  // tracks request IDs that have already been seen to distinguish initial load from new WebSocket pushes
+  const seenRequestIDsRef = useRef(new Set<string>())
 
-  // auto-update the ref values
   useEffect(() => { bnGrantedRef.current = bnGranted }, [bnGranted]) // prettier-ignore
   useEffect(() => { useNativeRef.current = useNative }, [useNative]) // prettier-ignore
   useEffect(() => { autoNavigateRef.current = autoNavigate }, [autoNavigate]) // prettier-ignore
-  useEffect(() => { stateSID.current = session?.sID || null }, [session]) // prettier-ignore
-  useEffect(() => { stateRID.current = request?.rID || null }, [request]) // prettier-ignore
 
-  /** The event listeners for the session */
-  const listeners = useCallback(
-    (): Partial<SessionEvents> => ({
-      onNewRequest: (req): void => {
-        // the in-app notification function to show the new request notification
-        const showInAppNotification = (): void => {
-          notify.show({
-            title: 'New request received',
-            message: `From ${req.clientAddress} with method ${req.method}`,
-            icon: <IconRocket />,
-            color: 'blue',
-          })
-        }
+  // suppress unused-var warning; config is accessed only for maxRequests side-effect via the provider
+  void config
 
-        // show a notification about the new request using the browser's native notification API,
-        // if the permission is granted and the setting is enabled
-        if (bnGrantedRef.current && useNativeRef.current) {
-          bnShow(`New request received (${dayjs(req.capturedAt).format('HH:mm:ss.SSS')})`, {
-            body: `From ${req.clientAddress} with method ${req.method}`,
-            tag: 'new-request', // to show only one notification (but update it)
-            autoClose: 5000,
-          })
-            // in case the notification is not shown, show the in-app notification
-            .then((n) => {
-              if (!n) {
-                showInAppNotification()
-              }
-            })
-            // do the same in case of an error
-            .catch(showInAppNotification)
-        } else {
-          // otherwise, show the in-app notification
-          showInAppNotification()
-        }
+  useEffect(() => {
+    seenRequestIDsRef.current = new Set()
+    setSessionLoading(true)
 
-        if (maxRequests && maxRequests > 0) {
-          setRequestsCount(maxRequests)
-        }
-
-        // navigate to the new request if the setting is enabled
-        if (autoNavigateRef.current) {
-          navigate(pathTo(RouteIDs.SessionAndRequest, sID, req.rID)) // navigate to the new request
-        }
-      },
-      onRequestDelete: (req): void => {
-        if (stateSID.current) {
-          // since the request is already deleted from the server, we can remove it from the client only
-          removeRequest(stateSID.current, req.rID, false)
-            .then((slow) => slow())
-            .catch((err) => {
-              notify.show({
-                title: 'An error occurred during the request deletion',
-                message: String(err),
-                color: 'red',
-              })
-            })
-        }
-      },
-      onRequestsClear: (): void => {
-        if (stateSID.current) {
-          // since the requests are already cleared from the server, we can remove them from the client only
-          removeAllRequests(stateSID.current, false)
-            .then((slow) => slow())
-            .catch((err) => {
-              notify.show({
-                title: 'An error occurred during the requests clearing',
-                message: String(err),
-                color: 'red',
-              })
-            })
-        }
-      },
-      onError: (err): void => {
+    setSessionID(sID)
+      .catch((err) => {
         notify.show({
-          title: 'An error occurred during the subscription to the new requests',
+          title: 'Switching to the session failed',
           message: String(err),
           color: 'red',
         })
-      },
-    }),
-    [bnShow, navigate, sID, maxRequests, setRequestsCount, removeAllRequests, removeRequest]
-  )
+        navigate(pathTo(ROUTE_ID.Home))
+      })
+      .finally(() => setSessionLoading(false))
+  }, [sID, setSessionID, navigate])
 
-  /** The effect to switch to the session and request */
+  // detect new requests arriving via WebSocket and show notifications
   useEffect(() => {
-    Promise.allSettled([
-      // if the session ID has changed, switch to the session
-      stateSID.current !== sID
-        ? (async () => {
-            try {
-              // invoke the fast switching to the session (usually with the data from the database) and
-              // get the slow operation
-              const sessionSwitchSlow = await switchToSession(sID, listeners())
-
-              setSessionLoading(true) // set the session loading state to true
-
-              // start the slow operation (usually with the data from the server)
-              await sessionSwitchSlow()
-            } finally {
-              setSessionLoading(false) // unset the session loading state
-            }
-          })()
-        : Promise.resolve(),
-
-      // if the request ID has changed, switch to the request
-      stateRID.current !== rID
-        ? (async () => {
-            try {
-              // invoke the fast switching to the request (usually with the data from the database) and
-              // get the slow operation
-              const requestSwitchSlow = await switchToRequest(sID, rID ?? null)
-
-              setRequestLoading(true) // set the request loading state to true
-
-              // start the slow operation (usually with the data from the server)
-              await requestSwitchSlow()
-            } finally {
-              setRequestLoading(false) // unset the request loading state
-            }
-          })()
-        : Promise.resolve(),
-    ] satisfies Array<Promise<void>>).then((results) => {
-      const sessionSwitchResult = results[0]
-      const requestSwitchResult = results[1]
-
-      if (sessionSwitchResult === undefined || requestSwitchResult === undefined) {
-        return
+    if (sessionLoading) {
+      // while the initial load runs, mark every request as already seen so they don't trigger notifications
+      for (const id of requests.keys()) {
+        seenRequestIDsRef.current.add(id)
       }
+      return
+    }
 
-      // if switching to the session failed
-      if (sessionSwitchResult.status === 'rejected') {
+    const newEntries = [...requests.entries()].filter(([id]) => !seenRequestIDsRef.current.has(id))
+
+    for (const [id, req] of newEntries) {
+      const showInAppNotification = (): void => {
         notify.show({
-          title: 'Switching to the session failed',
-          message: String(sessionSwitchResult.reason),
-          color: 'red',
+          title: 'New request received',
+          message: `From ${req.clientAddress} with method ${req.method}`,
+          icon: <IconRocket />,
+          color: 'blue',
         })
-
-        navigate(pathTo(RouteIDs.Home)) // navigate to the home screen
-
-        return
       }
 
-      // if switching to the request failed
-      if (requestSwitchResult.status === 'rejected') {
-        notify.show({
-          title: 'Switching to the request failed',
-          message: String(requestSwitchResult.reason),
-          color: 'red',
+      if (bnGrantedRef.current && useNativeRef.current) {
+        bnShow(`New request received (${dayjs(req.capturedAt).format('HH:mm:ss.SSS')})`, {
+          body: `From ${req.clientAddress} with method ${req.method}`,
+          tag: 'new-request',
+          autoClose: 5000,
         })
-
-        navigate(pathTo(RouteIDs.SessionAndRequest, sID)) // navigate to the session screen
-
-        return
+          .then((n) => {
+            if (!n) {
+              showInAppNotification()
+            }
+          })
+          .catch(showInAppNotification)
+      } else {
+        showInAppNotification()
       }
-    })
-  }, [sID, rID, listeners, navigate, switchToRequest, switchToSession])
+
+      if (autoNavigateRef.current) {
+        navigate(pathTo(ROUTE_ID.SessionAndRequest, { sID, rID: id }))
+      }
+
+      seenRequestIDsRef.current.add(id)
+    }
+  }, [requests, sessionLoading, sID, navigate, bnShow])
 
   return (
-    (!!request && <RequestDetails loading={requestLoading} />) || (
+    (!!request && <RequestDetails loading={false} />) || (
       <>
         <SessionDetails loading={sessionLoading} />
         <Blockquote my="lg" color="blue" icon={<IconInfoCircle />}>

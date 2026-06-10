@@ -1,5 +1,6 @@
 import type { MantineColor } from '@mantine/core'
 
+/** Maps HTTP methods to specific colors for UI representation. */
 export const methodToColor = (
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
 ): MantineColor => {

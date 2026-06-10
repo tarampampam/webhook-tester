@@ -185,10 +185,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) { //nolint:funl
 	w.Header().Set("X-Wh-Request-Id", rID)
 	w.Header().Set("Content-Length", strconv.Itoa(len(s.Response.Body)))
 
-	// set the header to allow CORS requests from any origin and method
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "*")
 
 	// publish the event about the captured request in the background.
 	// wrapping context via WithoutCancel is important here - the request context will be canceled as soon as the

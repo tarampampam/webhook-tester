@@ -1,51 +1,42 @@
 #!/usr/bin/make
 
-DC_RUN_ARGS = --rm --user "$(shell id -u):$(shell id -g)"
-
 .DEFAULT_GOAL : help
 help: ## Show this help
 	@printf "\033[33m%s:\033[0m\n" 'Available commands'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[32m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-shell: ## Start shell
-	docker compose run $(DC_RUN_ARGS) app sh
-
-web-shell: ## Start shell in web directory
-	docker compose run $(DC_RUN_ARGS) -w '/src/web' app sh
-
 install: ## Install dependencies
-	test -d ./web/node_modules || docker compose run $(DC_RUN_ARGS) app npm --prefix ./web install --no-audit
-	command -v go >/dev/null 2>&1 && go mod download || true
+	@test -d ./web/node_modules || npm --prefix ./web install --no-audit
+	@go mod download
 
-generate: install ## Run code generation
-	docker compose run $(DC_RUN_ARGS) app go generate -skip readme ./...
-	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run generate
-	docker compose run $(DC_RUN_ARGS) app go generate -run readme ./...
+gen: install ## Run code generation
+	go generate -skip readme ./...  # generate all except readme
+	npm --prefix ./web run generate # generate web code
+	go generate -run readme ./...   # update readme
 
-node-build: install ## Build the frontend
-	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run build
+web-build: install ## Build the frontend
+	npm --prefix ./web run build
 
-node-fmt: install ## Format frontend code
-	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run fmt
+build: web-build ## Build the application
+	GOAMD64=v2 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" ./cmd/webhook-tester/
+
+fmt: install ## Apply code formatting
+	npm --prefix ./web run fmt
+	go fix ./...
+	go fmt ./...
+	golangci-lint run --fix --issues-exit-code 0 || true
 
 lint: install ## Run linters
-	golangci-lint run # requires golangci-lint to be installed on host
-	docker compose run $(DC_RUN_ARGS) app npm --prefix ./web run lint
+	golangci-lint run --fix ./...
+	npm --prefix ./web run lint
 
-e2e: ## Run end-to-end tests
-	docker compose run $(DC_RUN_ARGS) k6 run ./tests/k6/run.js
+test: install ## Run tests
+	go test -v -race ./...
+	npm --prefix ./web run test
 
-up: install ## Start the application in watch mode
-	#docker compose build
-	docker compose kill app-http app-web-serve --remove-orphans 2>/dev/null || true
-	docker compose up -d app-web-serve --wait # start the web dev server (vite)
-	@printf "\n\t\033[33m%s\033[0m\n" "Open http://127.0.0.1:8080 in your browser to view the app in production mode (go server)"
-	@printf "\t\033[33m%s\033[0m\n\n" "  or http://127.0.0.1:8081 to view the app web in development mode (vite, nodejs server)"
-	docker compose up app-http
-
-down: ## Stop the application
-	docker compose down --remove-orphans
-
-clean: down ## Clean all build artifacts
-	rm -rf ./web/dist ./web/node_modules ./app ./webhook-tester
-	docker compose down --rmi local --volumes --remove-orphans
+up: install ## Start the application in development mode
+	@go run ./cmd/webhook-tester/ --port 8081 & BACKEND_PID=$$!; \
+	DEV_SERVER_PROXY_TO='http://localhost:8081' npm run --prefix ./web serve -- --port 8080 & FRONTEND_PID=$$!; \
+	trap 'kill $$BACKEND_PID $$FRONTEND_PID' INT TERM EXIT; \
+	printf "\n\t\033[1;7;33m %s \033[0m\n\n" "Press Ctrl+C to stop the development servers"; \
+	wait
