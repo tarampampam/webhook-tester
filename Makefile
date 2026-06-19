@@ -18,7 +18,7 @@ web-build: install ## Build the frontend
 	npm --prefix ./web run build
 
 build: web-build ## Build the application
-	GOAMD64=v2 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" ./cmd/webhook-tester/
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" ./cmd/webhook-tester/
 
 fmt: install ## Apply code formatting
 	npm --prefix ./web run fmt
@@ -35,8 +35,14 @@ test: install ## Run tests
 	npm --prefix ./web run test
 
 up: install ## Start the application in development mode
-	@go run ./cmd/webhook-tester/ --port 8081 & BACKEND_PID=$$!; \
+	@mkdir -p ./tmp/data
+	@go run ./cmd/webhook-tester/ \
+		--port 8081 \
+		--max-requests=16 \
+		--storage-driver=fs \
+		--fs-storage-dir=./tmp/data \
+		--auto-create-sessions & BACKEND_PID=$$!; \
 	DEV_SERVER_PROXY_TO='http://localhost:8081' npm run --prefix ./web serve -- --port 8080 & FRONTEND_PID=$$!; \
 	trap 'kill $$BACKEND_PID $$FRONTEND_PID' INT TERM EXIT; \
-	printf "\n\t\033[1;7;33m %s \033[0m\n\n" "Press Ctrl+C to stop the development servers"; \
+	printf "\n\n\t\033[1;7;33m %s \033[0m\n\n\n" "Press Ctrl+C to stop the development servers"; \
 	wait

@@ -19,9 +19,7 @@ const URLConsumer = (): React.JSX.Element => {
 
 describe('useWebhookURL', () => {
   test('throws when called outside WebhookURLProvider', () => {
-    expect(() => renderHook(() => useWebhookURL())).toThrow(
-      'useWebhookURL must be used within a WebhookURLProvider'
-    )
+    expect(() => renderHook(() => useWebhookURL())).toThrow('useWebhookURL must be used within a WebhookURLProvider')
   })
 })
 

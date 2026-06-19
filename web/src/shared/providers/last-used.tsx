@@ -1,17 +1,17 @@
-import React, { createContext, type Dispatch, type SetStateAction, useContext } from 'react'
+import React, { createContext, type Dispatch, type PropsWithChildren, type SetStateAction, useContext } from 'react'
 import { useStorage } from '../hooks/use-storage'
 
 interface Context {
   /** The last-used session ID, or null if none has been set yet. */
   readonly lastUsedSID: string | null
   /** Updates the last-used session ID. Pass null to clear it. */
-  setLastUsedSID: Dispatch<SetStateAction<string | null>>
+  readonly setLastUsedSID: Dispatch<SetStateAction<string | null>>
 }
 
 const ctx = createContext<Context | null>(null)
 
 /** Persists the last-used session ID to localStorage so it survives page reloads. */
-export const LastUsedProvider = ({ children }: { children?: React.ReactNode }): React.JSX.Element => {
+export const LastUsedProvider = ({ children }: PropsWithChildren): React.JSX.Element => {
   const [lastUsedSID, setLastUsedSID] = useStorage<string | null>(null, 'last-used-sid', 'local')
 
   return <ctx.Provider value={{ lastUsedSID, setLastUsedSID }}>{children}</ctx.Provider>

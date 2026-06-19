@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext } from 'react'
+import React, { createContext, type PropsWithChildren, useCallback, useContext } from 'react'
 import { useStorage } from '../hooks/use-storage'
 
 /**
@@ -21,8 +21,8 @@ const DEFAULT_USER_SETTINGS: Readonly<UserSettings> = {
 }
 
 interface Context {
-  userSettings: Readonly<UserSettings>
-  updateUserSettings: (settings: Partial<UserSettings>) => void
+  readonly userSettings: Readonly<UserSettings>
+  updateUserSettings(settings: Partial<UserSettings>): void
 }
 
 const ctx = createContext<Context | null>(null)
@@ -31,7 +31,7 @@ const ctx = createContext<Context | null>(null)
  * Provider that persists user preferences to localStorage and exposes them to children via context.
  * Falls back to defaults when storage is unavailable.
  */
-export const UserSettingsProvider = ({ children }: { children?: React.ReactNode }): React.JSX.Element => {
+export const UserSettingsProvider = ({ children }: PropsWithChildren): React.JSX.Element => {
   const [settings, setSettings] = useStorage<UserSettings>(DEFAULT_USER_SETTINGS, 'user-settings', 'local')
 
   // merge partial updates into the current settings, falling back to defaults if storage is unavailable

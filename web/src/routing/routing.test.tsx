@@ -1,19 +1,6 @@
-import { render } from '@testing-library/react'
-import { type FC, isValidElement } from 'react'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { isValidElement } from 'react'
 import { describe, expect, test } from 'vitest'
-import { createRoutes, pathTo, ROUTE_ID, useActiveRequestID, useActiveSessionID } from './routing'
-
-/** Builds a data router for a given path, rendering Capture component on every route. */
-const makeRouter = (path: string, Capture: FC) =>
-  createMemoryRouter(
-    [
-      { path: '/s/:sID/:rID?', id: ROUTE_ID.SessionAndRequest, element: <Capture /> },
-      { path: '/', element: <Capture /> },
-      { path: '*', element: <Capture /> },
-    ],
-    { initialEntries: [path] }
-  )
+import { createRoutes, pathTo, ROUTE_ID } from './routing'
 
 describe('pathTo', () => {
   describe(ROUTE_ID.Home, () => {
@@ -22,15 +9,21 @@ describe('pathTo', () => {
     })
   })
 
-  describe(ROUTE_ID.SessionAndRequest, () => {
-    test.each<{ params: { sID: string; rID?: string }; expected: string }>([
+  describe(ROUTE_ID.Session, () => {
+    test.each<{ params: { sID: string }; expected: string }>([
       { params: { sID: 'abc' }, expected: '/s/abc' },
-      { params: { sID: 'abc', rID: 'def' }, expected: '/s/abc/def' },
-      { params: { sID: 'abc', rID: undefined }, expected: '/s/abc' },
       { params: { sID: 'foo/bar' }, expected: '/s/foo%2Fbar' },
+    ])('$expected', ({ params, expected }) => {
+      expect(pathTo(ROUTE_ID.Session, params)).toBe(expected)
+    })
+  })
+
+  describe(ROUTE_ID.Request, () => {
+    test.each<{ params: { sID: string; rID: string }; expected: string }>([
+      { params: { sID: 'abc', rID: 'def' }, expected: '/s/abc/def' },
       { params: { sID: 'abc', rID: 'x/y' }, expected: '/s/abc/x%2Fy' },
     ])('$expected', ({ params, expected }) => {
-      expect(pathTo(ROUTE_ID.SessionAndRequest, params)).toBe(expected)
+      expect(pathTo(ROUTE_ID.Request, params)).toBe(expected)
     })
   })
 })
@@ -40,9 +33,14 @@ describe('createRoutes', () => {
 
   test.each([
     { id: ROUTE_ID.Home, index: true },
-    { id: ROUTE_ID.SessionAndRequest, path: 's/:sID/:rID?' },
-  ])('route $id is registered', ({ id, ...shape }) => {
+    { id: ROUTE_ID.Session, path: 's/:sID' },
+  ])('route $id is registered in root children', ({ id, ...shape }) => {
     expect(children.find((r) => r.id === id)).toMatchObject(shape)
+  })
+
+  test('request route is nested under session', () => {
+    const sessionRoute = children.find((r) => r.id === ROUTE_ID.Session)
+    expect(sessionRoute?.children?.find((r) => r.id === ROUTE_ID.Request)).toMatchObject({ path: ':rID' })
   })
 
   test('wildcard 404 route is present', () => {
@@ -56,39 +54,5 @@ describe('createRoutes', () => {
       expect(element.props.to).toBe(pathTo(ROUTE_ID.Home))
       expect(element.props.replace).toBe(true)
     }
-  })
-})
-
-describe('useActiveSessionID', () => {
-  test.each<{ path: string; expected: string | null }>([
-    { path: '/s/abc', expected: 'abc' },
-    { path: '/s/abc/def', expected: 'abc' },
-    { path: '/', expected: null },
-    { path: '/other', expected: null },
-  ])('$path → $expected', ({ path, expected }) => {
-    let result: string | null = null
-    const Capture: FC = () => {
-      result = useActiveSessionID()
-      return null
-    }
-    render(<RouterProvider router={makeRouter(path, Capture)} />)
-    expect(result).toBe(expected)
-  })
-})
-
-describe('useActiveRequestID', () => {
-  test.each<{ path: string; expected: string | null }>([
-    { path: '/s/abc/def', expected: 'def' },
-    { path: '/s/abc', expected: null },
-    { path: '/', expected: null },
-    { path: '/other', expected: null },
-  ])('$path → $expected', ({ path, expected }) => {
-    let result: string | null = null
-    const Capture: FC = () => {
-      result = useActiveRequestID()
-      return null
-    }
-    render(<RouterProvider router={makeRouter(path, Capture)} />)
-    expect(result).toBe(expected)
   })
 })

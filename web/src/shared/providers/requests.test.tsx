@@ -132,11 +132,12 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(3)
-      expect([...result.current.requests.keys()]).toEqual(expect.arrayContaining(['r1', 'r2', 'r3']))
+      expect([...result.current.requests.keys()]).toEqual(['r1', 'r2', 'r3']) // newest → oldest
 
       const dbRows = await db.getRequests('s1')
-      expect(dbRows.map((r) => r.rID)).toEqual(expect.arrayContaining(['r1', 'r2', 'r3']))
+      expect(dbRows.map((r) => r.rID)).toEqual(['r1', 'r2', 'r3']) // newest → oldest
     })
 
     test('(no limit) DB has 2 stale entries not in API - stale deleted from DB, state holds 3 fresh', async () => {
@@ -157,6 +158,7 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(3)
       expect(result.current.requests.has('stale-1')).toBe(false)
       expect(result.current.requests.has('stale-2')).toBe(false)
@@ -179,6 +181,7 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(2)
     })
 
@@ -199,15 +202,15 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(2)
-      expect(result.current.requests.has('r-newest')).toBe(true)
-      expect(result.current.requests.has('r-2nd')).toBe(true)
+      expect([...result.current.requests.keys()]).toEqual(['r-newest', 'r-2nd']) // newest → oldest
       expect(result.current.requests.has('r-3rd')).toBe(false)
       expect(result.current.requests.has('r-oldest')).toBe(false)
 
       const dbRows = await db.getRequests('s1')
       expect(dbRows).toHaveLength(2)
-      expect(dbRows.map((r) => r.rID)).toEqual(expect.arrayContaining(['r-newest', 'r-2nd']))
+      expect(dbRows.map((r) => r.rID)).toEqual(['r-newest', 'r-2nd']) // newest → oldest
     })
 
     test('(limit=2) DB has 3 entries matching API - only 2 newest survive in state and DB', async () => {
@@ -227,9 +230,9 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(2)
-      expect(result.current.requests.has('r1')).toBe(true)
-      expect(result.current.requests.has('r2')).toBe(true)
+      expect([...result.current.requests.keys()]).toEqual(['r1', 'r2']) // newest → oldest
       expect(result.current.requests.has('r3')).toBe(false)
 
       expect(await db.getRequests('s1')).toHaveLength(2)
@@ -252,10 +255,10 @@ describe('RequestsProvider', () => {
         await result.current.setSessionID('s1')
       })
 
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(2)
+      expect([...result.current.requests.keys()]).toEqual(['fresh-1', 'fresh-2']) // newest → oldest
       expect(result.current.requests.has('stale')).toBe(false)
-      expect(result.current.requests.has('fresh-1')).toBe(true)
-      expect(result.current.requests.has('fresh-2')).toBe(true)
 
       const dbRows = await db.getRequests('s1')
       expect(dbRows).toHaveLength(2)
@@ -282,6 +285,7 @@ describe('RequestsProvider', () => {
       await act(async () => {
         await result.current.setSessionID('s1')
       })
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(4)
 
       await setLimit(3)
@@ -291,9 +295,7 @@ describe('RequestsProvider', () => {
         expect(await db.getRequests('s1')).toHaveLength(3)
       })
 
-      expect(result.current.requests.has('r1')).toBe(true)
-      expect(result.current.requests.has('r2')).toBe(true)
-      expect(result.current.requests.has('r3')).toBe(true)
+      expect([...result.current.requests.keys()]).toEqual(['r1', 'r2', 'r3']) // newest → oldest
       expect(result.current.requests.has('r4')).toBe(false)
     })
   })
@@ -307,15 +309,19 @@ describe('RequestsProvider', () => {
       vi.spyOn(api, 'subscribeToSessionRequests').mockResolvedValue((): void => {})
 
       const { result } = renderHook(() => useRequests(), { wrapper: makeWrapper(api, db) })
+      expect(result.current.isReady).toBe(false)
+
       await act(async () => {
         await result.current.setSessionID('s1')
       })
       expect(result.current.requests.size).toBe(1)
+      expect(result.current.isReady).toBe(true)
 
       act(() => {
         result.current.unsetSessionID()
       })
       expect(result.current.requests.size).toBe(0)
+      expect(result.current.isReady).toBe(false)
     })
 
     test("switching session A → B: state shows only B's requests", async () => {
@@ -333,11 +339,13 @@ describe('RequestsProvider', () => {
       await act(async () => {
         await result.current.setSessionID('sA')
       })
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(2)
 
       await act(async () => {
         await result.current.setSessionID('sB')
       })
+      expect(result.current.isReady).toBe(true)
       expect(result.current.requests.size).toBe(1)
       expect(result.current.requests.has('b1')).toBe(true)
       expect(result.current.requests.has('a1')).toBe(false)
@@ -393,8 +401,7 @@ describe('RequestsProvider', () => {
         expect(result.current.requests.has('r-old')).toBe(false)
       })
 
-      expect(result.current.requests.size).toBe(2)
-      expect(result.current.requests.has('r-mid')).toBe(true)
+      expect([...result.current.requests.keys()]).toEqual(['r-new', 'r-mid']) // newest → oldest
     })
 
     test('delete event - request removed from state and DB', async () => {
@@ -452,10 +459,12 @@ describe('RequestsProvider', () => {
       await act(async () => {
         await result.current.setSessionID('s1')
       })
+      expect(result.current.isReady).toBe(true)
 
       act(() => {
         result.current.unsetSessionID()
       })
+      expect(result.current.isReady).toBe(false)
 
       await act(async () => {
         ws.emit(wsCreate('late', 9000))
@@ -463,6 +472,52 @@ describe('RequestsProvider', () => {
       await act(async () => {}) // drain pending microtasks
 
       expect(result.current.requests.size).toBe(0)
+    })
+  })
+
+  describe('external signal abort', () => {
+    test('aborting external signal closes WebSocket', async () => {
+      const api = new Client({ baseUrl: 'http://test' })
+      const db = newTestDatabase()
+      const closeWs = vi.fn()
+
+      vi.spyOn(api, 'getSessionRequests').mockResolvedValue([])
+      vi.spyOn(api, 'subscribeToSessionRequests').mockResolvedValue(closeWs)
+
+      const { result } = renderHook(() => useRequests(), { wrapper: makeWrapper(api, db) })
+      const ctrl = new AbortController()
+
+      await act(async () => {
+        await result.current.setSessionID('s1', { signal: ctrl.signal })
+      })
+      expect(result.current.isReady).toBe(true)
+
+      act(() => {
+        ctrl.abort()
+      })
+
+      expect(closeWs).toHaveBeenCalled()
+    })
+
+    test('isReady stays false when aborted before subscribe completes', async () => {
+      const api = new Client({ baseUrl: 'http://test' })
+      const db = newTestDatabase()
+      const ctrl = new AbortController()
+
+      vi.spyOn(api, 'getSessionRequests').mockResolvedValue([])
+      // abort the external signal as soon as subscribeToSessionRequests is called
+      vi.spyOn(api, 'subscribeToSessionRequests').mockImplementation(async () => {
+        ctrl.abort()
+        return (): void => {}
+      })
+
+      const { result } = renderHook(() => useRequests(), { wrapper: makeWrapper(api, db) })
+
+      await act(async () => {
+        await result.current.setSessionID('s1', { signal: ctrl.signal })
+      })
+
+      expect(result.current.isReady).toBe(false)
     })
   })
 
@@ -555,22 +610,21 @@ describe('RequestsProvider', () => {
   })
 
   describe('error handling', () => {
-    test('setSessionID API failure invokes errHandler', async () => {
+    test('setSessionID API failure - rejects with the thrown error', async () => {
       const api = new Client({ baseUrl: 'http://test' })
       const db = newTestDatabase()
-      const errHandler = vi.fn()
 
       vi.spyOn(api, 'getSessionRequests').mockRejectedValue(new Error('network down'))
 
-      const { result } = renderHook(() => useRequests(), {
-        wrapper: makeWrapper(api, db, undefined, errHandler),
-      })
-      await act(async () => {
-        await result.current.setSessionID('s1')
-      })
+      const { result } = renderHook(() => useRequests(), { wrapper: makeWrapper(api, db) })
 
-      expect(errHandler).toHaveBeenCalledOnce()
-      expect(errHandler).toHaveBeenCalledWith(expect.objectContaining({ message: 'network down' }))
+      await expect(
+        act(async () => {
+          await result.current.setSessionID('s1')
+        })
+      ).rejects.toThrow('network down')
+
+      expect(result.current.isReady).toBe(false)
     })
 
     test('WebSocket create - getSessionRequest failure invokes errHandler, provider stays functional', async () => {

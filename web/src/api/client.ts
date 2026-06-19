@@ -2,7 +2,7 @@ import createClient, { type Client as OpenapiClient, type ClientOptions } from '
 import { base64ToUint8Array, uint8ArrayToBase64 } from '~/shared'
 import { APIErrorCommon } from './errors'
 import { throwIfBadRequest, throwIfNotFound } from './middleware'
-import type { components, paths, RequestEventAction } from './schema.gen'
+import { type components, type paths, RequestEventAction } from './schema.gen'
 
 type RequestOptions = {
   priority?: RequestPriority
@@ -382,21 +382,50 @@ export class Client {
 
           try {
             const req = JSON.parse(event.data) as components['schemas']['RequestEvent']
-            const payload: RequestEvent = {
-              action: req.action,
-              request: req.request
-                ? Object.freeze({
-                    uuid: req.request.uuid,
-                    clientAddress: req.request.client_address,
-                    method: req.request.method,
-                    headers: Object.freeze(
-                      Array.from(req.request.headers).map(({ name, value }) => Object.freeze({ name, value }))
-                    ),
-                    url: Object.freeze(new URL(req.request.url)),
-                    capturedAt: Object.freeze(new Date(req.request.captured_at_unix_milli)),
-                  })
-                : null,
-            }
+            const payload = ((): RequestEvent => {
+              switch (req.action) {
+                case RequestEventAction.create: {
+                  if (!req.request) {
+                    throw new Error('Missing request data for create action')
+                  }
+
+                  return {
+                    action: req.action,
+                    request: Object.freeze({
+                      uuid: req.request.uuid,
+                      clientAddress: req.request.client_address,
+                      method: req.request.method,
+                      headers: Object.freeze(
+                        Array.from(req.request.headers).map(({ name, value }) => Object.freeze({ name, value }))
+                      ),
+                      url: Object.freeze(new URL(req.request.url)),
+                      capturedAt: Object.freeze(new Date(req.request.captured_at_unix_milli)),
+                    }),
+                  }
+                }
+
+                case RequestEventAction.delete: {
+                  if (!req.request) {
+                    throw new Error('Missing request data for delete action')
+                  }
+
+                  return {
+                    action: req.action,
+                    request: Object.freeze({
+                      uuid: req.request.uuid,
+                    }),
+                  }
+                }
+
+                case RequestEventAction.clear:
+                  return {
+                    action: req.action,
+                  }
+
+                default:
+                  throw new Error(`Unknown action: ${req.action}`)
+              }
+            })()
 
             handlers.onUpdate(Object.freeze(payload))
           } catch (e) {
@@ -504,14 +533,25 @@ type CapturedRequest = Readonly<{
   capturedAt: Readonly<Date>
 }>
 
-type RequestEvent = Readonly<{
-  action: RequestEventAction
-  request: {
-    uuid: string
-    clientAddress: string
-    method: HttpMethod
-    headers: ReadonlyArray<{ name: string; value: string }>
-    url: Readonly<URL>
-    capturedAt: Readonly<Date>
-  } | null
-}>
+type RequestEvent = Readonly<
+  | {
+      action: RequestEventAction.create
+      request: {
+        uuid: string
+        clientAddress: string
+        method: HttpMethod
+        headers: ReadonlyArray<{ name: string; value: string }>
+        url: Readonly<URL>
+        capturedAt: Readonly<Date>
+      }
+    }
+  | {
+      action: RequestEventAction.delete
+      request: {
+        uuid: string
+      }
+    }
+  | {
+      action: RequestEventAction.clear
+    }
+>

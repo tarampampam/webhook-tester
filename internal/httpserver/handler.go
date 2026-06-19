@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -26,7 +27,7 @@ func NewHandler(
 	autoCreateSessions bool,
 	maxRequestBodySize uint,
 	readyChecker checker,
-	latestVersionGetter latestVersionProvider,
+	latestVersionGetter func(context.Context) (string, error),
 	useLiveFrontend bool,
 ) http.Handler {
 	mux := http.NewServeMux()

@@ -18,6 +18,7 @@ import (
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_create"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_delete"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/session_get"
+	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/handlers/version_latest"
 	j "gh.tarampamp.am/webhook-tester/v3/internal/httpserver/json"
 	"gh.tarampamp.am/webhook-tester/v3/internal/httpserver/openapi"
 	"gh.tarampamp.am/webhook-tester/v3/internal/logger"
@@ -32,9 +33,6 @@ type (
 
 	// checker is a function type for performing readiness checks, returning an error if the check fails.
 	checker func(context.Context) error
-
-	// latestVersionProvider is a function type for providing the latest version of the application.
-	latestVersionProvider func(context.Context) (string, error)
 )
 
 // OpenAPI is the server implementation for the OpenAPI specification.
@@ -54,11 +52,13 @@ type OpenAPI struct {
 			delete    func(context.Context, sID, rID) (*openapi.SuccessfulOperationResponse, error)
 			deleteAll func(context.Context, sID) (*openapi.SuccessfulOperationResponse, error)
 		}
+		version struct {
+			latest func(context.Context) (*openapi.VersionResponse, error)
+		}
 	}
-	sessionTTL          time.Duration
-	settings            AppSettings
-	latestVersionGetter latestVersionProvider
-	readyChecker        checker
+	sessionTTL   time.Duration
+	settings     AppSettings
+	readyChecker checker
 }
 
 // AppSettings is a "holder" struct for application settings that are returned in the /api/settings response.
@@ -79,14 +79,13 @@ func NewOpenAPI(
 	sessionTTL time.Duration,
 	settings AppSettings,
 	readyChecker checker,
-	latestVersionGetter latestVersionProvider,
+	latestVersionGetter func(context.Context) (string, error),
 ) *OpenAPI {
 	o := OpenAPI{
-		log:                 log,
-		sessionTTL:          sessionTTL,
-		settings:            settings,
-		latestVersionGetter: latestVersionGetter,
-		readyChecker:        readyChecker,
+		log:          log,
+		sessionTTL:   sessionTTL,
+		settings:     settings,
+		readyChecker: readyChecker,
 	}
 
 	o.handlers.session.create = session_create.New(s, sessionTTL).Handle
@@ -98,6 +97,7 @@ func NewOpenAPI(
 	o.handlers.request.subscribe = requests_subscribe.New(ps).Handle
 	o.handlers.request.delete = request_delete.New(s, ps).Handle
 	o.handlers.request.deleteAll = requests_delete_all.New(s, ps).Handle
+	o.handlers.version.latest = version_latest.New(latestVersionGetter).Handle
 
 	return &o
 }
@@ -325,6 +325,8 @@ func (o *OpenAPI) ApiSettings(w http.ResponseWriter, r *http.Request) {
 
 // ApiAppVersion handles GET /api/version.
 func (o *OpenAPI) ApiAppVersion(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "public, max-age=10")
+
 	o.respondWithJSON(w, r, http.StatusOK, openapi.VersionResponse{
 		Version: appmeta.Version(),
 	})
@@ -332,17 +334,17 @@ func (o *OpenAPI) ApiAppVersion(w http.ResponseWriter, r *http.Request) {
 
 // ApiAppVersionLatest handles GET /api/version/latest.
 func (o *OpenAPI) ApiAppVersionLatest(w http.ResponseWriter, r *http.Request) {
-	latestVersion, err := o.latestVersionGetter(r.Context())
+	resp, err := o.handlers.version.latest(r.Context())
 	if err != nil {
-		o.handleError(w, r, openapi.NewErrServerError("failed to get the latest version"))
+		o.handleError(w, r, err)
 		o.log.Warn("failed to get the latest version", logger.Error(err))
 
 		return
 	}
 
-	o.respondWithJSON(w, r, http.StatusOK, openapi.VersionResponse{
-		Version: latestVersion,
-	})
+	w.Header().Set("Cache-Control", "public, max-age=60")
+
+	o.respondWithJSON(w, r, http.StatusOK, resp)
 }
 
 const (

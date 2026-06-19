@@ -10,7 +10,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { Client } from '~/api'
 import { Database } from '~/db'
 import { createRoutes } from '~/routing'
-import { initializeHighlightJs } from '~/theme'
+import { appTheme, initializeHighlightJs } from '~/theme'
 import '~/theme/highlight.css'
 import '@mantine/core/styles.css'
 import '@mantine/code-highlight/styles.css'
@@ -19,6 +19,7 @@ import {
   AppConfigProvider,
   AppVersionProvider,
   BrowserNotificationsProvider,
+  L10nProvider,
   LastUsedProvider,
   RequestsProvider,
   SessionsProvider,
@@ -37,7 +38,7 @@ const App = (): React.JSX.Element => {
   const db = new Database()
 
   return (
-    <MantineProvider defaultColorScheme="auto">
+    <MantineProvider theme={appTheme} defaultColorScheme="auto">
       <CodeHighlightAdapterProvider adapter={highlightJsAdapter}>
         <Notifications />
         <AppProviders api={api} db={db} errHandler={console.error}>
@@ -64,19 +65,21 @@ const AppProviders = ({
   children: React.ReactNode
 }): React.JSX.Element => {
   return (
-    <AppVersionProvider api={api}>
-      <AppConfigProvider api={api}>
-        <BrowserNotificationsProvider>
-          <UserSettingsProvider>
-            <SessionsProvider api={api} db={db} errHandler={errHandler}>
-              <RequestsProvider.WithConfig api={api} db={db} errHandler={errHandler}>
-                <LastUsedProvider>{children}</LastUsedProvider>
-              </RequestsProvider.WithConfig>
-            </SessionsProvider>
-          </UserSettingsProvider>
-        </BrowserNotificationsProvider>
-      </AppConfigProvider>
-    </AppVersionProvider>
+    <L10nProvider>
+      <AppVersionProvider api={api}>
+        <AppConfigProvider api={api}>
+          <BrowserNotificationsProvider>
+            <UserSettingsProvider>
+              <SessionsProvider api={api} db={db} errHandler={errHandler}>
+                <RequestsProvider.WithConfig api={api} db={db} errHandler={errHandler}>
+                  <LastUsedProvider>{children}</LastUsedProvider>
+                </RequestsProvider.WithConfig>
+              </SessionsProvider>
+            </UserSettingsProvider>
+          </BrowserNotificationsProvider>
+        </AppConfigProvider>
+      </AppVersionProvider>
+    </L10nProvider>
   )
 }
 

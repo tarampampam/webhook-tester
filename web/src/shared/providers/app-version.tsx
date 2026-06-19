@@ -1,19 +1,28 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react'
 import { type Client } from '~/api'
 import { anyToError } from '../utils/errors'
 
 interface Context {
   /** The version string of the currently running binary, or null while loading or on fetch error. */
   readonly current: string | null
+
+  /** The raw version string as returned by the API, before any normalization. Null while loading or on fetch error. */
+  readonly currentRaw: string | null
+
   /** The latest published version string, or null while loading or on fetch error. */
   readonly latest: string | null
+
   /** True if an update is available, false if up-to-date, null if either version is not yet known. */
   readonly updateAvailable: boolean | null
+
   /** The last fetch error from either version endpoint. Null if no error has occurred. */
   readonly error: Error | null
 }
 
 const ctx = createContext<Context | null>(null)
+
+/** Extracts a clean semver string (e.g., "1.2.3") from a potentially dirty version string. */
+const cleanVersion = (v: string): string | null => v.match(/\d+\.\d+\.\d+/)?.[0] ?? null
 
 /**
  * Compares two semantic version strings (e.g., "1.2.3") and returns true if the latest version is newer
@@ -33,14 +42,9 @@ const isNewerVersion = (current: string, latest: string): boolean => {
 }
 
 /** Fetches the current and latest app versions on mount and exposes them to children via context. */
-export const AppVersionProvider = ({
-  api,
-  children,
-}: {
-  api: Client
-  children?: React.ReactNode
-}): React.JSX.Element => {
+export const AppVersionProvider = ({ api, children }: PropsWithChildren<{ api: Client }>): React.JSX.Element => {
   const [current, setCurrent] = useState<string | null>(null)
+  const [currentRaw, setCurrentRaw] = useState<string | null>(null)
   const [latest, setLatest] = useState<string | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
@@ -54,7 +58,8 @@ export const AppVersionProvider = ({
     api
       .currentVersion({ signal: ctrl.signal })
       .then((ver) => {
-        setCurrent(ver)
+        setCurrentRaw(ver)
+        setCurrent(cleanVersion(ver))
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === 'AbortError') {
@@ -77,7 +82,7 @@ export const AppVersionProvider = ({
     api
       .latestVersion({ signal: ctrl.signal })
       .then((ver) => {
-        setLatest(ver)
+        setLatest(cleanVersion(ver))
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === 'AbortError') {
@@ -98,7 +103,7 @@ export const AppVersionProvider = ({
     return null
   }, [current, latest])
 
-  return <ctx.Provider value={{ current, latest, updateAvailable, error }}>{children}</ctx.Provider>
+  return <ctx.Provider value={{ current, currentRaw, latest, updateAvailable, error }}>{children}</ctx.Provider>
 }
 
 /**

@@ -18,21 +18,22 @@ describe('useAppVersion', () => {
 })
 
 describe('AppVersionProvider', () => {
-  test('sets current after currentVersion resolves', async () => {
+  test('sets current after currentVersion resolves, stripping build metadata', async () => {
     const api = new Client({ baseUrl: 'http://test' })
-    vi.spyOn(api, 'currentVersion').mockResolvedValue('1.2.3')
+    vi.spyOn(api, 'currentVersion').mockResolvedValue('1.2.3@undefined')
     vi.spyOn(api, 'latestVersion').mockReturnValue(pending())
 
     const { result } = renderHook(() => useAppVersion(), { wrapper: makeWrapper(api) })
 
     await waitFor(() => expect(result.current.current).toBe('1.2.3'))
+    expect(result.current.currentRaw).toBe('1.2.3@undefined')
     expect(result.current.latest).toBeNull()
   })
 
-  test('sets latest after latestVersion resolves', async () => {
+  test('sets latest after latestVersion resolves, stripping build metadata', async () => {
     const api = new Client({ baseUrl: 'http://test' })
     vi.spyOn(api, 'currentVersion').mockReturnValue(pending())
-    vi.spyOn(api, 'latestVersion').mockResolvedValue('2.0.0')
+    vi.spyOn(api, 'latestVersion').mockResolvedValue('v2.0.0@build.123')
 
     const { result } = renderHook(() => useAppVersion(), { wrapper: makeWrapper(api) })
 

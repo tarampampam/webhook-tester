@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { Client } from '~/api'
+import { APIErrorNotFound, Client } from '~/api'
 import { type Database } from '~/db'
 import { newTestDatabase } from '~/test-utils'
 import { SessionsProvider, useSessions } from './sessions'
@@ -102,6 +102,76 @@ describe('SessionsProvider', () => {
           await result.current.newSession({}, {})
         })
       ).rejects.toThrow('api failure')
+
+      expect(result.current.sessions.size).toBe(0)
+    })
+  })
+
+  describe('addExistingSession', () => {
+    const apiGetSessionData = (uuid: string) =>
+      Object.freeze({
+        uuid,
+        response: Object.freeze({
+          statusCode: 201,
+          headers: Object.freeze([{ name: 'x-foo', value: 'bar' }]),
+          delay: 50,
+          body: new Uint8Array([1, 2, 3]),
+        }),
+        createdAt: Object.freeze(new Date(0)),
+      })
+
+    test('fetches session from backend, persists to DB, updates state, returns true', async () => {
+      const api = new Client({ baseUrl: 'http://test' })
+      const db = newTestDatabase()
+      vi.spyOn(api, 'getSession').mockResolvedValue(apiGetSessionData('ext-uuid'))
+
+      const { result } = renderHook(() => useSessions(), { wrapper: makeWrapper(api, db) })
+      await act(async () => {})
+
+      let found: boolean | undefined
+      await act(async () => {
+        found = await result.current.addExistingSession('ext-uuid')
+      })
+
+      expect(found).toBe(true)
+      expect(result.current.sessions.has('ext-uuid')).toBe(true)
+      expect(result.current.sessions.get('ext-uuid')?.response.code).toBe(201)
+      expect(result.current.sessions.get('ext-uuid')?.response.delay).toBe(50)
+      expect(result.current.sessions.get('ext-uuid')?.response.headers).toEqual([{ name: 'x-foo', value: 'bar' }])
+      expect(await db.getSession('ext-uuid')).not.toBeNull()
+    })
+
+    test('returns false when session does not exist on server (404), without touching DB or state', async () => {
+      const api = new Client({ baseUrl: 'http://test' })
+      const db = newTestDatabase()
+      vi.spyOn(api, 'getSession').mockRejectedValue(new APIErrorNotFound())
+
+      const { result } = renderHook(() => useSessions(), { wrapper: makeWrapper(api, db) })
+      await act(async () => {})
+
+      let found: boolean | undefined
+      await act(async () => {
+        found = await result.current.addExistingSession('missing-uuid')
+      })
+
+      expect(found).toBe(false)
+      expect(result.current.sessions.has('missing-uuid')).toBe(false)
+      expect(await db.getSession('missing-uuid')).toBeNull()
+    })
+
+    test('propagates non-404 errors to the caller', async () => {
+      const api = new Client({ baseUrl: 'http://test' })
+      const db = newTestDatabase()
+      vi.spyOn(api, 'getSession').mockRejectedValue(new Error('network failure'))
+
+      const { result } = renderHook(() => useSessions(), { wrapper: makeWrapper(api, db) })
+      await act(async () => {})
+
+      await expect(
+        act(async () => {
+          await result.current.addExistingSession('some-uuid')
+        })
+      ).rejects.toThrow('network failure')
 
       expect(result.current.sessions.size).toBe(0)
     })

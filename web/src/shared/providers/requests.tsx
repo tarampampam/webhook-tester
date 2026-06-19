@@ -1,12 +1,5 @@
-import React, {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import type { PropsWithChildren } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { type Client, RequestEventAction } from '~/api'
 import type { Database, RequestInput } from '~/db'
 import { anyToError } from '../utils/errors'
@@ -18,10 +11,10 @@ export type Request = {
   readonly id: string
   readonly clientAddress: string
   readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE' | string
-  headers: ReadonlyArray<{ name: string; value: string }>
+  readonly headers: ReadonlyArray<{ name: string; value: string }>
   url: Readonly<URL>
-  getPayload: () => Promise<Uint8Array | null>
-  capturedAt: Readonly<Date>
+  readonly getPayload: () => Promise<Uint8Array | null>
+  readonly capturedAt: Readonly<Date>
 }
 
 type Options = {
@@ -33,13 +26,22 @@ interface Context {
   /**
    * All captured requests for the active session, keyed by request UUID. Kept in sync via WebSocket events.
    */
-  requests: ReadonlyMap<string, Request>
+  readonly requests: ReadonlyMap<string, Request>
+
+  /**
+   * True once the initial request list has been loaded and the WebSocket subscription is established.
+   * Resets to false on unsetSessionID.
+   */
+  readonly isReady: boolean
 
   /**
    * Activate a session: hydrate state from IndexedDB immediately, then reconcile against the API and open
    * a WebSocket for real-time updates. Tears down any previously active session first.
+   *
+   * Pass an AbortSignal to abort in-flight work and close the WebSocket when the signal fires (e.g. on
+   * component unmount). Throws on non-abort errors - caller is responsible for handling them.
    */
-  setSessionID(sID: string): Promise<void>
+  setSessionID(sID: string, opts?: Options): Promise<void>
 
   /**
    * Tear down the active session: abort all in-flight work, close the WebSocket, and clear the requests map.
@@ -80,9 +82,9 @@ const applyRequestsLimit = (
     return m
   }
 
-  const sorted = [...m.entries()].sort(([, a], [, b]): number => a.capturedAt.getTime() - b.capturedAt.getTime())
+  const sorted = [...m.entries()].sort(([, a], [, b]): number => b.capturedAt.getTime() - a.capturedAt.getTime())
 
-  return new Map(sorted.slice(sorted.length - limit))
+  return new Map(sorted.slice(0, limit))
 }
 
 /**
@@ -91,142 +93,160 @@ const applyRequestsLimit = (
  * @note errHandler must be stabilized by the caller (e.g. with useCallback) to avoid
  *       unnecessary re-renders and effect re-runs.
  */
-export const RequestsProvider = ({
-  api,
-  db,
-  requestsLimit,
-  errHandler,
-  children,
-}: PropsWithChildren<RequestsProviderProps & { requestsLimit: number | undefined }>): React.JSX.Element => {
-  const [requests, setRequests] = useState<ReadonlyMap<string, Request>>(new Map())
-  const ctrlRef = useRef<AbortController | null>(null)
-  const closeRef = useRef<(() => void) | null>(null)
-  const limitRef = useRef<number | undefined>(requestsLimit)
-  const sIDRef = useRef<string | null>(null)
+export const RequestsProvider = Object.assign(
+  ({
+    api,
+    db,
+    requestsLimit,
+    errHandler,
+    children,
+  }: PropsWithChildren<RequestsProviderProps & { requestsLimit: number | undefined }>): React.JSX.Element => {
+    const [requests, setRequests] = useState<ReadonlyMap<string, Request>>(new Map())
+    const [isReady, setIsReady] = useState(false)
+    const ctrlRef = useRef<AbortController | null>(null)
+    const closeRef = useRef<(() => void) | null>(null)
+    const limitRef = useRef<number | undefined>(requestsLimit)
+    const sIDRef = useRef<string | null>(null)
 
-  const subscribe = useCallback(
-    async (sID: string): Promise<void> => {
-      closeRef.current?.()
-      closeRef.current = null
+    const subscribe = useCallback(
+      async (sID: string): Promise<void> => {
+        closeRef.current?.()
+        closeRef.current = null
 
-      // capture signal before the first await - ctrlRef.current may be replaced by the time we resume
-      const signal = ctrlRef.current?.signal
-      const close = await api.subscribeToSessionRequests(
-        sID,
-        {
-          onUpdate: (event): void => {
-            void (async (): Promise<void> => {
-              switch (event.action) {
-                case RequestEventAction.create: {
-                  const r = event.request
-                  if (!r) {
-                    break // should never happen - created events must have a request
-                  }
-
-                  if (signal?.aborted) {
-                    return
-                  }
-
-                  await db.putRequests(
-                    [
-                      {
-                        sID,
-                        rID: r.uuid,
-                        method: r.method,
-                        clientAddress: r.clientAddress,
-                        url: r.url.toString(),
-                        capturedAt: r.capturedAt,
-                        headers: r.headers,
-                        payload: undefined, // payload is not coming through the websocket
-                      },
-                    ],
-                    limitRef.current
-                  )
-
-                  if (signal?.aborted) {
-                    return
-                  }
-
-                  const requestUrl = new URL(r.url)
-
-                  // update the state with the new request (but without payload yet)
-                  setRequests((prev) => {
-                    if (prev.has(r.uuid)) {
-                      return prev // already have this request - no update needed
+        // capture signal before the first await - ctrlRef.current may be replaced by the time we resume
+        const signal = ctrlRef.current?.signal
+        const close = await api.subscribeToSessionRequests(
+          sID,
+          {
+            onUpdate: (event): void => {
+              void (async (): Promise<void> => {
+                switch (event.action) {
+                  case RequestEventAction.create: {
+                    const r = event.request
+                    if (!r) {
+                      break // should never happen - created events must have a request
                     }
 
-                    const next = new Map(prev)
-                    next.set(r.uuid, {
-                      sID,
-                      id: r.uuid,
-                      clientAddress: r.clientAddress,
-                      method: r.method,
-                      headers: r.headers,
-                      url: requestUrl,
-                      capturedAt: r.capturedAt,
-                      getPayload: async (): Promise<null> => null,
+                    if (signal?.aborted) {
+                      return
+                    }
+
+                    await db.putRequests(
+                      [
+                        {
+                          sID,
+                          rID: r.uuid,
+                          method: r.method,
+                          clientAddress: r.clientAddress,
+                          url: r.url.toString(),
+                          capturedAt: r.capturedAt,
+                          headers: r.headers,
+                          payload: undefined, // payload is not coming through the websocket
+                        },
+                      ],
+                      limitRef.current
+                    )
+
+                    if (signal?.aborted) {
+                      return
+                    }
+
+                    const requestUrl = new URL(r.url)
+
+                    // update the state with the new request (but without payload yet)
+                    setRequests((prev) => {
+                      if (prev.has(r.uuid)) {
+                        return prev // already have this request - no update needed
+                      }
+
+                      // prepend so the newest request appears first in the list
+                      const next = new Map([
+                        [
+                          r.uuid,
+                          {
+                            sID,
+                            id: r.uuid,
+                            clientAddress: r.clientAddress,
+                            method: r.method,
+                            headers: r.headers,
+                            url: requestUrl,
+                            capturedAt: r.capturedAt,
+                            getPayload: async (): Promise<null> => null,
+                          },
+                        ],
+                        ...prev,
+                      ])
+
+                      return applyRequestsLimit(next, limitRef.current)
                     })
 
-                    return applyRequestsLimit(next, limitRef.current)
-                  })
-
-                  // get the captured request payload from the api
-                  const full = await api.getSessionRequest(sID, r.uuid, { signal })
-                  if (signal?.aborted) {
-                    return
-                  }
-
-                  // update the db with the payload - this will make it available to the getPayload function in the state
-                  await db.putRequestPayload(r.uuid, full.requestPayload)
-
-                  // update the state to notify consumers that the payload is now available
-                  setRequests((prev) => {
-                    const existing = prev.get(r.uuid)
-                    if (!existing) {
-                      return prev
+                    // get the captured request payload from the api
+                    const full = await api.getSessionRequest(sID, r.uuid, { signal })
+                    if (signal?.aborted) {
+                      return
                     }
 
-                    const next = new Map(prev)
-                    next.set(r.uuid, {
-                      ...existing,
-                      getPayload: db.newRequestPayloadReader(r.uuid), // deliver payload directly from the db
+                    // update the db with the payload - this will make it available to the getPayload function in the state
+                    await db.putRequestPayload(r.uuid, full.requestPayload)
+
+                    // update the state to notify consumers that the payload is now available
+                    setRequests((prev) => {
+                      const existing = prev.get(r.uuid)
+                      if (!existing) {
+                        return prev
+                      }
+
+                      const next = new Map(prev)
+                      next.set(r.uuid, {
+                        ...existing,
+                        getPayload: db.newRequestPayloadReader(r.uuid), // deliver payload directly from the db
+                      })
+
+                      return next
                     })
 
-                    return next
-                  })
-
-                  break
-                }
-                case RequestEventAction.delete: {
-                  const r = event.request
-                  if (!r) {
-                    break // should never happen - deleted events must have a request
+                    break
                   }
-
-                  await db.deleteRequest(r.uuid)
-
-                  // update the state to remove the deleted request
-                  setRequests((prev) => {
-                    if (!prev.has(r.uuid)) {
-                      return prev // don't have this request - no update needed
+                  case RequestEventAction.delete: {
+                    const r = event.request
+                    if (!r) {
+                      break // should never happen - deleted events must have a request
                     }
 
-                    const next = new Map(prev)
-                    next.delete(r.uuid)
+                    await db.deleteRequest(r.uuid)
 
-                    return next
-                  })
+                    // update the state to remove the deleted request
+                    setRequests((prev) => {
+                      if (!prev.has(r.uuid)) {
+                        return prev // don't have this request - no update needed
+                      }
 
-                  break
+                      const next = new Map(prev)
+                      next.delete(r.uuid)
+
+                      return next
+                    })
+
+                    break
+                  }
+                  case RequestEventAction.clear: {
+                    await db.deleteAllRequests(sID)
+                    setRequests(new Map())
+
+                    break
+                  }
                 }
-                case RequestEventAction.clear: {
-                  await db.deleteAllRequests(sID)
-                  setRequests(new Map())
-
-                  break
+              })().catch((err) => {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                  return
                 }
-              }
-            })().catch((err) => {
+
+                if (errHandler) {
+                  errHandler(anyToError(err))
+                }
+              })
+            },
+            onError: (err) => {
               if (err instanceof DOMException && err.name === 'AbortError') {
                 return
               }
@@ -234,246 +254,245 @@ export const RequestsProvider = ({
               if (errHandler) {
                 errHandler(anyToError(err))
               }
-            })
+            },
           },
-          onError: (err) => {
-            if (err instanceof DOMException && err.name === 'AbortError') {
-              return
-            }
+          { signal }
+        )
 
-            if (errHandler) {
-              errHandler(anyToError(err))
-            }
-          },
-        },
-        { signal }
-      )
+        if (signal?.aborted) {
+          close()
 
-      if (signal?.aborted) {
-        close()
-
-        return
-      }
-
-      closeRef.current = close
-    },
-    [api, db, errHandler]
-  )
-
-  const unsetSessionID = useCallback((): void => {
-    ctrlRef.current?.abort()
-    ctrlRef.current = null
-    closeRef.current?.()
-    closeRef.current = null
-    sIDRef.current = null
-
-    setRequests(new Map())
-  }, [])
-
-  const setSessionID = useCallback(
-    async (sID: string): Promise<void> => {
-      unsetSessionID()
-
-      const ctrl = new AbortController()
-      ctrlRef.current = ctrl
-      const { signal } = ctrl
-
-      sIDRef.current = sID
-
-      try {
-        const dbData = await db.getRequests(sID)
-        if (signal.aborted) {
           return
         }
 
-        // set requests from the db (FAST)
-        setRequests(() => {
-          const m = new Map<string, Request>()
-          for (const r of dbData) {
-            m.set(r.rID, {
-              sID,
-              id: r.rID,
-              clientAddress: r.clientAddress,
-              method: r.method,
-              headers: r.headers,
-              url: new URL(r.url),
-              capturedAt: r.capturedAt,
-              getPayload: r.getPayload,
-            })
-          }
+        closeRef.current = close
+      },
+      [api, db, errHandler]
+    )
 
-          return applyRequestsLimit(m, limitRef.current)
+    const unsetSessionID = useCallback((): void => {
+      ctrlRef.current?.abort()
+      ctrlRef.current = null
+      closeRef.current?.()
+      closeRef.current = null
+      sIDRef.current = null
+
+      setIsReady(false)
+      setRequests(new Map())
+    }, [])
+
+    const setSessionID = useCallback(
+      async (sID: string, opts?: Options): Promise<void> => {
+        unsetSessionID()
+
+        const ctrl = new AbortController()
+        ctrlRef.current = ctrl
+        const { signal } = ctrl
+
+        // wire external abort - tear down this session's resources; ctrl captured by value to avoid stale-ref issues
+        opts?.signal?.addEventListener('abort', () => {
+          ctrl.abort()
+          closeRef.current?.()
         })
 
-        // fetch requests from the api (SLOW)
-        const apiData = await api.getSessionRequests(sID)
-        if (signal.aborted) {
-          return
-        }
+        sIDRef.current = sID
 
-        // remove stale db entries (exist in db but not in api response)
-        const apiIds = new Set(apiData.map((r) => r.uuid))
-        const staleIds = dbData.filter((r) => !apiIds.has(r.rID)).map((r) => r.rID)
-        if (staleIds.length) {
-          await db.deleteRequest(...staleIds)
-        }
+        try {
+          const dbData = await db.getRequests(sID)
+          if (signal.aborted) {
+            return
+          }
 
-        if (signal.aborted) {
-          return
-        }
-
-        // sync db with the api data
-        if (apiData.length) {
-          await db.putRequests(
-            apiData.map<RequestInput>((r) => ({
-              sID,
-              rID: r.uuid,
-              method: r.method,
-              clientAddress: r.clientAddress,
-              url: r.url.toString(),
-              capturedAt: r.capturedAt,
-              headers: r.headers,
-              payload: r.requestPayload,
-            })),
-            limitRef.current
-          )
-        }
-
-        if (signal.aborted) {
-          return
-        }
-
-        const parsedUrls = new Map(apiData.map((r) => [r.uuid, new URL(r.url)]))
-
-        // reconcile state: api is authoritative - add new, remove stale
-        setRequests((prev) => {
-          const next = new Map<string, Request>()
-          for (const r of apiData) {
-            const url = parsedUrls.get(r.uuid)
-            if (!url) {
-              continue
-            }
-
-            next.set(
-              r.uuid,
-              prev.get(r.uuid) ?? {
+          // set requests from the db (FAST)
+          setRequests(() => {
+            const m = new Map<string, Request>()
+            for (const r of dbData) {
+              m.set(r.rID, {
                 sID,
-                id: r.uuid,
+                id: r.rID,
                 clientAddress: r.clientAddress,
                 method: r.method,
                 headers: r.headers,
-                url,
+                url: new URL(r.url),
                 capturedAt: r.capturedAt,
-                getPayload: db.newRequestPayloadReader(r.uuid), // deliver payload directly from the db
-              }
+                getPayload: r.getPayload,
+              })
+            }
+
+            return applyRequestsLimit(m, limitRef.current)
+          })
+
+          // fetch requests from the api (SLOW)
+          const apiData = await api.getSessionRequests(sID)
+          if (signal.aborted) {
+            return
+          }
+
+          // remove stale db entries (exist in db but not in api response)
+          const apiIds = new Set(apiData.map((r) => r.uuid))
+          const staleIds = dbData.filter((r) => !apiIds.has(r.rID)).map((r) => r.rID)
+          if (staleIds.length) {
+            await db.deleteRequest(...staleIds)
+          }
+
+          if (signal.aborted) {
+            return
+          }
+
+          // sync db with the api data
+          if (apiData.length) {
+            await db.putRequests(
+              apiData.map<RequestInput>((r) => ({
+                sID,
+                rID: r.uuid,
+                method: r.method,
+                clientAddress: r.clientAddress,
+                url: r.url.toString(),
+                capturedAt: r.capturedAt,
+                headers: r.headers,
+                payload: r.requestPayload,
+              })),
+              limitRef.current
             )
           }
 
-          // avoid re-render if nothing changed (same keys, same count)
-          if (next.size === prev.size && [...next.keys()].every((k) => prev.has(k))) {
-            return prev
+          if (signal.aborted) {
+            return
           }
 
-          return applyRequestsLimit(next, limitRef.current)
-        })
+          const parsedUrls = new Map(apiData.map((r) => [r.uuid, new URL(r.url)]))
 
-        // subscribe to real-time updates only after initial state is settled
-        await subscribe(sID)
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return
-        }
+          // reconcile state: api is authoritative - add new, remove stale
+          setRequests((prev) => {
+            const next = new Map<string, Request>()
+            for (const r of apiData) {
+              const url = parsedUrls.get(r.uuid)
+              if (!url) {
+                continue
+              }
 
-        if (errHandler) {
-          errHandler(anyToError(err))
-        }
-      }
-    },
-    [unsetSessionID, db, api, subscribe, errHandler]
-  )
-
-  const delRequest = useCallback(
-    async (sID: string, rID: string, opts?: Options): Promise<void> => {
-      if (await api.deleteSessionRequest(sID, rID, { signal: opts?.signal })) {
-        await db.deleteRequest(rID)
-
-        setRequests((prev) => {
-          if (!prev.has(rID)) {
-            return prev // don't have this request - no update needed
-          }
-
-          const next = new Map(prev)
-          next.delete(rID)
-
-          return next
-        })
-      }
-    },
-    [db, api]
-  )
-
-  const delAllRequests = useCallback(
-    async (sID: string, opts?: Options): Promise<void> => {
-      if (await api.deleteAllSessionRequests(sID, { signal: opts?.signal })) {
-        await db.deleteAllRequests(sID)
-
-        setRequests((prev) => {
-          // ensure current session's requests are linked to the sID before clearing
-          if (![...prev.values()].some((r) => r.sID === sID)) {
-            return prev // no requests for this session - no update needed
-          }
-
-          const next = new Map(prev)
-          for (const [rID, r] of prev) {
-            if (r.sID === sID) {
-              next.delete(rID)
+              next.set(
+                r.uuid,
+                prev.get(r.uuid) ?? {
+                  sID,
+                  id: r.uuid,
+                  clientAddress: r.clientAddress,
+                  method: r.method,
+                  headers: r.headers,
+                  url,
+                  capturedAt: r.capturedAt,
+                  getPayload: db.newRequestPayloadReader(r.uuid), // deliver payload directly from the db
+                }
+              )
             }
+
+            // avoid re-render if nothing changed (same keys, same count)
+            if (next.size === prev.size && [...next.keys()].every((k) => prev.has(k))) {
+              return prev
+            }
+
+            return applyRequestsLimit(next, limitRef.current)
+          })
+
+          // subscribe to real-time updates only after initial state is settled
+          await subscribe(sID)
+
+          if (!signal.aborted) {
+            setIsReady(true)
+          }
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            return
           }
 
-          return next
-        })
+          throw err
+        }
+      },
+      [unsetSessionID, db, api, subscribe]
+    )
+
+    const delRequest = useCallback(
+      async (sID: string, rID: string, opts?: Options): Promise<void> => {
+        if (await api.deleteSessionRequest(sID, rID, { signal: opts?.signal })) {
+          await db.deleteRequest(rID)
+
+          setRequests((prev) => {
+            if (!prev.has(rID)) {
+              return prev // don't have this request - no update needed
+            }
+
+            const next = new Map(prev)
+            next.delete(rID)
+
+            return next
+          })
+        }
+      },
+      [db, api]
+    )
+
+    const delAllRequests = useCallback(
+      async (sID: string, opts?: Options): Promise<void> => {
+        if (await api.deleteAllSessionRequests(sID, { signal: opts?.signal })) {
+          await db.deleteAllRequests(sID)
+
+          setRequests((prev) => {
+            // ensure current session's requests are linked to the sID before clearing
+            if (![...prev.values()].some((r) => r.sID === sID)) {
+              return prev // no requests for this session - no update needed
+            }
+
+            const next = new Map(prev)
+            for (const [rID, r] of prev) {
+              if (r.sID === sID) {
+                next.delete(rID)
+              }
+            }
+
+            return next
+          })
+        }
+      },
+      [db, api]
+    )
+
+    // keep ref in sync with prop and retroactively trim current state whenever the limit changes
+    useEffect(() => {
+      limitRef.current = requestsLimit
+
+      const sID = sIDRef.current
+      if (sID && requestsLimit) {
+        db.trimRequests(sID, requestsLimit)
+          .then(() => setRequests((prev) => applyRequestsLimit(prev, requestsLimit)))
+          .catch((err) => {
+            if (errHandler) {
+              errHandler(anyToError(err))
+            }
+          })
       }
+    }, [db, errHandler, requestsLimit])
+
+    return (
+      <ctx.Provider value={{ requests, isReady, setSessionID, unsetSessionID, delRequest, delAllRequests }}>
+        {children}
+      </ctx.Provider>
+    )
+  },
+  {
+    /**
+     * Higher-order component that wraps RequestsProvider and injects the requests limit from the app config.
+     */
+    WithConfig: ({ children, ...props }: PropsWithChildren<RequestsProviderProps>): React.JSX.Element => {
+      const cfg = useAppConfig()
+
+      return (
+        <RequestsProvider requestsLimit={cfg.config?.limits.maxRequests} {...props}>
+          {children}
+        </RequestsProvider>
+      )
     },
-    [db, api]
-  )
-
-  // keep ref in sync with prop and retroactively trim current state whenever the limit changes
-  useEffect(() => {
-    limitRef.current = requestsLimit
-
-    const sID = sIDRef.current
-    if (sID && requestsLimit) {
-      db.trimRequests(sID, requestsLimit)
-        .then(() => setRequests((prev) => applyRequestsLimit(prev, requestsLimit)))
-        .catch((err) => {
-          if (errHandler) {
-            errHandler(anyToError(err))
-          }
-        })
-    }
-  }, [db, errHandler, requestsLimit])
-
-  return (
-    <ctx.Provider value={{ requests, setSessionID, unsetSessionID, delRequest, delAllRequests }}>
-      {children}
-    </ctx.Provider>
-  )
-}
-
-/**
- * Higher-order component that wraps RequestsProvider and injects the requests limit from the app config.
- */
-const WithConfig = ({ children, ...props }: PropsWithChildren<RequestsProviderProps>): React.JSX.Element => {
-  const cfg = useAppConfig()
-
-  return (
-    <RequestsProvider requestsLimit={cfg.config?.limits.maxRequests} {...props}>
-      {children}
-    </RequestsProvider>
-  )
-}
-
-RequestsProvider.WithConfig = WithConfig // attach the HOC as a static property for convenient access
+  }
+)
 
 /**
  * Hook for accessing the current session's captured requests and session controls.

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, type PropsWithChildren, useContext, useEffect, useState } from 'react'
 import { type Client } from '~/api'
 import { anyToError } from '../utils/errors'
 
@@ -16,13 +16,7 @@ const ctx = createContext<Context | null>(null)
  * Provider that fetches app config from the API once and exposes it to children via context.
  * Skips re-fetching once config is loaded; aborts the in-flight request on unmount.
  */
-export const AppConfigProvider = ({
-  api,
-  children,
-}: {
-  api: Client
-  children?: React.ReactNode
-}): React.JSX.Element => {
+export const AppConfigProvider = ({ api, children }: PropsWithChildren<{ api: Client }>): React.JSX.Element => {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [error, setError] = useState<Error | null>(null)
 

@@ -1,5 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { type Client } from '~/api'
+import React, { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useState } from 'react'
+import { APIErrorNotFound, type Client } from '~/api'
 import { type Database } from '~/db'
 import { anyToError } from '~/shared'
 
@@ -40,7 +40,10 @@ interface Context {
    *
    * Populated optimistically from IndexedDB on mount, then reconciled against the backend.
    */
-  sessions: ReadonlyMap<string, Session>
+  readonly sessions: ReadonlyMap<string, Session>
+
+  /** True once the sessions map has been hydrated from IndexedDB and validated against the backend. */
+  readonly isReady: boolean
 
   /**
    * Creates a new session. Registers it on the backend first, then persists to IndexedDB and updates local state.
@@ -49,6 +52,14 @@ interface Context {
    * The caller is responsible for passing an AbortSignal tied to the component's lifetime.
    */
   newSession(userOptions: NewSessionOptions, reqOpts?: Options): Promise<string>
+
+  /**
+   * Fetches a session by ID from the backend and registers it locally. Persists to IndexedDB and updates state.
+   * Returns false if the session does not exist on the server (404). All other errors propagate to the caller.
+   *
+   * The caller is responsible for passing an AbortSignal tied to the component's lifetime.
+   */
+  addExistingSession(id: string, reqOpts?: Options): Promise<boolean>
 
   /**
    * Deletes a session by UUID. Removes it from IndexedDB and local state immediately (optimistic), then fires the
@@ -74,13 +85,13 @@ export const SessionsProvider = ({
   db,
   errHandler,
   children,
-}: {
+}: PropsWithChildren<{
   api: Client
   db: Database
   errHandler?: (err: Error) => void
-  children?: React.ReactNode
-}): React.JSX.Element => {
+}>): React.JSX.Element => {
   const [sessions, setSessions] = useState<Map<string, Session>>(new Map())
+  const [isReady, setIsReady] = useState(false)
 
   const newSession = useCallback(
     async (userOptions: NewSessionOptions, reqOpts?: Options): Promise<string> => {
@@ -121,6 +132,52 @@ export const SessionsProvider = ({
     [api, db]
   )
 
+  const addExistingSession = useCallback(
+    async (id: string, reqOpts?: Options): Promise<boolean> => {
+      let meta: Awaited<ReturnType<typeof api.getSession>>
+
+      try {
+        meta = await api.getSession(id, { signal: reqOpts?.signal })
+      } catch (err) {
+        if (err instanceof APIErrorNotFound) {
+          return false
+        }
+
+        throw err
+      }
+
+      const hdrs = meta.response.headers.map(({ name, value }) => ({ name, value }))
+
+      await db.putSession({
+        id: meta.uuid,
+        response: {
+          code: meta.response.statusCode,
+          headers: hdrs,
+          delay: meta.response.delay,
+          body: meta.response.body,
+        },
+        createdAt: meta.createdAt,
+      })
+
+      setSessions((prev) => {
+        const next = new Map(prev)
+        next.set(id, {
+          id,
+          response: {
+            code: meta.response.statusCode,
+            headers: hdrs,
+            delay: meta.response.delay,
+            getBody: async () => meta.response.body,
+          },
+        })
+        return next
+      })
+
+      return true
+    },
+    [api, db]
+  )
+
   const delSession = useCallback(
     async (id: string, opts?: Options): Promise<void> => {
       await db.deleteSession(id) // delete session from database (FAST)
@@ -144,7 +201,11 @@ export const SessionsProvider = ({
     void (async (): Promise<void> => {
       // load the list of sessions (from DB)
       const ids = await db.getSessionIDs()
-      if (!ids.length || ctrl.signal.aborted) {
+      if (!ids.length) {
+        setIsReady(true)
+        return
+      }
+      if (ctrl.signal.aborted) {
         return
       }
 
@@ -157,7 +218,11 @@ export const SessionsProvider = ({
       }
 
       // no data (or unmounted) - no funny bunny honey
-      if (!current.size || ctrl.signal.aborted) {
+      if (!current.size) {
+        setIsReady(true)
+        return
+      }
+      if (ctrl.signal.aborted) {
         return
       }
 
@@ -188,6 +253,10 @@ export const SessionsProvider = ({
         // SECOND STATE UPDATE - nonexistent sessions are removed
         setSessions(new Map(current))
       }
+
+      if (!ctrl.signal.aborted) {
+        setIsReady(true)
+      }
     })().catch((err) => {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return
@@ -199,7 +268,9 @@ export const SessionsProvider = ({
     return () => ctrl.abort()
   }, [api, db, errHandler])
 
-  return <ctx.Provider value={{ sessions, newSession, delSession }}>{children}</ctx.Provider>
+  return (
+    <ctx.Provider value={{ sessions, isReady, newSession, addExistingSession, delSession }}>{children}</ctx.Provider>
+  )
 }
 
 /** Hook that returns the sessions context. Must be called inside a SessionsProvider. */

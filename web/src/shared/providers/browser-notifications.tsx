@@ -16,14 +16,14 @@ type BrowserNotificationsContext = {
    * Request permission to show notifications. Returns true if permission is granted, false otherwise.
    * If permission is already granted, it resolves to true immediately without prompting the user.
    */
-  request: () => Promise<boolean>
+  request(): Promise<boolean>
 
   /**
    * Show a browser notification with the given title and options. If permission is not granted, it will first
    * request permission.
    * Returns the Notification object if shown successfully, or null if permission was denied or an error occurred.
    */
-  show: (title: string, options?: Options) => Promise<Notification | null>
+  show(title: string, options?: Options): Promise<Notification | null>
 }
 
 const ctx = createContext<BrowserNotificationsContext | null>(null)

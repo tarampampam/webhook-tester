@@ -1,25 +1,6 @@
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from 'react'
 
-/** @deprecated must be unexported, don't use outside of this file */
-export type StorageArea = 'local' | 'session'
-
-/**
- * The list of keys used in the storage.
- *
- * @deprecated
- */
-export enum UsedStorageKeys {
-  UISettings = 'ui-settings',
-  SessionsLastUsed = 'sessions-last-used',
-  NewSessionStatusCode = 'ns-status-code',
-  NewSessionHeadersList = 'ns-headers-list',
-  NewSessionSessionDelay = 'ns-session-delay',
-  NewSessionResponseBody = 'ns-response-body',
-  NewSessionDestroyCurrentSession = 'ns-destroy-current',
-  SessionDetailsShellTab = 'sd-selected-shell-tab',
-  SessionDetailsCodeTab = 'sd-selected-code-tab',
-  RequestDetailsHeadersExpand = 'rd-headers-expand',
-}
+type StorageArea = 'local' | 'session'
 
 /**
  * The cache keeps track of whether each storage type is available.
