@@ -9,7 +9,7 @@ export type Session = {
   response: {
     readonly code: number
     headers: ReadonlyArray<{ name: string; value: string }>
-    readonly delay: number
+    readonly delay: number // in seconds
     getBody: () => Promise<Uint8Array | null>
   }
 }

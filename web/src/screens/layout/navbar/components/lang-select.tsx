@@ -1,4 +1,4 @@
-import { type ComboboxData, NativeSelect, type NativeSelectProps } from '@mantine/core'
+import { type ComboboxStringGroupData, NativeSelect, type NativeSelectProps } from '@mantine/core'
 import { IconLanguage } from '@tabler/icons-react'
 import React, { useCallback, useMemo } from 'react'
 import { isSupportedLangCode } from '~/l10n'
@@ -7,7 +7,7 @@ import { L10nKey, useL10n } from '~/shared'
 export const LangSelect = ({ ...props }: NativeSelectProps): React.JSX.Element => {
   const { t, supported, switchTo, langCode, langNames } = useL10n()
 
-  const data = useMemo<ComboboxData>(() => {
+  const data = useMemo<ComboboxStringGroupData>(() => {
     return supported.map((code) => ({
       value: code,
       label: langNames.get(code) ?? code,

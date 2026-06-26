@@ -111,4 +111,3 @@ export const pathTo = <T extends ROUTE_ID>(
       throw new Error(`Unknown route: ${String(id)}`)
   }
 }
-

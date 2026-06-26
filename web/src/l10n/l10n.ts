@@ -36,6 +36,15 @@ export const KEY = {
   yourUniqueWebhookUrl: 'yourUniqueWebhookUrl',
   sendSimpleRequestInShell: 'sendSimpleRequestInShell',
   codeSnippets: 'codeSnippets',
+  webhookOptions: 'webhookOptions',
+  statusCode: 'statusCode',
+  responseHeaders: 'responseHeaders',
+  responseDelay: 'responseDelay',
+  responseBody: 'responseBody',
+  plusMore: 'plusMore',
+  timeSec: 'timeSec',
+  noDelay: 'noDelay',
+  noHeaders: 'noHeaders',
 } as const
 
 /**
@@ -96,7 +105,16 @@ const locales = {
     [KEY.yourUniqueWebhookUrl]: "Here's your unique webhook URL",
     [KEY.sendSimpleRequestInShell]:
       'Send simple request (execute next command in your terminal without leaving this page)',
-    [KEY.codeSnippets]: 'Code snippets in different languages',
+    [KEY.codeSnippets]: 'Code snippets in various programming languages',
+    [KEY.webhookOptions]: 'Webhook options',
+    [KEY.statusCode]: 'Status code',
+    [KEY.responseHeaders]: 'Response headers',
+    [KEY.responseDelay]: 'Response delay',
+    [KEY.responseBody]: 'Response body',
+    [KEY.plusMore]: 'more', // e.g. `+5 more`
+    [KEY.timeSec]: 'sec', // short for "seconds"
+    [KEY.noDelay]: 'none',
+    [KEY.noHeaders]: 'none',
   },
   ru: {
     [KEY.justNow]: 'Только что',
@@ -131,7 +149,16 @@ const locales = {
     [KEY.yourUniqueWebhookUrl]: 'Вот ваш уникальный URL вебхука',
     [KEY.sendSimpleRequestInShell]:
       'Отправьте простой запрос (выполните следующую команду в вашем терминале, не покидая эту страницу)',
-    [KEY.codeSnippets]: 'Примеры кода на разных языках',
+    [KEY.codeSnippets]: 'Примеры кода на различных языках программирования',
+    [KEY.webhookOptions]: 'Настройки вебхука',
+    [KEY.statusCode]: 'Код ответа',
+    [KEY.responseHeaders]: 'Заголовки ответа',
+    [KEY.responseDelay]: 'Задержка ответа',
+    [KEY.responseBody]: 'Тело ответа',
+    [KEY.plusMore]: 'ещё',
+    [KEY.timeSec]: 'сек',
+    [KEY.noDelay]: 'нет',
+    [KEY.noHeaders]: 'нет',
   },
 } satisfies Partial<Readonly<Record<LangCode, Readonly<Record<KEY, string>>>>>
 

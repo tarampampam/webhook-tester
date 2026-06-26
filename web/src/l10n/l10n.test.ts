@@ -25,6 +25,10 @@ describe('isSupportedLangCode', () => {
 describe('translate', () => {
   test('en and ru translations differ for every key', () => {
     for (const key of Object.values(KEY)) {
+      if (key === KEY.localhost) {
+        continue // skip this key as it is the same in both languages
+      }
+
       expect(translate(key, 'en')).not.toBe(translate(key, 'ru'))
     }
   })

@@ -515,7 +515,7 @@ type SessionOptions = Readonly<{
   response: Readonly<{
     statusCode: number
     headers: ReadonlyArray<{ name: string; value: string }>
-    delay: number
+    delay: number // in seconds
     body: Readonly<Uint8Array>
   }>
   createdAt: Readonly<Date>
