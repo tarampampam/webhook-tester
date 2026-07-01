@@ -3,17 +3,17 @@ module gh.tarampamp.am/webhook-tester/v2
 go 1.26
 
 require (
-	github.com/alicebob/miniredis/v2 v2.37.0
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/oapi-codegen/runtime v1.4.0
-	github.com/redis/go-redis/v9 v9.19.0
+	github.com/oapi-codegen/runtime v1.4.2
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli-docs/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.9.0
+	github.com/urfave/cli/v3 v3.10.0
 	go.uber.org/zap v1.28.0
 	golang.ngrok.com/ngrok v1.13.0
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.21.0
 )
 
 require (
