@@ -21,7 +21,7 @@ jobs:
     name: Check for GitLeaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with: {fetch-depth: 0}
       - uses: gacts/gitleaks@v1
 
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
       - run: helm dependency update .
       - run: helm template . > /dev/null
@@ -40,7 +40,7 @@ jobs:
     name: Test and lint the backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with: {go-version-file: go.mod}
       - run: go generate -skip readme ./...
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
@@ -87,7 +87,7 @@ jobs:
         arch: [amd64, arm64]
     needs: [lint-and-test-backend, lint-and-test-frontend, build-web]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: gacts/github-slug@v1
         id: slug
       - id: values
@@ -127,7 +127,7 @@ jobs:
         options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 2s --health-retries 3
     needs: [build-app]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: {name: webhook-tester-linux-amd64}
       - run: mkdir ./data
@@ -148,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-and-test-backend, lint-and-test-frontend]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: docker/build-push-action@v7
         with:
           context: .

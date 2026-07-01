@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env: {FORCE_COLOR: 'true', NPM_PREFIX: './web'}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with: {node-version-file: ./web/package.json, cache: 'npm', cache-dependency-path: ./web/package-lock.json}
       - run: npm --prefix "$NPM_PREFIX" install -dd --no-audit
@@ -32,7 +32,7 @@ jobs:
         arch: [amd64, arm64]
     needs: [build-web]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: gacts/github-slug@v1
         id: slug
       - id: values
@@ -95,7 +95,7 @@ jobs:
     name: Build the docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -132,7 +132,7 @@ jobs:
     needs: [build-docker-image]
     defaults: {run: {working-directory: ./deployments/helm}}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
       - uses: gacts/github-slug@v1
         id: slug
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [helm-pack]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with: {ref: gh-pages}
       - uses: azure/setup-helm@v5
       - uses: actions/download-artifact@v8
