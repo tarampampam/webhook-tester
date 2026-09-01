@@ -3,7 +3,7 @@ import { join, resolve } from 'path'
 import { defineConfig } from 'vite'
 import { compression } from 'vite-plugin-compression2'
 
-const rootDir = resolve(__dirname)
+const rootDir = resolve(import.meta.dirname)
 const [distDir, srcDir] = [join(rootDir, 'dist'), join(rootDir, 'src')]
 const isWatchMode = ['serve', 'dev', 'watch'].some((arg) => process.argv.slice(2).some((a) => a.indexOf(arg) !== -1))
 const devServerProxyTo = process.env?.['DEV_SERVER_PROXY_TO'] || undefined
