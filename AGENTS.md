@@ -13,7 +13,7 @@ through ngrok tunnel.
 - **TypeScript/React frontend** (`./web/`) - Vite-based SPA (React + Mantine UI + openapi-fetch)
 - **OpenAPI spec** (`./api/openapi.yml`) - source of truth for the HTTP API contract
 
-Go module: `gh.tarampamp.am/webhook-tester/v3`, Go version `>=1.26` (check the `go` directive in `go.mod` for the
+Go module: `gh.tarampamp.am/webhook-tester/v3`, Go version `>=1.27` (check the `go` directive in `go.mod` for the
 exact version).
 
 ## Hard prohibitions

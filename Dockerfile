@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # -✂- this stage is used to develop and build the application locally -------------------------------------------------
-FROM docker.io/library/golang:1.26.4-alpine AS builder
+FROM docker.io/library/golang:1.27-alpine AS builder
 
 # path to the directory used by go to store cache and modules (/var/cache/go)
 ENV GOCACHE=/var/cache/go/build GOMODCACHE=/var/cache/go/mod
