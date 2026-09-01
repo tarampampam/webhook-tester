@@ -3,7 +3,7 @@
 {{/* --- ORIGINAL CODE BEGIN --- */}}
 {{range .}}{{$opid := .OperationId}}
 {{range .TypeDefinitions}}
-// {{.TypeName}} defines parameters for {{$opid}}.
+{{if .Comment}}{{.Comment}}{{else}}// {{.TypeName}} defines parameters for {{$opid}}.{{end}}
 type {{.TypeName}} {{if .IsAlias}}={{end}} {{.Schema.TypeDecl}}
 {{end}}
 {{end}}

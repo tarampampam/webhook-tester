@@ -2,7 +2,7 @@
 
 {{/* --- ORIGINAL CODE BEGIN --- */}}
 {{range .Types}}
-{{ if .Schema.Description }}{{ toGoComment .Schema.Description .TypeName  }}{{ else }}// {{.TypeName}} defines model for {{.JsonName}}.{{ end }}
+{{ .DocComment }}
 type {{.TypeName}} {{if .IsAlias }}={{end}} {{.Schema.TypeDecl}}
 
 {{/* --- CUSTOM CODE BEGIN --- */ -}}
