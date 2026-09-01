@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: WebHook Tester
   description: The powerful tool to test webhooks and not only
-  version: 0.3.0
+  version: 0.4.0
   contact: {name: tarampampam, url: 'https://github.com/tarampampam'}
 
 servers:
@@ -28,7 +28,7 @@ paths:
       operationId: apiSessionCreate
       requestBody: {$ref: '#/components/requestBodies/CreateSessionRequest'}
       responses:
-        '200': {$ref: '#/components/responses/SessionOptionsResponse'}
+        '201': {$ref: '#/components/responses/CreateSessionResponse'}
         '400': {$ref: '#/components/responses/ErrorResponse'} # Bad request
         '5XX': {$ref: '#/components/responses/ErrorResponse'} # Server error
 
@@ -399,6 +399,18 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/AppSettings'}
+
+    CreateSessionResponse:
+      description: Created session information
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              uuid: {$ref: '#/components/schemas/UUID'}
+              created_at_unix_milli: {$ref: '#/components/schemas/UnixMilliTime'}
+            required: [uuid, created_at_unix_milli]
+            additionalProperties: false
 
     SessionOptionsResponse:
       description: Options of the session

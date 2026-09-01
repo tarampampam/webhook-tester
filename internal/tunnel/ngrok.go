@@ -2,115 +2,164 @@ package tunnel
 
 import (
 	"context"
-	"errors"
+	"crypto/tls"
 	"fmt"
-	"net/url"
-	"sync/atomic"
+	"sync"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
-	ngrokLog "golang.ngrok.com/ngrok/log"
+	"golang.ngrok.com/ngrok/v2"
+
+	"gh.tarampamp.am/webhook-tester/v3/internal/logger"
 )
 
+// Ngrok manages an outbound tunnel to the ngrok cloud service.
 type Ngrok struct {
-	tunnel    atomic.Pointer[ngrok.Forwarder]
-	authToken string
-	log       ngrokLog.Logger
+	mu          sync.Mutex
+	agent       ngrok.Agent
+	fwd         ngrok.EndpointForwarder
+	authToken   string
+	url         string
+	log         *logger.Logger
+	upstreamTLS *tls.Config
 }
 
-// NgrokOption is a functional option for the Ngrok instance.
+var _ Tunneler = (*Ngrok)(nil) // compile-time interface assertion
+
+// NgrokOption is a functional option for the [Ngrok] instance.
 type NgrokOption func(*Ngrok)
 
-// WithNgrokLogger sets the logger for the Ngrok instance.
-func WithNgrokLogger(log *zap.Logger) NgrokOption {
-	return func(n *Ngrok) { n.log = &ngrokLogAdapter{zap: log} }
+// WithNgrokLogger sets the logger for the [Ngrok] instance.
+func WithNgrokLogger(l *logger.Logger) NgrokOption {
+	return func(n *Ngrok) { n.log = l }
 }
 
-// NewNgrok creates a new Ngrok instance with the given auth token and options.
+// WithNgrokURL sets the public URL for the [Ngrok] instance.
+func WithNgrokURL(url string) NgrokOption {
+	return func(n *Ngrok) { n.url = url }
+}
+
+// WithNgrokTLSUpstream configures the [Ngrok] instance to forward to an HTTPS upstream using the provided TLS
+// client configuration. Pass [tls.Config] with InsecureSkipVerify set to true for self-signed certificates.
+func WithNgrokTLSUpstream(cfg *tls.Config) NgrokOption {
+	return func(n *Ngrok) { n.upstreamTLS = cfg }
+}
+
+// NewNgrok creates a new [Ngrok] instance with the given auth token and options.
 func NewNgrok(authToken string, opts ...NgrokOption) *Ngrok {
-	var n = Ngrok{
-		authToken: authToken,
-		log:       &ngrokLogAdapter{zap: zap.NewNop()},
-	}
+	n := &Ngrok{authToken: authToken}
 
 	for _, opt := range opts {
-		opt(&n)
+		opt(n)
 	}
 
-	return &n
+	return n
 }
 
+// Expose starts a ngrok tunnel to the given local port and returns the public URL.
 func (n *Ngrok) Expose(ctx context.Context, localPort uint16) (string, error) {
-	if n.tunnel.Load() != nil {
-		return "", errors.New("tunnel already started")
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.fwd != nil {
+		return "", ErrAlreadyStarted
 	}
 
-	var backendUrl, uErr = url.Parse(fmt.Sprintf("http://127.0.0.1:%d", localPort))
-	if uErr != nil {
-		return "", fmt.Errorf("failed to parse backend url: %w", uErr)
-	}
-
-	ln, tErr := ngrok.ListenAndForward(
-		ctx,
-		backendUrl,
-		config.HTTPEndpoint(),
-		ngrok.WithAuthtoken(n.authToken),
-		ngrok.WithLogger(n.log),
+	var (
+		agentOpts = []ngrok.AgentOption{
+			ngrok.WithAuthtoken(n.authToken),
+			ngrok.WithAutoConnect(true),
+		}
+		upstreamOpts []ngrok.UpstreamOption
+		forwardsOpts []ngrok.EndpointOption
+		scheme       = "http"
 	)
-	if tErr != nil {
-		return "", tErr
+
+	if n.log != nil {
+		agentOpts = append(agentOpts,
+			ngrok.WithLogger(n.log.Slog()),
+			ngrok.WithEventHandler(n.newEventsHandler()),
+		)
 	}
 
-	n.tunnel.Store(&ln)
-
-	return ln.URL(), nil
-}
-
-func (n *Ngrok) Close() error {
-	if old := n.tunnel.Swap(nil); old != nil {
-		return (*old).Close()
+	// setup upstream options based on TLS configuration, if provided
+	if n.upstreamTLS != nil {
+		scheme, upstreamOpts = "https", append(upstreamOpts, ngrok.WithUpstreamTLSClientConfig(n.upstreamTLS))
 	}
 
-	return errors.New("tunnel not started")
-}
-
-// ngrokLogAdapter is an adapter for the [ngrokLog.Logger] interface.
-type ngrokLogAdapter struct{ zap *zap.Logger }
-
-var _ ngrokLog.Logger = (*ngrokLogAdapter)(nil) // ensure ngrokLogAdapter implements [ngrokLog.Logger]
-
-// Log a message at the given level with data key/value pairs. data may be nil.
-func (n *ngrokLogAdapter) Log(_ context.Context, level ngrokLog.LogLevel, msg string, data map[string]any) {
-	var lvl zapcore.Level
-
-	switch level {
-	case ngrokLog.LogLevelTrace:
-		lvl = zapcore.DebugLevel
-	case ngrokLog.LogLevelDebug:
-		lvl = zapcore.DebugLevel
-	case ngrokLog.LogLevelInfo:
-		lvl = zapcore.InfoLevel
-	case ngrokLog.LogLevelWarn:
-		lvl = zapcore.WarnLevel
-	case ngrokLog.LogLevelError:
-		lvl = zapcore.ErrorLevel
-	case ngrokLog.LogLevelNone:
-		lvl = zapcore.DebugLevel
-	default:
-		n.zap.Error(fmt.Sprintf("invalid log level: %v", level))
-
-		return
+	// configure "public" URL if specified, otherwise ngrok will generate it itself
+	if n.url != "" {
+		forwardsOpts = append(forwardsOpts, ngrok.WithURL(n.url))
 	}
 
-	if ce := n.zap.Check(lvl, msg); ce != nil {
-		var fields = make([]zap.Field, 0, len(data))
+	// create agent
+	agent, agentErr := ngrok.NewAgent(agentOpts...)
+	if agentErr != nil {
+		return "", fmt.Errorf("create ngrok agent: %w", agentErr)
+	}
 
-		for k, v := range data {
-			fields = append(fields, zap.Any(k, v))
+	// and forwarder
+	fwd, fwdErr := agent.Forward(ctx, ngrok.WithUpstream(
+		fmt.Sprintf("%s://localhost:%d", scheme, localPort), // not `127.0.0.1` for IPv6 support
+		upstreamOpts...,
+	), forwardsOpts...)
+	if fwdErr != nil {
+		if err := agent.Disconnect(); err != nil {
+			return "", fmt.Errorf("start ngrok tunnel: %w; additionally, failed to disconnect agent: %w", fwdErr, err)
 		}
 
-		ce.Write(fields...)
+		return "", fmt.Errorf("start ngrok tunnel: %w", fwdErr)
+	}
+
+	n.agent, n.fwd = agent, fwd
+
+	return fwd.URL().String(), nil
+}
+
+// Close stops the active ngrok tunnel and disconnects the agent.
+func (n *Ngrok) Close() error {
+	n.mu.Lock()
+	agent, fwd := n.agent, n.fwd
+	n.agent, n.fwd = nil, nil
+	n.mu.Unlock()
+
+	if fwd == nil || agent == nil {
+		return nil
+	}
+
+	closeErr := fwd.Close()
+	disErr := agent.Disconnect()
+
+	if closeErr != nil && disErr != nil {
+		return fmt.Errorf("close ngrok tunnel: %w; additionally, failed to disconnect agent: %w", closeErr, disErr)
+	} else if closeErr != nil {
+		return fmt.Errorf("close ngrok tunnel: %w", closeErr)
+	} else if disErr != nil {
+		return fmt.Errorf("disconnect ngrok agent: %w", disErr)
+	}
+
+	return nil
+}
+
+func (n *Ngrok) newEventsHandler() ngrok.EventHandler {
+	if n.log == nil {
+		return func(e ngrok.Event) {} // no-op if no logger configured
+	}
+
+	return func(e ngrok.Event) {
+		switch v := e.(type) {
+		case *ngrok.EventAgentConnectSucceeded:
+			n.log.Info("ngrok agent connected")
+		case *ngrok.EventAgentDisconnected:
+			if v.Error != nil {
+				n.log.Error("ngrok agent disconnected", logger.Error(v.Error))
+			} else {
+				n.log.Info("ngrok agent disconnected")
+			}
+		case *ngrok.EventAgentHeartbeatReceived:
+			n.log.Debug("ngrok heartbeat", logger.Duration("latency", v.Latency))
+		case *ngrok.EventConnectionOpened:
+			n.log.Debug("ngrok connection opened", logger.String("remote_addr", v.RemoteAddr))
+		default:
+			n.log.Debug("ngrok event", logger.String("type", e.EventType().String()))
+		}
 	}
 }

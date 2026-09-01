@@ -1,749 +1,1251 @@
 package storage
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/md5" //nolint:gosec // MD5 is used for non-cryptographic hashing of filesystem paths
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
-
-	"gh.tarampamp.am/webhook-tester/v2/internal/encoding"
 )
 
-// FS is an implementation of the Storage interface that organizes data on the filesystem using the following structure:
+const (
+	fsDirPerm  = os.FileMode(0o755) // -rwxr-xr-x
+	fsFilePerm = os.FileMode(0o644) // -rw-r--r--
+
+	readDirSize            = 128 // number of entries to read per ReadDir call when scanning directories
+	requestMetaFilePostfix = ".meta.bin"
+)
+
+// FS is a filesystem-backed [Storage] implementation that organizes data on the filesystem using the following layout:
 //
 //	📂 {root}
-//	├── 📂 {session-uuid}
-//	│   ├── 📄 session.<expiration-time-unix-millis>.json
-//	│   ├── 📄 request.<created-time-unix-millis>.{request-uuid}.json
-//	│   └── …
+//	├── 📂 {md5(sID)}                   // 32-char lowercase hex directory per session
+//	│   ├── 📄 meta.bin                 // binary session metadata
+//	│   ├── 📄 session.json[.gz]        // session response payload
+//	│   └── 📂 requests
+//	│       ├── 📄 index.txt            // request index, one line per request
+//	│       ├── 📄 {md5(rID)}.meta.bin  // binary request metadata
+//	│       └── 📄 {md5(rID)}.json[.gz] // captured request payload
 //	└── …
+//
+// A background goroutine evicts expired sessions on a configurable interval; it stops when [FS.Close] is called or
+// the context passed to [NewFS] is canceled. After either event all methods return [ErrClosed].
 type FS struct {
-	sessionTTL      time.Duration
-	maxRequests     uint32
-	root            string
-	cleanupInterval time.Duration
-	encDec          encoding.EncoderDecoder
-	mu              sync.RWMutex
+	root          *os.Root
+	requestsLimit uint
+	compressor    Compressor
+	decBuf        *pool[*bytes.Buffer]
+	timeNow       func() time.Time
+	cleanupTick   time.Duration
+	mu            sync.RWMutex // TODO: make mutex file-based to allow multiple FS instances to share the same root
 
-	// this function returns the current time, it's used to mock the time in tests
-	timeNow TimeFunc
-
-	close  chan struct{}
-	closed atomic.Bool
-
-	dirPerm, filePerm os.FileMode
+	closeOnce     sync.Once     // guards closeSignalCh from being closed multiple times
+	closeSignalCh chan struct{} // closed to signal the cleanup goroutine to stop
+	closedCh      chan struct{} // closed when the cleanup goroutine has stopped, to allow Close to wait for it
 }
 
-var ( // ensure interface implementation
+var ( // compile-time interface assertion
 	_ Storage   = (*FS)(nil)
 	_ io.Closer = (*FS)(nil)
 )
 
+// FSOption configures an [FS] storage instance.
 type FSOption func(*FS)
 
-func WithFSCleanupInterval(v time.Duration) FSOption { return func(f *FS) { f.cleanupInterval = v } }
-func WithFSTimeNow(fn TimeFunc) FSOption             { return func(f *FS) { f.timeNow = fn } }
+// WithFSTimeNow sets the function that returns the current time.
+func WithFSTimeNow(fn func() time.Time) FSOption { return func(s *FS) { s.timeNow = fn } }
 
-//	func WithFSDirPerm(v os.FileMode) FSOption       { return func(f *FS) { f.dirPerm = v } }
-//	func WithFSFilePerm(v os.FileMode) FSOption      { return func(f *FS) { f.filePerm = v } }
+// WithFSCleanupInterval sets the interval between expired-session cleanup sweeps.
+// Defaults to 1 second.
+func WithFSCleanupInterval(d time.Duration) FSOption { return func(s *FS) { s.cleanupTick = d } }
 
-func NewFS(root string, sessionTTL time.Duration, maxRequests uint32, opts ...FSOption) *FS {
-	var s = FS{
-		root:            root,
-		sessionTTL:      sessionTTL,
-		maxRequests:     maxRequests,
-		cleanupInterval: time.Second, // default cleanup interval
-		encDec:          encoding.JSON{},
-		timeNow:         defaultTimeFunc,
-		close:           make(chan struct{}),
-		dirPerm:         os.FileMode(0755), //nolint:mnd
-		filePerm:        os.FileMode(0644), //nolint:mnd
-	}
+// WithFSCompressor sets the compressor used for session and request data files.
+// Defaults to [GzipCompressor].
+func WithFSCompressor(c Compressor) FSOption { return func(s *FS) { s.compressor = c } }
 
-	for _, opt := range opts {
-		opt(&s)
-	}
-
-	if s.cleanupInterval > time.Duration(0) {
-		go s.cleanup(context.Background()) // start cleanup goroutine
-	}
-
-	return &s
-}
-
-// newID generates a new (unique) ID.
-func (*FS) newID() string { return uuid.New().String() }
-
-// withLock lock the mutex for reading or writing and calls the specified function.
-// The readOnly parameter specifies whether the lock is read-only.
+// NewFS creates a new filesystem-backed storage instance rooted at root.
+// The caller retains ownership of root; [FS.Close] does not close it.
 //
-// The function returns the result of the function call.
-func (s *FS) withLock(readOnly bool, fn func() error) error {
-	if readOnly {
-		s.mu.RLock()
-	} else {
-		s.mu.Lock()
+// `requestsLimit` is the maximum number of captured requests stored per session (0 = unlimited).
+// The cleanup goroutine stops when Close is called or ctx is canceled; either event closes the storage.
+func NewFS(ctx context.Context, root *os.Root, requestsLimit uint, opts ...FSOption) *FS { //nolint:gocognit
+	s := &FS{
+		root:          root,
+		requestsLimit: requestsLimit,
+		compressor:    NewGzipCompressor(gzip.BestSpeed),
+		decBuf:        newPool[*bytes.Buffer](func() *bytes.Buffer { return new(bytes.Buffer) }),
+		timeNow:       time.Now,
+		cleanupTick:   time.Second,
+		closeSignalCh: make(chan struct{}),
+		closedCh:      make(chan struct{}),
 	}
 
-	defer func() {
-		if readOnly {
-			s.mu.RUnlock()
-		} else {
-			s.mu.Unlock()
+	for _, o := range opts {
+		o(s)
+	}
+
+	go func() {
+		defer func() {
+			s.closeOnce.Do(func() { close(s.closeSignalCh) }) // ensure ErrClosed is returned after ctx cancel
+			close(s.closedCh)
+		}()
+
+		ticker := time.NewTicker(s.cleanupTick)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.closeSignalCh:
+				return
+			case <-ticker.C:
+				s.mu.Lock()
+
+				now := s.timeNow()
+
+				if rootDir, oErr := s.root.Open("."); oErr == nil {
+					for {
+						dirs, rdErr := rootDir.ReadDir(readDirSize)
+						if rdErr != nil && !errors.Is(rdErr, io.EOF) {
+							break // something went wrong reading the root directory
+						}
+
+						for _, d := range dirs {
+							if !d.IsDir() || !s.isValidHash(d.Name()) {
+								continue
+							}
+
+							if meta, mErr := s.readSessionMetaH(d.Name()); mErr == nil && meta.IsExpired(now) {
+								_ = s.root.RemoveAll(d.Name()) //nolint:errcheck
+							}
+						}
+
+						if rdErr != nil {
+							break // includes io.EOF
+						}
+					}
+
+					_ = rootDir.Close()
+				}
+
+				s.mu.Unlock()
+			}
 		}
 	}()
 
-	return fn()
+	return s
 }
 
-func (s *FS) cleanup(ctx context.Context) {
-	var timer = time.NewTimer(s.cleanupInterval)
-	defer timer.Stop()
+// Reindex rebuilds all per-session request indexes by scanning the filesystem.
+//
+// It is safe to call on a clean (empty) directory - no index files are written if no session directories are found.
+//
+// Callers should invoke Reindex once after [NewFS] when crash recovery is desired - a clean shutdown keeps request
+// indexes consistent, but an unexpected process termination may leave them stale. Reindex is not required for a
+// first-time startup on an empty directory, and is not needed on normal (non-crash) restarts.
+//
+// Reindex holds the write lock for its entire duration, blocking all concurrent reads and writes.
+//
+// If ctx is canceled mid-scan, request indexes for sessions already processed will have been updated.
+// Reindex always returns a non-nil error in that case; callers that require a consistent index must call it again.
+func (s *FS) Reindex(ctx context.Context) error { //nolint:gocognit,funlen
+	if err := s.checkOpen(ctx); err != nil {
+		return err
+	}
 
-	for {
-		select {
-		case <-s.close: // close signal received
-			return
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-			var (
-				now  = s.timeNow()
-				dirs []os.DirEntry
-				sIDs []string
-			)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-			// list all session directories
-			if err := s.withLock(true, func() (err error) { dirs, err = os.ReadDir(s.root); return }); err == nil { //nolint:nlreturn,lll
-				sIDs = make([]string, 0, len(dirs))
+	const ioWorkers = 32 // optimal queue depth for NVMe
 
-				for _, dir := range dirs {
-					if dir.IsDir() && len(dir.Name()) == 36 { // UUID length
-						sIDs = append(sIDs, dir.Name())
-					}
+	// semaphore limits concurrent request-reindex goroutines
+	sem := make(chan struct{}, ioWorkers)
+	defer close(sem)
+
+	var (
+		outErr atomic.Pointer[error]
+		wg     sync.WaitGroup
+	)
+
+	root, oErr := s.root.Open(".")
+	if oErr != nil {
+		return fmt.Errorf("open root directory: %w", oErr)
+	}
+
+	defer func() { _ = root.Close() }()
+
+rootDirsLoop:
+	for { // iterate over all files and directories in the root
+		if err := ctx.Err(); err != nil {
+			outErr.Store(&err)
+
+			break
+		}
+
+		rootDirs, rootDirsErr := root.ReadDir(readDirSize)
+		if rootDirsErr != nil && !errors.Is(rootDirsErr, io.EOF) {
+			outErr.Store(&rootDirsErr)
+
+			break
+		}
+
+		for _, rootDir := range rootDirs {
+			if err := ctx.Err(); err != nil {
+				outErr.Store(&err)
+
+				break rootDirsLoop
+			}
+
+			// skip non-directories, and directories that don't look like session dirs
+			if !rootDir.IsDir() || !s.isValidHash(rootDir.Name()) {
+				continue
+			}
+
+			// read the session metadata file to skip expired sessions
+			sm, smErr := s.root.Open(s.sessionMetaFileH(rootDir.Name()))
+			if smErr != nil {
+				if errors.Is(smErr, os.ErrNotExist) {
+					continue // skip partially created or already removed
 				}
+
+				outErr.Store(new(fmt.Errorf("open session metadata %s: %w", rootDir.Name(), smErr)))
+
+				break rootDirsLoop
 			}
 
-			var wg sync.WaitGroup
+			var sessionMeta fsSessionMeta
 
-			for _, sID := range sIDs {
-				wg.Go(func() {
-					// check the session expiration
-					if _, expiresAt, err := s.findSessionFile(sID); err == nil && expiresAt.Before(now) {
-						_ = s.DeleteSession(ctx, sID) // and delete the expired
+			_, mrErr := sessionMeta.ReadFrom(sm)
+			_ = sm.Close()
+
+			if mrErr != nil || sessionMeta.IsExpired(s.timeNow()) {
+				continue // skip expired sessions and sessions with unreadable metadata file
+			}
+
+			sem <- struct{}{} // acquire a goroutine slot
+
+			wg.Add(1)
+
+			// reindex the requests for this session in a separate goroutine to speed up the process
+			go func(sHash string) {
+				defer func() { <-sem; wg.Done() }() // release the goroutine slot when done
+
+				if ctx.Err() != nil { // respect context cancellation
+					return
+				}
+
+				reqDir, reqDirErr := s.root.Open(s.requestsDirH(sHash))
+				if reqDirErr != nil {
+					if !errors.Is(reqDirErr, os.ErrNotExist) {
+						outErr.Store(new(fmt.Errorf("open requests dir %s: %w", sHash, reqDirErr)))
 					}
-				})
-			}
 
-			wg.Wait()
-			timer.Reset(s.cleanupInterval)
+					return // no requests directory - nothing to index
+				}
+
+				defer func() { _ = reqDir.Close() }()
+
+				if err := newFSRequestIndex(s.root, s.requestsDirH(sHash)).WriteIndex(func(yield func(fsRequestIndexRecord) bool) {
+					for {
+						if ctx.Err() != nil {
+							return
+						}
+
+						// read requests directories
+						reqFiles, rdErr := reqDir.ReadDir(readDirSize)
+						if rdErr != nil && !errors.Is(rdErr, io.EOF) {
+							outErr.Store(new(fmt.Errorf("read requests dir %s: %w", sHash, rdErr)))
+
+							return
+						}
+
+						for _, reqFile := range reqFiles {
+							rHash, ok := s.requestHashFromFilename(reqFile.Name())
+							if !reqFile.Type().IsRegular() || !ok {
+								continue
+							}
+
+							// read request metadata file
+							rmf, rmfErr := s.root.Open(s.requestMetaFileH(sHash, rHash))
+							if rmfErr != nil {
+								if errors.Is(rmfErr, os.ErrNotExist) {
+									continue
+								}
+
+								outErr.Store(new(fmt.Errorf("open request metadata %s/%s: %w", sHash, rHash, rmfErr)))
+
+								return
+							}
+
+							var requestMeta fsRequestMeta
+
+							_, readErr := requestMeta.ReadFrom(rmf)
+							_ = rmf.Close()
+
+							if readErr != nil {
+								continue // skip requests with unreadable metadata
+							}
+
+							// pass the request index entry to the index writer
+							if !yield(fsRequestIndexRecord{Hash: rHash, CreatedAt: requestMeta.CreatedAt}) {
+								return
+							}
+						}
+
+						if errors.Is(rdErr, io.EOF) {
+							return
+						}
+					}
+				}); err != nil {
+					outErr.Store(new(fmt.Errorf("write requests index for session %s: %w", sHash, err)))
+				}
+			}(rootDir.Name())
+		}
+
+		if errors.Is(rootDirsErr, io.EOF) {
+			break // end of directory reached
 		}
 	}
+
+	wg.Wait()
+
+	if err := outErr.Load(); err != nil && *err != nil {
+		return *err
+	}
+
+	return ctx.Err() // non-nil if context was canceled after the sessions scan but during goroutines
 }
 
-// isOpenAndNotDone checks if the storage is open and the context is not done.
-func (s *FS) isOpenAndNotDone(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err // context is done
-	} else if s.closed.Load() {
-		return ErrClosed // storage is closed
+// checkOpen returns [ErrClosed] if the storage has been closed, or ctx.Err() if the context is done.
+func (s *FS) checkOpen(ctx context.Context) error {
+	select {
+	case <-s.closeSignalCh:
+		return ErrClosed
+	default:
+		return ctx.Err()
 	}
+}
+
+// Close implements [io.Closer]. It stops the cleanup goroutine and marks the storage as closed.
+// All subsequent method calls return [ErrClosed]. Safe to call more than once.
+func (s *FS) Close() error {
+	s.closeOnce.Do(func() { close(s.closeSignalCh) })
+	<-s.closedCh
 
 	return nil
 }
 
-// sessionDir returns the path to the session directory (e.g. {root}/{sID}).
-func (s *FS) sessionDir(sID string) string { return path.Join(s.root, sID) }
+// NewSession implements [SessionStorage].
+func (s *FS) NewSession(
+	ctx context.Context,
+	sID string,
+	response SessionResponse,
+	ttl time.Duration,
+) (_ *SessionMeta, outErr error) {
+	if err := s.checkOpen(ctx); err != nil {
+		return nil, err
+	}
 
-func (s *FS) findSessionFile(sID string) (filePath string, _ *time.Time, _ error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	var (
-		dir   = s.sessionDir(sID)
-		files []os.DirEntry
+		now  = s.timeNow()
+		hash = s.hash(sID)
 	)
 
-	if err := s.withLock(true, func() (err error) { files, err = os.ReadDir(dir); return }); err != nil { //nolint:nlreturn,lll
-		return "", nil, err // directory reading failed
-	}
-
-	const prefix, postfix = "session.", ".json"
-
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue // is not a regular file
-		}
-
-		if n := file.Name(); strings.HasPrefix(n, prefix) && strings.HasSuffix(n, postfix) {
-			var ts, err = strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(n, prefix), postfix), 10, 64)
-			if err != nil {
-				return "", nil, err // timestamp parsing failed
+	// check if the session already exists - it may be expired, so we need to remove it first
+	if meta, mErr := s.readSessionMetaH(hash); mErr == nil {
+		if meta.IsExpired(now) { // session expired - remove it
+			if err := s.root.RemoveAll(hash); err != nil {
+				return nil, err
 			}
-
-			var t = time.UnixMilli(ts)
-
-			return path.Join(dir, n), &t, nil
+		} else { // session exists and is not expired
+			return nil, ErrSessionAlreadyExists
 		}
+	} else if !errors.Is(mErr, ErrSessionNotFound) { // unexpected error
+		return nil, mErr
 	}
 
-	return "", nil, os.ErrNotExist // no file found
-}
-
-type fsRequestFile struct {
-	rID, path string
-	createdAt time.Time
-}
-
-// listRequestFiles returns a list of request files for the specified session ID. The list is sorted by creation time
-// (newest first).
-func (s *FS) listRequestFiles(sID string) ([]fsRequestFile, error) {
-	var (
-		dir   = s.sessionDir(sID)
-		files []os.DirEntry
-	)
-
-	if err := s.withLock(true, func() (err error) { files, err = os.ReadDir(dir); return }); err != nil { //nolint:nlreturn,lll
-		return nil, err // directory reading failed
+	// create the deepest directory to automatically create all parent ones
+	if err := s.root.MkdirAll(s.requestsDirH(hash), fsDirPerm); err != nil {
+		return nil, fmt.Errorf("create session directory: %w", err)
 	}
 
-	var list = make([]fsRequestFile, 0, len(files)-1) // -1 because we don't count the session file
-
-	const prefix, postfix = "request.", ".json"
-
-	// filter out request files
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() {
-			continue // is not a regular file
+	defer func() { // on any error (after creating any file/dir) remove the session dir to avoid leaving corrupted data
+		if outErr != nil {
+			_ = s.root.RemoveAll(hash) //nolint:errcheck
 		}
+	}()
 
-		// file format: request.<created-time-unix-millis>.{request-uuid}.json
-		if n := file.Name(); strings.HasPrefix(n, prefix) && strings.HasSuffix(n, postfix) {
-			var parts = strings.Split(strings.TrimSuffix(strings.TrimPrefix(n, prefix), postfix), ".")
-			if len(parts) != 2 { //nolint:mnd
-				continue // invalid file name
-			}
-
-			var ts, tsErr = strconv.ParseInt(parts[0], 10, 64)
-			if tsErr != nil {
-				continue // timestamp parsing failed
-			}
-
-			list = append(list, fsRequestFile{
-				rID:       parts[1],
-				path:      path.Join(dir, n),
-				createdAt: time.UnixMilli(ts),
-			})
-		}
+	var expiresAt time.Time
+	if ttl != NoExpiration {
+		expiresAt = now.Add(ttl)
 	}
 
-	// sort the list by creation time (newest first)
-	slices.SortFunc(list, func(a, b fsRequestFile) int { return int(b.createdAt.UnixMilli() - a.createdAt.UnixMilli()) })
-
-	return list, nil
-}
-
-func (s *FS) NewSession(ctx context.Context, session Session, id ...string) (sID string, _ error) {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return "", err // closed, or context is done
-	}
-
-	var now = s.timeNow()
-
-	if len(id) > 0 { //nolint:nestif // use the specified ID
-		if len(id[0]) == 0 {
-			return "", errors.New("empty session ID")
-		}
-
-		sID = id[0]
-
-		if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return "", err // unexpected error (ignore "session not found" error)
-			}
-		} else if expiresAt.Before(now) { // session found, but expired
-			if dErr := s.DeleteSession(ctx, sID); dErr != nil {
-				return "", dErr
-			}
-		} else { // no error, not expired == session already exists
-			return "", errors.New("session already exists")
-		}
-	} else {
-		sID = s.newID() // generate a new ID
-	}
-
-	// set the creation time
-	session.CreatedAtUnixMilli = now.UnixMilli()
-
-	// encode the session data
-	data, mErr := s.encDec.Encode(session)
-	if mErr != nil {
-		return "", mErr
-	}
-
-	if err := s.withLock(false, func() error {
-		var sessionDir = s.sessionDir(sID)
-
-		// create a session directory
-		if err := os.Mkdir(sessionDir, s.dirPerm); err != nil {
-			return err
-		}
-
-		// create a session file
-		f, fErr := os.OpenFile(
-			path.Join(sessionDir, fmt.Sprintf("session.%d.json", now.Add(s.sessionTTL).UnixMilli())),
-			os.O_WRONLY|os.O_CREATE,
-			s.filePerm,
-		)
+	{ // create the session metadata file
+		f, fErr := s.root.OpenFile(s.sessionMetaFileH(hash), os.O_CREATE|os.O_WRONLY|os.O_EXCL, fsFilePerm)
 		if fErr != nil {
-			return fErr
+			return nil, fmt.Errorf("create session metadata file: %w", fErr)
 		}
 
-		defer func() { _ = f.Close() }()
+		if _, err := (&fsSessionMeta{
+			CreatedAt: now,
+			ExpiresAt: expiresAt,
+			ID:        sID,
+		}).WriteTo(f); err != nil {
+			_ = f.Close()
 
-		// write the data to the file
-		if _, err := f.Write(data); err != nil {
-			return fErr
+			return nil, fmt.Errorf("write session metadata: %w", err)
 		}
 
-		return f.Close()
-	}); err != nil {
-		return "", err
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
 	}
 
-	return sID, nil
-}
+	{ // create the session data file
+		approxCap := 64 + len(response.Headers)*8 //nolint:mnd // ~64 bytes of JSON overhead + ~8 bytes per header
+		headers := make([]fsResponseHeader, len(response.Headers))
 
-func (s *FS) GetSession(ctx context.Context, sID string) (*Session, error) {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return nil, err // closed, or context is done
-	}
-
-	var now = s.timeNow()
-
-	filePath, expiresAt, sErr := s.findSessionFile(sID)
-	if sErr != nil {
-		if errors.Is(sErr, os.ErrNotExist) {
-			return nil, ErrSessionNotFound
+		for i, v := range response.Headers {
+			headers[i] = fsResponseHeader(v)
+			approxCap += len(v.Name) + len(v.Value)
 		}
 
-		return nil, sErr
-	} else if expiresAt.Before(now) { // check the session expiration
-		if err := s.DeleteSession(ctx, sID); err != nil {
+		var buf bytes.Buffer
+
+		buf.Grow(approxCap + len(response.Body))
+
+		if err := json.NewEncoder(&buf).Encode(fsSession{
+			Code:      response.Code,
+			Headers:   headers,
+			Body:      response.Body,
+			DelayNano: response.Delay.Nanoseconds(),
+		}); err != nil {
 			return nil, err
 		}
 
-		return nil, ErrSessionNotFound // session has been expired
+		f, fErr := s.root.OpenFile(s.sessionDataFileH(hash), os.O_CREATE|os.O_WRONLY|os.O_EXCL, fsFilePerm)
+		if fErr != nil {
+			return nil, fmt.Errorf("create session data file: %w", fErr)
+		}
+
+		if err := s.compressor.Compress(&buf, f); err != nil {
+			_ = f.Close()
+
+			return nil, err
+		}
+
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
 	}
 
-	var data []byte
+	return &SessionMeta{
+		CreatedAt: now,
+		ExpiresAt: expiresAt,
+	}, nil
+}
 
-	if err := s.withLock(true, func() (err error) {
-		var f *os.File
-
-		if f, err = os.OpenFile(filePath, os.O_RDONLY, 0); err != nil {
-			return // file opening failed
-		}
-
-		defer func() { _ = f.Close() }()
-
-		if data, err = io.ReadAll(f); err != nil {
-			return // failed to read the file
-		}
-
-		return f.Close()
-	}); err != nil {
-		if errors.Is(err, os.ErrNotExist) { // probably, another thread has deleted the session
-			return nil, ErrSessionNotFound
-		}
-
+// GetSession implements [SessionStorage].
+func (s *FS) GetSession(ctx context.Context, sID string) (*Session, error) {
+	if err := s.checkOpen(ctx); err != nil {
 		return nil, err
 	}
 
-	// decode
-	var session Session
-	if uErr := s.encDec.Decode(data, &session); uErr != nil {
-		return nil, uErr
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sHash := s.hash(sID)
+
+	meta, mErr := s.readSessionMetaH(sHash)
+	if mErr != nil {
+		return nil, mErr
 	}
 
-	// set the expiration time
-	session.ExpiresAt = *expiresAt
+	// don't remove expired sessions here - just return not found, and let the cleanup goroutine remove them
+	// eventually, or once the client tries to create a new session with the same ID
+	if meta.IsExpired(s.timeNow()) {
+		return nil, ErrSessionNotFound
+	}
 
-	return &session, nil
+	data, dErr := s.readSessionDataH(sHash)
+	if dErr != nil {
+		return nil, dErr
+	}
+
+	return &Session{Meta: meta.toSessionMeta(), Response: data.toSessionResponse()}, nil
 }
 
+// AddSessionTTL implements [SessionStorage].
 func (s *FS) AddSessionTTL(ctx context.Context, sID string, howMuch time.Duration) error {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return err // closed, or context is done
-	}
-
-	var now = s.timeNow()
-
-	filePath, expiresAt, sErr := s.findSessionFile(sID)
-	if sErr != nil {
-		if errors.Is(sErr, os.ErrNotExist) {
-			return ErrSessionNotFound
-		}
-
-		return sErr
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return dErr
-		}
-
-		return ErrSessionNotFound
-	}
-
-	// rename the session file, to store the new expiration time
-	return s.withLock(false, func() error {
-		return os.Rename(
-			filePath,
-			path.Join(path.Dir(filePath), fmt.Sprintf("session.%d.json", expiresAt.Add(howMuch).UnixMilli())),
-		)
-	})
-}
-
-func (s *FS) DeleteSession(ctx context.Context, sID string) error {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return err // closed, or context is done
-	}
-
-	if _, _, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return ErrSessionNotFound
-		}
-
+	if err := s.checkOpen(ctx); err != nil {
 		return err
 	}
 
-	// delete the session directory with all its content
-	return s.withLock(false, func() error { return os.RemoveAll(s.sessionDir(sID)) })
-}
-
-func (s *FS) NewRequest(ctx context.Context, sID string, r Request) (rID string, _ error) { //nolint:funlen,gocyclo
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return "", err
-	}
-
-	var now = s.timeNow()
-
-	// check the session existence
-	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", ErrSessionNotFound
-		}
-
-		return "", err
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return "", dErr
-		}
-
-		return "", ErrSessionNotFound
-	}
-
-	rID, r.CreatedAtUnixMilli = s.newID(), now.UnixMilli()
-
-	data, mErr := s.encDec.Encode(r)
-	if mErr != nil {
-		return "", mErr
-	}
-
-	if err := s.withLock(false, func() (err error) {
-		var (
-			dir = s.sessionDir(sID)
-			f   *os.File
-		)
-
-		// create a request file
-		if f, err = os.OpenFile(
-			path.Join(dir, fmt.Sprintf("request.%d.%s.json", r.CreatedAtUnixMilli, rID)),
-			os.O_WRONLY|os.O_CREATE,
-			s.filePerm,
-		); err != nil {
-			return
-		}
-
-		defer func() { _ = f.Close() }()
-
-		// write the request data to the file
-		if _, err = f.Write(data); err != nil {
-			return
-		}
-
-		return f.Close()
-	}); err != nil {
-		return "", err
-	}
-
-	if s.maxRequests > 0 { // limit stored requests count
-		list, lErr := s.listRequestFiles(sID)
-		if lErr != nil {
-			return "", lErr
-		}
-
-		if len(list) > int(s.maxRequests) {
-			var toRemove = list[s.maxRequests:]
-
-			// remove unnecessary files
-			if err := s.withLock(false, func() (err error) {
-				for _, file := range toRemove {
-					if err = os.Remove(file.path); err != nil {
-						return err // return the first error
-					}
-				}
-
-				return
-			}); err != nil {
-				return "", err // failed to remove files
-			}
-		}
-	}
-
-	return rID, nil
-}
-
-func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) { //nolint:funlen,gocyclo,gocognit
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return nil, err
-	}
-
-	var now = s.timeNow()
-
-	// check the session existence
-	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrSessionNotFound
-		}
-
-		return nil, err
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return nil, dErr
-		}
-
-		return nil, ErrSessionNotFound
-	}
-
-	var data []byte
-
-	if err := s.withLock(true, func() (err error) {
-		var (
-			dir   = s.sessionDir(sID)
-			files []os.DirEntry
-		)
-
-		if files, err = os.ReadDir(dir); err != nil {
-			return // directory reading failed
-		}
-
-		for _, file := range files {
-			if file.IsDir() || !file.Type().IsRegular() {
-				continue // is not a regular file
-			}
-
-			if n := file.Name(); strings.HasPrefix(n, "request.") && strings.Contains(n, rID) {
-				var f *os.File
-
-				if f, err = os.OpenFile(path.Join(dir, n), os.O_RDONLY, 0); err != nil {
-					return // file opening failed
-				}
-
-				if d, rErr := io.ReadAll(f); rErr != nil {
-					_ = f.Close() // do not forget to close the file in case of an error
-
-					return rErr // reading failed
-				} else {
-					data = d
-				}
-
-				return f.Close()
-			}
-		}
-
-		return
-	}); err != nil {
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return nil, ErrRequestNotFound // request not found (no data)
-	}
-
-	var request Request
-	if uErr := s.encDec.Decode(data, &request); uErr != nil {
-		return nil, uErr
-	}
-
-	return &request, nil
-}
-
-func (s *FS) GetAllRequests(ctx context.Context, sID string) (map[string]Request, error) { //nolint:funlen
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return nil, err
-	}
-
-	var now = s.timeNow()
-
-	// check the session existence
-	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrSessionNotFound
-		}
-
-		return nil, err
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return nil, dErr
-		}
-
-		return nil, ErrSessionNotFound
-	}
-
-	// list all request files
-	var list, lErr = s.listRequestFiles(sID)
-	if lErr != nil {
-		return nil, lErr
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	var (
-		eg errgroup.Group
-		mu sync.Mutex // protect the map
-		m  = make(map[string]Request, len(list))
+		sHash = s.hash(sID)
+		now   = s.timeNow()
 	)
 
-	for _, file := range list {
-		eg.Go(func() error {
-			var data []byte
-
-			if err := s.withLock(true, func() (err error) {
-				var f *os.File
-
-				if f, err = os.OpenFile(file.path, os.O_RDONLY, 0); err != nil {
-					return // file opening failed
-				}
-
-				if data, err = io.ReadAll(f); err != nil {
-					_ = f.Close() // do not forget to close the file in case of an error
-
-					return // reading failed
-				}
-
-				return f.Close()
-			}); err != nil {
-				return err
-			}
-
-			var request Request
-			if err := s.encDec.Decode(data, &request); err != nil {
-				return err // decoding failed
-			}
-
-			mu.Lock()
-			m[file.rID] = request
-			mu.Unlock()
-
-			return nil
-		})
+	meta, mErr := s.readSessionMetaH(sHash)
+	if mErr != nil {
+		return mErr
 	}
 
-	return m, eg.Wait()
-}
-
-func (s *FS) DeleteRequest(ctx context.Context, sID, rID string) error {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
-		return err
-	}
-
-	var now = s.timeNow()
-
-	// check the session existence
-	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return ErrSessionNotFound
-		}
-
-		return err
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return dErr
-		}
-
+	// expired = not found (creating a new session with the same ID will remove the expired one)
+	if meta.IsExpired(now) {
 		return ErrSessionNotFound
 	}
 
-	// list all request files
-	var list, lErr = s.listRequestFiles(sID)
-	if lErr != nil {
-		return lErr
+	if howMuch == NoExpiration {
+		meta.ExpiresAt = time.Time{}
+	} else {
+		meta.ExpiresAt = now.Add(howMuch)
 	}
 
-	for _, file := range list {
-		if file.rID == rID {
-			return s.withLock(false, func() error { return os.Remove(file.path) })
-		}
+	f, fErr := s.root.OpenFile(s.sessionMetaFileH(sHash), os.O_WRONLY|os.O_TRUNC, fsFilePerm)
+	if fErr != nil {
+		return fErr
 	}
 
-	return ErrRequestNotFound
+	if _, err := meta.WriteTo(f); err != nil {
+		_ = f.Close()
+
+		return fmt.Errorf("write session metadata: %w", err)
+	}
+
+	return f.Close()
 }
 
-func (s *FS) DeleteAllRequests(ctx context.Context, sID string) error {
-	if err := s.isOpenAndNotDone(ctx); err != nil {
+// DeleteSession implements [SessionStorage].
+func (s *FS) DeleteSession(ctx context.Context, sID string) error {
+	if err := s.checkOpen(ctx); err != nil {
 		return err
 	}
 
-	var now = s.timeNow()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	// check the session existence
-	if _, expiresAt, err := s.findSessionFile(sID); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return ErrSessionNotFound
-		}
+	sHash := s.hash(sID)
 
-		return err
-	} else if expiresAt.Before(now) {
-		if dErr := s.DeleteSession(ctx, sID); dErr != nil { // delete the expired session
-			return dErr
-		}
+	meta, mErr := s.readSessionMetaH(sHash)
+	if mErr != nil {
+		return mErr
+	}
 
+	if meta.IsExpired(s.timeNow()) {
 		return ErrSessionNotFound
 	}
 
-	// list all request files
-	var list, lErr = s.listRequestFiles(sID)
-	if lErr != nil {
-		return lErr
-	}
-
-	if err := s.withLock(false, func() (err error) {
-		for _, file := range list {
-			if err = os.Remove(file.path); err != nil {
-				return // return the first error
-			}
-		}
-
-		return
-	}); err != nil {
-		return err // failed to remove files
+	if err := s.root.RemoveAll(sHash); err != nil {
+		return fmt.Errorf("remove session directory: %w", err)
 	}
 
 	return nil
 }
 
-func (s *FS) Close() error {
-	if s.closed.CompareAndSwap(false, true) {
-		close(s.close)
-
-		return nil
+// NewRequest implements [RequestStorage].
+func (s *FS) NewRequest( //nolint:funlen,gocognit
+	ctx context.Context,
+	sID, rID string,
+	req CapturedRequest,
+) (_ *RequestMeta, outErr error) {
+	if err := s.checkOpen(ctx); err != nil {
+		return nil, err
 	}
 
-	return ErrClosed
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var (
+		now          = s.timeNow()
+		sHash, rHash = s.hash(sID), s.hash(rID)
+	)
+
+	sessMeta, mErr := s.readSessionMetaH(sHash)
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	if sessMeta.IsExpired(now) {
+		return nil, ErrSessionNotFound
+	}
+
+	// check the request existence before creating any files
+	if _, statErr := s.root.Stat(s.requestMetaFileH(sHash, rHash)); statErr == nil {
+		return nil, ErrRequestAlreadyExists
+	}
+
+	rIdx := newFSRequestIndex(s.root, s.requestsDirH(sHash))
+
+	// evict the oldest requests if the per-session limit is reached
+	if s.requestsLimit > 0 { //nolint:nestif
+		var (
+			list   = make([]sortEntry, 0, s.requestsLimit+1)
+			idxErr error
+		)
+
+		if idxIter, idxIterErr := rIdx.ReadIndex(&idxErr); idxIterErr == nil {
+			for idxEntry := range idxIter {
+				list = append(list, sortEntry{id: idxEntry.Hash, createdAt: idxEntry.CreatedAt})
+			}
+		} else if !errors.Is(idxIterErr, os.ErrNotExist) {
+			return nil, fmt.Errorf("read request index: %w", idxIterErr)
+		}
+
+		if idxErr != nil {
+			return nil, fmt.Errorf("decode request index: %w", idxErr)
+		}
+
+		if uint(len(list)) >= s.requestsLimit {
+			slices.SortFunc(list, func(a, b sortEntry) int { return b.createdAt.Compare(a.createdAt) })
+
+			excess := list[s.requestsLimit-1:] // all entries at or beyond position limit-1
+
+			for _, e := range excess {
+				if err := s.root.Remove(s.requestMetaFileH(sHash, e.id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("remove request metadata: %w", err)
+				}
+
+				if err := s.root.Remove(s.requestDataFileH(sHash, e.id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("remove request data: %w", err)
+				}
+			}
+
+			if err := rIdx.DeleteRecords(func(e fsRequestIndexRecord) bool {
+				return slices.ContainsFunc(excess, func(ev sortEntry) bool { return e.Hash == ev.id })
+			}); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("update request index after eviction: %w", err)
+			}
+		}
+	}
+
+	var (
+		metaPath = s.requestMetaFileH(sHash, rHash)
+		dataPath = s.requestDataFileH(sHash, rHash)
+	)
+
+	defer func() { // on any error after this point - remove new request files to avoid corrupted state
+		if outErr != nil {
+			_ = s.root.Remove(metaPath) //nolint:errcheck
+			_ = s.root.Remove(dataPath) //nolint:errcheck
+		}
+	}()
+
+	{ // write the request metadata file
+		f, fErr := s.root.OpenFile(metaPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, fsFilePerm)
+		if fErr != nil {
+			return nil, fmt.Errorf("create request metadata file: %w", fErr)
+		}
+
+		if _, err := (&fsRequestMeta{
+			CreatedAt: now,
+			ID:        rID,
+		}).WriteTo(f); err != nil {
+			_ = f.Close()
+
+			return nil, fmt.Errorf("write request metadata: %w", err)
+		}
+
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+	}
+
+	{ // write the request data file
+		approxCap := 64 + len(req.Headers)*8 //nolint:mnd // ~64 bytes of JSON overhead + ~8 bytes per header
+		headers := make([]fsRequestHeader, len(req.Headers))
+
+		for i, v := range req.Headers {
+			headers[i] = fsRequestHeader(v)
+			approxCap += len(v.Name) + len(v.Value)
+		}
+
+		var buf bytes.Buffer
+
+		buf.Grow(approxCap + len(req.Body))
+
+		if err := json.NewEncoder(&buf).Encode(fsRequest{
+			ClientAddr: req.ClientAddr,
+			Method:     req.Method,
+			Body:       req.Body,
+			Headers:    headers,
+			URL:        req.URL,
+		}); err != nil {
+			return nil, err
+		}
+
+		f, fErr := s.root.OpenFile(dataPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, fsFilePerm)
+		if fErr != nil {
+			return nil, fmt.Errorf("create request data file: %w", fErr)
+		}
+
+		if err := s.compressor.Compress(&buf, f); err != nil {
+			_ = f.Close()
+
+			return nil, err
+		}
+
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := rIdx.AddRecord(fsRequestIndexRecord{Hash: rHash, CreatedAt: now}); err != nil {
+		return nil, fmt.Errorf("update request index: %w", err)
+	}
+
+	return &RequestMeta{CreatedAt: now}, nil
+}
+
+// GetRequest implements [RequestStorage].
+func (s *FS) GetRequest(ctx context.Context, sID, rID string) (*Request, error) {
+	if err := s.checkOpen(ctx); err != nil {
+		return nil, err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sHash, rHash := s.hash(sID), s.hash(rID)
+
+	sessMeta, sErr := s.readSessionMetaH(sHash)
+	if sErr != nil {
+		return nil, sErr
+	}
+
+	if sessMeta.IsExpired(s.timeNow()) {
+		return nil, ErrSessionNotFound
+	}
+
+	reqMeta, mErr := s.readRequestMetaH(sHash, rHash)
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	data, dErr := s.readRequestDataH(sHash, rHash)
+	if dErr != nil {
+		return nil, dErr
+	}
+
+	return &Request{Meta: reqMeta.toRequestMeta(), Data: data.toCapturedRequest()}, nil
+}
+
+// GetRequests implements [RequestStorage].
+func (s *FS) GetRequests( //nolint:gocognit,funlen
+	ctx context.Context, sID string, iterErr *error,
+) (iter.Seq2[string, Request], error) {
+	if err := s.checkOpen(ctx); err != nil {
+		return nil, err
+	}
+
+	s.mu.RLock()
+
+	sHash := s.hash(sID)
+
+	sessMeta, smErr := s.readSessionMetaH(sHash)
+	if smErr != nil {
+		s.mu.RUnlock()
+
+		return nil, smErr
+	}
+
+	if sessMeta.IsExpired(s.timeNow()) {
+		s.mu.RUnlock()
+
+		return nil, ErrSessionNotFound
+	}
+
+	var (
+		list   = make([]sortEntry, 0, 16) //nolint:mnd
+		idxErr error
+	)
+
+	if idxIter, idxIterErr := newFSRequestIndex(s.root, s.requestsDirH(sHash)).ReadIndex(&idxErr); idxIterErr == nil {
+		for entry := range idxIter {
+			list = append(list, sortEntry{id: entry.Hash, createdAt: entry.CreatedAt})
+		}
+	} else if !errors.Is(idxIterErr, os.ErrNotExist) {
+		s.mu.RUnlock()
+
+		return nil, fmt.Errorf("read request index: %w", idxIterErr)
+	}
+
+	if idxErr != nil {
+		s.mu.RUnlock()
+
+		return nil, idxErr
+	}
+
+	s.mu.RUnlock()
+
+	// sort requests by creation time, newest first (ID = hashed rID)
+	slices.SortFunc(list, func(a, b sortEntry) int { return b.createdAt.Compare(a.createdAt) })
+
+	return func(yield func(string, Request) bool) {
+		for _, e := range list {
+			s.mu.RLock()
+
+			mf, mfErr := s.root.Open(s.requestMetaFileH(sHash, e.id))
+			if mfErr != nil {
+				s.mu.RUnlock()
+
+				if errors.Is(mfErr, os.ErrNotExist) {
+					continue // skip requests without metadata file (corrupted or in the middle of being created)
+				}
+
+				if iterErr != nil {
+					*iterErr = mfErr // unexpected request metadata file error
+				}
+
+				return
+			}
+
+			var reqMeta fsRequestMeta
+
+			_, mrErr := reqMeta.ReadFrom(mf)
+			_ = mf.Close() // we don't need this file anymore
+
+			// skip requests with unreadable metadata file, but report unexpected metadata file errors
+			if mrErr != nil {
+				s.mu.RUnlock()
+
+				if iterErr != nil {
+					*iterErr = mrErr
+				}
+
+				continue
+			}
+
+			// open request data file
+			df, dfErr := s.root.Open(s.requestDataFileH(sHash, e.id))
+			if dfErr != nil { // skip requests without data file, but report unexpected data file errors
+				s.mu.RUnlock()
+
+				if !errors.Is(dfErr, os.ErrNotExist) && iterErr != nil {
+					*iterErr = dfErr
+
+					return
+				}
+
+				continue
+			}
+
+			// prepare a reader for the request data file (decompress if needed)
+			rc, rcErr := s.compressor.NewReader(df)
+			if rcErr != nil {
+				_ = df.Close()
+
+				s.mu.RUnlock()
+
+				if iterErr != nil {
+					*iterErr = rcErr
+
+					return // stop iteration: decompressor initialization failed
+				}
+
+				continue // no error sink - skip this entry and keep going
+			}
+
+			var data fsRequest
+
+			decErr := s.decodeJSON(rc, &data)
+
+			// checking the compressor error is required because the gzip compressor verifies the checksum when closing
+			if cErr := rc.Close(); cErr != nil {
+				_ = df.Close()
+
+				if iterErr != nil {
+					*iterErr = cErr
+				}
+
+				s.mu.RUnlock()
+
+				continue // request data file is probably broken
+			}
+
+			_ = df.Close()
+
+			s.mu.RUnlock()
+
+			// decode the request data file into a request struct
+			if decErr != nil {
+				if iterErr != nil {
+					*iterErr = fmt.Errorf("decode request data: %w", decErr)
+				}
+
+				continue
+			}
+
+			if !yield(reqMeta.ID, Request{Meta: reqMeta.toRequestMeta(), Data: data.toCapturedRequest()}) {
+				return
+			}
+		}
+	}, nil
+}
+
+// DeleteRequest implements [RequestStorage].
+func (s *FS) DeleteRequest(ctx context.Context, sID, rID string) error {
+	if err := s.checkOpen(ctx); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sHash, rHash := s.hash(sID), s.hash(rID)
+
+	sessMeta, smErr := s.readSessionMetaH(sHash)
+	if smErr != nil {
+		return smErr
+	}
+
+	if sessMeta.IsExpired(s.timeNow()) {
+		return ErrSessionNotFound
+	}
+
+	requestMeta := s.requestMetaFileH(sHash, rHash)
+
+	// check the request existence before attempting deletion
+	if _, statErr := s.root.Stat(requestMeta); statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
+			return ErrRequestNotFound
+		}
+
+		return statErr
+	}
+
+	if err := s.root.Remove(requestMeta); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove request metadata: %w", err)
+	}
+
+	if err := s.root.Remove(s.requestDataFileH(sHash, rHash)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove request data: %w", err)
+	}
+
+	// update the request index - remove the entry for this request
+	if err := newFSRequestIndex(s.root, s.requestsDirH(sHash)).DeleteRecords(func(e fsRequestIndexRecord) bool {
+		return e.Hash == rHash
+	}); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("delete request index entry: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAllRequests implements [RequestStorage].
+func (s *FS) DeleteAllRequests(ctx context.Context, sID string) error {
+	if err := s.checkOpen(ctx); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sHash := s.hash(sID)
+
+	sessMeta, mErr := s.readSessionMetaH(sHash)
+	if mErr != nil {
+		return mErr
+	}
+
+	if sessMeta.IsExpired(s.timeNow()) {
+		return ErrSessionNotFound
+	}
+
+	if err := s.root.RemoveAll(s.requestsDirH(sHash)); err != nil {
+		return fmt.Errorf("remove requests directory: %w", err)
+	}
+
+	// recreate the directory so subsequent NewRequest calls can write into it
+	if err := s.root.Mkdir(s.requestsDirH(sHash), fsDirPerm); err != nil {
+		return fmt.Errorf("recreate requests directory: %w", err)
+	}
+
+	return nil
+}
+
+// hash returns the lowercase hex-encoded MD5 of hash of the input string.
+// Used for generating filesystem paths.
+func (*FS) hash(v string) string { h := md5.Sum([]byte(v)); return hex.EncodeToString(h[:]) } //nolint:nlreturn,gosec
+
+// isValidHash reports whether v is a 32-character lowercase hex string (MD5 output).
+// Used to distinguish session directories from other entries during directory scans.
+func (*FS) isValidHash(v string) bool {
+	const md5len = md5.Size * 2
+
+	if len(v) != md5len {
+		return false
+	}
+
+	for _, c := range v {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// sessionMetaFileH returns the session metadata file path for a pre-hashed session ID.
+//
+// Example: "{sHash}/meta.bin".
+func (*FS) sessionMetaFileH(sHash string) string { return path.Join(sHash, "meta.bin") }
+
+// sessionDataFileH returns the session data file path for a pre-hashed session ID.
+//
+// Example: "{sHash}/session.json[.gz]".
+func (s *FS) sessionDataFileH(sHash string) string {
+	return path.Join(sHash, s.compressor.Filename("session.json"))
+}
+
+// requestsDirH returns the requests directory path for a pre-hashed session ID.
+//
+// Example: "{sHash}/requests".
+func (*FS) requestsDirH(sHash string) string { return path.Join(sHash, "requests") }
+
+// requestMetaFileH returns the request metadata file path for pre-hashed session and request IDs.
+//
+// Example: "{sHash}/requests/{rHash}.meta.bin".
+func (s *FS) requestMetaFileH(sHash, rHash string) string {
+	return path.Join(s.requestsDirH(sHash), rHash+requestMetaFilePostfix)
+}
+
+// requestDataFileH returns the request data file path for pre-hashed session and request IDs.
+//
+// Example: "{sHash}/requests/{rHash}.json[.gz]".
+func (s *FS) requestDataFileH(sHash, rHash string) string {
+	return path.Join(s.requestsDirH(sHash), s.compressor.Filename(rHash+".json"))
+}
+
+// requestHashFromFilename extracts the request hash from a request metadata filename such as
+// "{hash}.meta.bin". Returns ("", false) if the name is not a valid request metadata filename.
+func (s *FS) requestHashFromFilename(name string) (string, bool) {
+	hash, ok := strings.CutSuffix(name, requestMetaFilePostfix)
+	if !ok || !s.isValidHash(hash) {
+		return "", false
+	}
+
+	return hash, true
+}
+
+// readSessionMetaH reads session metadata for a pre-hashed session ID. Returns [ErrSessionNotFound] if absent.
+func (s *FS) readSessionMetaH(sHash string) (*fsSessionMeta, error) {
+	f, fErr := s.root.Open(s.sessionMetaFileH(sHash))
+	if fErr != nil {
+		if errors.Is(fErr, os.ErrNotExist) {
+			return nil, ErrSessionNotFound
+		}
+
+		return nil, fErr
+	}
+
+	var meta fsSessionMeta
+
+	if _, err := meta.ReadFrom(f); err != nil {
+		_ = f.Close()
+
+		return nil, fmt.Errorf("read session metadata: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	return &meta, nil
+}
+
+// decodeJSON reads r into a pooled buffer and unmarshals JSON into v.
+func (s *FS) decodeJSON(r io.Reader, v any) error {
+	buf := s.decBuf.Get()
+	buf.Reset()
+
+	defer s.decBuf.Put(buf)
+
+	if _, err := io.Copy(buf, r); err != nil {
+		return err
+	}
+
+	return json.Unmarshal(buf.Bytes(), v)
+}
+
+// readSessionDataH opens and decodes the session data file for sHash. Returns [ErrSessionNotFound] if absent.
+func (s *FS) readSessionDataH(sHash string) (*fsSession, error) {
+	f, fErr := s.root.Open(s.sessionDataFileH(sHash))
+	if fErr != nil {
+		if errors.Is(fErr, os.ErrNotExist) {
+			return nil, ErrSessionNotFound
+		}
+
+		return nil, fErr
+	}
+
+	rc, rcErr := s.compressor.NewReader(f)
+	if rcErr != nil {
+		_ = f.Close()
+
+		return nil, rcErr
+	}
+
+	var data fsSession
+
+	if err := s.decodeJSON(rc, &data); err != nil {
+		_, _ = rc.Close(), f.Close()
+
+		return nil, fmt.Errorf("decode session data: %w", err)
+	}
+
+	// checking the compressor error is required because the gzip compressor verifies the checksum when closing
+	if err := rc.Close(); err != nil {
+		_ = f.Close()
+
+		return nil, err
+	}
+
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+// readRequestMetaH opens and decodes the request metadata for sHash and rHash. Returns [ErrRequestNotFound] if absent.
+func (s *FS) readRequestMetaH(sHash, rHash string) (*fsRequestMeta, error) {
+	f, fErr := s.root.Open(s.requestMetaFileH(sHash, rHash))
+	if fErr != nil {
+		if errors.Is(fErr, os.ErrNotExist) {
+			return nil, ErrRequestNotFound
+		}
+
+		return nil, fErr
+	}
+
+	var meta fsRequestMeta
+
+	if _, err := meta.ReadFrom(f); err != nil {
+		_ = f.Close()
+
+		return nil, fmt.Errorf("read request metadata: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	return &meta, nil
+}
+
+// readRequestDataH opens and decodes the request data file for sHash and rHash. Returns [ErrRequestNotFound] if absent.
+func (s *FS) readRequestDataH(sHash, rHash string) (*fsRequest, error) {
+	f, fErr := s.root.Open(s.requestDataFileH(sHash, rHash))
+	if fErr != nil {
+		if errors.Is(fErr, os.ErrNotExist) {
+			return nil, ErrRequestNotFound
+		}
+
+		return nil, fErr
+	}
+
+	rc, rcErr := s.compressor.NewReader(f)
+	if rcErr != nil {
+		_ = f.Close()
+
+		return nil, rcErr
+	}
+
+	var data fsRequest
+
+	if err := s.decodeJSON(rc, &data); err != nil {
+		_, _ = rc.Close(), f.Close()
+
+		return nil, fmt.Errorf("decode request data: %w", err)
+	}
+
+	// checking the compressor error is required because the gzip compressor verifies the checksum when closing
+	if err := rc.Close(); err != nil {
+		_ = f.Close()
+
+		return nil, err
+	}
+
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// fsResponseHeader represents a single HTTP response header in the session data file.
+type fsResponseHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// fsSession holds the response data stored in the session data file.
+type fsSession struct {
+	Code      uint16             `json:"code"`
+	Headers   []fsResponseHeader `json:"headers,omitempty"`
+	Body      []byte             `json:"body,omitempty"`
+	DelayNano int64              `json:"delay_ns,omitempty"`
+}
+
+// toSessionResponse converts the internal session data to the public [SessionResponse] type.
+func (d fsSession) toSessionResponse() SessionResponse {
+	var headers []ResponseHeader
+	if len(d.Headers) > 0 {
+		headers = make([]ResponseHeader, len(d.Headers))
+		for i, v := range d.Headers {
+			headers[i] = ResponseHeader(v)
+		}
+	}
+
+	return SessionResponse{Code: d.Code, Headers: headers, Body: d.Body, Delay: time.Duration(d.DelayNano)}
+}
+
+// fsRequestHeader represents a single HTTP request header in the request data file.
+type fsRequestHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// fsRequest holds the captured request data stored in the request data file.
+type fsRequest struct {
+	ClientAddr string            `json:"client_addr,omitempty"`
+	Method     string            `json:"method,omitempty"`
+	Body       []byte            `json:"body,omitempty"`
+	Headers    []fsRequestHeader `json:"headers,omitempty"`
+	URL        string            `json:"url,omitempty"`
+}
+
+// toCapturedRequest converts the internal request data to the public [CapturedRequest] type.
+func (d fsRequest) toCapturedRequest() CapturedRequest {
+	var headers []RequestHeader
+	if len(d.Headers) > 0 {
+		headers = make([]RequestHeader, len(d.Headers))
+		for i, v := range d.Headers {
+			headers[i] = RequestHeader(v)
+		}
+	}
+
+	return CapturedRequest{ClientAddr: d.ClientAddr, Method: d.Method, Body: d.Body, Headers: headers, URL: d.URL}
 }

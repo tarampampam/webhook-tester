@@ -1,75 +1,267 @@
 package logger_test
 
-//	import (
-//		"regexp"
-//		"strings"
-//		"testing"
-//		"time"
-//
-//		"github.com/kami-zh/go-capturer"
-//		"github.com/stretchr/testify/assert"
-//		"github.com/stretchr/testify/require"
-//
-//		"gh.tarampamp.am/webhook-tester/v2/internal/logger"
-//	)
+import (
+	"regexp"
+	"strings"
+	"testing"
+	"time"
 
-//	func TestNewDebugLevelConsoleFormat(t *testing.T) {
-//		output := capturer.CaptureStderr(func() {
-//			log, err := logger.New(logger.DebugLevel, logger.ConsoleFormat)
-//			require.NoError(t, err)
-//
-//			log.Debug("dbg msg")
-//			log.Info("inf msg")
-//			log.Error("err msg")
-//		})
-//
-//		assert.Contains(t, output, time.Now().Format("15:04:05"))
-//		assert.Regexp(t, `\t.+info.+\tinf msg`, output)
-//		assert.Regexp(t, `\t.+info.+\t.+logger_test\.go:\d+\tinf msg`, output)
-//		assert.Contains(t, output, "dbg msg")
-//		assert.Contains(t, output, "err msg")
-//	}
-//
-//	func TestNewErrorLevelConsoleFormat(t *testing.T) {
-//		output := capturer.CaptureStderr(func() {
-//			log, err := logger.New(logger.ErrorLevel, logger.ConsoleFormat)
-//			require.NoError(t, err)
-//
-//			log.Debug("dbg msg")
-//			log.Info("inf msg")
-//			log.Error("err msg")
-//		})
-//
-//		assert.NotContains(t, output, "inf msg")
-//		assert.NotContains(t, output, "dbg msg")
-//		assert.Contains(t, output, "err msg")
-//	}
-//
-//	func TestNewWarnLevelJSONFormat(t *testing.T) {
-//		output := capturer.CaptureStderr(func() {
-//			log, err := logger.New(logger.WarnLevel, logger.JSONFormat)
-//			require.NoError(t, err)
-//
-//			log.Debug("dbg msg")
-//			log.Info("inf msg")
-//			log.Warn("warn msg")
-//			log.Error("err msg")
-//		})
-//
-//		//	 replace timestamp field with fixed value
-//		fakeTimestamp := regexp.MustCompile(`"ts":\d+\.\d+,`)
-//		output = fakeTimestamp.ReplaceAllString(output, `"ts":0.1,`)
-//
-//		lines := strings.Split(strings.Trim(output, "\n"), "\n")
-//
-//		assert.JSONEq(t, `{"level":"warn","ts":0.1,"msg":"warn msg"}`, lines[0])
-//		assert.JSONEq(t, `{"level":"error","ts":0.1,"msg":"err msg"}`, lines[1])
-//	}
-//
-//	func TestNewErrors(t *testing.T) {
-//		_, err := logger.New(logger.Level(127), logger.ConsoleFormat)
-//		require.EqualError(t, err, "unsupported logging level")
-//
-//		_, err = logger.New(logger.WarnLevel, logger.Format(255))
-//		require.EqualError(t, err, "unsupported logging format")
-//	}
+	"gh.tarampamp.am/webhook-tester/v3/internal/logger"
+	"gh.tarampamp.am/webhook-tester/v3/internal/testutil/assert"
+)
+
+var (
+	rTimestamp = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}\.\d{3} `)
+	rJSONTs    = regexp.MustCompile(`"ts":[0-9.]+,`)
+)
+
+// withoutJSONTs strips the dynamic "ts" field from a JSON log line.
+func withoutJSONTs(s string) string { return rJSONTs.ReplaceAllString(s, "") }
+
+func newLog(t *testing.T, buf interface{ Write([]byte) (int, error) }, level logger.Level, format logger.Format) *logger.Logger {
+	t.Helper()
+
+	l, err := logger.New(level, format, logger.WithWriter(buf))
+	assert.NoError(t, err)
+
+	return l
+}
+
+func TestNew_Errors(t *testing.T) {
+	t.Parallel()
+
+	_, err := logger.New(logger.Level(127), logger.ConsoleFormat)
+	assert.ErrorEqual(t, err, "unsupported logging level")
+
+	_, err = logger.New(logger.WarnLevel, logger.Format(255))
+	assert.ErrorEqual(t, err, "unsupported logging format")
+}
+
+func TestConsoleFormat(t *testing.T) {
+	t.Parallel()
+
+	attrTime := time.Date(2024, 1, 15, 10, 30, 45, 123000000, time.UTC)
+
+	t.Run("format", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Debug("message",
+			logger.String("str", "value"),
+			logger.Int("n", 42),
+			logger.Bool("ok", true),
+			logger.Time("when", attrTime),
+			logger.Duration("dur", 500*time.Millisecond),
+		)
+
+		want := "DEBUG  message  str=value n=42 ok=true when=2024-01-15T10:30:45.123Z dur=500ms\n"
+
+		assert.Equal(t, want, withoutTimestamps(t, buf.String()))
+	})
+
+	t.Run("string quoting", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Debug("msg",
+			logger.String("plain", "value"),
+			logger.String("spaced", "hello world"),
+			logger.String("empty", ""),
+		)
+
+		want := `DEBUG  msg  plain=value spaced="hello world" empty=""` + "\n"
+
+		assert.Equal(t, want, withoutTimestamps(t, buf.String()))
+	})
+
+	t.Run("level filtering", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tt := range []struct {
+			level logger.Level
+			want  string
+		}{
+			{logger.DebugLevel, "DEBUG  d\nINFO   i\nWARN   w\nERROR  e\n"},
+			{logger.InfoLevel, "INFO   i\nWARN   w\nERROR  e\n"},
+			{logger.WarnLevel, "WARN   w\nERROR  e\n"},
+			{logger.ErrorLevel, "ERROR  e\n"},
+		} {
+			t.Run(tt.level.String(), func(t *testing.T) {
+				t.Parallel()
+
+				var buf strings.Builder
+
+				l := newLog(t, &buf, tt.level, logger.ConsoleFormat)
+				l.Debug("d")
+				l.Info("i")
+				l.Warn("w")
+				l.Error("e")
+
+				assert.Equal(t, tt.want, withoutTimestamps(t, buf.String()))
+			})
+		}
+	})
+
+	t.Run("named", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Named("svc").Debug("msg")
+
+		assert.Equal(t, "DEBUG  msg  logger=svc\n", withoutTimestamps(t, buf.String()))
+	})
+
+	t.Run("with pre-attached attrs", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).
+			With(logger.String("env", "prod")).
+			Debug("msg", logger.Int("n", 1))
+
+		assert.Equal(t, "DEBUG  msg  env=prod n=1\n", withoutTimestamps(t, buf.String()))
+	})
+}
+
+func TestJSONFormat(t *testing.T) {
+	t.Parallel()
+
+	attrTime := time.Date(2024, 1, 15, 10, 30, 45, 123000000, time.UTC)
+
+	t.Run("format", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.JSONFormat).Debug("message",
+			logger.String("str", "value"),
+			logger.Int("n", 42),
+			logger.Bool("ok", true),
+			logger.Time("when", attrTime),
+			logger.Duration("dur", 500*time.Millisecond),
+		)
+
+		want := `{"level":"debug","msg":"message","str":"value","n":42,"ok":true,"when":"2024-01-15T10:30:45.123Z","dur":500000000}` + "\n"
+
+		assert.Equal(t, want, withoutJSONTs(buf.String()))
+	})
+
+	t.Run("level filtering", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tt := range []struct {
+			level logger.Level
+			want  string
+		}{
+			{logger.DebugLevel, `{"level":"debug","msg":"d"}` + "\n" + `{"level":"info","msg":"i"}` + "\n" + `{"level":"warn","msg":"w"}` + "\n" + `{"level":"error","msg":"e"}` + "\n"},
+			{logger.InfoLevel, `{"level":"info","msg":"i"}` + "\n" + `{"level":"warn","msg":"w"}` + "\n" + `{"level":"error","msg":"e"}` + "\n"},
+			{logger.WarnLevel, `{"level":"warn","msg":"w"}` + "\n" + `{"level":"error","msg":"e"}` + "\n"},
+			{logger.ErrorLevel, `{"level":"error","msg":"e"}` + "\n"},
+		} {
+			t.Run(tt.level.String(), func(t *testing.T) {
+				t.Parallel()
+
+				var buf strings.Builder
+
+				l := newLog(t, &buf, tt.level, logger.JSONFormat)
+				l.Debug("d")
+				l.Info("i")
+				l.Warn("w")
+				l.Error("e")
+
+				assert.Equal(t, tt.want, withoutJSONTs(buf.String()))
+			})
+		}
+	})
+
+	t.Run("named", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.JSONFormat).Named("svc").Debug("msg")
+
+		assert.Contains(t, buf.String(), `"logger":"svc"`)
+	})
+}
+
+func TestLogger_Slog(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unnamed", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		sl := newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Slog()
+		assert.NotNil(t, sl)
+
+		sl.Info("hello")
+
+		assert.Equal(t, "INFO   hello\n", withoutTimestamps(t, buf.String()))
+	})
+
+	t.Run("named bakes in logger attribute", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		newLog(t, &buf, logger.DebugLevel, logger.ConsoleFormat).Named("ngrok").Slog().Info("hello")
+
+		assert.Contains(t, withoutTimestamps(t, buf.String()), "logger=ngrok")
+	})
+
+	t.Run("level filtering is inherited", func(t *testing.T) {
+		t.Parallel()
+
+		var buf strings.Builder
+
+		sl := newLog(t, &buf, logger.WarnLevel, logger.ConsoleFormat).Slog()
+		sl.Debug("d")
+		sl.Info("i")
+		sl.Warn("w")
+		sl.Error("e")
+
+		assert.Equal(t, "WARN   w\nERROR  e\n", withoutTimestamps(t, buf.String()))
+	})
+}
+
+func TestNewNop(t *testing.T) {
+	t.Parallel()
+
+	l := logger.NewNop()
+	assert.NotNil(t, l)
+	l.Debug("d")
+	l.Info("i")
+	l.Warn("w")
+	l.Error("e")
+	_ = l.Named("x")
+	_ = l.With(logger.String("k", "v"))
+}
+
+// withoutTimestamps validates and strips the "HH:MM:SS.mmm " prefix from every log line in s.
+func withoutTimestamps(t *testing.T, s string) string {
+	t.Helper()
+
+	const n = len("00:00:00.000 ")
+
+	var b strings.Builder
+
+	for _, line := range strings.SplitAfter(s, "\n") {
+		if line == "" {
+			continue
+		}
+
+		if !rTimestamp.MatchString(line) {
+			t.Fatalf("missing HH:MM:SS.mmm timestamp prefix: %q", line)
+		}
+
+		b.WriteString(line[n:])
+	}
+
+	return b.String()
+}

@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/refs/tags/v2.8.0/configuration-schema.json
+
+package: openapi
+output: server.gen.go
+
+generate:
+  std-http-server: true
+
+output-options:
+  overlay:
+    path: ./spec/overlay.yml
+  user-templates:
+    stdhttp/std-http-interface.tmpl: ./templates/stdhttp/std-http-interface.tmpl

@@ -5,28 +5,25 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
+	"path/filepath"
 	"syscall"
 
-	"gh.tarampamp.am/webhook-tester/v2/internal/cli"
+	"gh.tarampamp.am/webhook-tester/v3/cmd/webhook-tester/app"
 )
 
-// main CLI application entrypoint.
 func main() {
 	if err := run(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
+		_, _ = fmt.Fprintln(os.Stderr, err)
 
 		os.Exit(1)
 	}
 }
 
-// run is the entry point of the program. The code is in separate function to allow executing deferred functions
-// before exiting (os.Exit does not execute deferred functions).
 func run() error {
-	defer runtime.Gosched() // increase the chance of running deferred functions before exiting
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	var ctx, cancel = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	return cli.NewApp().Run(ctx, os.Args)
+	// AFFAIR, Go runtime guarantees that os.Args[0] is always present and contains the path to the executable,
+	// so we can safely use it as the application name
+	return app.NewApp(filepath.Base(os.Args[0])).Run(ctx, os.Args[1:])
 }

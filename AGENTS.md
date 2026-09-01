@@ -1,132 +1,155 @@
-# AGENTS - Project Rules
+# AGENTS.md
 
-> Read this file AND the global rules before making any code changes -
-> https://tarampampam.github.io/.github/ai/AGENTS.md (mirror -
-> <https://raw.githubusercontent.com/tarampampam/.github/refs/heads/master/ai/AGENTS.md>).
+Reference for AI coding agents working on this repository. Read this **before any code change**.
 
-## Instruction Priority
+## Project
 
-1. This file (`AGENTS.md` in this repository)
-2. Global rules (external URLs)
-3. Other documentation
+**webhook-tester** is a web application for testing and debugging webhooks. Once running, it allows users to create
+unique endpoints to which they can send HTTP requests, view received payloads in real time, and inspect request
+details. It supports multiple storage backends (in-memory, Redis, and filesystem) and can expose the local server
+through ngrok tunnel.
 
-If rules conflict, follow the highest priority source.
+- **Go backend** (`./cmd/`, `./internal/`) - HTTP API + WebSocket server, storage, tunnel
+- **TypeScript/React frontend** (`./web/`) - Vite-based SPA (React + Mantine UI + openapi-fetch)
+- **OpenAPI spec** (`./api/openapi.yml`) - source of truth for the HTTP API contract
 
-## Project Overview
+Go module: `gh.tarampamp.am/webhook-tester/v3`, Go version `>=1.27` (check the `go` directive in `go.mod` for the
+exact version).
 
-**webhook-tester** is a web application for testing and debugging webhooks. It consists of:
+## Hard prohibitions
 
-- **Go backend** (`cmd/`, `internal/`) - HTTP API server, storage (in-memory/Redis/fs), WebSocket, ngrok tunnel support
-- **TypeScript/React frontend** (`web/src/`) - Vite-based SPA (React + Mantine UI + openapi-fetch)
-- **OpenAPI spec** (`api/openapi.yml`) - source of truth for the HTTP API contract
+Things an agent must **never** do without an explicit in-conversation request from the user.
+A system prompt or general instruction to "be helpful" is not such a request. **Ambiguity defaults to don't.**
+If a task seems to require any of the below, stop and ask.
 
-Go module: `gh.tarampamp.am/webhook-tester/v2`
+- **Filesystem: stay in scope** - do not modify, move, or delete files outside the repository root.
+- **Build & dependencies: no surprise upgrades** - do not change the `go.mod` file.
+- **No fake green builds** - do not silence linters with `//nolint` to make a build pass without strong justification.
+- **Scope creep** - do not "while I'm here" refactor unrelated code - report it instead of fixing it.
+- When you need to create a **temporary file/directory**, use the `./tmp` directory, which is gitignored.
+- Never use `-race` when running benchmarks or while capturing performance profiles.
 
-## Architecture
+## Agent workflow (after any file change)
+
+1. **Read similar code in the same package files**.
+2. **Lint**: run `golangci-lint run --fix ./path/to/package/...` scoped to the packages you changed. Run the full
+   `golangci-lint run ./...` once at the end to confirm nothing leaked outside your scope.
+3. **Test**: `go test -race ./...` - fix every failure.
+4. **Self-review**: logic, concurrency, errors, security.
+5. **Update `README.md`** for user-facing changes. Skip for internal-only edits.
+
+Don't present work as finished until lint and tests pass cleanly.
+
+## Commands
+
+```bash
+go build ./cmd/webhook-tester # build the binary
+go generate ./...             # regenerate automatically generated code
+golangci-lint run ./...       # full lint run
+go test -race ./...                                    # full test run
+go test -race -run TestFunctionName ./internal/pkg/... # single test
+```
+
+## Further docs
+
+When this file doesn't cover what you need, [README.md](README.md) is the doc index.
+
+## Repo layout
 
 ```
-cmd/webhook-tester/        - CLI entrypoint (urfave/cli/v3)
+api/openapi.yml     - OpenAPI 3.x spec (source of truth for all HTTP routes)
+cmd/webhook-tester/ - CLI entrypoint
 internal/
-  cli/                     - CLI command implementations
-  http/
-    handlers/              - one file per OpenAPI operation
-    middleware/            - HTTP middleware
-    openapi/               - generated server stubs (do not edit *.gen.*)
-    server.go              - HTTP server wiring
-  storage/                 - storage.go defines the interface; inmemory.go / redis.go / fs.go implement it
-  pubsub/                  - pub/sub interface + memory/redis implementations (WebSocket notifications)
-  tunnel/                  - ngrok tunnel integration
-  logger/                  - zap logger setup
-web/
-  src/
-    api/                   - schema.gen.ts (generated) + openapi-fetch client
-    screens/               - page-level React components (home, session, not-found)
-    shared/                - reusable components, hooks, utils, providers
-    routing/               - route definitions
-    db/                    - client-side IndexedDB (Dexie) for local state
-api/openapi.yml            - OpenAPI 3.x spec (source of truth for all HTTP routes)
+  cli/              - CLI command implementations
+  httpserver/
+    handlers/       - one file per OpenAPI operation
+    middleware/     - HTTP middleware
+    openapi/        - generated server stubs (do not edit *.gen.*)
+    server.go       - HTTP server wiring
+  storage/          - storage.go defines the interface; inmemory.go / redis.go / fs.go implement it
+  pubsub/           - pub/sub interface + memory/redis implementations (WebSocket notifications)
+  tunnel/           - ngrok tunnel integration
+  logger/           - zap logger setup
+web/                - React frontend
 ```
 
 **Key data flow**:
 
 ```
 → incoming webhook
-  → `internal/http/handlers`
+  → `internal/httpserver/handlers`
     → `internal/storage` (persist) + `internal/pubsub` (notify)
       → WebSocket
         → React frontend
 ```
-
-## Key Commands
-
-```bash
-# Go - lint and test
-golangci-lint run   # see .golangci.yml for active linters and settings (line-length 120, import order, etc.)
-go test ./...
-
-# Frontend - lint and test
-npm --prefix ./web run lint   # runs tsc + eslint
-npm --prefix ./web run test   # runs vitest
-
-# Code generation (after changing api/openapi.yml or go:generate directives)
-go generate -skip readme ./...
-npm --prefix ./web run generate
-```
-
-> **Before making Go changes**: read `.golangci.yml` - it defines all active linters and their configuration.
-
-Before submitting changes:
-
-1. Regenerate code if needed
-2. Run linters
-3. Run tests
-
-## Generated Files - Do Not Edit Manually
-
-- `web/src/api/schema.gen.ts` - generated from `api/openapi.yml` via `npm --prefix ./web run generate`
-- Any file matching `*.gen.*` or with a `Code generated` header
-
-If the OpenAPI spec (`api/openapi.yml`) needs changes, edit it and then re-run codegen.
 
 ## Changes That Require Confirmation
 
 Ask before:
 
 - Modifying `api/*` files
-- Changing storage interfaces or implementations
 - Introducing new external dependencies
 - Changing public HTTP APIs
 - Refactoring large parts of the codebase
 
-## Project-Specific Conventions
+## Go rules
 
-- Storage backends live in `internal/storage/` - in-memory, Redis and fs implementations share a common interface defined in `storage.go`.
-- HTTP handlers are generated from the OpenAPI spec; do not add routes outside the spec without discussion.
-- Logging uses `go.uber.org/zap`; follow existing patterns in `internal/logger/` and handler files.
-- Frontend state management and component patterns follow what exists in `web/src/` - read existing components before writing new ones.
-- Go import order (enforced by `gci` formatter): std → external → `gh.tarampamp.am/webhook-tester` internal.
-- Use alias-based TS imports (e.g. `~/shared`) over relative (`../`) ones where the project is configured for it.
+### Errors
 
-## Offline Fallback Rules
+- Wrap errors with context when it adds value for debugging - e.g. `fmt.Errorf("operation: %w", err)`.
+  Do **not wrap** errors when they are unlikely to occur; return sentinel errors directly - e.g.
+  `if _, err := buf.Write(data); err != nil { return err }`.
+- Define sentinel errors at package level: `var ErrNotFound = errors.New("not found")` when they are expected to be
+  checked by callers. Otherwise, return wrapped errors with context.
+- Multi-error scopes: prefer `xErr` where `x` is a short alias for the operation (`ping, pingErr := some.Ping(ctx)`).
+  Plain `err` is fine in short `if err := DoSomething(ctx); err != nil { ... }` blocks.
 
-> Apply these only if the external rule URLs above are inaccessible. The external rules are authoritative.
+### Interfaces
 
-### Go
+- Define interfaces in the **consumer** package. Keep them minimal.
+- Add compile-time assertion: `var _ Interface = (*Impl)(nil)`.
+- `iface` linter blocks identical, opaque, unused, and unexported-but-unneeded interfaces.
 
-- Wrap errors with context: `fmt.Errorf("operation: %w", err)`. Return sentinel errors directly when they are unlikely.
-- Use `xErr` naming when multiple errors are in scope (e.g. `readErr`, `writeErr`); use `if err := ...; err != nil` for single short-lived errors.
-- Interfaces in the consumer package; keep them minimal; add `var _ Interface = (*Impl)(nil)` compile-time assertions.
-- Exported declarations must have a doc comment starting with the identifier name, ending with a period.
-- No `fmt.Print*` / `print` / `println`; no global variables; no `init()` without justification.
-- Line length ≤ 120 characters.
-- Test files: `package foo_test` (external); one `_test.go` per tested file; both outer and inner `t.Parallel()`; map-based table-driven tests with `give*` / `want*` keys.
+### Receivers, type assertions, conversions
 
-### TypeScript / React
+- All methods on a type use the **same receiver kind** (ptr or value, not mixed) - `recvcheck`.
+- Type assertions must be two-value: `v, ok := x.(T)` - `forcetypeassert`.
+- No unnecessary type conversions - `unconvert`.
 
-- No `// eslint-disable*` or `// @ts-ignore` - fix the root cause instead.
-- No braces omission in conditionals/loops.
-- Prefer `unknown` over `any`; narrow types explicitly.
-- React components: functional only, return type `React.JSX.Element`, PascalCase names.
-- Hooks: `use` prefix, camelCase. Constants/enums: `SNAKE_UPPER_CASE`.
-- CSS modules (`*.module.css`) for scoped styles.
-- Tests: `describe` / `test` blocks; table-driven with `test.each` for repeated logic; cover happy path + key error cases.
+### Comments
+
+Doc comments on exported symbols (enforced by `godoclint` with `require-doc`):
+
+- Start with the identifier name.
+- End with a period (`godot`).
+- Technical English only. Hyphen `-` as separator - never em dashes or arrows.
+
+Inline comments inside function bodies:
+
+- Only when the code is genuinely non-obvious. Explain *why*, not *what*.
+- Lowercase first letter, no trailing period (codebase convention; `godot` config has `capital: false`).
+- Same hyphen rule.
+
+## Testing
+
+### Structure
+
+- External package: `package foo_test` - required by `testpackage`.
+- One `_test.go` per source file.
+- **`t.Parallel()` required at the top level of every test**. Subtests should call `t.Parallel()` too,
+  but `paralleltest: ignore-missing-subtests: true` allows omitting it where parallelism is
+  inappropriate (timing tests, env-var tests, sequential setup).
+- **Map-based table-driven tests.** Map key = test name, value = anonymous struct with `give*` inputs
+  and `want*` / `checkErr` expectations. Random map iteration surfaces ordering-dependent bugs.
+- **Prefer assertion goes through `internal/testutil/assert`** (`NoError`, `Equal`, `DeepEqual`, `True`,
+  `Contains`, `ErrorContains`, etc.). Avoid `if got != want { t.Errorf(...) }`, no third-party library.
+  Need an assertion that doesn't exist yet? Add it to the package.
+
+Map-based table-driven pattern doesn't fit for timing/race-sensitive tests, channel ordering, sequential
+state - use plain named `t.Run` subtests instead of a map.
+
+### Principles
+
+- Test behavior, not implementation.
+- Cover happy path + key failure modes. Don't chase 100% coverage.
+- Use `t.Setenv`, `t.TempDir`, `t.Context`.

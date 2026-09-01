@@ -4,6 +4,19 @@
 ## Distributive
 /dist
 
+## Temp dirs & trash
+/temp
+/tmp
+
+## AI shit
+/.copilot
+/.cursor
+/.claude
+/.windsurf
+/.aider*
+/.gemini
+
 ## etc
 *.log
+/coverage
 /src/*-old
