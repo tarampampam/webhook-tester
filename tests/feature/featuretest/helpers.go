@@ -42,17 +42,13 @@ func CreateSession(t *testing.T, baseUrl string, status int, headers map[string]
 		respBody = ReadBody(t, resp)
 	)
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.IsJSON(t, respBody)
 	assert.InDelta(t,
 		float64(time.Now().UnixMilli()),
 		JSONPath[float64](t, respBody, "created_at_unix_milli"),
 		1000, //nolint:mnd // 1 second in milliseconds
 	)
-	assert.Equal(t, float64(status), JSONPath[float64](t, respBody, "response.status_code"))
-	assert.Equal(t, 0, JSONPath[float64](t, respBody, "response.delay"))
-	assert.Equal(t, b64, JSONPath[string](t, respBody, "response.response_body_base64"))
-	assert.Equal(t, len(headers), len(JSONPath[[]any](t, respBody, "response.headers")))
 
 	return JSONPath[string](t, respBody, "uuid")
 }

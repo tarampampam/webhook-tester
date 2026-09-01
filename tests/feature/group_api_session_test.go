@@ -1,6 +1,7 @@
 package feature_test
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -74,7 +75,7 @@ func groupTestAPISession(t *testing.T, baseUrl string) {
 					)
 					body := ft.ReadBody(t, resp)
 
-					assert.Equal(t, 400, resp.StatusCode)
+					assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 					assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
 					assert.IsJSON(t, body)
 					assert.Contains(t, string(body), tc.wantErrSubstr)
@@ -92,7 +93,7 @@ func groupTestAPISession(t *testing.T, baseUrl string) {
 			resp := ft.MustGet(t, baseUrl+"/api/session/00000000-0000-0000-0000-000000000000")
 			body := ft.ReadBody(t, resp)
 
-			assert.Equal(t, 404, resp.StatusCode)
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 			assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
 			assert.IsJSON(t, body)
 			assert.Contains(t, string(body), "session not found")
@@ -104,7 +105,7 @@ func groupTestAPISession(t *testing.T, baseUrl string) {
 			resp := ft.MustGet(t, baseUrl+"/api/session/foobar")
 			body := ft.ReadBody(t, resp)
 
-			assert.Equal(t, 400, resp.StatusCode)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
 			assert.IsJSON(t, body)
 			assert.Contains(t, string(body), "invalid session ID")
@@ -117,21 +118,21 @@ func groupTestAPISession(t *testing.T, baseUrl string) {
 		sID := ft.CreateSession(t, baseUrl, 200, nil, nil)
 
 		// verify the session exists
-		assert.Equal(t, 200, ft.MustGet(t, baseUrl+"/api/session/"+sID).StatusCode)
+		assert.Equal(t, http.StatusOK, ft.MustGet(t, baseUrl+"/api/session/"+sID).StatusCode)
 
 		// delete the session
 		delResp := ft.MustDelete(t, baseUrl+"/api/session/"+sID)
 		delBody := ft.ReadBody(t, delResp)
 
-		assert.Equal(t, 200, delResp.StatusCode)
+		assert.Equal(t, http.StatusOK, delResp.StatusCode)
 		assert.Contains(t, delResp.Header.Get("Content-Type"), "application/json")
 		assert.IsJSON(t, delBody)
 		assert.Equal(t, true, ft.JSONPath[bool](t, delBody, "success"))
 
 		// session should be gone now
-		assert.Equal(t, 404, ft.MustGet(t, baseUrl+"/api/session/"+sID).StatusCode)
+		assert.Equal(t, http.StatusNotFound, ft.MustGet(t, baseUrl+"/api/session/"+sID).StatusCode)
 
 		// deleting again should also be 404
-		assert.Equal(t, 404, ft.MustDelete(t, baseUrl+"/api/session/"+sID).StatusCode)
+		assert.Equal(t, http.StatusNotFound, ft.MustDelete(t, baseUrl+"/api/session/"+sID).StatusCode)
 	})
 }
