@@ -176,4 +176,24 @@ describe('L10nProvider', () => {
       expect(result.current.relativeTime(giveA, giveB)).toBe(want)
     })
   })
+
+  describe('formatDuration', () => {
+    test.each([
+      { langCode: 'en', giveSeconds: 0, want: '0 seconds' },
+      { langCode: 'en', giveSeconds: 59, want: '59 seconds' },
+      { langCode: 'en', giveSeconds: 60, want: '1 minute' },
+      { langCode: 'en', giveSeconds: 3_599, want: '60 minutes' },
+      { langCode: 'en', giveSeconds: 3_600, want: '1 hour' },
+      { langCode: 'en', giveSeconds: 86_399, want: '24 hours' },
+      { langCode: 'en', giveSeconds: 86_400, want: '1 day' },
+      { langCode: 'ru', giveSeconds: 1, want: '1 секунда' },
+      { langCode: 'ru', giveSeconds: 120, want: '2 минуты' },
+      { langCode: 'ru', giveSeconds: 3_600, want: '1 час' },
+      { langCode: 'ru', giveSeconds: 86_400, want: '1 день' },
+    ])('formatDuration $langCode: $want', ({ langCode, giveSeconds, want }) => {
+      vi.spyOn(navigator, 'languages', 'get').mockReturnValue([langCode])
+      const { result } = renderHook(() => useL10n(), { wrapper })
+      expect(result.current.formatDuration(giveSeconds)).toBe(want)
+    })
+  })
 })

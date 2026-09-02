@@ -46,4 +46,28 @@ describe('translate', () => {
   ] satisfies [KEY, string][])('ru: %s → %s', (key, expected) => {
     expect(translate(key, 'ru')).toBe(expected)
   })
+
+  test.each([
+    {
+      lang: 'en' as const,
+      values: { text: 'value', number: 42, repeated: true, nullable: null, undefined: undefined },
+      want: 'Test value, 42, true, true, null, undefined, {missing}, { spaces }, {123}',
+    },
+    {
+      lang: 'ru' as const,
+      values: { text: 'value', number: 42, repeated: true, nullable: null, undefined: undefined },
+      want: 'Тест value, 42, true, true, null, undefined, {missing}, { spaces }, {123}',
+    },
+  ])('interpolates placeholders in $lang translations', ({ lang, values, want }) => {
+    expect(translate(KEY.__testKey, lang, values)).toBe(want)
+  })
+
+  test('does not substitute inherited values', () => {
+    const values: Record<string, unknown> = {}
+    Object.setPrototypeOf(values, { text: 'value', number: 42, repeated: true, nullable: null, undefined })
+
+    expect(translate(KEY.__testKey, 'en', values)).toBe(
+      'Test {text}, {number}, {repeated}, {repeated}, {nullable}, {undefined}, {missing}, { spaces }, {123}'
+    )
+  })
 })

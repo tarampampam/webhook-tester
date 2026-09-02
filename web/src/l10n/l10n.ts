@@ -4,6 +4,7 @@ import type { LangCode } from './lang-codes'
  * Translation message keys - each maps to a localized string in every supported locale.
  */
 export const KEY = {
+  __testKey: '__testKey', // for testing purposes
   justNow: 'justNow',
   notFoundMessage: 'notFoundMessage',
   goToHome: 'goToHome',
@@ -45,12 +46,21 @@ export const KEY = {
   timeSec: 'timeSec',
   noDelay: 'noDelay',
   noHeaders: 'noHeaders',
+  webhookTesterUsedFor: 'webhookTesterUsedFor',
+  noNeedToRefresh: 'noNeedToRefresh',
+  webhookWithCustomStatus: 'webhookWithCustomStatus',
+  sessionWillExpireAfter: 'sessionWillExpireAfter',
+  maxRequestBodySizeLimit: 'maxRequestBodySizeLimit',
+  maxRequestsLimit: 'maxRequestsLimit',
 } as const
 
 /**
  * Type of translation message keys.
  */
 export type KEY = (typeof KEY)[keyof typeof KEY]
+
+const __TEST_KEY_VALUE =
+  '{text}, {number}, {repeated}, {repeated}, {nullable}, {undefined}, {missing}, { spaces }, {123}'
 
 /**
  * All supported locales and their translations.
@@ -73,6 +83,7 @@ export type KEY = (typeof KEY)[keyof typeof KEY]
 const locales = {
   // TODO: add more languages
   en: {
+    [KEY.__testKey]: `Test ${__TEST_KEY_VALUE}`, // for testing purposes
     [KEY.justNow]: 'Just now',
     [KEY.notFoundMessage]: 'The requested page was not found',
     [KEY.goToHome]: 'Go to Home',
@@ -115,8 +126,16 @@ const locales = {
     [KEY.timeSec]: 'sec', // short for "seconds"
     [KEY.noDelay]: 'none',
     [KEY.noHeaders]: 'none',
+    [KEY.webhookTesterUsedFor]: 'Webhook Tester lets you easily test webhooks and other HTTP requests',
+    [KEY.noNeedToRefresh]: 'Any requests sent to this URL are instantly logged here - no need to refresh!',
+    [KEY.webhookWithCustomStatus]:
+      'To specify a status code in the response, append it to the URL, like {url} - this way, the URL will respond with a {code} status',
+    [KEY.sessionWillExpireAfter]: 'Requests and tokens for this URL expire after {duration} of inactivity',
+    [KEY.maxRequestBodySizeLimit]: 'The maximum size for incoming requests is {size}',
+    [KEY.maxRequestsLimit]: 'The maximum number of requests per session is {limit}',
   },
   ru: {
+    [KEY.__testKey]: `Тест ${__TEST_KEY_VALUE}`, // for testing purposes
     [KEY.justNow]: 'Только что',
     [KEY.notFoundMessage]: 'Страница не найдена',
     [KEY.goToHome]: 'На главную',
@@ -159,6 +178,15 @@ const locales = {
     [KEY.timeSec]: 'сек',
     [KEY.noDelay]: 'нет',
     [KEY.noHeaders]: 'нет',
+    [KEY.webhookTesterUsedFor]:
+      'При помощи Webhook Tester вы можете легко и удобно тестировать вебхуки и любые другие HTTP-запросы',
+    [KEY.noNeedToRefresh]:
+      'Любые запросы, отправленные на этот URL - мгновенно отобразятся здесь, даже без обновления страницы!',
+    [KEY.webhookWithCustomStatus]:
+      'Чтобы указать код ответа в ответе, добавьте его к URL, например {url} - таким образом, URL будет возвращать {code} код ответа',
+    [KEY.sessionWillExpireAfter]: 'Все сохраненные запросы, как и сам URL будут удалены через {duration} бездействия',
+    [KEY.maxRequestBodySizeLimit]: 'Максимальный размер входящих запросов составляет {size}',
+    [KEY.maxRequestsLimit]: 'Хранимое количество запросов в одной сессии ограничено {limit}',
   },
 } satisfies Partial<Readonly<Record<LangCode, Readonly<Record<KEY, string>>>>>
 
@@ -178,6 +206,27 @@ export const SUPPORTED_LANG_CODES = Object.keys(locales) as ReadonlyArray<Suppor
 export const isSupportedLangCode = (v: string): v is SupportedLangCode => v in locales
 
 /**
- * Returns the localized string for key in the given language.
+ * Returns the localized string for key in the given language, replacing named placeholders with own values.
+ *
+ * Missing placeholder values are preserved. Provided values are converted using String().
+ *
+ * @example
+ * ```ts
+ * // [KEY.foo]: 'URL: {url}', code: {code}'
+ *
+ * translate(KEY.foo, 'en', { url: 'https://example.test/200', code: 200 }) // 'URL: https://example.test/200, code: 200'
+ * ```
  */
-export const translate = (key: KEY, lang: SupportedLangCode): string => locales[lang][key]
+export const translate = (key: KEY, lang: SupportedLangCode, values?: Readonly<Record<string, unknown>>): string => {
+  if (!values) {
+    return locales[lang][key] // fast path for no placeholder values
+  }
+
+  return locales[lang][key].replace(/\{([A-Za-z][A-Za-z0-9_]*)}/g, (placeholder, name: string) => {
+    if (Object.prototype.hasOwnProperty.call(values, name)) {
+      return String(values[name])
+    }
+
+    return placeholder
+  })
+}

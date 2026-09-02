@@ -78,9 +78,11 @@ export const RequestsNavigator = Object.assign(
             {t(L10nKey.newerRequest)}
           </Button>
         </Button.Group>
-        <Badge color={isDark ? 'gray' : 'lime'} size="sm" px="0.7em" radius="sm">
-          {nav?.total ?? 0}
-        </Badge>
+        {nav?.total && (
+          <Badge color={isDark ? 'gray' : 'lime'} size="sm" px="0.7em" radius="sm">
+            {nav?.total ?? 0}
+          </Badge>
+        )}
         <Button.Group miw={0}>
           <Button
             {...shortProps}

@@ -19,17 +19,47 @@ interface Context {
   /** Switches the active locale. */
   switchTo(lang: SupportedLangCode): void
 
-  /** Returns the translated string for the given message key in the active locale. */
-  t(key: KEY): string
+  /**
+   * Returns the translated string for the given message key in the active locale.
+   *
+   * @see {translate} for details on placeholder replacement.
+   */
+  t(key: KEY, values?: Readonly<Record<string, unknown>>): string
 
-  /** Returns a human-friendly relative time string (e.g. "3 minutes ago") for the given dates in the active locale. */
+  /**
+   * Returns a human-friendly relative time string for the given dates in the active locale.
+   *
+   * @example
+   * ```ts
+   * relativeTime(new Date('2026-09-01T11:57:00Z'), new Date('2026-09-01T12:00:00Z')) // "3 minutes ago" in English
+   * relativeTime(new Date('2026-09-01T14:00:00Z'), new Date('2026-09-01T12:00:00Z')) // "in 2 hours" in English
+   * ```
+   */
   relativeTime(a: Date, b: Date): string
 
   /**
    * Returns a localized string representation of the given date in the active locale, formatted according to
    * the given options.
+   *
+   * @example
+   * ```ts
+   * formatDateTime(new Date('2026-09-01T12:34:56Z'), { dateStyle: 'long' }) // "September 1, 2026" in English
+   * formatDateTime(new Date('2026-09-01T12:34:56Z'), { dateStyle: 'short', timeStyle: 'short', timeZone: 'UTC' }) // "9/1/26, 12:34 PM" in English
+   * ```
    */
   formatDateTime(date: Date, opts: Intl.DateTimeFormatOptions): string
+
+  /**
+   * Returns a localized human-readable duration using the largest applicable unit.
+   *
+   * @example
+   * ```ts
+   * formatDuration(86_400) // "1 day" in English
+   * formatDuration(3_600)  // "1 hour" in English
+   * formatDuration(120)    // "2 minutes" in English
+   * ```
+   */
+  formatDuration(seconds: number): string
 }
 
 const ctx = createContext<Context | null>(null)
@@ -42,6 +72,13 @@ const RELATIVE_TIME_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ['hour', 60 * 60 * 1000],
   ['minute', 60 * 1000],
   ['second', 1000],
+]
+
+const DURATION_UNITS: Array<[Exclude<Intl.NumberFormatOptions['unit'], undefined>, number]> = [
+  ['day', 24 * 60 * 60],
+  ['hour', 60 * 60],
+  ['minute', 60],
+  ['second', 1],
 ]
 
 /**
@@ -103,7 +140,10 @@ export const L10nProvider = ({ children }: PropsWithChildren): React.JSX.Element
     return new Map(SUPPORTED_LANG_CODES.map((code) => [code, resolver(code)]))
   }, [])
 
-  const t = useCallback((key: KEY): string => translate(key, langCode), [langCode])
+  const t = useCallback(
+    (key: KEY, values?: Readonly<Record<string, unknown>>): string => translate(key, langCode, values),
+    [langCode]
+  )
 
   const relativeTime = useCallback(
     (a: Date, b: Date): string => {
@@ -136,6 +176,17 @@ export const L10nProvider = ({ children }: PropsWithChildren): React.JSX.Element
     [langCode]
   )
 
+  const formatDuration = useCallback(
+    (seconds: number): string => {
+      const [unit, unitSeconds] = DURATION_UNITS.find(([, size]) => Math.abs(seconds) >= size) ?? ['second', 1]
+
+      return new Intl.NumberFormat(langCode, { style: 'unit', unit, unitDisplay: 'long' }).format(
+        Math.round(seconds / unitSeconds)
+      )
+    },
+    [langCode]
+  )
+
   return (
     <ctx.Provider
       value={{
@@ -146,6 +197,7 @@ export const L10nProvider = ({ children }: PropsWithChildren): React.JSX.Element
         t,
         relativeTime,
         formatDateTime,
+        formatDuration,
       }}
     >
       {children}
