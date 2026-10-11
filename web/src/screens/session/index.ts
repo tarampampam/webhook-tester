@@ -1,1 +1,1 @@
-export { SessionAndRequestScreen } from './screen'
+export { SessionLayout } from './session-layout'

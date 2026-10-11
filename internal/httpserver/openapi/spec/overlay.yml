@@ -1,0 +1,10 @@
+# doc: https://spec.openapis.org/overlay/latest.html
+# sandbox: https://overlay.speakeasy.com/
+
+overlay: 1.0.0
+info:
+  title: Update the API Documentation
+  version: 1.0.0
+
+actions:
+  - {target: $, update: {}} # no-op; placeholder until real overlay actions are added

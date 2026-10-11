@@ -2,79 +2,166 @@ package storage_test
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
+	"encoding/hex"
+	"os"
+	"path"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"gh.tarampamp.am/webhook-tester/v2/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v3/internal/storage"
+	"gh.tarampamp.am/webhook-tester/v3/internal/testutil/assert"
 )
 
-func TestFS_Session_CreateReadDelete(t *testing.T) {
-	t.Parallel()
+func fsFactory(tb testing.TB, limit uint, timeNow func() time.Time) storage.Storage {
+	tb.Helper()
 
-	var ft = newFakeTime(t)
+	root, err := os.OpenRoot(tb.TempDir())
+	if err != nil {
+		tb.Fatalf("open root: %v", err)
+	}
 
-	testSessionCreateReadDelete(t,
-		func(sTTL time.Duration, maxReq uint32) storage.Storage {
-			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
-		},
-		func(t time.Duration) { ft.Add(t) },
-		ft.Get,
+	s := storage.NewFS(
+		tb.Context(),
+		root,
+		limit,
+		storage.WithFSTimeNow(timeNow),
+		storage.WithFSCleanupInterval(10*time.Millisecond),
 	)
+
+	tb.Cleanup(func() {
+		_ = s.Close()
+		_ = root.Close()
+	})
+
+	return s
 }
 
-func TestFS_Request_CreateReadDelete(t *testing.T) {
+func TestFS(t *testing.T) { t.Parallel(); RunSuite(t, fsFactory) } //nolint:gci
+
+func TestFS_ContextCancellationClosesStorage(t *testing.T) {
 	t.Parallel()
+	testContextCancellationClosesStorage(t, func(ctx context.Context) storage.Storage {
+		root, err := os.OpenRoot(t.TempDir())
+		assert.NoError(t, err)
+		t.Cleanup(func() { _ = root.Close() })
 
-	var ft = newFakeTime(t)
+		s := storage.NewFS(ctx, root, 10)
 
-	testRequestCreateReadDelete(t,
-		func(sTTL time.Duration, maxReq uint32) storage.Storage {
-			return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSTimeNow(ft.Get))
-		},
-		func(t time.Duration) { ft.Add(t) },
-	)
-}
+		t.Cleanup(func() { _ = s.Close() })
 
-func TestFS_Close(t *testing.T) {
-	t.Parallel()
-
-	var ctx = context.Background()
-
-	impl := storage.NewFS(t.TempDir(), time.Minute, 1)
-	require.NoError(t, impl.Close())
-	require.ErrorIs(t, impl.Close(), storage.ErrClosed) // second close
-
-	_, err := impl.NewSession(ctx, storage.Session{})
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	_, err = impl.GetSession(ctx, "foo")
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	err = impl.DeleteSession(ctx, "foo")
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	_, err = impl.NewRequest(ctx, "foo", storage.Request{})
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	_, err = impl.GetRequest(ctx, "foo", "bar")
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	_, err = impl.GetAllRequests(ctx, "foo")
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	err = impl.DeleteRequest(ctx, "foo", "bar")
-	require.ErrorIs(t, err, storage.ErrClosed)
-
-	err = impl.DeleteAllRequests(ctx, "foo")
-	require.ErrorIs(t, err, storage.ErrClosed)
-}
-
-func TestFS_RaceProvocation(t *testing.T) {
-	t.Parallel()
-
-	testRaceProvocation(t, func(sTTL time.Duration, maxReq uint32) storage.Storage {
-		return storage.NewFS(t.TempDir(), sTTL, maxReq, storage.WithFSCleanupInterval(10*time.Nanosecond))
+		return s
 	})
 }
+
+func TestFS_CleanupEvictsExpired(t *testing.T) {
+	t.Parallel()
+
+	ft := newFakeTime()
+
+	root, err := os.OpenRoot(t.TempDir())
+	assert.NoError(t, err)
+
+	defer func() { _ = root.Close() }()
+
+	s := storage.NewFS(
+		t.Context(),
+		root,
+		10,
+		storage.WithFSTimeNow(ft.Now),
+		storage.WithFSCleanupInterval(time.Microsecond),
+	)
+	defer func() { _ = s.Close() }()
+
+	_, err = s.NewSession(t.Context(), "s1", storage.SessionResponse{}, time.Second)
+	assert.NoError(t, err)
+
+	_, err = s.GetSession(t.Context(), "s1")
+	assert.NoError(t, err)
+
+	ft.Advance(2 * time.Second) // expire the session
+
+	time.Sleep(50 * time.Millisecond) // let the cleanup goroutine fire
+
+	_, err = s.GetSession(t.Context(), "s1")
+	assert.ErrorIs(t, err, storage.ErrSessionNotFound)
+}
+
+func TestFS_PersistenceSuite(t *testing.T) {
+	t.Parallel()
+
+	root, err := os.OpenRoot(t.TempDir())
+	assert.NoError(t, err)
+
+	t.Cleanup(func() { _ = root.Close() })
+
+	RunPersistenceSuite(t, func(tb testing.TB, limit uint, timeNow func() time.Time) storage.Storage {
+		s := storage.NewFS(
+			tb.Context(),
+			root,
+			limit,
+			storage.WithFSTimeNow(timeNow),
+			storage.WithFSCleanupInterval(10*time.Millisecond),
+		)
+		tb.Cleanup(func() { _ = s.Close() })
+
+		return s
+	})
+}
+
+func TestFS_ReindexRecoversRequests(t *testing.T) {
+	t.Parallel()
+
+	root, err := os.OpenRoot(t.TempDir())
+	assert.NoError(t, err)
+
+	defer func() { _ = root.Close() }()
+
+	s := storage.NewFS(t.Context(), root, 10)
+	defer func() { _ = s.Close() }()
+
+	_, err = s.NewSession(t.Context(), "s1", storage.SessionResponse{Code: 200}, storage.NoExpiration)
+	assert.NoError(t, err)
+
+	_, err = s.NewRequest(t.Context(), "s1", "r1", storage.CapturedRequest{Method: "GET"})
+	assert.NoError(t, err)
+
+	// simulate crash: remove the request index file
+	h := md5.Sum([]byte("s1")) //nolint:gosec
+	assert.NoError(t, root.Remove(path.Join(hex.EncodeToString(h[:]), "requests", "index.txt")))
+
+	// session is still accessible - GetSession reads meta.bin directly, no index needed
+	_, err = s.GetSession(t.Context(), "s1")
+	assert.NoError(t, err)
+
+	// request is not visible without the index
+	reqSq, reqSqErr := s.GetRequests(t.Context(), "s1", nil)
+	assert.NoError(t, reqSqErr)
+	assert.Seq2Count(t, 0, reqSq)
+
+	// Reindex restores the request index
+	assert.NoError(t, s.Reindex(t.Context()))
+
+	reqSq, reqSqErr = s.GetRequests(t.Context(), "s1", nil)
+	assert.NoError(t, reqSqErr)
+	assert.Seq2Count(t, 1, reqSq)
+}
+
+func TestFS_ReindexCancelledContextReturnsError(t *testing.T) {
+	t.Parallel()
+
+	root, err := os.OpenRoot(t.TempDir())
+	assert.NoError(t, err)
+
+	defer func() { _ = root.Close() }()
+
+	s := storage.NewFS(t.Context(), root, 10)
+	defer func() { _ = s.Close() }()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	assert.ErrorIs(t, s.Reindex(ctx), context.Canceled)
+}
+
+func BenchmarkFS(b *testing.B) { RunBenchmarks(b, fsFactory) }

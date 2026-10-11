@@ -6,31 +6,25 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 
-	"gh.tarampamp.am/webhook-tester/v2/internal/pubsub"
+	"gh.tarampamp.am/webhook-tester/v3/internal/pubsub"
 )
 
-func TestRedis_Publish_and_Receive(t *testing.T) {
-	t.Parallel()
+func redisFactory(tb testing.TB) pubsub.PubSub {
+	tb.Helper()
 
-	var mini = miniredis.RunT(t)
+	srv := miniredis.RunT(tb)
 
-	testPublishAndReceive(t, func() pubSub[any] {
-		return pubsub.NewRedis[any](
-			redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-			encDec,
-		)
-	})
+	client := redis.NewClient(&redis.Options{Addr: srv.Addr()})
+
+	tb.Cleanup(func() { _ = client.Close() })
+
+	ps := pubsub.NewRedis(client)
+
+	tb.Cleanup(func() { _ = ps.Close() })
+
+	return ps
 }
 
-//	func TestRedis_RaceProvocation(t *testing.T) {
-//		t.Parallel()
-//
-//		var mini = miniredis.RunT(t)
-//
-//		testRaceProvocation(t, func() pubSub[any] {
-//			return pubsub.NewRedis[any](
-//				redis.NewClient(&redis.Options{Addr: mini.Addr()}),
-//				encDec,
-//			)
-//		})
-//	}
+func TestRedis(t *testing.T) { t.Parallel(); RunSuite(t, redisFactory) }
+
+func BenchmarkRedis(b *testing.B) { RunBenchmarks(b, redisFactory) }

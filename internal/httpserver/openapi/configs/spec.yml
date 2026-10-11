@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/refs/tags/v2.8.0/configuration-schema.json
+
+package: openapi
+output: spec.gen.go
+
+generate:
+  embedded-spec: true
+
+output-options:
+  user-templates:
+    inline.tmpl: ./templates/inline.tmpl

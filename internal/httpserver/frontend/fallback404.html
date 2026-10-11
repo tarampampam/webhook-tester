@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta http-equiv="refresh" content="1"/>
+  <style>
+    :root {
+      --color-bg-primary: #fff;
+      --color-text-primary: #0e0620;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg-primary: #212121;
+        --color-text-primary: #fafafa;
+      }
+    }
+
+    html,
+    body {
+      height: 100vh;
+      background-color: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      font-family: 'Nunito Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      align-items: center;
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    h1 {
+      background-color: var(--color-text-primary);
+      color: var(--color-bg-primary);
+      padding: .3em .7em;
+    }
+
+    h2 {
+      margin: 0;
+      padding: 0;
+    }
+
+    .loader {
+      width: 1em;
+      height: 1em;
+      border-radius: 50%;
+      display: inline-block;
+      border-top: 3px solid var(--color-bg-primary);
+      border-right: 3px solid transparent;
+      box-sizing: border-box;
+      animation: rotation 1100ms linear infinite;
+      position: relative;
+      top: .1em;
+      margin-left: .3em;
+    }
+
+    @keyframes rotation {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <title>Not found</title>
+</head>
+<body>
+<h1>
+  Error 404
+  <span class="loader"></span>
+</h1>
+<h2>Not found</h2>
+</body>
+</html>

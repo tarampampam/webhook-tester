@@ -11,7 +11,7 @@ import (
 )
 
 // Generate mock distributive files, if needed.
-//go:generate go run generate_dist_stub.go
+//go:generate go run generate/dist_stub.go
 
 //go:embed dist
 var content embed.FS
@@ -29,17 +29,17 @@ func Dist(live bool) fs.FS {
 		}
 
 		return os.DirFS(path.Join(filepath.Dir(filePath), distDirName))
-	} else {
-		data, err := fs.Sub(content, distDirName)
-		if err != nil {
-			return noFs("dist directory not found")
-		}
-
-		return data
 	}
+
+	data, err := fs.Sub(content, distDirName)
+	if err != nil {
+		return noFs("dist directory not found")
+	}
+
+	return data
 }
 
-// noFs is a mock fs.FS implementation, which returns an error on Open.
+// noFs is a mock [fs.FS] implementation, which returns an error on Open.
 type noFs string
 
 var _ fs.FS = (*noFs)(nil) // verify that noFs implements fs.FS

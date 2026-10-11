@@ -9,72 +9,65 @@ type Options = NotificationOptions & {
 }
 
 type BrowserNotificationsContext = {
-  granted: boolean // is the permission granted to show notifications
-  request: () => Promise<boolean> // request the permission to show notifications
-  show: (title: string, options?: Options) => Promise<Notification | null>
+  /** Whether permission to show notifications has been granted. */
+  readonly granted: boolean
+
+  /**
+   * Request permission to show notifications. Returns true if permission is granted, false otherwise.
+   * If permission is already granted, it resolves to true immediately without prompting the user.
+   */
+  request(): Promise<boolean>
+
+  /**
+   * Show a browser notification with the given title and options. If permission is not granted, it will first
+   * request permission.
+   * Returns the Notification object if shown successfully, or null if permission was denied or an error occurred.
+   */
+  show(title: string, options?: Options): Promise<Notification | null>
 }
 
-const browserNotificationsContext = createContext<BrowserNotificationsContext>({
-  granted: false,
-  request: () => {
-    throw new Error('The BrowserNotificationsProvider is not initialized')
-  },
-  show: () => {
-    throw new Error('The BrowserNotificationsProvider is not initialized')
-  },
-})
+const ctx = createContext<BrowserNotificationsContext | null>(null)
 
 /**
+ * Provides browser notification state and helpers to the component tree. Tracks
+ * permission status reactively via the Permissions API and exposes `request` and
+ * `show` methods. Wrap your app (or the relevant subtree) with this before calling
+ * `useBrowserNotifications`.
+ *
  * @link https://developer.mozilla.org/en-US/docs/Web/API/Notification
  */
 export const BrowserNotificationsProvider = ({ children }: { children: React.JSX.Element }) => {
   const [granted, setGranted] = useState<boolean>(Notification?.permission === 'granted')
 
-  // request the permission to show notifications from the user
   const request = useCallback(async (): Promise<boolean> => {
-    // check if the permission is already granted
-    if (!granted) {
-      // ask the user for permission to show notifications
-      const got: boolean = (await Notification?.requestPermission()) === 'granted'
-
-      // update the state
-      setGranted(got)
-
-      return got
+    if (granted) {
+      return true
     }
 
-    // since the permission is already granted, return true
-    return true
+    const got = (await Notification?.requestPermission()) === 'granted'
+    setGranted(got)
+
+    return got
   }, [granted])
 
-  // show a notification
   const show = useCallback(
     async (title: string, options?: Options): Promise<Notification | null> => {
-      // check if the permission is granted and request it if not
       if (!granted && !(await request())) {
         return null
       }
 
       const n = new Notification(title, options)
 
-      if (options?.onClose) {
-        n.onclose = options.onClose
-      }
-
-      if (options?.onClick) {
-        n.onclick = options.onClick
-      }
-
-      if (options?.onError) {
-        n.onerror = options.onError
-      }
-
-      if (options?.onShow) {
-        n.onshow = options.onShow
-      }
+      n.onclose = options?.onClose || null
+      n.onclick = options?.onClick || null
+      n.onerror = options?.onError || null
+      n.onshow = options?.onShow || null
 
       if (options?.autoClose && options.autoClose > 0) {
-        setTimeout(() => n.close(), options.autoClose)
+        const t = setTimeout(() => {
+          n.close()
+          clearTimeout(t)
+        }, options.autoClose)
       }
 
       return n
@@ -82,8 +75,7 @@ export const BrowserNotificationsProvider = ({ children }: { children: React.JSX
     [granted, request]
   )
 
-  // subscribe to the permission change event and update the granted state accordingly
-  useEffect((): (() => void) => {
+  useEffect(() => {
     const handler = (e: Event) => {
       if ((e.target && 'state' in e.target) || e.target instanceof PermissionStatus) {
         setGranted((e.target.state as PermissionState) === 'granted')
@@ -92,30 +84,39 @@ export const BrowserNotificationsProvider = ({ children }: { children: React.JSX
 
     let permissionStatus: PermissionStatus | null = null
     const eventName: keyof PermissionStatusEventMap = 'change'
+    let cancelled = false
 
-    navigator?.permissions.query({ name: 'notifications' }).then((s) => {
-      permissionStatus = s // store the status for use in the cleanup function
+    navigator?.permissions
+      .query({ name: 'notifications' })
+      .then((s) => {
+        if (cancelled) {
+          return
+        }
 
-      s.addEventListener(eventName, handler)
-    })
+        permissionStatus = s // store the status for use in the cleanup function
+
+        s.addEventListener(eventName, handler)
+      })
+      .catch(() => {
+        /* notifications permission name not supported in this browser */
+      })
 
     // cleanup the event listener
-    return () => permissionStatus?.removeEventListener(eventName, handler)
+    return () => {
+      cancelled = true
+      permissionStatus?.removeEventListener(eventName, handler)
+    }
   }, [])
 
-  return (
-    <browserNotificationsContext.Provider value={{ granted, request, show }}>
-      {children}
-    </browserNotificationsContext.Provider>
-  )
+  return <ctx.Provider value={{ granted, request, show }}>{children}</ctx.Provider>
 }
 
+/** Returns browser notification state and helpers. Must be used inside BrowserNotificationsProvider. */
 export const useBrowserNotifications = (): Readonly<BrowserNotificationsContext> => {
-  const ctx = useContext(browserNotificationsContext)
-
-  if (!ctx) {
+  const context = useContext(ctx)
+  if (!context) {
     throw new Error('useBrowserNotifications must be used within a BrowserNotificationsProvider')
   }
 
-  return ctx
+  return context
 }

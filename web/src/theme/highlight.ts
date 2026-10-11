@@ -33,12 +33,52 @@ const languages: Record<
   go: { aliases: ['golang'], loader: () => go },
   java: { aliases: ['ebanina'], loader: () => java },
   python: { aliases: ['py'], loader: () => python },
+  url: { aliases: ['url', 'uri'], loader: () => urlLanguage },
 }
 
 export const initializeHighlightJs = (lib: HLJSApi): void => {
   for (const [lang, config] of Object.entries(languages)) {
     const langFn = config.loader()
 
-    ;[lang, ...config.aliases].forEach((alias) => lib.registerLanguage(alias, langFn))
+    void [lang, ...config.aliases].forEach((alias) => lib.registerLanguage(alias, langFn))
+  }
+}
+
+const urlLanguage = (): Language => {
+  const PCT = { scope: 'symbol', match: /%[0-9A-Fa-f]{2}/, relevance: 0 }
+
+  return {
+    name: 'URL',
+    aliases: ['uri', 'url'],
+    case_insensitive: true,
+    contains: [
+      { begin: [/[a-zA-Z][a-zA-Z0-9+\-.]*/, /:\/\//], beginScope: { 1: 'keyword', 2: 'comment' }, relevance: 10 },
+      {
+        begin: [/[^:@/?#\s]+/, /:/, /[^@/?#\s]+/, /@/],
+        beginScope: { 1: 'attribute', 2: 'comment', 3: 'string', 4: 'comment' },
+        relevance: 5,
+      },
+      {
+        scope: 'built_in',
+        match:
+          /(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|[a-zA-Z][a-zA-Z0-9-]*|\d{1,3}(?:\.\d{1,3}){3})(?=[:/?#]|$)/,
+        relevance: 0,
+      },
+      { begin: [/:/, /\d+/], beginScope: { 1: 'comment', 2: 'number' }, relevance: 0 },
+      { begin: [/\//, /[^/?#;]*/], beginScope: { 1: 'deletion', 2: 'string' }, contains: [PCT], relevance: 0 },
+      {
+        begin: [/;/, /[^=;/?#]+/, /=/, /[^;/?#]*/],
+        beginScope: { 1: 'comment', 2: 'attribute', 3: 'comment', 4: 'string' },
+        relevance: 0,
+      },
+      { scope: 'comment', match: /[?&]/, relevance: 0 },
+      {
+        begin: [/[^=&#[\]\s]+(?:\[[^\]]*])*/, /=/, /[^&#]*/],
+        beginScope: { 1: 'keyword', 2: 'comment', 3: 'attribute' },
+        relevance: 0,
+      },
+      { begin: [/#/, /.*/], beginScope: { 1: 'comment', 2: 'code' }, relevance: 1 },
+      PCT,
+    ],
   }
 }

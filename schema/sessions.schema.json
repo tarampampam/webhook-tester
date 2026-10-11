@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cdn.jsdelivr.net/gh/tarampampam/webhook-tester@3/schema/sessions.schema.json",
+  "title": "webhook-tester sessions bootstrap file",
+  "description": "Defines sessions to be created automatically on startup if they do not already exist",
+  "type": "object",
+  "properties": {
+    "sessions": {
+      "type": "array",
+      "description": "List of sessions to bootstrap",
+      "items": {
+        "$ref": "#/$defs/session"
+      }
+    }
+  },
+  "required": ["sessions"],
+  "$defs": {
+    "session": {
+      "type": "object",
+      "description": "A single session definition",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Session UUID. Determines the webhook URL path",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "examples": ["123e4567-e89b-12d3-a456-426614174000"]
+        },
+        "code": {
+          "type": "integer",
+          "description": "HTTP response status code returned to incoming webhook requests",
+          "minimum": 100,
+          "maximum": 599,
+          "examples": [200, 404, 503]
+        },
+        "headers": {
+          "type": "object",
+          "description": "HTTP response headers returned to incoming webhook requests",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "examples": [{"Content-Type": "application/json", "X-Custom": "value"}]
+        },
+        "body": {
+          "description": "HTTP response body. Accepts a plain string, a base64-encoded string, or an array of byte values (integers 0-255)",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Plain text or base64-encoded body. Base64 is decoded automatically; falls back to raw string if decoding fails"
+            },
+            {
+              "type": "array",
+              "description": "Raw bytes as an array of integers, each in the range [0, 255]",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            {
+              "type": "null",
+              "description": "Empty body"
+            }
+          ]
+        },
+        "delay": {
+          "description": "Artificial delay before the response is sent. Accepts a number (seconds, e.g. 1.5 = 1s500ms) or a duration string (e.g. \"500ms\", \"2s\", \"1m\")",
+          "oneOf": [
+            {
+              "type": "number",
+              "description": "Delay in seconds. Fractions are supported (e.g. 0.1 = 100ms)",
+              "minimum": 0,
+              "examples": [0.1, 1, 1.5]
+            },
+            {
+              "type": "string",
+              "description": "Duration string accepted by Go's time.ParseDuration (e.g. \"100ms\", \"5s\", \"1m30s\")",
+              "pattern": "^[0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h)(([0-9]+(\\.[0-9]+)?)(ns|us|µs|ms|s|m|h))*$",
+              "examples": ["100ms", "5s", "1m30s"]
+            }
+          ]
+        }
+      },
+      "required": ["id"]
+    }
+  }
+}

@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" sizes="48x48" type="image/png" href="/favicon-48x48.png" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta charset="utf-8"/>
+  <meta name="robots" content="nofollow,noarchive"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <link rel="icon" sizes="48x48" type="image/png" href="/favicon-48x48.png"/>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
   <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAq1BMVEUAAABIjuJKkeJKkOJ
 JkeJKkOJIj+FJkttKkOJJkONJkOJKkOBKj+FLkOJJj+FMj+RJkttKkOJKkOIVKUL///8+esFHi9s0Z6NFh9Q4cLAwX5cZMU4bNlZQlOMkSHHP4fdbmuRCg
 sywz/KMuO1moucgQGYfPGD2+v7y9/3s8/zi7fuWv+4tWIsiRGyCsusuW5DZ6PmoyvGgxfB0qeg8dbkoT3wrVIS91/RtpuiUEj5AAAAAEnRSTlMAHfjkmHd
@@ -15,29 +17,38 @@ sFiclyt8tWzKv0mUNacf4oBCoYy+NkBpdkvWIDZikdT6QyYL0ChTPSUBZWmZRgIDPGkz3uVbmFwnFQsA
 zUtdHQBx2ZeuS7sgIHJ+xDYwPPE6bTs5vCt/LCtSSRJrKxPP6FpANPHFOiuiqJSnT9paxfTANl+j4HlI4e0di4Ll8mFZpxWIN7e/kNdiBfWXylViw8dd9p
 FUVzsUAY56wRm0G11EJrmmqNXDY+0kFofCzgo1AgWoNS1cRLkGUCHZ4ufWQTSoQmQi6pdp7ssD+PMXLKAyG90V7PvP3qQfV3srEBrM6mU1PEi/mNiBnKRw
 BKktoIfuK2mjVn1+GyV/aD3t/4E1Etg4tugnY99IO3Gue85Wua7ltRjqJZOGJW2UuuV4yihuZLaW04YEUrlD3DY1slaVUTbIZl9O2XtzuXz5Q3jqyyg/F9
-47d8oP9xU+H9z5OXv78+QVhHIpeT9m1ZwAAAABJRU5ErkJggg==" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <meta name="apple-mobile-web-app-title" content="WebHook Tester" />
-  <link rel="manifest" href="/site.webmanifest" />
+47d8oP9xU+H9z5OXv78+QVhHIpeT9m1ZwAAAABJRU5ErkJggg=="/>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+  <meta name="apple-mobile-web-app-title" content="WebHook Tester"/>
+  <link rel="manifest" href="/site.webmanifest"/>
+
+  <meta name="title" content="WebHook Tester"/>
+  <meta name="description"
+        content="Test and debug webhooks instantly. Create a unique URL, send HTTP requests, and view them in real time"/>
+  <meta property="og:title" content="WebHook Tester"/>
+  <meta property="og:description"
+        content="Test and debug webhooks instantly. Create a unique URL, send HTTP requests, and view them in real time"/>
+  <meta property="og:locale" content="en_US"/>
+  <meta name="format-detection" content="telephone=no"/>
 
   <title>WebHook Tester</title>
-  <meta name="description" content="Allows you to easily test webhooks and other types of HTTP requests"/>
 
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      min-height: 100%;
-      height: 100%;
-      width: 100%;
-      background-color: #fff;
-      color: #010101;
       font-family: sans-serif;
       font-size: 16px;
+      min-height: 100vh;
+    }
+
+    body {
+      background-color: #fff;
+      color: #010101;
     }
 
     @media (prefers-color-scheme: dark) {
-      html, body {
+      body {
         background-color: #242424;
         color: #dcdcdc;
       }
@@ -46,12 +57,12 @@ BKktoIfuK2mjVn1+GyV/aD3t/4E1Etg4tugnY99IO3Gue85Wua7ltRjqJZOGJW2UuuV4yihuZLaW04YE
     body, #root {
       display: flex;
       flex-direction: column;
-      width: 100%;
     }
 
     #root {
       flex-grow: 1;
       align-items: stretch;
+      min-height: 100vh;
     }
 
     #please-wait-app-loading {
@@ -61,20 +72,18 @@ BKktoIfuK2mjVn1+GyV/aD3t/4E1Etg4tugnY99IO3Gue85Wua7ltRjqJZOGJW2UuuV4yihuZLaW04YE
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      height: 100%;
-      width: 100%;
+      min-height: 100vh;
 
       .loader {
         display: inline-block;
         opacity: 0;
-        transition: opacity;
-        animation: app-loading-spinner-fade-in ease 1300ms;
+        animation: app-loading-spinner-fade-in ease 1350ms;
         animation-iteration-count: 1;
         animation-fill-mode: forwards;
 
         &, .inner, .inner:before, .inner:after {
-          width: 100px;
-          height: 100px;
+          width: 9em;
+          height: 9em;
         }
 
         .inner {
@@ -82,6 +91,7 @@ BKktoIfuK2mjVn1+GyV/aD3t/4E1Etg4tugnY99IO3Gue85Wua7ltRjqJZOGJW2UuuV4yihuZLaW04YE
           display: flex;
           flex-direction: column;
           justify-content: center;
+          align-items: center;
           text-align: center;
 
           &:before, &:after {
@@ -105,10 +115,19 @@ BKktoIfuK2mjVn1+GyV/aD3t/4E1Etg4tugnY99IO3Gue85Wua7ltRjqJZOGJW2UuuV4yihuZLaW04YE
       100% { transform: rotate(360deg) }
     }
     @keyframes app-loading-spinner-fade-in {
-      30%  { opacity: 0 }
+      0%   { opacity: 0 }
       100% { opacity: 1 }
     }
   </style>
+  <script>
+    try {
+      // to avoid flashing light theme on dark theme when user has dark color scheme preference
+      document.documentElement.setAttribute(
+        'data-mantine-color-scheme',
+        window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      );
+    } catch {}
+  </script>
 </head>
 <body>
 <div id="root">

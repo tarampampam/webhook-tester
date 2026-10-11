@@ -1,0 +1,26 @@
+.card {
+  &.card {
+    box-shadow: var(--mantine-shadow-sm);
+    transition: box-shadow 300ms;
+  }
+}
+
+.cardDark {
+  &.card:hover {
+    --color: var(--mantine-color-teal-5);
+    box-shadow:
+      var(--mantine-shadow-sm),
+      inset 5px 0 5px -5px var(--color),
+      inset -5px 0 5px -5px var(--color);
+  }
+}
+
+.cardLight {
+  &.card:hover {
+    --color: var(--mantine-color-dark-6);
+    box-shadow:
+      var(--mantine-shadow-sm),
+      inset 5px 0 5px -5px var(--color),
+      inset -5px 0 5px -5px var(--color);
+  }
+}

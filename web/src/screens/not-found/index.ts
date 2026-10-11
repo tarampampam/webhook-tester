@@ -1,1 +1,0 @@
-export { NotFoundScreen } from './screen'

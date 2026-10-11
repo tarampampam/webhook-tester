@@ -1,2 +1,1 @@
-export { Database } from './database'
-export * from './tables'
+export { Database, type SessionInput, type RequestInput } from './database'
