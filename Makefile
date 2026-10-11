@@ -41,6 +41,7 @@ up: install ## Start the application in development mode
 		--max-requests=16 \
 		--storage-driver=fs \
 		--fs-storage-dir=./tmp/data \
+		--max-request-body-size=16384 \
 		--auto-create-sessions & BACKEND_PID=$$!; \
 	DEV_SERVER_PROXY_TO='http://localhost:8081' npm run --prefix ./web serve -- --port 8080 & FRONTEND_PID=$$!; \
 	trap 'kill $$BACKEND_PID $$FRONTEND_PID' INT TERM EXIT; \

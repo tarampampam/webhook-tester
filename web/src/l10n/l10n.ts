@@ -48,7 +48,6 @@ export const KEY = {
   noHeaders: 'noHeaders',
   webhookTesterUsedFor: 'webhookTesterUsedFor',
   noNeedToRefresh: 'noNeedToRefresh',
-  webhookWithCustomStatus: 'webhookWithCustomStatus',
   sessionWillExpireAfter: 'sessionWillExpireAfter',
   maxRequestBodySizeLimit: 'maxRequestBodySizeLimit',
   maxRequestsLimit: 'maxRequestsLimit',
@@ -128,8 +127,6 @@ const locales = {
     [KEY.noHeaders]: 'none',
     [KEY.webhookTesterUsedFor]: 'Webhook Tester lets you easily test webhooks and other HTTP requests',
     [KEY.noNeedToRefresh]: 'Any requests sent to this URL are instantly logged here - no need to refresh!',
-    [KEY.webhookWithCustomStatus]:
-      'To specify a status code in the response, append it to the URL, like {url} - this way, the URL will respond with a {code} status',
     [KEY.sessionWillExpireAfter]: 'Requests and tokens for this URL expire after {duration} of inactivity',
     [KEY.maxRequestBodySizeLimit]: 'The maximum size for incoming requests is {size}',
     [KEY.maxRequestsLimit]: 'The maximum number of requests per session is {limit}',
@@ -179,14 +176,12 @@ const locales = {
     [KEY.noDelay]: 'нет',
     [KEY.noHeaders]: 'нет',
     [KEY.webhookTesterUsedFor]:
-      'При помощи Webhook Tester вы можете легко и удобно тестировать вебхуки и любые другие HTTP-запросы',
+      'При помощи Webhook Tester вы можете легко и удобно тестировать любые другие HTTP-запросы',
     [KEY.noNeedToRefresh]:
       'Любые запросы, отправленные на этот URL - мгновенно отобразятся здесь, даже без обновления страницы!',
-    [KEY.webhookWithCustomStatus]:
-      'Чтобы указать код ответа в ответе, добавьте его к URL, например {url} - таким образом, URL будет возвращать {code} код ответа',
     [KEY.sessionWillExpireAfter]: 'Все сохраненные запросы, как и сам URL будут удалены через {duration} бездействия',
     [KEY.maxRequestBodySizeLimit]: 'Максимальный размер входящих запросов составляет {size}',
-    [KEY.maxRequestsLimit]: 'Хранимое количество запросов в одной сессии ограничено {limit}',
+    [KEY.maxRequestsLimit]: 'Максимальное количество хранимых запросов равно {limit}',
   },
 } satisfies Partial<Readonly<Record<LangCode, Readonly<Record<KEY, string>>>>>
 

@@ -1,4 +1,5 @@
-import { Grid, Loader, Stack, Text } from '@mantine/core'
+import { Blockquote, Grid, List, Loader, Stack, Text } from '@mantine/core'
+import { IconInfoHexagon } from '@tabler/icons-react'
 import React from 'react'
 import { useActiveSessionID } from '~/routing'
 import { humanizeBytes, L10nKey as k, useAppConfig, useL10n, useSessions, useWebhookURL } from '~/shared'
@@ -6,8 +7,6 @@ import { CodeSnippets } from './components/code-snippets'
 import { SessionProps } from './components/session-props'
 import { ShellExamples } from './components/shell-examples'
 import { WebhookURL } from './components/webhook-url'
-
-const CUSTOM_STATUS_CODE = 404
 
 export const SessionScreen = (): React.JSX.Element => {
   const { webhookURL } = useWebhookURL()
@@ -17,11 +16,8 @@ export const SessionScreen = (): React.JSX.Element => {
   const { t, formatDuration } = useL10n()
 
   const session = sID && sessions.has(sID) ? sessions.get(sID) : null
-  const webhookURLWithCustomStatus = webhookURL
-    ? webhookURL.toString().replace(/\/$/, '') + `/${CUSTOM_STATUS_CODE}`
-    : null
   const sessionTTL = config?.limits.sessionTTL ? formatDuration(config.limits.sessionTTL) : null
-  const maxRequestBodySize = config?.limits.maxRequestBodySize ? humanizeBytes(config.limits.maxRequestBodySize) : null
+  const maxBodySize = config?.limits.maxRequestBodySize ? humanizeBytes(config.limits.maxRequestBodySize) : null
   const maxRequests = config?.limits.maxRequests ?? null
 
   return (
@@ -30,17 +26,22 @@ export const SessionScreen = (): React.JSX.Element => {
         {(webhookURL && (
           <Stack gap="xs">
             <Text>{t(k.webhookTesterUsedFor)}.</Text>
-
-            <Text fw="bolder">{t(k.yourUniqueWebhookUrl)}:</Text>
+            <Text fw="bolder" span>
+              {t(k.yourUniqueWebhookUrl)}:
+            </Text>
             <WebhookURL url={webhookURL} />
 
-            <Text my="md">{t(k.noNeedToRefresh)}</Text>
-            <Text my="md">
-              {t(k.webhookWithCustomStatus, { url: webhookURLWithCustomStatus, code: CUSTOM_STATUS_CODE })}.
-            </Text>
-            {sessionTTL && <Text my="md">{t(k.sessionWillExpireAfter, { duration: sessionTTL })}.</Text>}
-            {maxRequestBodySize && <Text my="md">{t(k.maxRequestBodySizeLimit, { size: maxRequestBodySize })}.</Text>}
-            {maxRequests && <Text my="md">{t(k.maxRequestsLimit, { limit: maxRequests })}.</Text>}
+            <Text>{t(k.noNeedToRefresh)}</Text>
+
+            {(sessionTTL || maxBodySize || maxRequests) && (
+              <Blockquote color="yellow" p="md" m="md" icon={<IconInfoHexagon size="1em" stroke={1.5} />} iconSize={30}>
+                <List fz="sm">
+                  {sessionTTL && <List.Item>{t(k.sessionWillExpireAfter, { duration: sessionTTL })}</List.Item>}
+                  {maxBodySize && <List.Item>{t(k.maxRequestBodySizeLimit, { size: maxBodySize })}</List.Item>}
+                  {maxRequests && <List.Item>{t(k.maxRequestsLimit, { limit: maxRequests })}</List.Item>}
+                </List>
+              </Blockquote>
+            )}
 
             <Text fz="0.85em">{t(k.sendSimpleRequestInShell)}:</Text>
             <ShellExamples url={webhookURL} />
